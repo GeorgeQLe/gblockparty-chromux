@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="en"
+      data-visual-tier="document"
+      data-interrogation-status="review"
+      data-interrogation-round="3"
+      data-interrogation-gate="coverage-checkpoint">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chromux — Idea Scope Brief · Coverage Checkpoint (Round 3)</title>
+<style>
+  :root{
+    --bg:#0d1117; --surface:#161b22; --border:#30363d; --text:#c9d1d9;
+    --text-muted:#8b949e; --accent:#58a6ff; --green:#3fb950; --red:#f85149;
+    --orange:#d29922; --purple:#bc8cff; --qbg:#1c2333;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--text);margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.55;}
+  main{max-width:960px;margin:0 auto;padding:2rem 1.25rem 6rem;
+    max-width:100%;overflow-wrap:break-word;}
+  @media(min-width:961px){main{max-width:960px}}
+  h1{font-size:1.7rem;margin:.2rem 0 .4rem}
+  h2{color:var(--accent);font-size:1.25rem;margin:2.2rem 0 .6rem;
+     border-bottom:1px solid var(--border);padding-bottom:.3rem}
+  h3{color:var(--purple);font-size:1.05rem;margin:1.4rem 0 .4rem}
+  a{color:var(--accent)}
+  .sub{color:var(--text-muted);margin:.2rem 0 1rem}
+  .toc{background:var(--surface);border:1px solid var(--border);border-radius:8px;
+    padding:1rem 1.25rem;margin:1.5rem 0}
+  .toc ul{margin:.3rem 0 0;padding-left:1.2rem}
+  .toc li{margin:.2rem 0}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:8px;
+    padding:1rem 1.25rem;margin:1rem 0}
+  .card.identity{border-left:3px solid var(--accent)}
+  .card.gatebanner{border-left:3px solid var(--purple)}
+  .kv{margin:.3rem 0}
+  .kv b{color:#fff}
+  .tag{display:inline-block;font-size:.72rem;font-weight:600;letter-spacing:.02em;
+    padding:.12rem .5rem;border-radius:999px;border:1px solid var(--border);
+    color:var(--text-muted);white-space:nowrap;vertical-align:middle}
+  .tag.ok{color:var(--green);border-color:var(--green)}
+  .tag.na{color:var(--text-muted);border-color:var(--border)}
+  .tag.risk{color:var(--orange);border-color:var(--orange)}
+  .tag.out{color:var(--red);border-color:var(--red)}
+  table{width:100%;border-collapse:collapse;font-size:.95rem}
+  .scroll{overflow-x:auto}
+  th,td{border:1px solid var(--border);padding:.6rem .7rem;text-align:left;vertical-align:top}
+  th{background:#11161d;color:var(--text-muted);font-weight:600}
+  td .area{white-space:nowrap;color:#fff;font-weight:600}
+  ul.tight{margin:.3rem 0;padding-left:1.15rem}
+  ul.tight li{margin:.3rem 0}
+  .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));gap:1rem;margin:1rem 0}
+  .col h3{margin-top:.2rem}
+  textarea,input[type=text]{width:100%;background:#0b0f14;color:var(--text);
+    border:1px solid var(--border);border-radius:6px;padding:.6rem .7rem;
+    font:inherit;min-height:44px}
+  textarea{min-height:80px;resize:vertical}
+  .q{background:var(--qbg);border:1px solid var(--border);border-left:3px solid var(--purple);
+    border-radius:8px;padding:1rem 1.15rem;margin:1.1rem 0}
+  .q .qhead{display:flex;justify-content:space-between;gap:.75rem;align-items:flex-start;flex-wrap:wrap}
+  .q h4{margin:.1rem 0 .5rem;font-size:1rem;color:var(--text)}
+  .rec{font-size:.9rem;color:var(--text-muted);background:#0b0f14;border:1px dashed var(--border);
+    border-radius:6px;padding:.6rem .7rem;margin:.5rem 0}
+  .rec b{color:var(--text)}
+  .conf{font-size:.72rem;font-weight:600;padding:.12rem .5rem;border-radius:999px;border:1px solid}
+  .conf-high{color:var(--green);border-color:var(--green)}
+  .conf-medium{color:var(--orange);border-color:var(--orange)}
+  .conf-low{color:var(--red);border-color:var(--red)}
+  .btnrow{display:flex;gap:.6rem;flex-wrap:wrap;margin:.6rem 0 .2rem}
+  button{font:inherit;cursor:pointer;background:#21262d;color:var(--text);
+    border:1px solid var(--border);border-radius:6px;padding:.55rem 1rem;min-height:44px}
+  button:hover{border-color:var(--accent)}
+  button.primary{background:var(--accent);color:#08131f;border-color:var(--accent);font-weight:600}
+  .status{font-size:.82rem;color:var(--text-muted);margin-left:.2rem}
+  .navpager{font-size:.82rem;color:var(--text-muted);margin-top:.6rem;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+  .navpager button{padding:.3rem .7rem;min-height:36px}
+  .flash{animation:flash 1.2s ease}
+  @keyframes flash{0%{box-shadow:0 0 0 2px var(--accent)}100%{box-shadow:none}}
+  pre{background:#0b0f14;border:1px solid var(--border);border-radius:8px;padding:1rem;
+    overflow:auto;font-size:.85rem;white-space:pre;max-height:60vh}
+  .muted{color:var(--text-muted)}
+  code{background:#0b0f14;border:1px solid var(--border);border-radius:4px;padding:.05rem .35rem}
+  @media(max-width:560px){h1{font-size:1.4rem}}
+</style>
+</head>
+<body>
+<main>
+  <h1>Chromux — Idea Scope Brief</h1>
+  <p class="sub">Stage-zero interrogation · <b>Round 3 — Coverage Checkpoint</b> · gate: <code>coverage-checkpoint</code></p>
+  <p>Rounds 1 and 2 are compiled and consumed. The confidence gate <b>passes</b>: every interview area is
+  covered, so this is the loop's <b>exit gate</b> — not another round of questions. Below is everything we
+  established, the resolved concept identity and where I'll write the brief, what's in v1 vs deferred, and the
+  riskiest unknowns I'll carry into research. <b>Nothing canonical is written yet.</b> Confirm completeness (or
+  flag a gap) and I'll build the alignment preview page for the full idea brief; if you flag a gap, this becomes
+  a new round instead. Compile → Copy YAML → paste back.</p>
+
+  <nav class="toc" aria-label="Contents">
+    <b>Contents</b>
+    <ul>
+      <li><a href="#identity">1 · Resolved concept identity &amp; output paths</a></li>
+      <li><a href="#coverage">2 · Coverage map — every interview area</a></li>
+      <li><a href="#scope">3 · v1 scope vs deferred</a></li>
+      <li><a href="#unknowns">4 · Riskiest unknowns carried forward</a></li>
+      <li><a href="#next">5 · What happens next (preview, non-gating)</a></li>
+      <li><a href="#gate">6 · Coverage gate — confirm or flag gaps</a></li>
+      <li><a href="#compile">7 · Compile Responses</a></li>
+    </ul>
+  </nav>
+
+  <h2 id="identity">1 · Resolved concept identity &amp; output paths</h2>
+  <div class="card identity">
+    <p class="kv"><b>Concept:</b> Chromux — a desktop cockpit (cmux fork) that co-locates parallel
+      Codex/Claude Code sessions with an embedded Chromium browser pane, auto-opens/refreshes each session's
+      previews, and captures browser context back into a one-click YAML payload for the paired agent.</p>
+    <p class="kv"><b>Normalized slug:</b> <code>chromux</code> (project-level, unambiguous — matches the repo).</p>
+    <p class="kv"><b>Mode:</b> flat single-product research (no product-path split).</p>
+    <p class="kv"><b>Planned output on approval:</b>
+      <code>research/idea-brief.md</code> + <code>research/idea-brief-interview.md</code>.</p>
+    <p class="kv muted">The GBlockParty managed-infra / monetization angle is recorded <i>inside</i> the brief as
+      a deferred <code>revisit_candidate</code>, not as a separate product path. Flag row G1 below if you'd
+      rather it become its own tracked product path now.</p>
+  </div>
+
+  <h2 id="coverage">2 · Coverage map</h2>
+  <p class="muted">Every interview area the confidence gate must cover, with what we settled. Confirm this is
+    complete in the gate below, or flag any row as wrong/missing.</p>
+  <div class="scroll">
+  <table>
+    <thead><tr><th style="width:170px">Interview area</th><th>What we established</th><th style="width:110px">Status</th></tr></thead>
+    <tbody>
+      <tr><td><span class="area">Concept &amp; slug</span></td>
+        <td>Chromux; desktop devtool cockpit; slug <code>chromux</code>. (R1·Q1)</td>
+        <td><span class="tag ok">covered</span></td></tr>
+      <tr><td><span class="area">Problem</span></td>
+        <td>Reviewing agent-generated localhost apps and local HTML previews forces constant alt-tabbing away
+          from parallel agent sessions; pointing an agent back at what's broken on the page is manual
+          copy-paste. (R1·Q1/Q4)</td>
+        <td><span class="tag ok">covered</span></td></tr>
+      <tr><td><span class="area">Beneficiary / user</span></td>
+        <td>Solo dev (you) running multiple parallel coding-agent sessions; built in the open, other such
+          agent-driven devs later. (R1·Q5)</td>
+        <td><span class="tag ok">covered</span></td></tr>
+      <tr><td><span class="area">Product category</span></td>
+        <td>Desktop devtool — a cmux fork with an embedded Chromium browser pane plus a browser→agent capture
+          channel. Chromium/VSCode kept only as fallback bases. (R1·Q2)</td>
+        <td><span class="tag ok">covered</span></td></tr>
+      <tr><td><span class="area">Value wedge</span></td>
+        <td>Automation, not just co-location: auto-detect &amp; open/refresh each session's <code>localhost</code>
+          URL, open local <code>file://</code> previews, and one-click capture (console logs + highlighted-element
+          DOM/selector + screenshot + URL) → payload to the paired agent. Co-location alone is table stakes.
+          (R1·Q4, R2·Q1)</td>
+        <td><span class="tag ok">covered</span></td></tr>
+      <tr><td><span class="area">Constraints</span></td>
+        <td>Solo builder; macOS laptop first; Codex + Claude Code CLIs stay unchanged; limited screen real
+          estate. (R1·Q6)</td>
+        <td><span class="tag ok">covered</span></td></tr>
+      <tr><td><span class="area">Non-goals</span></td>
+        <td>Not a general-purpose browser; not a new agent runtime; not a full IDE/VSCode replacement; no
+          team/multiplayer features. (R1·Q6)</td>
+        <td><span class="tag ok">covered</span></td></tr>
+      <tr><td><span class="area">Interaction model</span></td>
+        <td>Split-pane per session (unified-sidebar toggle later); explicit 1:1 session↔pane pairing with a
+          picker; review queue that never hot-swaps the focused pane. (R1·Q3, R2·Q3/Q4)</td>
+        <td><span class="tag ok">covered</span></td></tr>
+      <tr><td><span class="area">Riskiest unknowns</span></td>
+        <td>cmux's real stack/extensibility for a first-class embedded browser; the payload→live-session
+          handoff mechanism. Both scoped with defaults, not yet validated. (R2·Q2, see §4)</td>
+        <td><span class="tag risk">covered as risk</span></td></tr>
+      <tr><td><span class="area">Market structure</span></td>
+        <td>Single-sided personal tool. GBlockParty managed-infra / lead-gen monetization is a deferred
+          revisit_candidate, not a v1 side — no multi-sided handoff applies. (R1·Q5, R2·B5)</td>
+        <td><span class="tag na">covered · N/A multi-sided</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2 id="scope">3 · v1 scope vs deferred</h2>
+  <div class="cols">
+    <div class="col card">
+      <h3>In v1 <span class="tag ok">daily driver</span></h3>
+      <ul class="tight">
+        <li>cmux fork, <b>split-pane per agent session</b></li>
+        <li><b>Auto-open/refresh</b> each session's <code>localhost:PORT</code> preview</li>
+        <li>Open local <b><code>file://</code> HTML</b> previews (no dev server)</li>
+        <li><b>Review queue</b> — new previews badge/queue, never hot-swap the focused pane</li>
+        <li>One <b>"Send to agent"</b> button → <code>claude -p</code> with console logs + highlighted-element
+          DOM/selector + screenshot + current URL</li>
+      </ul>
+    </div>
+    <div class="col card">
+      <h3>Deferred <span class="tag out">out of v1</span></h3>
+      <ul class="tight">
+        <li>Live-session <b>stdin injection</b> into the paired agent (fast follow after <code>claude -p</code>)</li>
+        <li>Full <b>network/telemetry</b> capture (perf entries, request waterfall)</li>
+        <li><b>Unified-sidebar</b> layout toggle</li>
+        <li><b>Chromium/VSCode</b> fallback bases (only if cmux blocks a first-class browser pane)</li>
+        <li><b>Productization</b> / OSS release / GBlockParty monetization</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2 id="unknowns">4 · Riskiest unknowns carried forward</h2>
+  <p class="muted">Pre-research — these are named, not solved. They become the first things the brief flags to
+    validate before or during build.</p>
+  <ul class="tight">
+    <li><span class="tag risk">unknown</span> <b>cmux extensibility:</b> can cmux's Electron stack host a
+      first-class embedded browser pane (BrowserView/webview) with the console/DOM/screenshot capture hooks?
+      Validate against actual cmux source; Chromium or VSCode are the fallback bases if not.</li>
+    <li><span class="tag risk">unknown</span> <b>Payload → live session handoff:</b> <code>claude -p</code> ships
+      first (lowest-risk); reliably injecting a payload into a <i>live</i> PTY agent session (stdin) is the real
+      open technical question, so it's deferred to a fast follow.</li>
+    <li><span class="tag risk">unknown</span> <b>localhost auto-detection:</b> how Chromux reliably learns each
+      session's emitted dev-server URL (log scraping, port watching, or a convention) to drive auto-open/refresh.</li>
+  </ul>
+
+  <h2 id="next">5 · What happens next <span class="tag na">preview · non-gating</span></h2>
+  <div class="card">
+    <p>On your confirmation I move to <b>stage two</b>: build the alignment preview page
+      <code>alignment/idea-scope-brief-chromux.html</code> rendering the full idea brief (Summary, Problem,
+      Beneficiary, Category, Value Wedge, Constraints, Non-Goals, Unknowns, Discovery Readiness, Deck Fit, Next
+      Steps) for your approval. <b>Only your approval of that page authorizes writing the canonical
+      <code>research/idea-brief.md</code>.</b></p>
+    <p class="muted">Early routing lean (finalized in the brief, not decided here): this is a deliberate
+      developer-tool build, so <code>devtool-afps</code> is the likely deck. Because it's a personal daily-driver
+      first, classic customer-discovery may be deferred in favor of building and dogfooding — the brief will make
+      that call explicitly.</p>
+  </div>
+
+  <h2 id="gate">6 · Coverage gate — confirm or flag gaps</h2>
+  <p class="muted">This is the exit gate. Confirm coverage is complete, or flag what's missing/wrong — flagging a
+    gap turns this into a new round instead of advancing. Each question has a recommended default and a
+    confidence badge: <b>Apply recommended</b> to accept, edit freely, or <b>Need clarification</b> to bounce it back.</p>
+  <div id="questions"><!-- questions injected --></div>
+
+  <h2 id="compile">7 · Compile Responses</h2>
+  <p>Answer the gate questions, then compile and copy the YAML and paste it back into the chat.</p>
+  <div class="btnrow">
+    <button class="primary" id="compile">Compile Responses</button>
+    <button id="copy">Copy YAML</button>
+    <span class="status" id="copystatus"></span>
+  </div>
+  <div id="navmount"></div>
+  <pre id="yaml" data-answer-sidecar="research/_working/interrogation-idea-scope-brief-r3.yaml"
+       aria-live="polite">Click "Compile Responses" to generate the YAML.</pre>
+</main>
+
+<script>
+/* ---------- content model ---------- */
+const QUESTIONS = [
+  {id:"G1",q:"Coverage completeness — is everything above correctly captured, or is a gap still open before I write the brief?",
+   conf:"high",
+   rec:"Recommend <b>confirmed complete — advance to the alignment preview</b>. Rounds 1–2 settled concept, problem, beneficiary, category, wedge, constraints, non-goals, interaction model, unknowns, and market structure; nothing reads as missing. If a gap exists, name it here and I'll open a new round instead of advancing. Also flag here if you want the GBlockParty angle promoted to its own tracked product path now rather than a deferred note in the brief.",
+   agent:"Coverage is complete. Advance to the stage-two alignment preview and render the full idea brief for approval. Keep GBlockParty/monetization as a deferred revisit_candidate inside the brief, not a separate product path."},
+  {id:"G2",q:"Identity & output paths — is `chromux` the right slug and are `research/idea-brief.md` + `research/idea-brief-interview.md` the right destinations?",
+   conf:"high",
+   rec:"Recommend <b>accept slug `chromux` and flat output paths</b> (<code>research/idea-brief.md</code>, <code>research/idea-brief-interview.md</code>). It's one unambiguous project-level concept matching the repo, so flat single-product mode fits and no product-path split is needed. Override if you want a different slug or a <code>research/{slug}/</code> nested path.",
+   agent:"Slug `chromux` and flat output paths research/idea-brief.md + research/idea-brief-interview.md are correct. One unambiguous project-level concept, flat single-product mode, no product-path split."},
+];
+
+/* ---------- render ---------- */
+const esc = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const qroot=document.getElementById("questions");
+QUESTIONS.forEach(q=>{
+  const div=document.createElement("div");
+  div.className="q";div.dataset.openQuestion=q.id;
+  div.innerHTML=`
+    <div class="qhead">
+      <h4>${q.id} · ${esc(q.q)}</h4>
+      <span class="conf conf-${q.conf}" data-agent-confidence="${q.conf}">agent confidence: ${q.conf}</span>
+    </div>
+    <div class="rec" data-recommended-answer>${q.rec}</div>
+    <span data-agent-recommended-answer hidden>${esc(q.agent)}</span>
+    <textarea data-open-input data-qid="${q.id}" placeholder="Your answer…"></textarea>
+    <div class="btnrow">
+      <button type="button" data-apply-recommended>Apply recommended</button>
+      <button type="button" data-clarify-copy>Need clarification</button>
+      <span class="status" data-apply-recommended-status></span>
+    </div>`;
+  qroot.appendChild(div);
+});
+
+/* ---------- apply recommended ---------- */
+document.addEventListener("click",e=>{
+  const btn=e.target.closest("[data-apply-recommended]");
+  if(!btn)return;
+  const block=btn.closest("[data-open-question]");
+  const src=block.querySelector("[data-agent-recommended-answer]")||block.querySelector("[data-recommended-answer]");
+  const rec=src?(src.textContent||"").trim():"";
+  const input=block.querySelector('textarea[data-open-input],input[type="text"][data-open-input]');
+  if(!input||!rec)return;
+  if(input.value.trim()&&!window.confirm("Replace your current answer with the recommended answer?"))return;
+  input.value=rec;
+  input.dispatchEvent(new Event("input",{bubbles:true}));
+  input.dispatchEvent(new Event("change",{bubbles:true}));
+  const st=block.querySelector("[data-apply-recommended-status]");
+  if(st)st.textContent="Recommended answer applied.";
+});
+
+/* ---------- clarify copy ---------- */
+async function copyText(text){
+  try{await navigator.clipboard.writeText(text);return "Copied";}
+  catch{const ta=document.createElement("textarea");ta.value=text;document.body.appendChild(ta);
+    ta.focus();ta.select();document.body.removeChild(ta);return "Select text to copy";}
+}
+document.addEventListener("click",async e=>{
+  const btn=e.target.closest("[data-clarify-copy]");
+  if(!btn)return;
+  const block=btn.closest("[data-open-question]");
+  const qtext=block.querySelector("h4").textContent.replace(/^\S+\s·\s/,"");
+  const payload=`Question: "${qtext}"\nI need clarification on what this is asking before I can answer.`;
+  const st=block.querySelector("[data-apply-recommended-status]");
+  const res=await copyText(payload);
+  if(st)st.textContent=res==="Copied"?"Clarification request copied.":res;
+});
+
+/* ---------- unanswered-question navigator ---------- */
+(function(){
+  const blocks=[...document.querySelectorAll("[data-open-question]")];
+  const answered=b=>{const i=b.querySelector("[data-open-input]");return i&&i.value.trim().length>0;};
+  const mk=()=>{
+    const n=blocks.filter(b=>!answered(b)).length;
+    return `<div class="navpager"><button type="button" data-nav="prev">‹ prev unanswered</button>
+      <span data-nav-count>${n?n+" left":"All answered"}</span>
+      <button type="button" data-nav="next">next unanswered ›</button></div>`;
+  };
+  const mount=document.getElementById("navmount");
+  mount.innerHTML=mk();
+  let idx=-1;
+  function jump(dir){
+    const un=blocks.filter(b=>!answered(b));
+    if(!un.length)return;
+    idx=(idx+dir+un.length)%un.length;
+    const t=un[((idx%un.length)+un.length)%un.length];
+    t.scrollIntoView({behavior:"smooth",block:"center"});
+    t.classList.add("flash");setTimeout(()=>t.classList.remove("flash"),1200);
+  }
+  document.addEventListener("click",e=>{
+    const b=e.target.closest("[data-nav]");if(!b)return;
+    jump(b.dataset.nav==="next"?1:-1);
+  });
+  document.addEventListener("input",()=>{
+    const n=blocks.filter(b=>!answered(b)).length;
+    document.querySelectorAll("[data-nav-count]").forEach(el=>el.textContent=n?n+" left":"All answered");
+  });
+})();
+
+/* ---------- compile YAML ---------- */
+const yq = s => JSON.stringify(s==null?"":String(s)); // JSON string == valid YAML double-quoted scalar
+function compile(){
+  const answers=QUESTIONS.map(q=>{
+    const val=(document.querySelector(`textarea[data-qid="${q.id}"]`).value||"").trim();
+    return {id:q.id,question:q.q,answer:val,agent:q.agent,conf:q.conf};
+  });
+  const allAnswered=answers.every(a=>a.answer.length>0);
+  const round_status=allAnswered?"complete":"partial";
+
+  let y="";
+  y+="# Invoke with: /idea-scope-brief\n";
+  y+='command: "/idea-scope-brief"\n';
+  y+="interrogation_page: interrogation/idea-scope-brief-r3-chromux.html\n";
+  y+="round: 3\n";
+  y+="round_status: "+round_status+"\n";
+  y+="gate_state: coverage-checkpoint\n";
+  y+="agent_routing:\n";
+  y+="  workflow: interrogation-loop\n";
+  y+="  parent_skill: idea-scope-brief\n";
+  y+='  command: "/idea-scope-brief"\n';
+  y+="  gate_owner: parent-orchestrator\n";
+  y+="  gate_type: interrogation-round\n";
+  y+="  round: 3\n";
+  y+="  answer_sidecar: research/_working/interrogation-idea-scope-brief-r3.yaml\n";
+  y+="  next_resolution: parent-resolves-from-yaml-and-filesystem\n";
+  y+="assumptions: []\n";
+  y+="open_answers:\n";
+  answers.forEach(a=>{
+    y+="  - id: "+a.id+"\n";
+    y+="    question: "+yq(a.question)+"\n";
+    y+="    answer: "+yq(a.answer)+"\n";
+    y+="    agent_recommended_answer: "+yq(a.agent)+"\n";
+    y+="    agent_confidence: "+a.conf+"\n";
+  });
+  y+="gate_answers:\n";
+  y+="  - id: coverage-checkpoint\n";
+  y+="    gate_type: coverage-checkpoint\n";
+  y+="    status: "+(allAnswered?"answered":"incomplete")+"\n";
+  document.getElementById("yaml").textContent=y;
+  return y;
+}
+document.getElementById("compile").addEventListener("click",compile);
+document.getElementById("copy").addEventListener("click",async()=>{
+  const y=compile();
+  const res=await copyText(y);
+  document.getElementById("copystatus").textContent=
+    res==="Copied"?"YAML copied — paste it back into the chat.":res;
+});
+</script>
+</body>
+</html>

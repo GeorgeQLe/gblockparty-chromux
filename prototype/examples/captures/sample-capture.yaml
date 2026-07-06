@@ -1,0 +1,47 @@
+schema_version: 1
+captured_at: '2026-07-06T05:32:59.312Z'
+session:
+  id: s1
+  name: e2e
+  project_path: /Users/example/project
+page:
+  url: file:///tmp/chromux-e2e.html
+  title: Chromux E2E Fixture
+selection:
+  selector: '#broken-cta'
+  outer_html: <button id="broken-cta" class="cta primary">Broken CTA</button>
+  truncated: false
+console:
+  total_captured: 3
+  included: 3
+  truncated: false
+  entries:
+    - ts: '2026-07-06T05:32:53.285Z'
+      level: info
+      message: fixture page loaded
+    - ts: '2026-07-06T05:32:53.285Z'
+      level: error
+      message: 'fixture synthetic error: cart.items is undefined'
+    - ts: '2026-07-06T05:32:53.299Z'
+      level: warn
+      message: >-
+        %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has
+        either no Content Security
+          Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+          this app to unnecessary security risks.
+
+        For more information and help, consult
+
+        https://electronjs.org/docs/tutorial/security.
+
+        This warning will not show up
+
+        once the app is packaged.
+screenshot:
+  path: /Users/example/.chromux/captures/2026-07-06_05-32-59/screenshot.png
+  mode: visible-viewport
+delivery:
+  adapter: claude -p
+  target: e2e
+  target_cwd: /Users/example/project
+notes: 'e2e: verify file-drop path'

@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en"
+      data-visual-tier="document"
+      data-interrogation-status="review"
+      data-interrogation-round="1"
+      data-interrogation-gate="continue">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chromux — Idea Scope Brief · Interrogation Round 1</title>
+<style>
+  :root{
+    --bg:#0d1117; --surface:#161b22; --border:#30363d; --text:#c9d1d9;
+    --text-muted:#8b949e; --accent:#58a6ff; --green:#3fb950; --red:#f85149;
+    --orange:#d29922; --purple:#bc8cff; --qbg:#1c2333;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--text);margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.55;}
+  main{max-width:960px;margin:0 auto;padding:2rem 1.25rem 6rem;
+    max-width:100%;overflow-wrap:break-word;}
+  @media(min-width:961px){main{max-width:960px}}
+  h1{font-size:1.7rem;margin:.2rem 0 .4rem}
+  h2{color:var(--accent);font-size:1.25rem;margin:2.2rem 0 .6rem;
+     border-bottom:1px solid var(--border);padding-bottom:.3rem}
+  h3{color:var(--purple);font-size:1.05rem;margin:1.4rem 0 .4rem}
+  a{color:var(--accent)}
+  .sub{color:var(--text-muted);margin:.2rem 0 1rem}
+  .toc{background:var(--surface);border:1px solid var(--border);border-radius:8px;
+    padding:1rem 1.25rem;margin:1.5rem 0}
+  .toc ul{margin:.3rem 0 0;padding-left:1.2rem}
+  .toc li{margin:.2rem 0}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:8px;
+    padding:1rem 1.25rem;margin:1rem 0}
+  .tag{display:inline-block;font-size:.72rem;font-weight:600;letter-spacing:.02em;
+    padding:.12rem .5rem;border-radius:999px;border:1px solid var(--border);
+    color:var(--text-muted);white-space:nowrap;vertical-align:middle}
+  .tag.prompt{color:var(--green);border-color:var(--green)}
+  .tag.repo{color:var(--accent);border-color:var(--accent)}
+  .tag.inferred{color:var(--orange);border-color:var(--orange)}
+  table{width:100%;border-collapse:collapse;font-size:.95rem}
+  .scroll{overflow-x:auto}
+  th,td{border:1px solid var(--border);padding:.6rem .7rem;text-align:left;vertical-align:top}
+  th{background:#11161d;color:var(--text-muted);font-weight:600}
+  .amrow td:first-child{white-space:nowrap;color:var(--text-muted);font-weight:600}
+  .decide{display:flex;gap:.9rem;flex-wrap:wrap;margin:.2rem 0}
+  .decide label{display:inline-flex;align-items:center;gap:.35rem;
+    padding:.4rem .2rem;min-height:44px;cursor:pointer}
+  .correction{margin-top:.5rem;width:100%;display:none}
+  .correction.show{display:block}
+  textarea,input[type=text]{width:100%;background:#0b0f14;color:var(--text);
+    border:1px solid var(--border);border-radius:6px;padding:.6rem .7rem;
+    font:inherit;min-height:44px}
+  textarea{min-height:80px;resize:vertical}
+  .q{background:var(--qbg);border:1px solid var(--border);border-left:3px solid var(--purple);
+    border-radius:8px;padding:1rem 1.15rem;margin:1.1rem 0}
+  .q .qhead{display:flex;justify-content:space-between;gap:.75rem;align-items:flex-start;flex-wrap:wrap}
+  .q h4{margin:.1rem 0 .5rem;font-size:1rem;color:var(--text)}
+  .rec{font-size:.9rem;color:var(--text-muted);background:#0b0f14;border:1px dashed var(--border);
+    border-radius:6px;padding:.6rem .7rem;margin:.5rem 0}
+  .rec b{color:var(--text)}
+  .conf{font-size:.72rem;font-weight:600;padding:.12rem .5rem;border-radius:999px;border:1px solid}
+  .conf-high{color:var(--green);border-color:var(--green)}
+  .conf-medium{color:var(--orange);border-color:var(--orange)}
+  .conf-low{color:var(--red);border-color:var(--red)}
+  .btnrow{display:flex;gap:.6rem;flex-wrap:wrap;margin:.6rem 0 .2rem}
+  button{font:inherit;cursor:pointer;background:#21262d;color:var(--text);
+    border:1px solid var(--border);border-radius:6px;padding:.55rem 1rem;min-height:44px}
+  button:hover{border-color:var(--accent)}
+  button.primary{background:var(--accent);color:#08131f;border-color:var(--accent);font-weight:600}
+  .status{font-size:.82rem;color:var(--text-muted);margin-left:.2rem}
+  .navpager{font-size:.82rem;color:var(--text-muted);margin-top:.6rem;display:flex;gap:.5rem;align-items:center}
+  .navpager button{padding:.3rem .7rem;min-height:36px}
+  .flash{animation:flash 1.2s ease}
+  @keyframes flash{0%{box-shadow:0 0 0 2px var(--accent)}100%{box-shadow:none}}
+  pre{background:#0b0f14;border:1px solid var(--border);border-radius:8px;padding:1rem;
+    overflow:auto;font-size:.85rem;white-space:pre;max-height:60vh}
+  .handoff{border-left:3px solid var(--accent)}
+  .muted{color:var(--text-muted)}
+  code{background:#0b0f14;border:1px solid var(--border);border-radius:4px;padding:.05rem .35rem}
+  @media(max-width:560px){h1{font-size:1.4rem}.decide{gap:.4rem}}
+</style>
+</head>
+<body>
+<main>
+  <h1>Chromux — Idea Scope Brief</h1>
+  <p class="sub">Stage-zero interrogation · <b>Round 1 — Idea Assumptions Manifest</b> · gate: <code>continue</code></p>
+  <p>This is the first interview round for the <b>Chromux</b> concept. Below is what I think the idea is,
+  drawn from your prompt and this (fresh) repo. Confirm / correct / flag each assumption, answer the open
+  questions, then hit <b>Compile Responses → Copy YAML</b> at the bottom and paste it back so I can run the
+  next round or advance to the alignment preview. This is pre-research: no market, competitor, UX, or
+  architecture decisions are made here — just scoping the idea.</p>
+
+  <nav class="toc" aria-label="Contents">
+    <b>Contents</b>
+    <ul>
+      <li><a href="#manifest">1 · Idea Assumptions Manifest</a></li>
+      <li><a href="#questions">2 · Open Questions</a></li>
+      <li><a href="#handoffs">3 · Handoffs (Market Structure · Deck Fit)</a></li>
+      <li><a href="#compile">4 · Compile Responses</a></li>
+    </ul>
+  </nav>
+
+  <h2 id="manifest">1 · Idea Assumptions Manifest</h2>
+  <p class="muted">Source tags: <span class="tag prompt">from prompt</span>
+    <span class="tag repo">from repo</span> <span class="tag inferred">inferred</span>.
+    Default is <b>confirm</b>; switch to correct or flag to reveal a note box.</p>
+
+  <div class="scroll">
+  <table>
+    <thead><tr><th style="width:70px">#</th><th>Assumption</th><th style="width:230px">Your call</th></tr></thead>
+    <tbody id="am">
+      <!-- rows injected -->
+    </tbody>
+  </table>
+  </div>
+
+  <div class="card">
+    <h3>Riskiest unknowns (my read)</h3>
+    <ul>
+      <li><b>Which base to fork</b> — cmux vs Chromium vs VSCode is the single biggest architecture + effort decision, and it's currently open. (Open question Q2.)</li>
+      <li><b>Where the win actually lives</b> — pure co-location (browser in the same window) vs automation (auto-detecting each session's localhost URL and wiring it into a paired pane). (Open question Q4.)</li>
+      <li><b>Personal tool vs product</b> — optimizing only for your workflow vs something shippable to other devs changes almost every downstream call. (Open question Q5.)</li>
+    </ul>
+  </div>
+
+  <h2 id="questions">2 · Open Questions</h2>
+  <p class="muted">Each question shows a recommended default with an agent-confidence badge. Use
+    <b>Apply recommended</b> to accept it, edit freely, or <b>Need clarification</b> to bounce it back.</p>
+  <div id="questions"><!-- questions injected --></div>
+
+  <h2 id="handoffs">3 · Handoffs</h2>
+  <div class="card">
+    <h3>Market Structure Handoff</h3>
+    <p>Chromux reads as <b>single-sided</b> — a tool with one user (you, then possibly other devs). No
+    marketplace / platform / B2B2C / multi-sided structure is apparent, so no market-structure handoff is
+    generated. Flag assumption A3 if you actually see two distinct sides.</p>
+  </div>
+  <div class="card handoff">
+    <h3>Deck Fit Handoff <span class="conf conf-medium">confidence: medium</span></h3>
+    <table><tbody>
+      <tr><td><b>Best candidate deck</b></td><td><code>devtool-afps</code> — deliberate developer-tool workflow deck</td></tr>
+      <tr><td><b>Source</b></td><td>canonical fallback (no <code>docs/decks.md</code> or saved <code>.agents/project.json</code> decks in this fresh repo)</td></tr>
+      <tr><td><b>Domain fit</b></td><td>Developer desktop tool / agentic dev environment → developer deck lane</td></tr>
+      <tr><td><b>Tempo fit</b></td><td>Deliberate — forking cmux/Chromium/VSCode into a desktop app is weeks/months, not a day-experiment</td></tr>
+      <tr><td><b>Runner-up</b></td><td><code>ord</code> (rapid OSS/CLI lane) — safer if you decide Chromux is a lightweight, ship-fast OSS utility rather than a deliberate product (see Q5)</td></tr>
+      <tr><td><b>Install (primary)</b></td><td><code>npx skillpacks install-deck devtool-afps</code></td></tr>
+      <tr><td><b>Likely first post-install skill</b></td><td><code>/devtool-positioning</code> (secondary context, not the primary command until confidence is confirmed)</td></tr>
+    </tbody></table>
+    <p class="muted">Confidence is medium, not high, because the personal-tool-vs-product answer (Q5) and
+    the base-to-fork answer (Q2) could tip this toward the rapid <code>ord</code> lane. I'll finalize the
+    deck recommendation in the idea brief after this round.</p>
+  </div>
+
+  <h2 id="compile">4 · Compile Responses</h2>
+  <p>When you've made a call on every row and answered the open questions, compile and copy the YAML,
+     then paste it back into the chat.</p>
+  <div class="btnrow">
+    <button class="primary" id="compile">Compile Responses</button>
+    <button id="copy">Copy YAML</button>
+    <span class="status" id="copystatus"></span>
+  </div>
+  <div id="navmount"></div>
+  <pre id="yaml" data-answer-sidecar="research/_working/interrogation-idea-scope-brief-r1.yaml"
+       aria-live="polite">Click “Compile Responses” to generate the YAML.</pre>
+</main>
+
+<script>
+/* ---------- content model ---------- */
+const ASSUMPTIONS = [
+  {id:"A1",src:"from prompt",cls:"prompt",text:"<b>Concept:</b> Chromux is a desktop workspace that co-locates cmux-style multi-agent terminal sessions (Codex, Claude Code) with an embedded Chromium browser pane, so you review localhost outputs without alt-tabbing."},
+  {id:"A2",src:"from prompt",cls:"prompt",text:"<b>Problem:</b> The core pain is constant alt-tabbing / context-switching between agent terminals and a separate browser to review localhost test sites, apps, and generated interrogation/alignment HTML pages — worst on a single laptop screen."},
+  {id:"A3",src:"from prompt",cls:"prompt",text:"<b>Beneficiary:</b> First user is you — a solo dev/founder running many parallel AI coding-agent sessions who reviews web outputs constantly. Broader hypothesis: other heavy multi-agent developers with the same alt-tab pain."},
+  {id:"A4",src:"inferred",cls:"inferred",text:"<b>Category:</b> A developer desktop application — an “agent-session cockpit” / agentic-IDE-lite that unifies terminal sessions, code files, and an integrated browser."},
+  {id:"A5",src:"from prompt",cls:"prompt",text:"<b>Platform (hypothesis):</b> Desktop app, Chromium/Electron-based, macOS-laptop-first. Not web, not mobile, not a browser extension."},
+  {id:"A6",src:"from prompt",cls:"prompt",text:"<b>Value wedge:</b> One window where each agent session's localhost preview lives in an adjacent/tabbed browser pane — a unified tab model spanning terminal + browser, with two layouts to experiment with: unified sidebar (cmux-style) vs split panes in a shared frame."},
+  {id:"A7",src:"inferred",cls:"inferred",text:"<b>Constraints:</b> Solo builder; limited laptop screen real estate; must fork one existing base (cmux, Chromium, or VSCode) rather than build from scratch; must keep running Codex + Claude Code CLIs unchanged."},
+  {id:"A8",src:"inferred",cls:"inferred",text:"<b>Non-goals (to confirm):</b> Not a general-purpose web browser; not a new coding-agent runtime; not a full VSCode/IDE replacement; not a team/multiplayer product (at least initially)."},
+];
+
+const QUESTIONS = [
+  {id:"Q1",q:"In one or two sentences, restate what Chromux is in your own words — and fix anything above that's off.",
+   conf:"high",
+   rec:"e.g. “A cmux fork that puts a live browser pane next to each agent session so I never leave the app to check localhost.” This anchors the whole brief, so phrase it the way you'd pitch it to yourself.",
+   agent:"Chromux is a desktop cockpit that co-locates my parallel Codex/Claude Code sessions with an embedded browser pane, so I review localhost apps and generated interrogation/alignment HTML without alt-tabbing."},
+  {id:"Q2",q:"Which base should Chromux fork — cmux, Chromium, or VSCode — or is that still open?",
+   conf:"medium",
+   rec:"<b>Lean cmux.</b> You already live in it for agent sessions, so you keep the multi-agent session model for free and only add a browser pane (Electron BrowserView / <code>&lt;webview&gt;</code>). Chromium = maximum browser control but you rebuild the terminal/agent layer. VSCode = best code editing + an existing Simple Browser, but it's the heaviest to bend into a cmux-style session cockpit. (Note: I should verify cmux's actual stack/extensibility before locking this — flag if you know it.)",
+   agent:"Fork cmux and embed a Chromium browser pane (Electron BrowserView/webview). Keep Chromium and VSCode as fallbacks if cmux's rendering or extensibility blocks a first-class browser integration. This is a hypothesis to validate against cmux's actual stack."},
+  {id:"Q3",q:"Which layout do you actually want to live in day one — unified sidebar (terminal + browser as sibling tabs), split panes (terminal + browser side-by-side in a shared frame), or build both and toggle?",
+   conf:"medium",
+   rec:"Ship the <b>split-pane shared frame first</b> — terminal + live browser side-by-side per session is the most direct alt-tab killer — and add the unified-sidebar tab mode as a second, toggleable layout later.",
+   agent:"v1 = split-pane shared frame (terminal + browser side-by-side, one browser pane paired per agent session); unified-sidebar tab mode added later as a toggle."},
+  {id:"Q4",q:"Is the real win just having the browser in the same window (co-location), or is it automation — Chromux auto-detecting each session's localhost URL and opening/refreshing it in the paired pane?",
+   conf:"medium",
+   rec:"The durable wedge is <b>automation</b>: watch each session's output for <code>localhost:PORT</code>, auto-open/refresh it in that session's browser pane, plus one-click reopen of your generated interrogation/alignment HTML. Pure co-location alone is just a tiling window manager you could get elsewhere.",
+   agent:"Automation is the wedge: auto-detect each session's localhost URL and open/refresh it in the paired browser pane, with quick-open for generated interrogation/alignment HTML pages. Co-location is table stakes, not the differentiator."},
+  {id:"Q5",q:"Is Chromux a personal tool you're optimizing for your own workflow, or something you intend to ship to other developers?",
+   conf:"medium",
+   rec:"Treat it as a <b>personal tool first</b> (fastest path — you're the only user who must be happy) but build it in the open so it can become an OSS devtool if others share the alt-tab pain. Decide product-hood after you're using it daily.",
+   agent:"Personal tool first, built in the open; revisit productizing as an OSS devtool once Chromux is part of my daily workflow."},
+  {id:"Q6",q:"What must stay OUT of scope, and what hard constraints are real right now (OS, time budget, tools you won't drop)?",
+   conf:"medium",
+   rec:"e.g. non-goals: general web browser, new agent runtime, full IDE replacement, team features. Constraints: solo, macOS laptop first, must keep Codex + Claude Code CLIs unchanged, limited screen space. Correct any of these.",
+   agent:"Non-goals: general-purpose browser, new agent runtime, full IDE/VSCode replacement, team/multiplayer features. Constraints: solo builder, macOS laptop first, keep Codex + Claude Code CLIs unchanged, limited laptop screen real estate."},
+];
+
+/* ---------- render ---------- */
+const esc = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const am = document.getElementById("am");
+ASSUMPTIONS.forEach(a=>{
+  const tr=document.createElement("tr");
+  tr.className="amrow";tr.dataset.aid=a.id;
+  tr.innerHTML=`<td>${a.id}<br><span class="tag ${a.cls}">${a.src}</span></td>
+    <td>${a.text}</td>
+    <td>
+      <div class="decide">
+        <label><input type="radio" name="d-${a.id}" value="confirm" checked> confirm</label>
+        <label><input type="radio" name="d-${a.id}" value="correct"> correct</label>
+        <label><input type="radio" name="d-${a.id}" value="flag"> flag</label>
+      </div>
+      <textarea class="correction" data-corr="${a.id}" placeholder="What's the correction / what are you flagging?"></textarea>
+    </td>`;
+  am.appendChild(tr);
+});
+
+const qroot=document.getElementById("questions");
+QUESTIONS.forEach(q=>{
+  const div=document.createElement("div");
+  div.className="q";div.dataset.openQuestion=q.id;
+  div.innerHTML=`
+    <div class="qhead">
+      <h4>${q.id} · ${esc(q.q)}</h4>
+      <span class="conf conf-${q.conf}" data-agent-confidence="${q.conf}">agent confidence: ${q.conf}</span>
+    </div>
+    <div class="rec" data-recommended-answer>${q.rec}</div>
+    <span data-agent-recommended-answer hidden>${esc(q.agent)}</span>
+    <textarea data-open-input data-qid="${q.id}" placeholder="Your answer…"></textarea>
+    <div class="btnrow">
+      <button type="button" data-apply-recommended>Apply recommended</button>
+      <button type="button" data-clarify-copy>Need clarification</button>
+      <span class="status" data-apply-recommended-status></span>
+    </div>`;
+  qroot.appendChild(div);
+});
+
+/* ---------- reveal correction boxes ---------- */
+document.addEventListener("change",e=>{
+  if(e.target.name && e.target.name.startsWith("d-")){
+    const id=e.target.name.slice(2);
+    const box=document.querySelector(`[data-corr="${id}"]`);
+    box.classList.toggle("show", e.target.value!=="confirm");
+  }
+});
+
+/* ---------- apply recommended ---------- */
+document.addEventListener("click",e=>{
+  const btn=e.target.closest("[data-apply-recommended]");
+  if(!btn)return;
+  const block=btn.closest("[data-open-question]");
+  const src=block.querySelector("[data-agent-recommended-answer]")||block.querySelector("[data-recommended-answer]");
+  const rec=src?(src.textContent||"").trim():"";
+  const input=block.querySelector('textarea[data-open-input],input[type="text"][data-open-input]');
+  if(!input||!rec)return;
+  if(input.value.trim()&&!window.confirm("Replace your current answer with the recommended answer?"))return;
+  input.value=rec;
+  input.dispatchEvent(new Event("input",{bubbles:true}));
+  input.dispatchEvent(new Event("change",{bubbles:true}));
+  const st=block.querySelector("[data-apply-recommended-status]");
+  if(st)st.textContent="Recommended answer applied.";
+});
+
+/* ---------- clarify copy ---------- */
+async function copyText(text){
+  try{await navigator.clipboard.writeText(text);return "Copied";}
+  catch{const ta=document.createElement("textarea");ta.value=text;document.body.appendChild(ta);
+    ta.focus();ta.select();document.body.removeChild(ta);return "Select text to copy";}
+}
+document.addEventListener("click",async e=>{
+  const btn=e.target.closest("[data-clarify-copy]");
+  if(!btn)return;
+  const block=btn.closest("[data-open-question]");
+  const qtext=block.querySelector("h4").textContent.replace(/^\S+\s·\s/,"");
+  const payload=`Question: "${qtext}"\nI need clarification on what this is asking before I can answer.`;
+  const st=block.querySelector("[data-apply-recommended-status]");
+  const res=await copyText(payload);
+  if(st)st.textContent=res==="Copied"?"Clarification request copied.":res;
+});
+
+/* ---------- unanswered-question navigator ---------- */
+(function(){
+  const blocks=[...document.querySelectorAll("[data-open-question]")];
+  const answered=b=>{const i=b.querySelector("[data-open-input]");return i&&i.value.trim().length>0;};
+  const mk=()=>{
+    const n=blocks.filter(b=>!answered(b)).length;
+    return `<div class="navpager"><button type="button" data-nav="prev">‹ prev</button>
+      <span data-nav-count>${n?n+" left":"All answered"}</span>
+      <button type="button" data-nav="next">next ›</button></div>`;
+  };
+  const mount=document.getElementById("navmount");
+  mount.innerHTML=mk();
+  let idx=-1;
+  function jump(dir){
+    const un=blocks.filter(b=>!answered(b));
+    if(!un.length)return;
+    idx=(idx+dir+un.length)%un.length;
+    const t=un[((idx%un.length)+un.length)%un.length];
+    t.scrollIntoView({behavior:"smooth",block:"center"});
+    t.classList.add("flash");setTimeout(()=>t.classList.remove("flash"),1200);
+  }
+  document.addEventListener("click",e=>{
+    const b=e.target.closest("[data-nav]");if(!b)return;
+    jump(b.dataset.nav==="next"?1:-1);
+  });
+  document.addEventListener("input",()=>{
+    const n=blocks.filter(b=>!answered(b)).length;
+    document.querySelectorAll("[data-nav-count]").forEach(el=>el.textContent=n?n+" left":"All answered");
+  });
+})();
+
+/* ---------- compile YAML ---------- */
+const yq = s => JSON.stringify(s==null?"":String(s)); // JSON string == valid YAML double-quoted scalar
+function compile(){
+  const decisions=ASSUMPTIONS.map(a=>{
+    const sel=document.querySelector(`input[name="d-${a.id}"]:checked`).value;
+    const corr=(document.querySelector(`[data-corr="${a.id}"]`).value||"").trim();
+    return {id:a.id,source:a.src,decision:sel,correction:corr};
+  });
+  const answers=QUESTIONS.map(q=>{
+    const val=(document.querySelector(`textarea[data-qid="${q.id}"]`).value||"").trim();
+    return {id:q.id,question:q.q,answer:val,agent:q.agent,conf:q.conf};
+  });
+  const allDecided=true; // radios default to confirm, always decided
+  const allAnswered=answers.every(a=>a.answer.length>0);
+  const round_status=allAnswered?"complete":"partial";
+
+  let y="";
+  y+="# Invoke with: /idea-scope-brief\n";
+  y+='command: "/idea-scope-brief"\n';
+  y+="interrogation_page: interrogation/idea-scope-brief-r1-chromux.html\n";
+  y+="round: 1\n";
+  y+="round_status: "+round_status+"\n";
+  y+="gate_state: continue\n";
+  y+="agent_routing:\n";
+  y+="  workflow: interrogation-loop\n";
+  y+="  parent_skill: idea-scope-brief\n";
+  y+='  command: "/idea-scope-brief"\n';
+  y+="  gate_owner: parent-orchestrator\n";
+  y+="  gate_type: interrogation-round\n";
+  y+="  round: 1\n";
+  y+="  answer_sidecar: research/_working/interrogation-idea-scope-brief-r1.yaml\n";
+  y+="  next_resolution: parent-resolves-from-yaml-and-filesystem\n";
+  y+="assumptions:\n";
+  decisions.forEach(d=>{
+    y+="  - id: "+d.id+"\n";
+    y+="    source: "+yq(d.source)+"\n";
+    y+="    decision: "+d.decision+"\n";
+    if(d.decision!=="confirm"||d.correction) y+="    correction: "+yq(d.correction)+"\n";
+  });
+  y+="open_answers:\n";
+  answers.forEach(a=>{
+    y+="  - id: "+a.id+"\n";
+    y+="    question: "+yq(a.question)+"\n";
+    y+="    answer: "+yq(a.answer)+"\n";
+    y+="    agent_recommended_answer: "+yq(a.agent)+"\n";
+    y+="    agent_confidence: "+a.conf+"\n";
+  });
+  y+="gate_answers: []\n";
+  document.getElementById("yaml").textContent=y;
+  return y;
+}
+document.getElementById("compile").addEventListener("click",compile);
+document.getElementById("copy").addEventListener("click",async()=>{
+  const y=compile();
+  const res=await copyText(y);
+  document.getElementById("copystatus").textContent=
+    res==="Copied"?"YAML copied — paste it back into the chat.":res;
+});
+</script>
+</body>
+</html>

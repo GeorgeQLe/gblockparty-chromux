@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en" data-alignment-category="research" data-visual-tier="visual" data-alignment-status="review" data-alignment-stage="stage-2">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chromux - Devtool Adoption · Artifact Review</title>
+<style>
+  :root{--bg:#0d1117;--panel:#161b22;--panel2:#111824;--line:#30363d;--text:#c9d1d9;--muted:#8b949e;--ink:#f0f6fc;--blue:#58a6ff;--green:#3fb950;--orange:#d29922;--red:#f85149;--purple:#bc8cff;--cyan:#39c5cf}
+  *{box-sizing:border-box} html,body{margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;padding-bottom:5rem}
+  .wrap{max-width:1180px;margin:0 auto;padding:2rem 1rem}
+  h1{color:var(--ink);font-size:2rem;line-height:1.15;margin:.35rem 0 .55rem}
+  h2{color:var(--blue);font-size:1.22rem;margin:0 0 .75rem;scroll-margin-top:1rem}
+  h3{color:var(--ink);font-size:1rem;margin:1rem 0 .35rem}
+  p{margin:.45rem 0} a{color:var(--blue)}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.88em;background:#1c2333;border:1px solid var(--line);border-radius:5px;padding:.08em .34em}
+  table{border-collapse:collapse;width:100%;font-size:.91rem}
+  th,td{border:1px solid var(--line);padding:.52rem .62rem;text-align:left;vertical-align:top}
+  th{background:#1a2230;color:var(--ink)}
+  ul,ol{margin:.35rem 0 .6rem 1.15rem;padding:0} li{margin:.24rem 0}
+  textarea{width:100%;min-height:5.5rem;background:#0b1018;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:.75rem;font:14px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  button{background:#238636;color:white;border:1px solid #2ea043;border-radius:7px;padding:.55rem .8rem;font-weight:700;cursor:pointer}
+  button.secondary{background:#21262d;border-color:var(--line);color:var(--text)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:1rem 1.15rem;margin:1rem 0}
+  .status{border-left:4px solid var(--orange)} .changed{border-left:4px solid var(--purple)} .proof{border-left:4px solid var(--green)}
+  .sub,.muted{color:var(--muted)}
+  .pill{display:inline-block;font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:.18em .56em;border-radius:999px;border:1px solid var(--line);color:var(--muted);margin:.1rem .24rem .1rem 0}
+  .review{color:var(--orange);border-color:var(--orange)} .stage{color:var(--purple);border-color:var(--purple)} .visual{color:var(--green);border-color:var(--green)} .verified{color:var(--cyan);border-color:var(--cyan)}
+  .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.7rem}
+  .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.7rem}
+  .mini{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:.8rem}
+  .mini strong{display:block;color:var(--ink);margin-bottom:.2rem}
+  .scroll{overflow-x:auto}.kv{display:grid;grid-template-columns:max-content 1fr;gap:.28rem .8rem}.kv dt{color:var(--muted)}.kv dd{margin:0}
+  .notice{border:1px solid #6b5216;background:#17140a;border-radius:8px;padding:.75rem;margin:.75rem 0;color:#f2cc60}
+  .ok{color:var(--green)} .warn{color:var(--orange)} .bad{color:var(--red)}
+  .tag{font-family:ui-monospace,monospace;font-size:.75rem;padding:.05em .42em;border-radius:5px;border:1px solid var(--line);white-space:nowrap;color:var(--muted)}
+  .gate{background:#0f1623;border:1px solid var(--line);border-radius:8px;padding:1rem;margin:.9rem 0}.gate legend{color:var(--ink);font-weight:800;margin-bottom:.35rem}
+  .option{display:block;margin:.45rem 0;padding:.55rem .65rem;border:1px solid var(--line);border-radius:7px;background:#111824}.option input{margin-right:.45rem}
+  .output{white-space:pre-wrap;background:#0b1018;border:1px solid var(--line);border-radius:8px;padding:.85rem;min-height:8rem;overflow:auto}
+  .bar{display:grid;grid-template-columns:160px 1fr max-content;align-items:center;gap:.65rem;margin:.45rem 0}.track{height:16px;background:#0b1018;border:1px solid var(--line);border-radius:999px;overflow:hidden}.fill{height:100%;background:var(--blue)}
+  .flow{display:grid;grid-template-columns:repeat(4,1fr);gap:.65rem}.node{border:1px solid var(--line);background:var(--panel2);border-radius:8px;padding:.75rem;min-height:92px}.node b{display:block;color:var(--ink)}
+  .hidden{display:none}
+  @media(max-width:900px){.grid,.grid2,.flow{grid-template-columns:1fr}.kv{grid-template-columns:1fr}.bar{grid-template-columns:1fr}.wrap{padding:1.2rem .85rem}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div>
+    <span class="pill review">review</span>
+    <span class="pill stage">stage-2 · artifact review</span>
+    <span class="pill visual">visual tier</span>
+    <span class="pill verified">smoke verified</span>
+  </div>
+  <h1>Chromux - Devtool Adoption Artifact Review</h1>
+  <p class="sub">Stage 2 review page for <code>$devtool-adoption</code>. The non-canonical working packet has been written to <code>research/_working/preliminary-devtool-adoption-research.md</code>. Canonical files are unchanged until artifact approval.</p>
+
+  <section class="card status" id="status">
+    <h2>Alignment Status</h2>
+    <dl class="kv">
+      <dt>alignment_status</dt><dd><strong>review</strong></dd>
+      <dt>alignment_stage</dt><dd>stage-2 - research and artifact review</dd>
+      <dt>alignment date</dt><dd>2026-07-06</dd>
+      <dt>producing skill</dt><dd><code>$devtool-adoption</code></dd>
+      <dt>concept slug</dt><dd><code>chromux</code></dd>
+      <dt>working packet</dt><dd><code>research/_working/preliminary-devtool-adoption-research.md</code></dd>
+      <dt>proposed canonical artifact</dt><dd><code>research/devtool-adoption.md</code></dd>
+      <dt>verification</dt><dd><code>npm run smoke</code> in <code>prototype/</code> returned <strong>SMOKE_OK</strong></dd>
+    </dl>
+    <div class="notice">Review required: approve this artifact, request Stage 2 revisions, or block canonicalization. This page does not perform Stage 3.</div>
+  </section>
+
+  <section class="card" id="toc">
+    <h2>Table Of Contents</h2>
+    <ol>
+      <li><a href="#verdict">Verdict</a></li>
+      <li><a href="#checks">Source And Code Checks</a></li>
+      <li><a href="#loops">Adoption Loops</a></li>
+      <li><a href="#examples">Examples And Templates</a></li>
+      <li><a href="#community">Community Channels</a></li>
+      <li><a href="#proof">Proof Artifacts</a></li>
+      <li><a href="#metrics">Metrics</a></li>
+      <li><a href="#changes">Proposed Canonical And Task Changes</a></li>
+      <li><a href="#evidence">Evidence Matrix</a></li>
+      <li><a href="#assumptions">Assumptions And Gaps</a></li>
+      <li><a href="#sources">Sources</a></li>
+      <li><a href="#gates">Approval Gates</a></li>
+    </ol>
+  </section>
+
+  <section class="card changed" id="verdict">
+    <h2>Verdict</h2>
+    <div class="grid">
+      <div class="mini"><strong>Recommended artifact action</strong><span class="warn">Amend canonical adoption research.</span> The stance remains proof-led, but the current artifact is stale about prototype proof.</div>
+      <div class="mini"><strong>What changed locally</strong><code>prototype/</code> now has a runnable Electron app, README, capture schema, examples, screenshot fixture, transcript, package scripts, and smoke check.</div>
+      <div class="mini"><strong>What did not change</strong>No evidence of sustained builder use, external installs, issue reports, community demand, or public-launch readiness exists.</div>
+    </div>
+    <h3>Updated Adoption Ladder</h3>
+    <div class="flow">
+      <div class="node"><b>1. Prototype Proof</b><span class="ok">Partially complete.</span> Scripted local loop and smoke check now exist.</div>
+      <div class="node"><b>2. Daily-Driver Proof</b><span class="warn">Next gate.</span> Measure real repeated builder use and capture usefulness.</div>
+      <div class="node"><b>3. Controlled OSS Preview</b><span class="muted">Deferred.</span> Invite only after self-serve first success is credible.</div>
+      <div class="node"><b>4. Public Community</b><span class="muted">Deferred.</span> Enable broader channels after external reports and support readiness.</div>
+    </div>
+  </section>
+
+  <section class="card proof" id="checks">
+    <h2>Source And Code Checks</h2>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Check</th><th>Result</th><th>Adoption impact</th></tr></thead>
+        <tbody>
+          <tr><td>Canonical adoption artifact</td><td><code>research/devtool-adoption.md</code> exists but still says many proof artifacts are missing.</td><td>Preserve sequence; update stale statuses.</td></tr>
+          <tr><td>Prototype README</td><td><code>prototype/README.md</code> documents quickstart, install app, first local loop, troubleshooting, and storage map.</td><td>Repo-readiness is partial, not zero.</td></tr>
+          <tr><td>Package metadata</td><td><code>prototype/package.json</code> version <code>0.5.0</code> with <code>start</code>, <code>smoke</code>, <code>package</code>, <code>install-app</code>.</td><td>Runnable/packageable prototype exists.</td></tr>
+          <tr><td>Capture contract</td><td><code>prototype/docs/capture-payload.md</code> defines YAML schema v1, bounds, retention, and versioning.</td><td>Payload contract is now a proof artifact.</td></tr>
+          <tr><td>Example fixtures</td><td><code>sample-capture.yaml</code>, <code>sample-screenshot.png</code>, and <code>first-local-loop.md</code> exist under <code>prototype/examples/</code>.</td><td>Adoption tasks need reconciliation.</td></tr>
+          <tr><td>Code surface</td><td>Code paths cover preview detection, review queue, capture persistence, popup routing, external detection, and <code>claude -p</code> delivery.</td><td>Claims can reference a real prototype with caveats.</td></tr>
+          <tr><td>Smoke check</td><td><code>npm run smoke</code> returned <strong>SMOKE_OK</strong>.</td><td>Scripted prototype health is freshly verified.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card" id="loops">
+    <h2>Adoption Loops</h2>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Loop</th><th>Current state</th><th>Activation event</th><th>Retention event</th><th>Canonical change</th></tr></thead>
+        <tbody>
+          <tr><td>Builder daily-driver</td><td>Scripted proof exists; repeated real-work proof missing.</td><td>First real coding task completed with route, capture, delivery/file-drop, and agent response.</td><td>Three real sessions in one week where Chromux replaces external Chrome for review/capture.</td><td>Advance gate from feasibility to repeated-use measurement.</td></tr>
+          <tr><td>Prototype repo readiness</td><td>Prototype README, quickstart, capture schema, screenshot, sample payload, transcript exist.</td><td>Clean checkout runs or inspects first loop.</td><td>Docs stay current after feature/refactor/version changes.</td><td>Mark partial readiness and root/public docs gaps.</td></tr>
+          <tr><td>Controlled OSS preview</td><td>Not started.</td><td>One non-builder completes first local loop without synchronous help.</td><td>User returns or files actionable issue.</td><td>Keep gated by daily-driver proof.</td></tr>
+          <tr><td>Public community</td><td>Not started.</td><td>Visitor self-serves through README, examples, forms, and trust docs.</td><td>Reports turn into repeatable docs/fixes.</td><td>Keep broad channels deferred.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card" id="examples">
+    <h2>Examples And Templates</h2>
+    <div class="grid2">
+      <div class="mini"><strong>Verified now</strong>Local <code>file://</code> path example, first-loop transcript, sample capture YAML, sample screenshot, no-hot-swap queue transcript.</div>
+      <div class="mini"><strong>Still missing</strong>Real Vite/localhost fixture, capture delivery failure transcript, manual baseline comparison, GitHub issue form.</div>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Artifact</th><th>Current status</th><th>Action</th><th>Rationale</th></tr></thead>
+        <tbody>
+          <tr><td>Local alignment or <code>file://</code> example</td><td>Present through scripted E2E fixture.</td><td>Keep as first verified example.</td><td>Matches this repo's alignment-page workflow.</td></tr>
+          <tr><td>Vite/localhost example</td><td>Not a full app fixture yet.</td><td>Add later.</td><td>Common public-user path still needs proof.</td></tr>
+          <tr><td>Multiple previews/no hot-swap</td><td>Transcript says second preview queued.</td><td>Promote as core proof.</td><td>Attention safety is part of the wedge.</td></tr>
+          <tr><td>Delivery failure example</td><td>Not present as fixture.</td><td>Add before preview cohort.</td><td>External users need retry confidence.</td></tr>
+          <tr><td>Manual baseline comparison</td><td>Missing.</td><td>Add after real daily use.</td><td>Needed to show Chromux beats terminal plus Chrome.</td></tr>
+          <tr><td>Issue forms</td><td>Missing.</td><td>Add only after controlled preview.</td><td>Support reports need structured details.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card" id="community">
+    <h2>Community Channels</h2>
+    <div class="bar"><span>Private notes</span><div class="track"><div class="fill" style="width:100%;background:var(--green)"></div></div><span>use now</span></div>
+    <div class="bar"><span>Prototype docs</span><div class="track"><div class="fill" style="width:85%;background:var(--green)"></div></div><span>use now</span></div>
+    <div class="bar"><span>Root README</span><div class="track"><div class="fill" style="width:45%;background:var(--orange)"></div></div><span>prepare</span></div>
+    <div class="bar"><span>Issue forms</span><div class="track"><div class="fill" style="width:25%;background:var(--orange)"></div></div><span>preview gate</span></div>
+    <div class="bar"><span>Discussions</span><div class="track"><div class="fill" style="width:12%;background:var(--muted)"></div></div><span>defer</span></div>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Channel</th><th>Recommendation</th><th>Evidence or rationale</th></tr></thead>
+        <tbody>
+          <tr><td>Private daily-driver notes</td><td>Use now.</td><td>Next missing evidence is repeated builder retention.</td></tr>
+          <tr><td>Prototype README/examples</td><td>Use now.</td><td>Already present and directly support first local loop evidence.</td></tr>
+          <tr><td>Root public README</td><td>Prepare after prototype docs stabilize.</td><td>GitHub README docs support purpose, usefulness, getting started, help, and maintainer context.</td></tr>
+          <tr><td>GitHub Issues with forms</td><td>Defer until controlled preview.</td><td>GitHub issue forms support structured required fields; Chromux failures need OS, CLI, auth, preview, capture, and delivery details.</td></tr>
+          <tr><td>GitHub Discussions</td><td>Defer.</td><td>Discussions are for open-ended Q&A, announcements, polls, and project conversation; early Chromux feedback should be structured.</td></tr>
+          <tr><td>Broad launch channels</td><td>Defer.</td><td>Out of approved scope and premature without daily-driver/external first-success proof.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card proof" id="proof">
+    <h2>Proof Artifacts</h2>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Proof artifact</th><th>Status</th><th>Evidence</th><th>Adoption implication</th></tr></thead>
+        <tbody>
+          <tr><td>Stack feasibility</td><td class="ok">Proven for Electron prototype; not proven for <code>cmux</code> fork.</td><td>Prototype code, smoke check, transcript.</td><td>Stop saying no runnable app exists; keep fork-base caveat.</td></tr>
+          <tr><td>Capture-to-agent handoff</td><td class="warn">Partially proven.</td><td>File-drop in smoke transcript; <code>claude -p</code> separately verified in transcript.</td><td>Next proof is real-session usefulness.</td></tr>
+          <tr><td>Sample capture YAML</td><td class="ok">Present.</td><td><code>prototype/examples/captures/sample-capture.yaml</code></td><td>Reconcile stale tasks.</td></tr>
+          <tr><td>Paired-pane screenshot</td><td class="ok">Present.</td><td><code>prototype/docs/screenshot.png</code>, <code>sample-screenshot.png</code></td><td>Prototype visual proof exists.</td></tr>
+          <tr><td>Review queue proof</td><td class="warn">Transcript present, standalone screenshot missing.</td><td><code>first-local-loop.md</code></td><td>Add annotated screenshot if needed for public proof.</td></tr>
+          <tr><td>Failure recovery transcript</td><td class="bad">Missing.</td><td>README explains retry, but no fixture.</td><td>Add before inviting external users.</td></tr>
+          <tr><td>Local data map</td><td class="warn">Partial.</td><td>Prototype README and capture payload docs.</td><td>Needs fuller privacy/local-data doc before public trust claims.</td></tr>
+          <tr><td>Manual baseline comparison</td><td class="bad">Missing.</td><td>No real-use timing or notes found.</td><td>Keep as daily-driver proof task.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card" id="metrics">
+    <h2>Activation And Retention Metrics</h2>
+    <p>Start with local records, not telemetry. The packet keeps traffic as an interest signal only, because GitHub traffic shows recent clones, visitors, referrers, and popular content; it does not prove activation.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Metric</th><th>Current source</th><th>Target signal</th><th>Decision use</th></tr></thead>
+        <tbody>
+          <tr><td>Smoke health</td><td><code>npm run smoke</code></td><td>Scripted checks pass.</td><td>Entry gate before sharing builds.</td></tr>
+          <tr><td>Real sessions launched</td><td>Manual note or local event log</td><td>Builder chooses Chromux for work.</td><td>Habit formation.</td></tr>
+          <tr><td>Previews reviewed in Chromux vs Chrome</td><td>Manual tally</td><td>Reduced context switching.</td><td>Validates wedge.</td></tr>
+          <tr><td>Captures generated</td><td><code>~/.chromux/captures</code> plus notes</td><td>Capture becomes habitual.</td><td>Shows use of evidence channel.</td></tr>
+          <tr><td>Useful capture rate</td><td>Builder marks agent outcome</td><td>Payload is actionable.</td><td>Guides schema changes.</td></tr>
+          <tr><td>Manual retry rate</td><td>Delivery log and notes</td><td>Low retry indicates trust.</td><td>Promotes delivery fixes if high.</td></tr>
+          <tr><td>Wrong-session incidents</td><td>Manual incident log</td><td>Pairing is safe.</td><td>Blocks external preview if recurring.</td></tr>
+          <tr><td>First-success reports</td><td>Future issue form/private report</td><td>Non-builder completes wedge.</td><td>Controlled preview gate.</td></tr>
+          <tr><td>GitHub traffic</td><td>Future repository Insights</td><td>Discovery/interest after sharing.</td><td>Interest only, not activation.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card changed" id="changes">
+    <h2>Proposed Canonical And Task Changes</h2>
+    <h3>Canonical adoption artifact</h3>
+    <ul>
+      <li>Preserve the proof-led adoption stance and personal-first sequence.</li>
+      <li>Replace stale missing-proof claims with current prototype evidence.</li>
+      <li>Reframe the next gate as daily-driver proof and external first-success readiness.</li>
+      <li>Mark prototype README, capture schema, sample capture, screenshot, transcript, and storage map as present.</li>
+      <li>Keep <code>cmux</code> fork feasibility caveated if the long-term plan still depends on it.</li>
+      <li>Keep broad community growth deferred.</li>
+    </ul>
+    <h3>Task files after approval</h3>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>File</th><th>Proposed change</th><th>Reason</th></tr></thead>
+        <tbody>
+          <tr><td><code>tasks/todo.md</code></td><td>Replace generic proof-artifact task with narrower real localhost/Vite fixture and failure-recovery transcript tasks.</td><td>Prototype sample payload, screenshot, and transcript exist.</td></tr>
+          <tr><td><code>tasks/todo.md</code></td><td>Replace root example creation tasks with validation/promote tasks for <code>prototype/examples/...</code> if root-level examples are desired.</td><td>Existing examples live under <code>prototype/</code>.</td></tr>
+          <tr><td><code>tasks/todo.md</code></td><td>Keep root/public capture payload, troubleshooting, privacy/local-data, and README tasks, but amend wording to acknowledge prototype docs.</td><td>Prototype docs are not full public repo readiness.</td></tr>
+          <tr><td><code>tasks/record-todo.md</code></td><td>Change builder daily-driver metric condition to begin after next real work session.</td><td>Runnable prototype exists.</td></tr>
+          <tr><td><code>tasks/recurring-todo.md</code></td><td>Change monthly review trigger to after first daily-driver week or before inviting external users.</td><td>Runnable app exists; usage evidence is now the gating condition.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card" id="evidence">
+    <h2>Evidence Matrix</h2>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Claim</th><th>Evidence</th><th>Inference</th><th>Confidence</th><th>Decision impact</th></tr></thead>
+        <tbody>
+          <tr><td>Canonical artifact is stale on prototype existence.</td><td>Current repo has prototype package, README, capture docs, examples; canonical artifact says these are missing.</td><td>Stage 3 should amend.</td><td>High</td><td>Update artifact and tasks.</td></tr>
+          <tr><td>Adoption wedge remains session-paired review plus evidence routing.</td><td>Local research, prototype README, and code all center on pairing, queueing, capture payloads, delivery/file-drop.</td><td>Progress validates the same wedge.</td><td>High</td><td>Keep first local loop central.</td></tr>
+          <tr><td>Prototype proof is not daily-driver proof.</td><td>Smoke/transcript are scripted; no repeated real-use metrics or external reports exist.</td><td>Public launch remains premature.</td><td>High</td><td>Start local adoption records.</td></tr>
+          <tr><td>Issue forms are the right first support surface.</td><td>GitHub docs support templates/forms with structured required fields.</td><td>Chromux failures require structured environment/workflow details.</td><td>High</td><td>Add forms only at controlled preview.</td></tr>
+          <tr><td>Discussions remain delayed.</td><td>GitHub docs position Discussions for open-ended Q&A, announcements, polls, direction.</td><td>Early feedback should be structured.</td><td>Medium-high</td><td>Do not enable before demand.</td></tr>
+          <tr><td>GitHub traffic is interest, not activation.</td><td>GitHub docs describe traffic as recent clones, visitors, referrers, popular content.</td><td>Cannot prove first success.</td><td>High</td><td>Pair with reports and usage records.</td></tr>
+          <tr><td>Trust docs still gate broad local-first claims.</td><td>Captures include screenshots, selected HTML, console tails, URLs, paths, delivery logs, browser profile state.</td><td>Local-only still needs disclosure and deletion guidance.</td><td>High</td><td>Keep privacy/local-data docs as release gate.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card" id="assumptions">
+    <h2>Assumptions And Gaps</h2>
+    <div class="grid2">
+      <div class="mini"><strong>High confidence</strong>The Electron prototype is the current product surface to evaluate; builder remains the first audience; external users should wait until daily-driver proof.</div>
+      <div class="mini"><strong>Medium confidence</strong>Root repository is not yet public-adoption ready; <code>claude -p</code> is good enough for the next real-use test.</div>
+    </div>
+    <h3>Source coverage gaps</h3>
+    <ul>
+      <li>No broad launch-channel research was performed; it was out of scope and remains premature.</li>
+      <li>No external Chromux users, interviews, installs, issues, or first-success reports were available.</li>
+      <li>No hands-on public GitHub traffic data was available.</li>
+      <li>The smoke check verifies a scripted path, not sustained use across real projects.</li>
+      <li>The <code>cmux</code> fork base was not inspected; verified stack evidence is for this Electron prototype.</li>
+      <li>Official source checks were limited to GitHub docs for README/community files, issue templates/forms, Discussions, and repository traffic.</li>
+    </ul>
+  </section>
+
+  <section class="card" id="sources">
+    <h2>Sources</h2>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Type</th><th>Source</th><th>Use</th></tr></thead>
+        <tbody>
+          <tr><td>Local research</td><td><code>research/devtool-adoption.md</code>, <code>devtool-positioning.md</code>, <code>devtool-dx-journey.md</code>, <code>devtool-integration-map.md</code>, <code>devtool-docs-audit.md</code>, <code>devtool-monetization.md</code></td><td>Baseline adoption stance and neighboring constraints.</td></tr>
+          <tr><td>Local tasks</td><td><code>tasks/todo.md</code>, <code>tasks/record-todo.md</code>, <code>tasks/recurring-todo.md</code></td><td>Follow-up reconciliation.</td></tr>
+          <tr><td>Prototype docs</td><td><code>prototype/README.md</code>, <code>prototype/docs/capture-payload.md</code>, <code>prototype/examples/...</code></td><td>Current proof artifacts and quickstart.</td></tr>
+          <tr><td>Prototype code</td><td><code>prototype/main.js</code>, <code>renderer/renderer.js</code>, <code>preload.js</code>, <code>webview-preload.js</code></td><td>Feature evidence for detection, queueing, capture, delivery.</td></tr>
+          <tr><td>Verification</td><td><code>npm run smoke</code> in <code>prototype/</code></td><td>Returned <code>SMOKE_OK</code>.</td></tr>
+          <tr><td>Official docs</td><td>GitHub README docs, issue/PR template docs, Discussions docs, repository traffic docs.</td><td>Community surface and metric support.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card" id="gates">
+    <h2>Artifact Approval Gates</h2>
+    <form id="reviewForm">
+      <fieldset class="gate" data-gate-name="artifact_decision">
+        <legend>Gate 1 - Artifact Decision</legend>
+        <label class="option"><input type="radio" name="artifact_decision" value="approve_packet" data-approval-effect="approve"> Approve the Stage 2 packet and proceed to Stage 3 canonicalization on the next compiled YAML.</label>
+        <label class="option"><input type="radio" name="artifact_decision" value="revise_packet" data-approval-effect="clarify"> Request Stage 2 revisions before canonicalization.</label>
+        <label class="option"><input type="radio" name="artifact_decision" value="block_packet" data-approval-effect="block"> Block canonicalization; the packet does not support the intended adoption artifact.</label>
+      </fieldset>
+      <fieldset class="gate" data-gate-name="canonical_changes">
+        <legend>Gate 2 - Canonical File Changes</legend>
+        <label class="option"><input type="radio" name="canonical_changes" value="approve_canonical_scope" data-approval-effect="approve"> Approve the proposed canonical adoption-artifact amendments.</label>
+        <label class="option"><input type="radio" name="canonical_changes" value="revise_canonical_scope" data-approval-effect="clarify"> Request changes to the canonical amendment scope.</label>
+        <label class="option"><input type="radio" name="canonical_changes" value="block_canonical_scope" data-approval-effect="block"> Do not update the canonical adoption artifact from this packet.</label>
+      </fieldset>
+      <fieldset class="gate" data-gate-name="task_changes">
+        <legend>Gate 3 - Task File Changes</legend>
+        <label class="option"><input type="radio" name="task_changes" value="approve_task_reconciliation" data-approval-effect="approve"> Approve the proposed task-file reconciliation during Stage 3.</label>
+        <label class="option"><input type="radio" name="task_changes" value="canonical_only" data-approval-effect="approve"> Approve canonical artifact changes only; do not edit task files during Stage 3.</label>
+        <label class="option"><input type="radio" name="task_changes" value="revise_tasks" data-approval-effect="clarify"> Request changes to the proposed task-file updates.</label>
+      </fieldset>
+      <fieldset class="gate" data-gate-name="reviewer_notes">
+        <legend>Optional Reviewer Notes</legend>
+        <p class="muted">Use this for factual corrections, scope edits, preferred task handling, or canonical wording requests.</p>
+        <textarea id="reviewerNotes" placeholder="Optional notes for the agent..."></textarea>
+      </fieldset>
+    </form>
+  </section>
+
+  <section class="card" id="compile">
+    <h2>Compile Responses</h2>
+    <p>Compile final YAML when the required gates are answered. Approval requires approving options and no unresolved negative feedback.</p>
+    <button type="button" onclick="compileYaml()">Compile Responses</button>
+    <button type="button" class="secondary" onclick="copyYaml()">Copy YAML</button>
+    <h3>Compiled YAML</h3>
+    <div class="output" id="yamlOutput">Select gate responses, then compile.</div>
+  </section>
+</div>
+
+<script>
+function esc(s){return String(s||'').replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/"/g,'\\"')}
+function selected(name){const el=document.querySelector(`input[name="${name}"]:checked`);return el?{value:el.value,effect:el.dataset.approvalEffect||'unknown',label:el.parentElement.textContent.trim()}:null}
+function compileYaml(){
+  const gates=['artifact_decision','canonical_changes','task_changes'];
+  const responses=gates.map(g=>({gate:g,selected:selected(g)}));
+  const unanswered=responses.filter(r=>!r.selected).map(r=>r.gate);
+  const negative=responses.filter(r=>r.selected&&r.selected.effect!=='approve').map(r=>r.gate);
+  const notes=document.getElementById('reviewerNotes').value.trim();
+  const complete=unanswered.length===0;
+  const approve=complete&&negative.length===0;
+  const lines=[
+    'response_type: "alignment-stage-2-artifact-approval"',
+    'alignment_page: "alignment/devtool-adoption-chromux.html"',
+    'alignment_status: "review"',
+    'alignment_stage: "stage-2"',
+    'producing_skill: "devtool-adoption"',
+    'concept_slug: "chromux"',
+    `response_status: "${complete?'complete':'incomplete'}"`,
+    `required_gate_status: "${complete?'complete':'incomplete'}"`,
+    `approval_status: "${approve?'ready-for-stage-3':'feedback-or-revision-required'}"`,
+    'working_packet: "research/_working/preliminary-devtool-adoption-research.md"',
+    'proposed_canonical_artifact: "research/devtool-adoption.md"',
+    'unanswered_required_questions:',
+    ...(unanswered.length?unanswered.map(x=>`  - "${x}"`):['  []']),
+    'gate_responses:'
+  ];
+  for(const r of responses){
+    if(!r.selected){lines.push(`  - gate: "${r.gate}"`,`    value: null`,`    approval_effect: "unanswered"`,`    response: ""`)}
+    else{lines.push(`  - gate: "${r.gate}"`,`    value: "${r.selected.value}"`,`    approval_effect: "${r.selected.effect}"`,`    response: "${esc(r.selected.label)}"`)}
+  }
+  lines.push('negative_or_clarifying_gates:');
+  lines.push(...(negative.length?negative.map(x=>`  - "${x}"`):['  []']));
+  lines.push('reviewer_notes: |');
+  lines.push(notes?notes.split('\n').map(l=>'  '+l).join('\n'):'  ');
+  lines.push('agent_instructions: |');
+  lines.push(approve?'  Proceed to Stage 3. Apply any approved notes, archive/remove the working packet, update approved canonical/task files, and convert this alignment page to confirmed.':'  Remain in Stage 2. Address feedback in the working packet and review page, then stop again for artifact approval.');
+  document.getElementById('yamlOutput').textContent=lines.join('\n');
+}
+async function copyYaml(){compileYaml();const text=document.getElementById('yamlOutput').textContent;try{await navigator.clipboard.writeText(text)}catch(e){}}
+</script>
+</body>
+</html>

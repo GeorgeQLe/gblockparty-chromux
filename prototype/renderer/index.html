@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self' file:; style-src 'self' 'unsafe-inline' file:; img-src 'self' data: file:; script-src 'self' file:" />
+  <title>Chromux</title>
+  <link rel="stylesheet" href="../node_modules/@xterm/xterm/css/xterm.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- ══ titlebar ══ -->
+  <header id="titlebar">
+    <div class="brand">
+      <span class="brand-mark">◮</span>
+      <span class="brand-name">CHROMUX</span>
+      <span class="brand-sub">AGENT&nbsp;COCKPIT&nbsp;·&nbsp;V1</span>
+    </div>
+    <div class="titlebar-gauges">
+      <button id="btn-update-ready" class="top-btn update-ready hidden" title="Open settings">UPDATE READY</button>
+      <span class="gauge"><i class="gdot g-green"></i><b id="g-sessions">0</b> SESSIONS</span>
+      <span class="gauge"><i class="gdot g-amber"></i><b id="g-queued">0</b> QUEUED</span>
+      <span class="gauge"><i class="gdot g-cyan"></i><b id="g-captures">0</b> SENT</span>
+      <button id="btn-settings" class="top-btn" title="Settings">SETTINGS</button>
+    </div>
+  </header>
+
+  <!-- ══ main frame ══ -->
+  <div id="app">
+    <aside id="rail">
+      <div class="rail-head">
+        <span class="microlabel">ATTENTION QUEUE</span>
+        <button id="btn-detect" class="btn" title="Detect open terminal tabs & agent sessions (⌘D)">⛶ DETECT</button>
+      </div>
+      <div id="attention-list"></div>
+      <div class="rail-foot">
+        <div class="microlabel">LOCAL STORAGE</div>
+        <button id="storage-path" class="pathlink" title="Reveal in Finder">~/.chromux/captures</button>
+      </div>
+    </aside>
+
+    <div id="workspace">
+      <nav id="session-tabs" aria-label="Session tabs">
+        <div id="tab-list"></div>
+        <button id="btn-new-session" class="session-tab add-tab" title="New session (⌘T)" aria-label="New session">+</button>
+      </nav>
+      <div id="restore-warning" class="restore-warning hidden"></div>
+
+      <main id="stage">
+        <div id="empty-state">
+          <div class="empty-mark">◮</div>
+          <div class="empty-title">CHROMUX</div>
+          <div class="empty-sub">Pair a coding-agent terminal with its own browser pane.<br/>
+            Localhost previews and generated HTML open here — no alt-tab, no copy-paste.</div>
+          <div class="empty-actions">
+            <button id="btn-first-session" class="btn btn-amber btn-lg">START FIRST SESSION</button>
+            <button id="btn-first-detect" class="btn btn-lg">⛶ DETECT OPEN TERMINALS</button>
+          </div>
+          <div class="empty-hints">
+            <span>AUTO-DETECT <em>localhost</em> + <em>file://…html</em></span>
+            <span>REVIEW QUEUE — NEVER STEALS FOCUS</span>
+            <span>ONE-CLICK CAPTURE → <em>claude&nbsp;-p</em></span>
+          </div>
+        </div>
+        <div id="views"></div>
+      </main>
+    </div>
+  </div>
+
+  <!-- ══ status bar ══ -->
+  <footer id="statusbar">
+    <div class="sb-left">
+      <span class="microlabel">ADAPTER</span><span class="sb-val">claude -p · one-off</span>
+      <span class="sb-sep"></span>
+      <span class="microlabel">PAIRING</span><span class="sb-val">1:1 session ↔ pane</span>
+    </div>
+    <div class="sb-right">
+      <button id="btn-log" class="sb-btn">DELIVERY LOG</button>
+      <span class="sb-ver">chromux 0.5.1 — prototype</span>
+    </div>
+  </footer>
+
+  <!-- ══ settings modal ══ -->
+  <div id="modal-settings" class="overlay hidden">
+    <div class="modal">
+      <div class="modal-head">
+        <span class="microlabel">SETTINGS</span>
+        <button class="modal-x" data-close="modal-settings">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="settings-block">
+          <div class="settings-row">
+            <span class="microlabel">CURRENT VERSION</span>
+            <span id="settings-current-version" class="settings-value">—</span>
+          </div>
+          <div class="settings-row">
+            <span class="microlabel">LATEST RELEASE</span>
+            <span id="settings-source-version" class="settings-value">—</span>
+          </div>
+          <div class="settings-row">
+            <span class="microlabel">RELEASE URL</span>
+            <button id="settings-source-dir" class="pathlink settings-path">—</button>
+          </div>
+        </div>
+        <div id="settings-update-status" class="settings-status">Update status unknown.</div>
+        <div class="settings-command hidden" id="settings-update-command"></div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" data-close="modal-settings">CLOSE</button>
+        <button id="settings-install-update" class="btn hidden">OPEN RELEASE</button>
+        <button id="settings-check-updates" class="btn btn-amber">CHECK FOR UPDATES</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ new session modal ══ -->
+  <div id="modal-new" class="overlay hidden">
+    <div class="modal">
+      <div class="modal-head">
+        <span class="microlabel">NEW SESSION</span>
+        <button class="modal-x" data-close="modal-new">✕</button>
+      </div>
+      <div class="modal-body">
+        <label class="field">
+          <span class="microlabel">SESSION NAME</span>
+          <input id="ns-name" type="text" spellcheck="false" />
+        </label>
+        <label class="field">
+          <span class="microlabel">PROJECT DIRECTORY</span>
+          <div class="field-row">
+            <input id="ns-cwd" type="text" spellcheck="false" placeholder="~" />
+            <button id="ns-browse" class="btn">BROWSE…</button>
+          </div>
+        </label>
+        <div class="field">
+          <span class="microlabel">AGENT — CLI RUNS UNCHANGED</span>
+          <div class="segmented" id="ns-agent">
+            <button data-agent="claude" class="on">CLAUDE CODE</button>
+            <button data-agent="codex">CODEX</button>
+            <button data-agent="">SHELL ONLY</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" data-close="modal-new">CANCEL</button>
+        <button id="ns-create" class="btn btn-amber">LAUNCH SESSION</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ detect modal ══ -->
+  <div id="modal-detect" class="overlay hidden">
+    <div class="modal modal-wide">
+      <div class="modal-head">
+        <span class="microlabel">DETECT — OPEN TERMINAL TABS &amp; AGENT SESSIONS</span>
+        <button class="modal-x" data-close="modal-detect">✕</button>
+      </div>
+      <div class="modal-body detect-body">
+        <div id="detect-status" class="detect-status">
+          <span class="scan-spinner" aria-hidden="true"></span>
+          <span id="detect-status-text">SCANNING…</span>
+        </div>
+        <label class="detect-search">
+          <span>FILTER</span>
+          <input id="detect-search" type="search" autocomplete="off" spellcheck="false" placeholder="agent, title, tty, cwd, URL, status…">
+        </label>
+        <div id="restore-block" class="restore-block hidden">
+          <div class="restore-head">
+            <span class="microlabel">BACKUP WORKSPACE SNAPSHOT</span>
+            <button id="restore-open-all" class="qi-btn open">OPEN ALL</button>
+          </div>
+          <div id="restore-list" class="restore-list"></div>
+        </div>
+        <div id="detect-list" class="detect-list"></div>
+        <div class="detect-hint">Opening here leaves the original tab untouched. <b>RESUME</b> continues the
+          tab's latest saved conversation in a new Chromux session — if the agent is still running in the
+          terminal, the two copies diverge from that point. <b>FRESH</b> starts a new conversation in the
+          same project.</div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" data-close="modal-detect">CLOSE</button>
+        <button id="detect-rescan" class="btn">⟳ RESCAN</button>
+        <button id="detect-open-all" class="btn btn-amber" disabled>OPEN ALL AGENTS</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ capture modal ══ -->
+  <div id="modal-capture" class="overlay hidden">
+    <div class="modal modal-wide">
+      <div class="modal-head">
+        <span class="microlabel" id="cap-title">CAPTURE → AGENT</span>
+        <button class="modal-x" data-close="modal-capture">✕</button>
+      </div>
+
+      <div class="modal-body cap-grid" id="cap-compose">
+        <div class="cap-col">
+          <div class="cap-summary" id="cap-summary"></div>
+          <label class="field">
+            <span class="microlabel">NOTE TO AGENT — WHAT'S WRONG / WHAT TO DO</span>
+            <textarea id="cap-notes" rows="3" spellcheck="false"
+              placeholder="e.g. the CTA button overflows its container on this page — fix the CSS"></textarea>
+          </label>
+          <label class="field">
+            <span class="microlabel">TARGET</span>
+            <select id="cap-target"></select>
+          </label>
+          <div class="field">
+            <span class="microlabel">SCREENSHOT</span>
+            <div id="cap-shot" class="cap-shot"><span class="dim">no screenshot</span></div>
+          </div>
+        </div>
+        <div class="cap-col">
+          <span class="microlabel">PAYLOAD PREVIEW — YAML v1</span>
+          <pre id="cap-yaml" class="yaml-view"></pre>
+        </div>
+      </div>
+
+      <div class="modal-body hidden" id="cap-deliver">
+        <div class="deliver-status" id="deliver-status">
+          <span class="pulse-dot"></span><span id="deliver-status-text">DELIVERING VIA claude -p …</span>
+        </div>
+        <pre id="deliver-output" class="yaml-view deliver-out"></pre>
+        <div class="deliver-meta" id="deliver-meta"></div>
+      </div>
+
+      <div class="modal-foot" id="cap-foot-compose">
+        <button class="btn" data-close="modal-capture">CANCEL</button>
+        <button id="cap-filedrop" class="btn" title="Write payload to ~/.chromux/captures only">FILE-DROP ONLY</button>
+        <button id="cap-send" class="btn btn-amber">SEND — claude -p</button>
+      </div>
+      <div class="modal-foot hidden" id="cap-foot-deliver">
+        <button id="deliver-reveal" class="btn">REVEAL PAYLOAD</button>
+        <button id="deliver-cancel" class="btn btn-red">ABORT</button>
+        <button id="deliver-done" class="btn btn-amber hidden" data-close="modal-capture">DONE</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ delivery log drawer ══ -->
+  <div id="drawer-log" class="drawer hidden">
+    <div class="drawer-head">
+      <span class="microlabel">DELIVERY LOG — ~/.chromux/delivery-log.jsonl</span>
+      <button class="modal-x" id="drawer-close">✕</button>
+    </div>
+    <div id="log-entries"></div>
+  </div>
+
+  <!-- ══ lifecycle warning modal ══ -->
+  <div id="modal-lifecycle" class="overlay hidden">
+    <div class="modal">
+      <div class="modal-head">
+        <span class="microlabel" id="lifecycle-title">LIVE SESSIONS WILL STOP</span>
+        <button class="modal-x" id="lifecycle-cancel-x">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="lifecycle-copy" class="lifecycle-copy"></div>
+        <div id="lifecycle-list" class="lifecycle-list"></div>
+      </div>
+      <div class="modal-foot">
+        <button id="lifecycle-cancel" class="btn">CANCEL</button>
+        <button id="lifecycle-confirm" class="btn btn-red">CONTINUE</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../node_modules/@xterm/xterm/lib/xterm.js"></script>
+  <script src="../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

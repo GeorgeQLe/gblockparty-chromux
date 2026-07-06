@@ -1,0 +1,36 @@
+{
+  "name": "chromux",
+  "version": "0.9.0",
+  "description": "OSS desktop front-end for local and GBlockParty-managed agent/browser workspaces.",
+  "main": "main.js",
+  "private": false,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GeorgeQLe/gblockparty-chromux.git",
+    "directory": "prototype"
+  },
+  "scripts": {
+    "start": "electron .",
+    "smoke": "electron . --smoke",
+    "test:detect-filter-renderer": "node scripts/test-detect-filter-renderer.js",
+    "test:attention-signals-renderer": "node scripts/test-attention-signals-renderer.js",
+    "test:github-update-check": "node scripts/test-github-update-check.js",
+    "test:update-queue-renderer": "node scripts/test-update-queue-renderer.js",
+    "package": "electron-packager . Chromux --platform=darwin --arch=arm64 --icon=build/icon.icns --app-bundle-id=dev.georgele.chromux --overwrite --out=dist --ignore='^/dist' --ignore='^/build/icon.iconset' --asar.unpack='**/node_modules/node-pty/**'",
+    "install-app": "npm run package && node scripts/record-install-source.js && rm -rf /Applications/Chromux.app && cp -R dist/Chromux-darwin-arm64/Chromux.app /Applications/Chromux.app",
+    "rebuild": "electron-rebuild -f -w node-pty",
+    "postinstall": "electron-rebuild -f -w node-pty"
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/xterm": "^5.5.0",
+    "js-yaml": "^4.1.0",
+    "node-pty": "^1.0.0"
+  },
+  "devDependencies": {
+    "@electron/packager": "^20.0.2",
+    "@electron/rebuild": "^3.7.0",
+    "electron": "^33.2.0"
+  }
+}
