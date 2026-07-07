@@ -551,6 +551,10 @@ body.dragging webview { pointer-events: none; }
 .console-chip { font-size: 10px; color: var(--faint); flex: none; letter-spacing: 0.05em; }
 .console-chip.has-errors { color: var(--red); }
 
+/* capture submitted for the pane's current URL — derived from capture records */
+.capture-chip { font-size: 10px; color: var(--amber); flex: none; letter-spacing: 0.05em; white-space: nowrap; }
+.capture-chip.failed { color: var(--red); }
+
 /* review queue dropdown */
 .queue-panel {
   position: absolute; top: 35px; right: 8px; z-index: 40;

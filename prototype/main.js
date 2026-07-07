@@ -3,7 +3,7 @@
 // claude -p delivery adapter, and webview popup interception (review-queue routing).
 'use strict';
 
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -19,6 +19,8 @@ const CAPTURES_DIR = path.join(CHROMUX_HOME, 'captures');
 const DELIVERY_LOG = path.join(CHROMUX_HOME, 'delivery-log.jsonl');
 const UPDATE_CACHE = path.join(CHROMUX_HOME, 'update-cache.json');
 const RESTORE_SESSIONS = path.join(CHROMUX_HOME, 'restore-sessions.json');
+const HOOKS_CLAUDE = path.join(CHROMUX_HOME, 'hooks-claude.json');
+const CODEX_NOTIFY = path.join(CHROMUX_HOME, 'codex-notify.sh');
 const PACKAGE_PATH = path.join(__dirname, 'package.json');
 
 let win = null;
@@ -43,6 +45,63 @@ function send(channel, payload) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
 }
 
+function requestGuardedQuit(reason = 'app-quit') {
+  send('lifecycle-confirm-close', {
+    reason,
+    liveCount: ptys.size,
+    alwaysConfirm: reason === 'app-quit',
+  });
+}
+
+function installAppMenu() {
+  const template = [
+    {
+      label: app.name,
+      submenu: [
+        {
+          label: 'Quit Chromux',
+          accelerator: 'Command+Q',
+          click: () => requestGuardedQuit('app-quit'),
+        },
+      ],
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' },
+      ],
+    },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' },
+        { role: 'toggleDevTools' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' },
+      ],
+    },
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' },
+        { role: 'zoom' },
+        { role: 'front' },
+      ],
+    },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
 function appendDeliveryLog(entry) {
   try {
     fs.appendFileSync(DELIVERY_LOG, JSON.stringify(entry) + '\n');
@@ -53,6 +112,77 @@ function appendDeliveryLog(entry) {
 
 function readJson(p) {
   try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return null; }
+}
+
+// ---------------------------------------------------------------------------
+// Deterministic turn signals — Claude Code hooks. Chromux launches claude with
+// `--settings ~/.chromux/hooks-claude.json` (merges with, never replaces, user
+// settings). Each hook is dependency-free sh printf that emits JSON whose
+// `terminalSequence` Claude Code writes to its own terminal, so the signal
+// rides the PTY Chromux already owns — no extra IPC, no file watchers. The
+// session id comes from CHROMUX_SESSION_ID in the PTY env; the renderer drops
+// any signal whose id does not match the PTY it arrived on (guards `claude -p`
+// children and pasted logs).
+// ---------------------------------------------------------------------------
+
+function chromuxHookCommand(event) {
+  // The doubled backslashes make printf emit the six-character texts
+  // "backslash-u001b" / "backslash-u0007", so stdout stays valid JSON;
+  // Claude Code's JSON parser decodes them into the real ESC/BEL bytes.
+  return `printf '{"terminalSequence":"\\\\u001b]777;chromux;v1;${event};%s\\\\u0007"}' "$CHROMUX_SESSION_ID"`;
+}
+
+function writeClaudeHooksSettings() {
+  ensureDirs();
+  const hook = (event) => [{ hooks: [{ type: 'command', command: chromuxHookCommand(event) }] }];
+  const settings = {
+    hooks: {
+      // No SubagentStop on purpose: a subagent finishing must not read as
+      // session-level turn completion.
+      UserPromptSubmit: hook('turn-start'),
+      Notification: hook('input-needed'),
+      Stop: hook('turn-end'),
+    },
+  };
+  fs.writeFileSync(HOOKS_CLAUDE, JSON.stringify(settings, null, 2) + '\n');
+  return HOOKS_CLAUDE;
+}
+
+function claudeCommand(resumeId = null) {
+  const base = `claude --settings '${HOOKS_CLAUDE}'`;
+  return resumeId ? `${base} --resume ${resumeId}` : base;
+}
+
+// Codex turn signals — verified on codex-cli 0.142.5: `codex -c notify=[...]`
+// is accepted (invalid values are rejected at parse time), the notify child is
+// invoked with a single JSON arg of type "agent-turn-complete", and a
+// /dev/tty write from that child rides the PTY back into our pty-data stream.
+// Codex has no turn-start/input-needed notifications, so codex sessions get
+// turn-end only; "working" is inferred in the renderer from submitted input.
+function writeCodexNotifyScript() {
+  ensureDirs();
+  const script = [
+    '#!/bin/sh',
+    '# Chromux codex notify hook. Emits a turn-end OSC to the controlling',
+    '# terminal so the signal arrives on the PTY Chromux owns. The session id',
+    '# comes from CHROMUX_SESSION_ID in the PTY env; the renderer drops any',
+    '# signal whose id does not match the PTY it arrived on.',
+    '[ -n "$CHROMUX_SESSION_ID" ] || exit 0',
+    'case "$1" in',
+    '  *\'"type":"agent-turn-complete"\'*) ;;',
+    '  *) exit 0 ;; # only turn completion may signal turn-end',
+    'esac',
+    'printf \'\\033]777;chromux;v1;turn-end;%s\\007\' "$CHROMUX_SESSION_ID" > /dev/tty 2>/dev/null || true',
+    '',
+  ].join('\n');
+  fs.writeFileSync(CODEX_NOTIFY, script, { mode: 0o755 });
+  fs.chmodSync(CODEX_NOTIFY, 0o755); // mode above is ignored when the file already exists
+  return CODEX_NOTIFY;
+}
+
+function codexCommand(resumeId = null) {
+  const base = `codex -c 'notify=["${CODEX_NOTIFY}"]'`;
+  return resumeId ? `${base} resume ${resumeId}` : base;
 }
 
 function sanitizeRestoreSession(session) {
@@ -139,8 +269,8 @@ function resolveRestoreSessions(sessions) {
     if (session.agent === 'claude') resume = latestClaudeSession(session.cwd);
     else if (session.agent === 'codex') resume = codexIndex.get(session.cwd) || null;
     const command = resume && session.agent === 'claude'
-      ? `claude --resume ${resume.id}`
-      : (resume && session.agent === 'codex' ? `codex resume ${resume.id}` : null);
+      ? claudeCommand(resume.id)
+      : (resume && session.agent === 'codex' ? codexCommand(resume.id) : null);
     const row = { ...session, resume, command };
     resolved.push(row);
     if (session.agent && !command) {
@@ -199,6 +329,26 @@ function createWindow() {
 
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
+  win.webContents.on('before-input-event', (event, input) => {
+    if (!input.meta || input.alt || input.control) return;
+    if (input.type !== 'keyDown') return;
+    const key = String(input.key || '').toLowerCase();
+    if (/^[1-9]$/.test(key)) {
+      event.preventDefault();
+      send('shortcut-activate-session-index', { index: Number(key) - 1 });
+      return;
+    }
+    if (key === 'j') {
+      event.preventDefault();
+      send('shortcut-focus-next-queue-item');
+      return;
+    }
+    if (key === 'q') {
+      event.preventDefault();
+      requestGuardedQuit('app-quit');
+    }
+  });
+
   if (SMOKE) {
     win.webContents.on('console-message', (_e, level, message) => {
       console.log(`[renderer:${level}] ${message}`);
@@ -232,10 +382,7 @@ function createWindow() {
   win.on('close', (event) => {
     if (closeConfirmed || ptys.size === 0 || SMOKE) return;
     event.preventDefault();
-    send('lifecycle-confirm-close', {
-      reason: 'app-close',
-      liveCount: ptys.size,
-    });
+    requestGuardedQuit('app-close');
   });
 
   win.on('closed', () => {
@@ -269,7 +416,7 @@ ipcMain.handle('pty-create', (_e, { id, cwd, command, cols, rows }) => {
     cols: cols || 80,
     rows: rows || 24,
     cwd: cwd && fs.existsSync(cwd) ? cwd : os.homedir(),
-    env: { ...process.env, TERM: 'xterm-256color', CHROMUX: '1' },
+    env: { ...process.env, TERM: 'xterm-256color', CHROMUX: '1', CHROMUX_SESSION_ID: id },
   });
   ptys.set(id, p);
   p.onData((data) => send('pty-data', { id, data }));
@@ -691,6 +838,8 @@ ipcMain.handle('get-env', () => ({
   capturesDir: CAPTURES_DIR,
   deliveryLog: DELIVERY_LOG,
   restoreSessions: readRestoreSnapshot(),
+  hooksSettingsPath: HOOKS_CLAUDE,
+  codexNotifyPath: CODEX_NOTIFY,
   version: currentVersion(),
 }));
 
@@ -728,6 +877,9 @@ ipcMain.handle('open-update-release', async (_e, opts = {}) => {
 
 app.whenReady().then(() => {
   ensureDirs();
+  installAppMenu();
+  try { writeClaudeHooksSettings(); } catch (err) { console.error('hooks settings write failed:', err.message); }
+  try { writeCodexNotifyScript(); } catch (err) { console.error('codex notify script write failed:', err.message); }
   createWindow();
   getUpdateStatus().then((status) => send('update-status', status)).catch(() => {});
   app.on('activate', () => {

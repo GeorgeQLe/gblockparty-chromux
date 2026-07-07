@@ -10,10 +10,16 @@ const state = {
   sessions: new Map(), // id -> session
   activeId: null,
   counter: 0,
-  sentCount: 0,
   env: null,
-  capture: null, // in-flight capture context
-  delivery: null, // in-flight delivery context
+  captures: new Map(), // captureId -> CaptureRecord
+  deliveryIndex: new Map(), // deliveryId -> captureId
+  events: [], // ring buffer of applied events (diagnostics), max EVENT_RING_MAX
+  ui: {
+    captureModal: null, // { captureId, pngBase64, payloadBase } while composing/delivering
+    dirty: new Set(),
+    rafScheduled: false,
+    lastQueueShortcutFocus: null,
+  },
   lastCwd: null,
   contextMenu: null,
   updateStatus: null,
@@ -68,12 +74,6 @@ const ANSI_RE = /\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?|\x
 // almost always a soft-wrapped fragment of a longer URL, not a dev server.
 const LOCALHOST_RE = /https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(?::\d+(?:\/[^\s"'<>)\]]*)?|\/[^\s"'<>)\]]*)/gi;
 const HTMLFILE_RE = /(?:file:\/\/)?(\/(?:[^\s"'<>:*?]+\/)*[^\s"'<>:*?]+\.html?)\b/gi;
-const EXPLICIT_INPUT_NEEDED_RE = /(?:\b(?:y\/n|n\/y|yes\/no|no\/yes)\b|(?:permission|approval|approve|allow|authorize|required|requested)|(?:continue|proceed)\?|(?:press|hit)\s+enter|(?:choose|select|pick)\s+(?:an?\s+)?(?:option|one|number)|(?:which|what)\s+(?:option|one|number)|\b(?:confirm|deny|accept|reject)\b)/i;
-const PROMPT_GLYPH_RE = /(?:^|\s)(?:❯|›)\s*$/;
-const INPUT_NEEDED_USER_SUPPRESS_MS = 1500;
-const INPUT_NEEDED_PROMPT_IDLE_MS = 700;
-const COMPLETED_RE = /(?:completed|done|finished|ready for review|changes applied|task complete|implementation complete|all set)\b/i;
-const ACTIVE_WORK_RE = /(?:running|building|compiling|installing|fetching|downloading|waiting for|processing|thinking|working)/i;
 const UPDATE_QUEUE_PHASES = new Set(['idle', 'waiting', 'ready', 'running', 'failed']);
 
 function normalizePreviewUrl(raw) {
@@ -97,11 +97,11 @@ function scanLineForPreviews(line) {
 }
 
 function feedDetector(session, chunk) {
-  scanAttentionSignals(session, chunk);
-  session.lineBuf += chunk;
-  const parts = session.lineBuf.split(/\r?\n|\r/);
-  session.lineBuf = parts.pop() || '';
-  if (session.lineBuf.length > 2048) session.lineBuf = session.lineBuf.slice(-2048);
+  const t = session.term;
+  t.lineBuf += chunk;
+  const parts = t.lineBuf.split(/\r?\n|\r/);
+  t.lineBuf = parts.pop() || '';
+  if (t.lineBuf.length > 2048) t.lineBuf = t.lineBuf.slice(-2048);
   for (const rawLine of parts) {
     const line = rawLine.replace(ANSI_RE, '');
     if (!line) continue;
@@ -118,10 +118,6 @@ function feedDetector(session, chunk) {
       }
     }
   }
-}
-
-function stripAnsi(text) {
-  return String(text || '').replace(ANSI_RE, '');
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -174,9 +170,9 @@ function logicalLineAt(term, bufferRow) {
 }
 
 function registerTerminalLinks(session) {
-  session.term.registerLinkProvider({
+  session.term.term.registerLinkProvider({
     provideLinks(bufferLineNumber, callback) {
-      const term = session.term;
+      const term = session.term.term;
       const row = bufferLineNumber - 1;
       if (!term.buffer.active.getLine(row)) {
         callback(undefined);
@@ -261,98 +257,231 @@ function registerTerminalLinks(session) {
   });
 }
 
-function scanAttentionSignals(session, chunk) {
-  const text = stripAnsi(chunk);
-  if (!text.trim()) return;
-  const now = Date.now();
-  session.lastOutputAt = now;
-  session.attentionTail = (session.attentionTail + text).slice(-6000);
-  const lines = session.attentionTail.split(/\r?\n|\r/).map((l) => l.trim()).filter(Boolean);
-  const recent = lines.slice(-8);
-  const lastText = recent.join('\n');
-  const inputSignal = classifyInputNeededSignal(session, lastText, recent, now);
-  if (inputSignal === 'explicit') {
-    setSessionAttention(session, 'inputNeeded', {
-      label: 'INPUT NEEDED',
-      detail: recent.slice(-2).join('  '),
-      ts: now,
-    });
-    session.attention.completed = null;
-    renderUpdateControls();
-    renderAttentionQueue();
-    return;
-  }
-  if (inputSignal === 'idlePrompt') scheduleIdlePromptAttention(session, recent, now);
-  if (COMPLETED_RE.test(lastText) && !ACTIVE_WORK_RE.test(lastText)) {
-    setSessionAttention(session, 'completed', {
-      label: 'COMPLETED',
-      detail: recent.slice(-2).join('  '),
-      ts: now,
-    });
-    renderUpdateControls();
-    renderAttentionQueue();
+// ───────────────────────────────────────────────────────────────────────────
+// Event seam — domain state mutates only inside apply(); every applied event
+// lands in a bounded ring buffer (state.events) for diagnosis, then dirty UI
+// areas are invalidated and coalesced into one rAF flush.
+// ───────────────────────────────────────────────────────────────────────────
+
+const EVENT_RING_MAX = 500;
+
+function recordEvent(event) {
+  // Keystroke payloads and bulky blobs stay out of the diagnostic ring.
+  const { data, patch, ...rest } = event;
+  state.events.push({ ...rest, ts: Date.now() });
+  if (state.events.length > EVENT_RING_MAX) {
+    state.events.splice(0, state.events.length - EVENT_RING_MAX);
   }
 }
 
-function isAgentAttentionSession(session) {
-  return session && (session.agent === 'claude' || session.agent === 'codex');
+const TURN_SIGNAL_STATES = {
+  'turn-start': 'working',
+  'input-needed': 'needsInput',
+  'turn-end': 'completed',
+};
+
+function applyTurnSignal(session, event) {
+  const next = TURN_SIGNAL_STATES[event.signal];
+  if (!next) return;
+  const turn = session.turn;
+  turn.state = next;
+  turn.instrumented = true;
+  turn.detail = event.detail || null;
+  turn.since = Date.now();
+  turn.acknowledged = false;
 }
 
-function recentlyTypedInSession(session, now = Date.now()) {
-  return Number.isFinite(session.lastUserInputAt)
-    && now - session.lastUserInputAt < INPUT_NEEDED_USER_SUPPRESS_MS;
+function applyUserInput(session, event) {
+  const turn = session.turn;
+  if (turn.state === 'needsInput' || turn.state === 'completed') {
+    // Any keystroke counts as answering in-terminal. An arrow key while
+    // needsInput yields a false "working" — a false negative, never a false
+    // positive alert; the next hook signal corrects it.
+    turn.state = 'working';
+    turn.detail = null;
+    turn.since = Date.now();
+    turn.acknowledged = false;
+    return true;
+  }
+  // Codex ships no turn-start hook — infer a turn from a submitted line.
+  if (session.agent === 'codex' && turn.state === 'unknown' && /\r/.test(event.data || '')) {
+    turn.state = 'working';
+    turn.since = Date.now();
+    return true;
+  }
+  return false;
 }
 
-function classifyInputNeededSignal(session, lastText, recent, now = Date.now()) {
-  if (!isAgentAttentionSession(session) || recentlyTypedInSession(session, now)) return null;
-  if (EXPLICIT_INPUT_NEEDED_RE.test(lastText)) return 'explicit';
-  const lastLine = recent[recent.length - 1] || '';
-  if (PROMPT_GLYPH_RE.test(lastLine)) return 'idlePrompt';
-  return null;
+function captureRecordOf(event) {
+  return event.captureId ? state.captures.get(event.captureId) : null;
 }
 
-function scheduleIdlePromptAttention(session, recent, seenAt = Date.now()) {
-  session.attentionPromptCandidate = {
-    seenAt,
-    detail: recent.slice(-2).join('  '),
+function apply(event) {
+  const session = event.sessionId ? state.sessions.get(event.sessionId) : null;
+  let recorded = false;
+  switch (event.type) {
+    case 'turn-signal':
+      if (session) applyTurnSignal(session, event);
+      break;
+    case 'user-input':
+      // Only state-changing input is worth ring space — raw typing is noise.
+      recorded = true;
+      if (session && applyUserInput(session, event)) {
+        recordEvent({ type: 'user-input', sessionId: session.id, turnState: session.turn.state });
+      }
+      break;
+    case 'session-exited':
+      if (session) {
+        session.lifecycle.alive = false;
+        session.lifecycle.exitCode = Number.isFinite(event.exitCode) ? event.exitCode : null;
+        session.lifecycle.exitedAt = Date.now();
+      }
+      break;
+    case 'session-focused':
+      // Display-only: never touches turn state, so looking at a completed
+      // session cannot regress the update queue.
+      state.activeId = event.sessionId;
+      break;
+    case 'attention-dismissed':
+      if (session) session.turn.acknowledged = true;
+      break;
+    case 'preview-queued':
+      if (session) session.browser.queue.push({ url: event.url, source: event.source, ts: Date.now() });
+      break;
+    case 'preview-opened':
+    case 'preview-dismissed':
+      if (session) session.browser.queue = session.browser.queue.filter((q) => q.url !== event.url);
+      break;
+    case 'capture-created':
+      state.captures.set(event.captureId, {
+        id: event.captureId,
+        sessionId: event.sessionId,
+        targetSessionId: null,
+        url: event.url || null,
+        status: 'composing',
+        payloadPath: null,
+        screenshotPath: null,
+        deliveryId: null,
+        exitCode: null,
+        error: null,
+        acknowledged: false,
+        ts: Date.now(),
+        updatedAt: Date.now(),
+      });
+      break;
+    case 'capture-written': {
+      const rec = captureRecordOf(event);
+      if (rec) {
+        rec.status = 'written';
+        rec.payloadPath = event.payloadPath || null;
+        rec.screenshotPath = event.screenshotPath || null;
+        rec.targetSessionId = event.targetSessionId !== undefined ? event.targetSessionId : rec.targetSessionId;
+        rec.updatedAt = Date.now();
+      }
+      break;
+    }
+    case 'capture-delivering': {
+      const rec = captureRecordOf(event);
+      if (rec) {
+        rec.status = 'delivering';
+        rec.deliveryId = event.deliveryId;
+        rec.targetSessionId = event.targetSessionId !== undefined ? event.targetSessionId : rec.targetSessionId;
+        rec.updatedAt = Date.now();
+        state.deliveryIndex.set(event.deliveryId, rec.id);
+      }
+      break;
+    }
+    case 'capture-delivered': {
+      const rec = captureRecordOf(event);
+      if (rec) {
+        rec.status = 'delivered';
+        rec.exitCode = 0;
+        rec.updatedAt = Date.now();
+        state.deliveryIndex.delete(rec.deliveryId);
+      }
+      break;
+    }
+    case 'capture-failed': {
+      const rec = captureRecordOf(event);
+      if (rec) {
+        rec.status = 'failed';
+        rec.exitCode = Number.isFinite(event.exitCode) ? event.exitCode : null;
+        rec.error = event.error || null;
+        rec.acknowledged = false;
+        rec.updatedAt = Date.now();
+        state.deliveryIndex.delete(rec.deliveryId);
+      }
+      break;
+    }
+    case 'capture-acknowledged': {
+      const rec = captureRecordOf(event);
+      if (rec) {
+        rec.acknowledged = true;
+        rec.updatedAt = Date.now();
+      }
+      break;
+    }
+    case 'update-queue-phase':
+      state.updateQueue = { ...state.updateQueue, ...event.patch, phase: event.phase };
+      reconcileUpdateQueue();
+      break;
+    case 'signal-rejected':
+    case 'session-created':
+    case 'session-closed':
+      break; // ring-buffer records only
+    default:
+      break;
+  }
+  if (!recorded) recordEvent(event);
+  invalidate('attention', 'update', 'badges', 'captureChips');
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Render coalescing — invalidate() marks areas dirty and schedules one rAF;
+// flushRender() is exported to tests for synchronous flushing.
+// ───────────────────────────────────────────────────────────────────────────
+
+function invalidate(...areas) {
+  for (const area of areas) state.ui.dirty.add(area);
+  if (state.ui.rafScheduled) return;
+  state.ui.rafScheduled = true;
+  requestAnimationFrame(() => flushRender());
+}
+
+function flushRender() {
+  state.ui.rafScheduled = false;
+  const dirty = state.ui.dirty;
+  if (dirty.size === 0) return;
+  state.ui.dirty = new Set();
+  if (dirty.has('update')) renderUpdateControls();
+  if (dirty.has('attention')) renderAttentionQueue();
+  if (dirty.has('badges')) updateBadges();
+  if (dirty.has('captureChips')) renderCaptureChips();
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Session shape — explicit state domains. Identity is flat and immutable;
+// lifecycle, turn, browser-pane, and terminal state live in their own domains.
+// ───────────────────────────────────────────────────────────────────────────
+
+function newSessionShape({ id, name, cwd, agent }) {
+  return {
+    id, name, cwd, agent,
+    lifecycle: { alive: true, exitCode: null, exitedAt: null },
+    turn: {
+      state: 'unknown', // 'unknown' | 'working' | 'needsInput' | 'completed'
+      instrumented: false, // true once a deterministic signal has arrived
+      detail: null,
+      since: 0,
+      acknowledged: false, // explicit DISMISS — hides the item, keeps the state
+    },
+    browser: {
+      webview: null, webContentsId: null, currentUrl: null, lastReload: 0,
+      queue: [], consoleBuf: [], consoleTotal: 0, picking: false,
+    },
+    term: { term: null, fitAddon: null, fit: () => {}, lineBuf: '', signalBuf: '' },
+    els: null,
   };
-  if (session.attentionPromptTimer) clearTimeout(session.attentionPromptTimer);
-  session.attentionPromptTimer = setTimeout(() => {
-    session.attentionPromptTimer = null;
-    const candidate = session.attentionPromptCandidate;
-    const now = Date.now();
-    if (!candidate || candidate.seenAt !== seenAt) return;
-    if (!isAgentAttentionSession(session) || recentlyTypedInSession(session, now)) return;
-    if (Number.isFinite(session.lastOutputAt) && now - session.lastOutputAt < INPUT_NEEDED_PROMPT_IDLE_MS) return;
-    setSessionAttention(session, 'inputNeeded', {
-      label: 'INPUT NEEDED',
-      detail: candidate.detail,
-      ts: now,
-    });
-    session.attention.completed = null;
-    renderUpdateControls();
-    renderAttentionQueue();
-  }, INPUT_NEEDED_PROMPT_IDLE_MS);
-}
-
-function setSessionAttention(session, key, value) {
-  session.attention[key] = value;
-}
-
-function clearSessionAttention(session, ...keys) {
-  for (const key of keys) session.attention[key] = null;
-  renderUpdateControls();
-  renderAttentionQueue();
-}
-
-function markSessionUserInput(session) {
-  session.lastUserInputAt = Date.now();
-  session.attentionPromptCandidate = null;
-  if (session.attentionPromptTimer) {
-    clearTimeout(session.attentionPromptTimer);
-    session.attentionPromptTimer = null;
-  }
-  clearSessionAttention(session, 'inputNeeded', 'completed');
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -361,25 +490,23 @@ function markSessionUserInput(session) {
 // ───────────────────────────────────────────────────────────────────────────
 
 function routePreview(session, url, source) {
-  const current = session.currentUrl;
-  if (current && current === url) {
+  const b = session.browser;
+  if (b.currentUrl && b.currentUrl === url) {
     const now = Date.now();
-    if (now - session.lastReload > BOUNDS.reloadThrottleMs && session.webview) {
-      session.lastReload = now;
-      try { session.webview.reload(); } catch { /* not ready */ }
+    if (now - b.lastReload > BOUNDS.reloadThrottleMs && b.webview) {
+      b.lastReload = now;
+      try { b.webview.reload(); } catch { /* not ready */ }
       flashRefresh(session);
     }
     return;
   }
-  if (!session.webview) {
+  if (!b.webview) {
     openInPane(session, url); // empty pane: auto-fill is not attention-stealing
     return;
   }
-  if (session.queue.some((q) => q.url === url)) return;
-  session.queue.push({ url, source, ts: Date.now() });
+  if (b.queue.some((q) => q.url === url)) return;
+  apply({ type: 'preview-queued', sessionId: session.id, url, source });
   renderQueue(session);
-  updateBadges();
-  renderAttentionQueue();
 }
 
 function flashRefresh(session) {
@@ -391,14 +518,15 @@ function flashRefresh(session) {
 
 function renderQueue(session) {
   const host = session.els.queueList;
+  const queue = session.browser.queue;
   host.innerHTML = '';
-  if (session.queue.length === 0) {
+  if (queue.length === 0) {
     const d = document.createElement('div');
     d.className = 'queue-empty';
     d.textContent = 'No queued previews. New URLs from this session land here instead of stealing your pane.';
     host.appendChild(d);
   }
-  for (const item of session.queue) {
+  for (const item of queue) {
     const row = document.createElement('div');
     row.className = 'queue-item';
     const src = document.createElement('span');
@@ -410,43 +538,49 @@ function renderQueue(session) {
     u.title = item.url;
     const open = document.createElement('button');
     open.className = 'qi-btn open';
+    open.dataset.queueOpenUrl = item.url;
     open.textContent = 'OPEN';
     open.onclick = () => {
-      session.queue = session.queue.filter((q) => q !== item);
+      apply({ type: 'preview-opened', sessionId: session.id, url: item.url });
       openInPane(session, item.url);
       renderQueue(session);
-      updateBadges();
-      renderAttentionQueue();
     };
     const dismiss = document.createElement('button');
     dismiss.className = 'qi-btn';
     dismiss.textContent = 'DISMISS';
     dismiss.onclick = () => {
-      session.queue = session.queue.filter((q) => q !== item);
+      apply({ type: 'preview-dismissed', sessionId: session.id, url: item.url });
       renderQueue(session);
-      updateBadges();
-      renderAttentionQueue();
     };
     row.append(src, u, open, dismiss);
     host.appendChild(row);
   }
-  session.els.queueBadge.textContent = String(session.queue.length);
-  session.els.queueBadge.classList.toggle('zero', session.queue.length === 0);
-  session.els.queueBtn.classList.toggle('attention', session.queue.length > 0);
-  renderAttentionQueue();
+  session.els.queueBadge.textContent = String(queue.length);
+  session.els.queueBadge.classList.toggle('zero', queue.length === 0);
+  session.els.queueBtn.classList.toggle('attention', queue.length > 0);
+  invalidate('attention', 'badges');
+}
+
+function deliveredCaptureCount() {
+  let n = 0;
+  for (const rec of state.captures.values()) {
+    if (rec.status === 'delivered') n += 1;
+  }
+  return n;
 }
 
 function updateBadges() {
   let queued = 0;
   for (const s of state.sessions.values()) {
-    queued += s.queue.length;
-    s.els.tabBadge.textContent = String(s.queue.length);
-    s.els.tabBadge.classList.toggle('zero', s.queue.length === 0);
+    if (!s.els || !s.els.tabBadge) continue;
+    queued += s.browser.queue.length;
+    s.els.tabBadge.textContent = String(s.browser.queue.length);
+    s.els.tabBadge.classList.toggle('zero', s.browser.queue.length === 0);
   }
   $('#g-queued').textContent = String(queued);
   $('#g-sessions').textContent = String(state.sessions.size);
-  $('#g-captures').textContent = String(state.sentCount);
-  renderAttentionQueue();
+  // "SENT" counts exactly what its label says: deliveries that exited 0.
+  $('#g-captures').textContent = String(deliveredCaptureCount());
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -454,39 +588,43 @@ function updateBadges() {
 // ───────────────────────────────────────────────────────────────────────────
 
 function openInPane(session, url) {
-  session.currentUrl = url;
-  session.lastReload = Date.now();
+  const b = session.browser;
+  b.currentUrl = url;
+  b.lastReload = Date.now();
   session.els.urlBar.value = url;
-  if (!session.webview) {
+  invalidate('captureChips');
+  if (!b.webview) {
     const wv = document.createElement('webview');
     wv.setAttribute('partition', 'persist:chromux');
     wv.setAttribute('preload', window.chromux.webviewPreloadPath);
     wv.setAttribute('src', url);
-    session.webview = wv;
+    b.webview = wv;
 
     wv.addEventListener('console-message', (e) => {
       const levels = ['debug', 'info', 'warn', 'error'];
-      session.consoleBuf.push({
+      b.consoleBuf.push({
         ts: new Date().toISOString(),
         level: levels[e.level] || String(e.level),
         message: String(e.message).slice(0, BOUNDS.consoleMsgChars),
       });
-      session.consoleTotal += 1;
-      if (session.consoleBuf.length > BOUNDS.consoleTail) session.consoleBuf.shift();
+      b.consoleTotal += 1;
+      if (b.consoleBuf.length > BOUNDS.consoleTail) b.consoleBuf.shift();
       renderConsoleChip(session);
     });
     wv.addEventListener('did-navigate', (e) => {
-      session.currentUrl = e.url;
+      b.currentUrl = e.url;
       session.els.urlBar.value = e.url;
+      invalidate('captureChips');
     });
     wv.addEventListener('did-navigate-in-page', (e) => {
       if (e.isMainFrame) {
-        session.currentUrl = e.url;
+        b.currentUrl = e.url;
         session.els.urlBar.value = e.url;
+        invalidate('captureChips');
       }
     });
     wv.addEventListener('dom-ready', () => {
-      try { session.webContentsId = wv.getWebContentsId(); } catch { /* ok */ }
+      try { b.webContentsId = wv.getWebContentsId(); } catch { /* ok */ }
     });
     wv.addEventListener('ipc-message', (e) => {
       if (e.channel === 'chromux-pick') onElementPicked(session, e.args[0] || {});
@@ -498,14 +636,15 @@ function openInPane(session, url) {
     session.els.pickBtn.disabled = false;
     session.els.captureBtn.disabled = false;
   } else {
-    session.webview.loadURL(url).catch(() => {});
+    b.webview.loadURL(url).catch(() => {});
   }
 }
 
 function renderConsoleChip(session) {
-  const errors = session.consoleBuf.filter((c) => c.level === 'error').length;
+  const b = session.browser;
+  const errors = b.consoleBuf.filter((c) => c.level === 'error').length;
   const chip = session.els.consoleChip;
-  chip.textContent = errors > 0 ? `⚠ ${errors} err · ${session.consoleTotal} logs` : `${session.consoleTotal} logs`;
+  chip.textContent = errors > 0 ? `⚠ ${errors} err · ${b.consoleTotal} logs` : `${b.consoleTotal} logs`;
   chip.classList.toggle('has-errors', errors > 0);
 }
 
@@ -589,16 +728,16 @@ const PICKER_JS = String.raw`
 })();`;
 
 function setPicking(session, on) {
-  session.picking = on;
+  session.browser.picking = on;
   session.els.pickBtn.classList.toggle('armed', on);
   session.els.pickBtn.textContent = on ? 'PICKING… ESC' : '⌖ PICK ELEMENT';
 }
 
 async function startPick(session) {
-  if (!session.webview || session.picking) return;
+  if (!session.browser.webview || session.browser.picking) return;
   setPicking(session, true);
   try {
-    await session.webview.executeJavaScript(PICKER_JS);
+    await session.browser.webview.executeJavaScript(PICKER_JS);
   } catch {
     setPicking(session, false);
   }
@@ -610,7 +749,7 @@ function onElementPicked(session, data) {
     selector: data.selector || null,
     outerHTML: data.outerHTML || null,
     pageTitle: data.title || null,
-    pageUrl: data.url || session.currentUrl,
+    pageUrl: data.url || session.browser.currentUrl,
   });
 }
 
@@ -620,24 +759,29 @@ function onElementPicked(session, data) {
 // ───────────────────────────────────────────────────────────────────────────
 
 async function openCaptureModal(session, selection) {
+  const b = session.browser;
   let pngBase64 = null;
   let shotDataUrl = null;
   try {
-    const image = await session.webview.capturePage();
+    const image = await b.webview.capturePage();
     shotDataUrl = image.toDataURL();
     pngBase64 = shotDataUrl.split(',')[1];
   } catch { /* screenshot failure keeps the payload (dx-journey failure map) */ }
 
   let title = selection.pageTitle;
   if (!title) {
-    try { title = await session.webview.executeJavaScript('document.title'); } catch { title = null; }
+    try { title = await b.webview.executeJavaScript('document.title'); } catch { title = null; }
   }
 
   const outerHTML = selection.outerHTML || null;
   const truncatedHtml = outerHTML !== null && outerHTML.length > BOUNDS.outerHtmlChars;
+  const pageUrl = selection.pageUrl || b.currentUrl;
 
-  state.capture = {
-    session,
+  state.counter += 1;
+  const captureId = 'c' + state.counter;
+  apply({ type: 'capture-created', captureId, sessionId: session.id, url: pageUrl });
+  state.ui.captureModal = {
+    captureId,
     pngBase64,
     payloadBase: {
       schema_version: 1,
@@ -648,7 +792,7 @@ async function openCaptureModal(session, selection) {
         project_path: session.cwd,
       },
       page: {
-        url: selection.pageUrl || session.currentUrl,
+        url: pageUrl,
         title: title || null,
       },
       selection: selection.selector ? {
@@ -657,10 +801,10 @@ async function openCaptureModal(session, selection) {
         truncated: truncatedHtml,
       } : null,
       console: {
-        total_captured: session.consoleTotal,
-        included: session.consoleBuf.length,
-        truncated: session.consoleTotal > session.consoleBuf.length,
-        entries: session.consoleBuf.slice(),
+        total_captured: b.consoleTotal,
+        included: b.consoleBuf.length,
+        truncated: b.consoleTotal > b.consoleBuf.length,
+        entries: b.consoleBuf.slice(),
       },
       screenshot: pngBase64 ? { path: '(assigned on save)', mode: 'visible-viewport' } : { path: null, mode: 'unavailable' },
     },
@@ -678,9 +822,9 @@ async function openCaptureModal(session, selection) {
     sum.appendChild(row);
   };
   addRow('SESSION', `${session.name} — ${session.cwd}`);
-  addRow('URL', state.capture.payloadBase.page.url || '—', 'url');
+  addRow('URL', pageUrl || '—', 'url');
   addRow('ELEMENT', selection.selector || 'none (page-level capture)', selection.selector ? 'sel' : '');
-  addRow('CONSOLE', `${session.consoleBuf.length} of ${session.consoleTotal} entries (tail)`);
+  addRow('CONSOLE', `${b.consoleBuf.length} of ${b.consoleTotal} entries (tail)`);
 
   const shot = $('#cap-shot');
   shot.innerHTML = '';
@@ -723,13 +867,13 @@ async function openCaptureModal(session, selection) {
 }
 
 function buildPayload() {
-  const cap = state.capture;
+  const modal = state.ui.captureModal;
   const targetId = $('#cap-target').value;
   const notes = $('#cap-notes').value.trim() || null;
   const targetSession = targetId === '__oneoff__' ? null : state.sessions.get(targetId);
   return {
     payload: {
-      ...cap.payloadBase,
+      ...modal.payloadBase,
       delivery: {
         adapter: 'claude -p',
         target: targetSession ? targetSession.name : 'one-off',
@@ -743,25 +887,38 @@ function buildPayload() {
 }
 
 function refreshYamlPreview() {
-  if (!state.capture) return;
+  if (!state.ui.captureModal) return;
   const { payload } = buildPayload();
   $('#cap-yaml').textContent = window.chromux.toYaml(payload);
 }
 
 async function persistCapture() {
+  const modal = state.ui.captureModal;
   const { payload, targetSession, notes } = buildPayload();
-  const res = await window.chromux.capturePrepare(payload, state.capture.pngBase64);
+  const res = await window.chromux.capturePrepare(payload, modal.pngBase64);
+  apply({
+    type: 'capture-written',
+    captureId: modal.captureId,
+    payloadPath: res.payloadPath,
+    screenshotPath: res.screenshotPath,
+    targetSessionId: targetSession ? targetSession.id : null,
+  });
   return { ...res, targetSession, notes, payload };
 }
 
 async function sendCapture() {
-  const cap = state.capture;
-  if (!cap) return;
+  const modal = state.ui.captureModal;
+  if (!modal) return;
   $('#cap-send').disabled = true;
   const { payloadPath, screenshotPath, yamlText, targetSession, notes } = await persistCapture();
   const cwd = targetSession ? targetSession.cwd : (state.env ? state.env.home : null);
   const deliveryId = 'd' + Date.now();
-  state.delivery = { id: deliveryId, payloadPath, exitCode: null, targetSessionId: targetSession ? targetSession.id : null };
+  apply({
+    type: 'capture-delivering',
+    captureId: modal.captureId,
+    deliveryId,
+    targetSessionId: targetSession ? targetSession.id : null,
+  });
 
   $('#cap-compose').classList.add('hidden');
   $('#cap-foot-compose').classList.add('hidden');
@@ -792,8 +949,7 @@ async function sendCapture() {
 }
 
 async function filedropCapture() {
-  const cap = state.capture;
-  if (!cap) return;
+  if (!state.ui.captureModal) return;
   const { payloadPath, screenshotPath, targetSession } = await persistCapture();
   window.chromux.logFiledrop({
     payloadPath,
@@ -815,51 +971,74 @@ async function filedropCapture() {
     `payload: <code>${payloadPath}</code><br>` +
     (screenshotPath ? `screenshot: <code>${screenshotPath}</code><br>` : '') +
     `manual send: <code>claude -p "$(cat '${payloadPath}')"</code>`;
-  state.delivery = { id: null, payloadPath, exitCode: 0 };
+}
+
+// Is the capture modal currently showing this delivery?
+function modalShowsDelivery(deliveryId) {
+  const modal = state.ui.captureModal;
+  return Boolean(modal && state.deliveryIndex.get(deliveryId) === modal.captureId);
 }
 
 window.chromux.onDeliverOutput(({ deliveryId, chunk }) => {
-  if (!state.delivery || state.delivery.id !== deliveryId) return;
+  if (!modalShowsDelivery(deliveryId)) return;
   const out = $('#deliver-output');
   out.textContent += chunk;
   out.scrollTop = out.scrollHeight;
 });
 
-window.chromux.onDeliverClose(({ deliveryId, exitCode, error }) => {
-  if (!state.delivery || state.delivery.id !== deliveryId) return;
-  state.delivery.exitCode = exitCode;
+// Delivery outcomes resolve through state.deliveryIndex — never through the
+// focused session or the currently open modal, so overlapping deliveries
+// settle independently and a failure attributes to the record that owns it.
+function handleDeliverClose({ deliveryId, exitCode, error }) {
+  const captureId = state.deliveryIndex.get(deliveryId);
+  if (!captureId) return; // unknown/duplicate close — nothing to attribute
+  const showing = modalShowsDelivery(deliveryId);
+  if (exitCode === 0) {
+    apply({ type: 'capture-delivered', captureId, deliveryId });
+  } else {
+    apply({ type: 'capture-failed', captureId, deliveryId, exitCode, error: error || null });
+  }
+  if (!showing) return;
   const status = $('#deliver-status');
   $('#deliver-cancel').classList.add('hidden');
   $('#deliver-done').classList.remove('hidden');
   if (exitCode === 0) {
     status.className = 'deliver-status ok';
     $('#deliver-status-text').textContent = 'DELIVERED — claude -p EXITED 0';
-    state.sentCount += 1;
-    updateBadges();
   } else {
     status.className = 'deliver-status fail';
     $('#deliver-status-text').textContent =
       `DELIVERY FAILED — EXIT ${exitCode}${error ? ' — ' + error : ''} (PAYLOAD KEPT, RETRY MANUALLY)`;
-    const target = state.delivery.targetSessionId
-      ? state.sessions.get(state.delivery.targetSessionId)
-      : state.sessions.get(state.activeId);
-    if (target) {
-      setSessionAttention(target, 'deliveryFailure', {
-        label: 'DELIVERY FAIL',
-        detail: `Exit ${exitCode}${error ? ': ' + error : ''}`,
-        ts: Date.now(),
-      });
-      renderAttentionQueue();
-    }
   }
-});
+}
+
+window.chromux.onDeliverClose(handleDeliverClose);
 
 // ───────────────────────────────────────────────────────────────────────────
 // Session creation / lifecycle
 // ───────────────────────────────────────────────────────────────────────────
 
-const AGENT_COMMANDS = { claude: 'claude', codex: 'codex', '': null };
 const AGENT_LABELS = { claude: 'CLAUDE CODE', codex: 'CODEX', '': 'SHELL' };
+
+// Launch command for an agent CLI. Claude sessions get `--settings` pointing
+// at the Chromux hooks file (merges with, never replaces, the user's own
+// settings) so deterministic turn signals flow back over the PTY.
+function agentCommand(agent, resumeId = null) {
+  if (agent === 'claude') {
+    const settingsPath = state.env && state.env.hooksSettingsPath;
+    const base = settingsPath ? `claude --settings '${settingsPath}'` : 'claude';
+    return resumeId ? `${base} --resume ${resumeId}` : base;
+  }
+  if (agent === 'codex') {
+    // Verified: the notify child's /dev/tty write rides the PTY back to us.
+    // Codex only reports turn completion, so codex sessions signal turn-end
+    // only; needsInput never fires and working is inferred from typed input.
+    const notifyPath = state.env && state.env.codexNotifyPath;
+    const base = notifyPath ? `codex -c 'notify=["${notifyPath}"]'` : 'codex';
+    return resumeId ? `${base} resume ${resumeId}` : base;
+  }
+  return null;
+}
 
 function agentLabel(agent) {
   return AGENT_LABELS[agent || ''] || (agent || 'shell').toUpperCase();
@@ -886,7 +1065,7 @@ async function duplicateSession(source, agent, mode) {
     name,
     cwd: source.cwd,
     agent,
-    initialUrl: source.currentUrl,
+    initialUrl: source.browser.currentUrl,
   });
 }
 
@@ -989,13 +1168,17 @@ function buildSessionView(session) {
   consoleChip.className = 'console-chip';
   consoleChip.textContent = '0 logs';
 
+  const captureChip = document.createElement('span');
+  captureChip.className = 'capture-chip hidden';
+  captureChip.title = 'A capture for the URL in this pane was submitted';
+
   const pickBtn = document.createElement('button');
   pickBtn.className = 'head-btn'; pickBtn.textContent = '⌖ PICK ELEMENT'; pickBtn.disabled = true;
   const captureBtn = document.createElement('button');
   captureBtn.className = 'head-btn'; captureBtn.textContent = '⚡ CAPTURE'; captureBtn.disabled = true;
   captureBtn.title = 'Capture page (console + screenshot + URL) without picking an element';
 
-  webHead.append(webLabel, back, reload, urlBar, consoleChip, queueBtn, pickBtn, captureBtn);
+  webHead.append(webLabel, back, reload, urlBar, consoleChip, captureChip, queueBtn, pickBtn, captureBtn);
 
   const queuePanel = document.createElement('div');
   queuePanel.className = 'queue-panel hidden';
@@ -1026,8 +1209,8 @@ function buildSessionView(session) {
   $('#views').appendChild(view);
 
   // wiring
-  back.onclick = () => { if (session.webview) session.webview.goBack(); };
-  reload.onclick = () => { if (session.webview) session.webview.reload(); };
+  back.onclick = () => { if (session.browser.webview) session.browser.webview.goBack(); };
+  reload.onclick = () => { if (session.browser.webview) session.browser.webview.reload(); };
   urlBar.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       let u = urlBar.value.trim();
@@ -1037,8 +1220,8 @@ function buildSessionView(session) {
     }
   });
   queueBtn.onclick = () => queuePanel.classList.toggle('hidden');
-  pickBtn.onclick = () => (session.picking ? null : startPick(session));
-  captureBtn.onclick = () => openCaptureModal(session, { selector: null, outerHTML: null, pageTitle: null, pageUrl: session.currentUrl });
+  pickBtn.onclick = () => (session.browser.picking ? null : startPick(session));
+  captureBtn.onclick = () => openCaptureModal(session, { selector: null, outerHTML: null, pageTitle: null, pageUrl: session.browser.currentUrl });
 
   // divider drag
   divider.addEventListener('mousedown', (e) => {
@@ -1048,13 +1231,13 @@ function buildSessionView(session) {
       const rect = view.getBoundingClientRect();
       const pct = Math.min(72, Math.max(18, ((ev.clientX - rect.left) / rect.width) * 100));
       view.style.gridTemplateColumns = `${pct}% 6px 1fr`;
-      session.fit();
+      session.term.fit();
     };
     const onUp = () => {
       document.body.classList.remove('dragging');
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
-      session.fit();
+      session.term.fit();
     };
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
@@ -1062,8 +1245,33 @@ function buildSessionView(session) {
 
   return {
     view, termHost, urlBar, queueBtn, queueBadge, queuePanel, queueList,
-    consoleChip, pickBtn, captureBtn, webHost, placeholder, refreshFlash,
+    consoleChip, captureChip, pickBtn, captureBtn, webHost, placeholder, refreshFlash,
   };
+}
+
+// "Capture submitted for this URL" chip — derived purely from capture records
+// that match the pane's current URL.
+const CAPTURE_CHIP_LABELS = {
+  written: '⚡ CAPTURE WRITTEN',
+  delivering: '⚡ CAPTURE DELIVERING…',
+  delivered: '⚡ CAPTURE SENT',
+  failed: '⚡ CAPTURE FAILED',
+};
+
+function renderCaptureChips() {
+  for (const session of state.sessions.values()) {
+    const chip = session.els && session.els.captureChip;
+    if (!chip) continue;
+    let latest = null;
+    for (const rec of state.captures.values()) {
+      if (rec.sessionId !== session.id || rec.status === 'composing') continue;
+      if (!rec.url || rec.url !== session.browser.currentUrl) continue;
+      if (!latest || rec.updatedAt > latest.updatedAt) latest = rec;
+    }
+    chip.classList.toggle('hidden', !latest);
+    chip.classList.toggle('failed', Boolean(latest && latest.status === 'failed'));
+    chip.textContent = latest ? CAPTURE_CHIP_LABELS[latest.status] || '⚡ CAPTURE' : '';
+  }
 }
 
 function orderedSessions() {
@@ -1097,13 +1305,17 @@ function renderTabs() {
   }
 }
 
+// Attention is a pure projection over turn state, preview queues, and capture
+// records. The focused session is excluded as a display rule only — the
+// underlying state persists, so its items reappear when focus moves away.
+// Exited sessions get the dead tab dot, never a queue item.
 function attentionItemsFor(session) {
   const items = [];
-  if (session.queue.length > 0) {
-    const next = session.queue[0];
+  if (session.browser.queue.length > 0) {
+    const next = session.browser.queue[0];
     items.push({
       type: 'queue',
-      kind: `QUEUE ${session.queue.length}`,
+      kind: `QUEUE ${session.browser.queue.length}`,
       detail: next.url,
       cls: 'queue',
       primary: 'OPEN',
@@ -1114,58 +1326,67 @@ function attentionItemsFor(session) {
       },
     });
   }
-  if (!session.alive) {
-    items.push({
-      type: 'exited',
-      kind: 'EXITED',
-      detail: 'Terminal process exited',
-      cls: 'exited',
-      primary: 'VIEW',
-      action: () => activateSession(session.id),
-    });
-  }
-  if (session.attention.deliveryFailure) {
-    items.push({
-      type: 'delivery',
-      kind: 'DELIVERY FAIL',
-      detail: session.attention.deliveryFailure.detail,
-      cls: 'exited',
-      primary: 'VIEW',
-      dismiss: () => clearSessionAttention(session, 'deliveryFailure'),
-      action: () => {
-        activateSession(session.id);
-        clearSessionAttention(session, 'deliveryFailure');
-      },
-    });
-  }
-  if (session.attention.inputNeeded) {
+  const turn = session.turn;
+  if (!turn.acknowledged && turn.state === 'needsInput') {
     items.push({
       type: 'input',
       kind: 'INPUT NEEDED',
-      detail: session.attention.inputNeeded.detail,
+      detail: turn.detail || 'Agent is waiting on your input',
       cls: 'input',
       primary: 'FOCUS',
-      dismiss: () => clearSessionAttention(session, 'inputNeeded'),
-      action: () => {
-        activateSession(session.id);
-        clearSessionAttention(session, 'inputNeeded');
-      },
+      dismiss: () => apply({ type: 'attention-dismissed', sessionId: session.id }),
+      action: () => activateSession(session.id),
     });
   }
-  if (session.attention.completed) {
+  if (!turn.acknowledged && turn.state === 'completed') {
     items.push({
       type: 'completed',
       kind: 'COMPLETED',
-      detail: session.attention.completed.detail,
+      detail: turn.detail || 'Agent turn finished',
       cls: 'completed',
       primary: 'VIEW',
-      dismiss: () => clearSessionAttention(session, 'completed'),
-      action: () => {
-        activateSession(session.id);
-        clearSessionAttention(session, 'completed');
+      dismiss: () => apply({ type: 'attention-dismissed', sessionId: session.id }),
+      action: () => activateSession(session.id),
+    });
+  }
+  return items;
+}
+
+// Failed deliveries attribute to the record's own target/capturing session —
+// never to whichever session happens to be focused.
+function captureFailureItems() {
+  const items = [];
+  for (const rec of state.captures.values()) {
+    if (rec.status !== 'failed' || rec.acknowledged) continue;
+    const session = state.sessions.get(rec.targetSessionId || rec.sessionId)
+      || state.sessions.get(rec.sessionId);
+    if (!session || session.id === state.activeId) continue;
+    items.push({
+      session,
+      item: {
+        type: 'delivery',
+        kind: 'DELIVERY FAIL',
+        detail: `Exit ${rec.exitCode}${rec.error ? ': ' + rec.error : ''}${rec.url ? ' — ' + rec.url : ''}`,
+        cls: 'exited',
+        primary: 'VIEW',
+        dismiss: () => apply({ type: 'capture-acknowledged', captureId: rec.id }),
+        action: () => activateSession(session.id),
       },
     });
   }
+  return items;
+}
+
+function attentionItems() {
+  const items = [];
+  // The update-queue item is global — it is never focus-filtered.
+  const updateItem = updateQueueAttentionItem();
+  if (updateItem) items.push(updateItem);
+  for (const session of orderedSessions()) {
+    if (session.id === state.activeId) continue;
+    for (const item of attentionItemsFor(session)) items.push({ session, item });
+  }
+  items.push(...captureFailureItems());
   return items;
 }
 
@@ -1173,16 +1394,11 @@ function renderAttentionQueue() {
   const host = $('#attention-list');
   if (!host) return;
   host.innerHTML = '';
-  const items = [];
-  const updateItem = updateQueueAttentionItem();
-  if (updateItem) items.push(updateItem);
-  for (const session of orderedSessions()) {
-    for (const item of attentionItemsFor(session)) items.push({ session, item });
-  }
+  const items = attentionItems();
   if (items.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'attention-empty';
-    empty.textContent = 'No sessions need attention. Queued previews, exited terminals, delivery failures, and agent prompts will appear here.';
+    empty.textContent = 'No sessions need attention. Queued previews, delivery failures, and agent input/completion signals will appear here.';
     host.appendChild(empty);
     return;
   }
@@ -1231,24 +1447,7 @@ function renderAttentionQueue() {
 async function createSession({ name, cwd, agent, initialUrl = null, initialQueue = [], command = undefined }) {
   state.counter += 1;
   const id = 's' + state.counter;
-  const session = {
-    id, name, cwd, agent,
-    alive: true,
-    term: null, fitAddon: null,
-    webview: null, webContentsId: null,
-    currentUrl: null, lastReload: 0,
-    queue: [], lineBuf: '',
-    attentionTail: '',
-    attentionPromptCandidate: null,
-    attentionPromptTimer: null,
-    lastOutputAt: 0,
-    lastUserInputAt: 0,
-    attention: { deliveryFailure: null, inputNeeded: null, completed: null },
-    consoleBuf: [], consoleTotal: 0,
-    picking: false,
-    els: null,
-    fit: () => {},
-  };
+  const session = newSessionShape({ id, name, cwd, agent });
 
   const viewEls = buildSessionView(session);
   const tabEls = buildSessionTab(session);
@@ -1266,31 +1465,32 @@ async function createSession({ name, cwd, agent, initialUrl = null, initialQueue
   const fitAddon = new FitAddon.FitAddon();
   term.loadAddon(fitAddon);
   term.open(viewEls.termHost);
-  session.term = term;
-  session.fitAddon = fitAddon;
-  session.fit = () => {
+  session.term.term = term;
+  session.term.fitAddon = fitAddon;
+  session.term.fit = () => {
     try {
       fitAddon.fit();
       window.chromux.ptyResize(id, term.cols, term.rows);
     } catch { /* hidden */ }
   };
-  session.fit();
+  session.term.fit();
   registerTerminalLinks(session);
 
   term.onData((data) => {
-    markSessionUserInput(session);
+    apply({ type: 'user-input', sessionId: id, data });
     window.chromux.ptyInput(id, data);
   });
-  new ResizeObserver(() => session.fit()).observe(viewEls.termHost);
+  new ResizeObserver(() => session.term.fit()).observe(viewEls.termHost);
 
   state.sessions.set(id, session);
+  apply({ type: 'session-created', sessionId: id, name, cwd, agent });
   await window.chromux.ptyCreate({
     id, cwd,
-    command: command !== undefined ? command : (AGENT_COMMANDS[agent] || null),
+    command: command !== undefined ? command : agentCommand(agent),
     cols: term.cols, rows: term.rows,
   });
 
-  session.queue = Array.isArray(initialQueue)
+  session.browser.queue = Array.isArray(initialQueue)
     ? initialQueue.map((item) => ({
       url: item.url,
       source: item.source || 'RESTORE',
@@ -1300,73 +1500,67 @@ async function createSession({ name, cwd, agent, initialUrl = null, initialQueue
   renderQueue(session);
   if (initialUrl) openInPane(session, initialUrl);
   activateSession(id);
-  updateBadges();
   renderTabs();
-  renderAttentionQueue();
   state.lastCwd = cwd;
   return session;
 }
 
 function activateSession(id) {
-  state.activeId = id;
+  apply({ type: 'session-focused', sessionId: id });
   for (const s of state.sessions.values()) {
     const active = s.id === id;
     s.els.view.classList.toggle('offstage', !active);
     s.els.tab.classList.toggle('active', active);
     if (active) {
-      clearSessionAttention(s, 'deliveryFailure', 'inputNeeded', 'completed');
       requestAnimationFrame(() => {
-        s.fit();
-        s.term.focus();
+        s.term.fit();
+        s.term.term.focus();
       });
     }
   }
   $('#empty-state').classList.toggle('hidden', state.sessions.size > 0);
   renderTabs();
-  renderAttentionQueue();
 }
 
 function closeSession(id) {
   const s = state.sessions.get(id);
   if (!s) return;
-  if (s.attentionPromptTimer) clearTimeout(s.attentionPromptTimer);
   window.chromux.ptyKill(id);
-  s.term.dispose();
+  s.term.term.dispose();
   s.els.view.remove();
   s.els.tab.remove();
   state.sessions.delete(id);
+  apply({ type: 'session-closed', sessionId: id });
   if (state.activeId === id) {
     const next = state.sessions.keys().next();
     state.activeId = next.done ? null : next.value;
     if (state.activeId) activateSession(state.activeId);
   }
   $('#empty-state').classList.toggle('hidden', state.sessions.size > 0);
-  updateBadges();
   renderTabs();
-  renderAttentionQueue();
 }
 
 function setUpdateQueuePhase(phase, patch = {}) {
   if (!UPDATE_QUEUE_PHASES.has(phase)) return;
-  state.updateQueue = {
-    ...state.updateQueue,
-    ...patch,
-    phase,
-  };
-  reconcileUpdateQueue();
-  renderUpdateControls();
-  renderAttentionQueue();
+  apply({ type: 'update-queue-phase', phase, patch });
 }
 
 function updateAvailable() {
   return Boolean(state.updateStatus && state.updateStatus.updateAvailable);
 }
 
+// Safety derives from turn state alone: exited/needsInput/completed are safe;
+// working/unknown block. `acknowledged` (a display flag) never affects safety,
+// and focusing a session cannot change its turn state — so looking at a
+// completed session no longer regresses the update queue.
 function updateSessionSafety(session) {
-  if (!session.alive) return { safe: true, reason: 'exited' };
-  if (session.attention.inputNeeded) return { safe: true, reason: 'waiting for input' };
-  if (session.attention.completed) return { safe: true, reason: 'completed' };
-  return { safe: false, reason: 'live work state unknown' };
+  if (!session.lifecycle.alive) return { safe: true, reason: 'exited' };
+  if (session.turn.state === 'needsInput') return { safe: true, reason: 'waiting for input' };
+  if (session.turn.state === 'completed') return { safe: true, reason: 'completed' };
+  return {
+    safe: false,
+    reason: session.turn.state === 'working' ? 'agent turn in progress' : 'live work state unknown',
+  };
 }
 
 function updateBlockers() {
@@ -1388,11 +1582,7 @@ function reconcileUpdateQueue() {
 
 function queueUpdate() {
   if (!updateAvailable() || state.updateQueue.phase === 'running') return;
-  state.updateQueue.error = null;
-  state.updateQueue.output = '';
-  state.updateQueue.phase = updateBlockers().length === 0 ? 'ready' : 'waiting';
-  renderUpdateControls();
-  renderAttentionQueue();
+  setUpdateQueuePhase(updateBlockers().length === 0 ? 'ready' : 'waiting', { error: null, output: '' });
 }
 
 function focusFirstUpdateBlocker() {
@@ -1535,8 +1725,7 @@ function renderUpdateControls() {
 
 function renderUpdateStatus(status) {
   state.updateStatus = status;
-  renderUpdateControls();
-  renderAttentionQueue();
+  invalidate('update', 'attention');
 }
 
 async function checkUpdates(manual = false) {
@@ -1554,9 +1743,9 @@ function snapshotOpenSessions() {
     name: session.name,
     cwd: session.cwd,
     agent: session.agent || '',
-    alive: Boolean(session.alive),
-    currentUrl: session.currentUrl || null,
-    queue: session.queue.map((item) => ({
+    alive: Boolean(session.lifecycle.alive),
+    currentUrl: session.browser.currentUrl || null,
+    queue: session.browser.queue.map((item) => ({
       url: item.url,
       source: item.source || 'QUEUE',
       ts: item.ts || Date.now(),
@@ -1566,19 +1755,25 @@ function snapshotOpenSessions() {
 }
 
 function liveSessions() {
-  return orderedSessions().filter((session) => session.alive);
+  return orderedSessions().filter((session) => session.lifecycle.alive);
 }
 
 function showLifecyclePrompt(reason) {
   const live = liveSessions();
-  if (live.length === 0 && reason !== 'update-install') return Promise.resolve(true);
+  const alwaysConfirm = reason === 'app-quit';
+  if (live.length === 0 && reason !== 'update-install' && !alwaysConfirm) return Promise.resolve(true);
   if (state.lifecyclePrompt) return state.lifecyclePrompt.promise;
 
   const isUpdate = reason === 'update-install';
-  $('#lifecycle-title').textContent = isUpdate ? 'INSTALL UPDATE WITH LIVE SESSIONS' : 'CLOSE CHROMUX WITH LIVE SESSIONS';
+  const isQuit = reason === 'app-quit';
+  $('#lifecycle-title').textContent = isUpdate
+    ? 'INSTALL UPDATE WITH LIVE SESSIONS'
+    : (isQuit ? 'QUIT CHROMUX?' : 'CLOSE CHROMUX WITH LIVE SESSIONS');
   $('#lifecycle-copy').textContent = isUpdate
     ? 'Continuing will stop live PTYs, save a workspace snapshot, install the update, and reopen the sessions after restart using Claude/Codex resume where possible.'
-    : 'Continuing will stop live PTYs and save a workspace snapshot. When Chromux opens again, it will reopen the sessions using Claude/Codex resume where possible.';
+    : (live.length === 0
+      ? 'Chromux will close after you confirm.'
+      : 'Continuing will stop live PTYs and save a workspace snapshot. When Chromux opens again, it will reopen the sessions using Claude/Codex resume where possible.');
   const host = $('#lifecycle-list');
   host.innerHTML = '';
   for (const session of live) {
@@ -1592,7 +1787,7 @@ function showLifecyclePrompt(reason) {
     row.append(name, detail);
     host.appendChild(row);
   }
-  $('#lifecycle-confirm').textContent = isUpdate ? 'SAVE & INSTALL' : 'SAVE & CLOSE';
+  $('#lifecycle-confirm').textContent = isUpdate ? 'SAVE & INSTALL' : (isQuit ? 'QUIT' : 'SAVE & CLOSE');
 
   let resolvePrompt;
   const promise = new Promise((resolve) => { resolvePrompt = resolve; });
@@ -1652,8 +1847,7 @@ async function openUpdateRelease() {
     }
   } finally {
     check.disabled = false;
-    renderUpdateControls();
-    renderAttentionQueue();
+    invalidate('update', 'attention');
   }
 }
 
@@ -1669,29 +1863,48 @@ function openSettings() {
   checkUpdates(false).catch(() => {});
 }
 
-// pty event routing
-window.chromux.onPtyData(({ id, data }) => {
+// pty event routing — Chromux OSC signals are extracted (chunk-boundary safe)
+// before anything reaches the terminal or the preview detector. A signal whose
+// session id does not match the PTY it arrived on is dropped and recorded as
+// signal-rejected (guards `claude -p` children and pasted logs).
+function handlePtyData(id, data) {
   const s = state.sessions.get(id);
   if (!s) return;
-  s.term.write(data);
-  feedDetector(s, data);
-});
+  const res = window.chromuxSignals.extractChromuxSignals(s.term.signalBuf, data);
+  s.term.signalBuf = res.buf;
+  for (const sig of res.signals) {
+    if (sig.malformed || sig.sessionId !== id) {
+      apply({
+        type: 'signal-rejected',
+        sessionId: id,
+        signal: sig.malformed ? null : sig.event,
+        claimedSessionId: sig.sessionId || null,
+      });
+    } else {
+      apply({ type: 'turn-signal', sessionId: id, signal: sig.event, detail: sig.detail });
+    }
+  }
+  if (res.clean) {
+    s.term.term.write(res.clean);
+    feedDetector(s, res.clean);
+  }
+}
+
+window.chromux.onPtyData(({ id, data }) => handlePtyData(id, data));
 
 window.chromux.onPtyExit(({ id, exitCode }) => {
   const s = state.sessions.get(id);
   if (!s) return;
-  s.alive = false;
+  apply({ type: 'session-exited', sessionId: id, exitCode });
   s.els.dot.classList.remove('live');
   s.els.dot.classList.add('dead');
-  s.term.write(`\r\n\x1b[38;5;210m── session exited (${exitCode}) ──\x1b[0m\r\n`);
-  renderUpdateControls();
-  renderAttentionQueue();
+  s.term.term.write(`\r\n\x1b[38;5;210m── session exited (${exitCode}) ──\x1b[0m\r\n`);
 });
 
 // popups intercepted in main → paired session's review queue
 window.chromux.onWebviewPopup(({ webContentsId, url }) => {
   for (const s of state.sessions.values()) {
-    if (s.webContentsId === webContentsId) {
+    if (s.browser.webContentsId === webContentsId) {
       routePreview(s, normalizePreviewUrl(url), 'POPUP');
       return;
     }
@@ -1724,9 +1937,7 @@ function formatAge(ts) {
 
 function resumeCommandFor(row) {
   if (!row.resume || !/^[0-9a-f-]+$/i.test(row.resume.id)) return null;
-  if (row.agent === 'claude') return `claude --resume ${row.resume.id}`;
-  if (row.agent === 'codex') return `codex resume ${row.resume.id}`;
-  return null;
+  return agentCommand(row.agent, row.resume.id);
 }
 
 function restoreAgeLabel(snapshot) {
@@ -1909,7 +2120,7 @@ function renderRestoreSessions() {
 async function openDetectedRow(row, mode) {
   const base = row.cwd ? row.cwd.split('/').filter(Boolean).pop() : row.tty;
   const name = uniqueSessionName(mode === 'resume' ? `${base}-resumed` : base);
-  const command = mode === 'resume' ? resumeCommandFor(row) : (AGENT_COMMANDS[row.agent] || null);
+  const command = mode === 'resume' ? resumeCommandFor(row) : agentCommand(row.agent);
   await createSession({ name, cwd: row.cwd || (state.env ? state.env.home : '~'), agent: row.agent, command });
   row.opened = true;
 }
@@ -1976,7 +2187,7 @@ function renderDetectList() {
       const fresh = document.createElement('button');
       fresh.className = 'qi-btn';
       fresh.textContent = 'FRESH';
-      fresh.title = `${AGENT_COMMANDS[row.agent]} in ${row.cwd || '~'}`;
+      fresh.title = `${agentCommand(row.agent)} in ${row.cwd || '~'}`;
       fresh.onclick = () => openDetectedRow(row, 'fresh').then(renderDetectList).catch(() => {});
       actions.appendChild(fresh);
     } else {
@@ -2180,7 +2391,9 @@ $('#ns-create').onclick = async () => {
 document.querySelectorAll('[data-close]').forEach((btn) => {
   btn.addEventListener('click', () => {
     $('#' + btn.dataset.close).classList.add('hidden');
-    if (btn.dataset.close === 'modal-capture') state.capture = null;
+    // Closing the modal drops only the compose context — the capture record
+    // survives, so in-flight deliveries still resolve and stay attributable.
+    if (btn.dataset.close === 'modal-capture') state.ui.captureModal = null;
   });
 });
 
@@ -2191,10 +2404,14 @@ $('#cap-send').onclick = () => sendCapture().catch((err) => {
 });
 $('#cap-filedrop').onclick = () => filedropCapture().catch(() => {});
 $('#deliver-cancel').onclick = () => {
-  if (state.delivery && state.delivery.id) window.chromux.deliverCancel(state.delivery.id);
+  const modal = state.ui.captureModal;
+  const rec = modal ? state.captures.get(modal.captureId) : null;
+  if (rec && rec.deliveryId && rec.status === 'delivering') window.chromux.deliverCancel(rec.deliveryId);
 };
 $('#deliver-reveal').onclick = () => {
-  if (state.delivery && state.delivery.payloadPath) window.chromux.revealPath(state.delivery.payloadPath);
+  const modal = state.ui.captureModal;
+  const rec = modal ? state.captures.get(modal.captureId) : null;
+  if (rec && rec.payloadPath) window.chromux.revealPath(rec.payloadPath);
 };
 
 $('#storage-path').onclick = () => {
@@ -2215,9 +2432,14 @@ $('#lifecycle-cancel').onclick = () => answerLifecyclePrompt(false);
 $('#lifecycle-cancel-x').onclick = () => answerLifecyclePrompt(false);
 $('#lifecycle-confirm').onclick = () => answerLifecyclePrompt(true);
 
-window.chromux.onLifecycleConfirmClose(async () => {
-  if (!(await showLifecyclePrompt('app-close'))) return;
+window.chromux.onLifecycleConfirmClose(async (payload = {}) => {
+  if (!(await showLifecyclePrompt(payload.reason || 'app-close'))) return;
   await window.chromux.confirmAppClose({ sessions: snapshotOpenSessions() });
+});
+
+window.chromux.onShortcutActivateSessionIndex(handleShortcutActivateSessionIndex);
+window.chromux.onShortcutFocusNextQueueItem(() => {
+  if (!modalOpen()) focusNextQueuedPreview();
 });
 
 $('#btn-log').onclick = async () => {
@@ -2269,6 +2491,34 @@ function activateSessionByIndex(index) {
   if (session) activateSession(session.id);
 }
 
+function focusNextQueuedPreview(now = Date.now()) {
+  const session = orderedSessions().find((s) => s.browser.queue.length > 0);
+  if (!session) return null;
+  const item = session.browser.queue[0];
+  const key = `${session.id}\n${item.url}`;
+  const last = state.ui.lastQueueShortcutFocus;
+  if (last && last.key === key && now - last.at < 900) {
+    return { sessionId: session.id, url: item.url, ignored: true };
+  }
+
+  activateSession(session.id);
+  session.els.queuePanel.classList.remove('hidden');
+  renderQueue(session);
+  const openButton = session.els.queueList.querySelector(`.qi-btn.open[data-queue-open-url="${CSS.escape(item.url)}"]`)
+    || session.els.queueList.querySelector('.qi-btn.open');
+  if (openButton) {
+    openButton.focus();
+    state.ui.lastQueueShortcutFocus = { key, at: now };
+  }
+  return { sessionId: session.id, url: item.url, ignored: false, focused: Boolean(openButton) };
+}
+
+function handleShortcutActivateSessionIndex(payload) {
+  const index = Number(payload && payload.index);
+  if (!Number.isInteger(index) || modalOpen() || editableFocused()) return;
+  activateSessionByIndex(index);
+}
+
 if (window.chromuxTest) {
   window.chromuxTestDetect = {
     setDetectRows(rows) {
@@ -2299,6 +2549,30 @@ if (window.chromuxTest) {
     restoreOpenAllDisabled: () => $('#restore-open-all').disabled,
   };
 
+  const testSession = (id) => {
+    const session = state.sessions.get(id);
+    if (!session) throw new Error(`Unknown test session: ${id}`);
+    return session;
+  };
+
+  const addFakeSession = ({ name = 'test-session', agent = 'codex', cwd = '/tmp', alive = true, turnState = 'unknown', queue = [] } = {}) => {
+    state.counter += 1;
+    const session = newSessionShape({ id: 's' + state.counter, name, cwd, agent });
+    session.lifecycle.alive = alive;
+    session.turn.state = turnState;
+    session.browser.queue = queue;
+    const written = [];
+    session._written = written;
+    session.term.term = { write: (d) => written.push(d), focus() {}, dispose() {} };
+    session.els = fakeSessionEls();
+    state.sessions.set(session.id, session);
+    if (!state.activeId) state.activeId = session.id;
+    apply({ type: 'session-created', sessionId: session.id, name, cwd, agent });
+    renderQueue(session);
+    flushRender();
+    return session.id;
+  };
+
   window.chromuxTestUpdateQueue = {
     setStatus(status) {
       renderUpdateStatus({
@@ -2310,8 +2584,12 @@ if (window.chromuxTest) {
         updateAvailable: true,
         ...status,
       });
+      flushRender();
     },
-    queue: queueUpdate,
+    queue() {
+      queueUpdate();
+      flushRender();
+    },
     phase: () => state.updateQueue.phase,
     blockers: () => updateBlockers().map((row) => row.session.name),
     attentionKinds: () => [...document.querySelectorAll('#attention-list .attention-kind')].map((el) => el.textContent),
@@ -2320,68 +2598,173 @@ if (window.chromuxTest) {
     setInstallResult(result) {
       state.testInstallUpdateResult = result;
     },
-    async addSession({ name = 'test-session', agent = 'codex', alive = true, inputNeeded = false, completed = false, queue = [], lastUserInputAt = 0 } = {}) {
-      const session = {
-        id: `test-${state.sessions.size + 1}`,
-        name,
-        cwd: '/tmp',
-        agent,
-        alive,
-        queue,
-        attentionTail: '',
-        attentionPromptCandidate: null,
-        attentionPromptTimer: null,
-        lastOutputAt: 0,
-        lastUserInputAt,
-        attention: {
-          deliveryFailure: null,
-          inputNeeded: inputNeeded ? { detail: 'approval required' } : null,
-          completed: completed ? { detail: 'task complete' } : null,
-        },
-        els: {
-          queuePanel: document.createElement('div'),
-        },
-      };
-      state.sessions.set(session.id, session);
-      if (!state.activeId) state.activeId = session.id;
-      renderUpdateControls();
-      renderAttentionQueue();
-      return session.id;
-    },
+    addSession: async (opts) => addFakeSession(opts),
     setSession(id, patch = {}) {
-      const session = state.sessions.get(id);
-      if (!session) throw new Error(`Unknown test session: ${id}`);
-      Object.assign(session, patch);
-      if (patch.inputNeeded !== undefined) {
-        session.attention.inputNeeded = patch.inputNeeded ? { detail: 'approval required' } : null;
-      }
-      if (patch.completed !== undefined) {
-        session.attention.completed = patch.completed ? { detail: 'task complete' } : null;
-      }
-      renderUpdateControls();
-      renderAttentionQueue();
+      const session = testSession(id);
+      if (patch.alive !== undefined) session.lifecycle.alive = patch.alive;
+      if (patch.turnState !== undefined) session.turn.state = patch.turnState;
+      invalidate('update', 'attention', 'badges');
+      flushRender();
     },
-    scanAttention(id, chunk) {
-      const session = state.sessions.get(id);
-      if (!session) throw new Error(`Unknown test session: ${id}`);
-      scanAttentionSignals(session, chunk);
-      renderUpdateControls();
-      renderAttentionQueue();
-    },
-    attentionState(id) {
-      const session = state.sessions.get(id);
-      if (!session) throw new Error(`Unknown test session: ${id}`);
-      return {
-        inputNeeded: Boolean(session.attention.inputNeeded),
-        completed: Boolean(session.attention.completed),
-        detail: session.attention.inputNeeded?.detail || session.attention.completed?.detail || '',
-      };
-    },
+    turnState: (id) => ({ ...testSession(id).turn }),
     markUserInput(id) {
-      const session = state.sessions.get(id);
-      if (!session) throw new Error(`Unknown test session: ${id}`);
-      markSessionUserInput(session);
+      apply({ type: 'user-input', sessionId: id, data: 'x\r' });
+      flushRender();
     },
+    flushRender,
+  };
+
+  window.chromuxTestSignals = {
+    addFakeSession,
+    feedPtyChunk(id, chunk) {
+      handlePtyData(id, chunk);
+      flushRender();
+    },
+    emitSignal(id, event, detail = null) {
+      apply({ type: 'turn-signal', sessionId: id, signal: event, detail });
+      flushRender();
+    },
+    typeInput(id, data = 'x') {
+      apply({ type: 'user-input', sessionId: id, data });
+      flushRender();
+    },
+    focus(id) {
+      activateSession(id);
+      flushRender();
+    },
+    dismiss(id) {
+      apply({ type: 'attention-dismissed', sessionId: id });
+      flushRender();
+    },
+    exit(id, exitCode = 0) {
+      apply({ type: 'session-exited', sessionId: id, exitCode });
+      flushRender();
+    },
+    turnState: (id) => ({ ...testSession(id).turn }),
+    activeId: () => state.activeId,
+    written: (id) => (testSession(id)._written || []).join(''),
+    attentionItems: () => [...document.querySelectorAll('#attention-list .attention-item')].map((el) => ({
+      kind: el.querySelector('.attention-kind')?.textContent || '',
+      name: el.querySelector('.attention-name')?.textContent || '',
+    })),
+    dismissItem(kind, name) {
+      for (const el of document.querySelectorAll('#attention-list .attention-item')) {
+        if (el.querySelector('.attention-kind')?.textContent !== kind) continue;
+        if (name && el.querySelector('.attention-name')?.textContent !== name) continue;
+        const buttons = [...el.querySelectorAll('.attention-actions .qi-btn')];
+        const dismiss = buttons.find((b) => b.textContent === 'DISMISS');
+        if (!dismiss) throw new Error(`No DISMISS on ${kind}`);
+        dismiss.click();
+        flushRender();
+        return true;
+      }
+      throw new Error(`No attention item ${kind}`);
+    },
+    events: () => state.events.map((e) => ({ ...e })),
+    flushRender,
+  };
+
+  window.chromuxTestCaptures = {
+    captureRecords: () => [...state.captures.values()].map((rec) => ({ ...rec })),
+    beginFakeCapture({ sessionId, url = null } = {}) {
+      state.counter += 1;
+      const captureId = 'c' + state.counter;
+      apply({ type: 'capture-created', captureId, sessionId, url });
+      apply({
+        type: 'capture-written',
+        captureId,
+        payloadPath: `/tmp/chromux-test/${captureId}/payload.yaml`,
+        screenshotPath: null,
+        targetSessionId: null,
+      });
+      state.ui.captureModal = { captureId, pngBase64: null, payloadBase: {} };
+      flushRender();
+      return captureId;
+    },
+    beginFakeDelivery(captureId, { targetSessionId = null } = {}) {
+      const deliveryId = 'd-test-' + captureId;
+      apply({ type: 'capture-delivering', captureId, deliveryId, targetSessionId });
+      flushRender();
+      return deliveryId;
+    },
+    closeDelivery(deliveryId, exitCode, error = null) {
+      handleDeliverClose({ deliveryId, exitCode, error });
+      flushRender();
+    },
+    acknowledge(captureId) {
+      apply({ type: 'capture-acknowledged', captureId });
+      flushRender();
+    },
+    closeCaptureModal() {
+      state.ui.captureModal = null;
+      flushRender();
+    },
+    captureModalId: () => (state.ui.captureModal ? state.ui.captureModal.captureId : null),
+    sentGauge: () => $('#g-captures').textContent,
+    setCurrentUrl(id, url) {
+      testSession(id).browser.currentUrl = url;
+      invalidate('captureChips');
+      flushRender();
+    },
+    captureChip(id) {
+      const chip = testSession(id).els.captureChip;
+      return { hidden: chip.classList.contains('hidden'), text: chip.textContent };
+    },
+    flushRender,
+  };
+
+  window.chromuxTestShortcuts = {
+    addSession: async (opts) => addFakeSession(opts),
+    activateIndex(index) {
+      handleShortcutActivateSessionIndex({ index });
+      flushRender();
+    },
+    focusNextQueuedPreview(now) {
+      const result = focusNextQueuedPreview(now);
+      flushRender();
+      return result;
+    },
+    activeId: () => state.activeId,
+    queueCount: (id) => testSession(id).browser.queue.length,
+    queuePanelHidden: (id) => testSession(id).els.queuePanel.classList.contains('hidden'),
+    focusedOpenUrl: () => document.activeElement?.dataset?.queueOpenUrl || null,
+    clickFocused() {
+      if (!document.activeElement) throw new Error('Nothing focused');
+      document.activeElement.click();
+      flushRender();
+    },
+    currentUrl: (id) => testSession(id).browser.currentUrl,
+    flushRender,
+  };
+}
+
+function fakeSessionEls() {
+  const queuePanel = document.createElement('div');
+  queuePanel.className = 'queue-panel hidden';
+  const queueList = document.createElement('div');
+  queuePanel.appendChild(queueList);
+  const queueBtn = document.createElement('button');
+  const queueBadge = document.createElement('span');
+  const webHost = document.createElement('div');
+  const placeholder = document.createElement('div');
+  webHost.appendChild(placeholder);
+  document.body.appendChild(queuePanel);
+  return {
+    queuePanel,
+    queueList,
+    queueBtn,
+    queueBadge,
+    webHost,
+    placeholder,
+    pickBtn: document.createElement('button'),
+    captureBtn: document.createElement('button'),
+    consoleChip: document.createElement('span'),
+    tabBadge: document.createElement('span'),
+    tab: document.createElement('button'),
+    dot: document.createElement('span'),
+    view: document.createElement('section'),
+    urlBar: document.createElement('input'),
+    captureChip: document.createElement('span'),
   };
 }
 
@@ -2396,7 +2779,7 @@ document.addEventListener('keydown', (e) => {
   }
   if (e.metaKey && /^[1-9]$/.test(e.key) && !modalOpen() && !editableFocused()) {
     e.preventDefault();
-    activateSessionByIndex(Number(e.key) - 1);
+    handleShortcutActivateSessionIndex({ index: Number(e.key) - 1 });
   }
   if (e.key === 'Escape') {
     closeSessionContextMenu();
