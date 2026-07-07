@@ -54,6 +54,19 @@ fs.writeFileSync(e2ePath, `
   expect(q.currentUrl(secondId) === 'http://localhost:5173/one', 'focused OPEN should open the focused URL');
   expect(q.focusedOpenUrl() !== 'http://localhost:5173/one', 'opened item should no longer be focused');
 
+  // Editable focus must suppress the shell shortcuts (the guarded IPC paths).
+  const input = document.createElement('input');
+  document.body.appendChild(input);
+  input.focus();
+  expect(q.shortcutFocusNextQueueItem() === null, 'Command+J must be a no-op while an editable is focused');
+  expect(document.activeElement === input, 'Command+J must not steal focus from an editable');
+  q.activateIndex(0);
+  expect(q.activeId() === secondId, 'Command+1..9 must be a no-op while an editable is focused');
+  input.blur();
+  input.remove();
+  const afterBlur = q.shortcutFocusNextQueueItem();
+  expect(afterBlur && afterBlur.sessionId === secondId, 'Command+J should work again once no editable is focused');
+
   return JSON.stringify({
     ok: true,
     activeId: q.activeId(),

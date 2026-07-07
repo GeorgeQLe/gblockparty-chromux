@@ -1020,22 +1020,32 @@ window.chromux.onDeliverClose(handleDeliverClose);
 
 const AGENT_LABELS = { claude: 'CLAUDE CODE', codex: 'CODEX', '': 'SHELL' };
 
+// POSIX single-quoting: close the quote, emit an escaped ', reopen. Safe for
+// any byte the filesystem allows (spaces, quotes, backslashes).
+function shellQuote(value) {
+  return `'${String(value).replace(/'/g, `'\\''`)}'`;
+}
+
 // Launch command for an agent CLI. Claude sessions get `--settings` pointing
 // at the Chromux hooks file (merges with, never replaces, the user's own
 // settings) so deterministic turn signals flow back over the PTY.
 function agentCommand(agent, resumeId = null) {
   if (agent === 'claude') {
     const settingsPath = state.env && state.env.hooksSettingsPath;
-    const base = settingsPath ? `claude --settings '${settingsPath}'` : 'claude';
-    return resumeId ? `${base} --resume ${resumeId}` : base;
+    const base = settingsPath ? `claude --settings ${shellQuote(settingsPath)}` : 'claude';
+    return resumeId ? `${base} --resume ${shellQuote(resumeId)}` : base;
   }
   if (agent === 'codex') {
     // Verified: the notify child's /dev/tty write rides the PTY back to us.
     // Codex only reports turn completion, so codex sessions signal turn-end
     // only; needsInput never fires and working is inferred from typed input.
     const notifyPath = state.env && state.env.codexNotifyPath;
-    const base = notifyPath ? `codex -c 'notify=["${notifyPath}"]'` : 'codex';
-    return resumeId ? `${base} resume ${resumeId}` : base;
+    // The path sits inside a TOML string inside a shell arg — escape both
+    // layers: backslash-escape for TOML, then single-quote for the shell.
+    const base = notifyPath
+      ? `codex -c ${shellQuote(`notify=["${notifyPath.replace(/[\\"]/g, '\\$&')}"]`)}`
+      : 'codex';
+    return resumeId ? `${base} resume ${shellQuote(resumeId)}` : base;
   }
   return null;
 }
@@ -2438,9 +2448,7 @@ window.chromux.onLifecycleConfirmClose(async (payload = {}) => {
 });
 
 window.chromux.onShortcutActivateSessionIndex(handleShortcutActivateSessionIndex);
-window.chromux.onShortcutFocusNextQueueItem(() => {
-  if (!modalOpen()) focusNextQueuedPreview();
-});
+window.chromux.onShortcutFocusNextQueueItem(handleShortcutFocusNextQueueItem);
 
 $('#btn-log').onclick = async () => {
   const drawer = $('#drawer-log');
@@ -2517,6 +2525,11 @@ function handleShortcutActivateSessionIndex(payload) {
   const index = Number(payload && payload.index);
   if (!Number.isInteger(index) || modalOpen() || editableFocused()) return;
   activateSessionByIndex(index);
+}
+
+function handleShortcutFocusNextQueueItem() {
+  if (modalOpen() || editableFocused()) return null;
+  return focusNextQueuedPreview();
 }
 
 if (window.chromuxTest) {
@@ -2724,6 +2737,13 @@ if (window.chromuxTest) {
       flushRender();
       return result;
     },
+    // The guarded IPC path (modal/editable checks), unlike focusNextQueuedPreview
+    // above which calls straight past the guard.
+    shortcutFocusNextQueueItem() {
+      const result = handleShortcutFocusNextQueueItem();
+      flushRender();
+      return result;
+    },
     activeId: () => state.activeId,
     queueCount: (id) => testSession(id).browser.queue.length,
     queuePanelHidden: (id) => testSession(id).els.queuePanel.classList.contains('hidden'),
@@ -2735,6 +2755,11 @@ if (window.chromuxTest) {
     },
     currentUrl: (id) => testSession(id).browser.currentUrl,
     flushRender,
+  };
+
+  window.chromuxTestAgentCommand = {
+    build: (agent, resumeId = null) => agentCommand(agent, resumeId),
+    env: () => ({ ...state.env }),
   };
 }
 

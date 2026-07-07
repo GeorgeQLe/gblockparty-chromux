@@ -1,6 +1,6 @@
 {
   "name": "chromux",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "description": "OSS desktop front-end for local and GBlockParty-managed agent/browser workspaces.",
   "main": "main.js",
   "private": false,
@@ -9,6 +9,9 @@
     "type": "git",
     "url": "https://github.com/GeorgeQLe/gblockparty-chromux.git",
     "directory": "prototype"
+  },
+  "engines": {
+    "node": ">=22.12.0"
   },
   "scripts": {
     "start": "electron .",
@@ -19,9 +22,10 @@
     "test:turn-signals-renderer": "node scripts/test-turn-signals-renderer.js",
     "test:capture-records-renderer": "node scripts/test-capture-records-renderer.js",
     "test:shortcuts-renderer": "node scripts/test-shortcuts-renderer.js",
+    "test:agent-command-quoting": "node scripts/test-agent-command-quoting.js",
     "test:github-update-check": "node scripts/test-github-update-check.js",
     "test:update-queue-renderer": "node scripts/test-update-queue-renderer.js",
-    "package": "electron-packager . Chromux --platform=darwin --arch=arm64 --icon=build/icon.icns --app-bundle-id=dev.georgele.chromux --overwrite --out=dist --ignore='^/dist' --ignore='^/build/icon.iconset' --asar.unpack='**/node_modules/node-pty/**'",
+    "package": "electron-packager . Chromux --platform=darwin --arch=arm64 --icon=build/icon --app-bundle-id=dev.georgele.chromux --overwrite --out=dist --ignore='^/dist' --ignore='^/build/icon.iconset' --asar.unpack='**/node_modules/node-pty/**'",
     "install-app": "npm run package && node scripts/record-install-source.js && rm -rf /Applications/Chromux.app && cp -R dist/Chromux-darwin-arm64/Chromux.app /Applications/Chromux.app",
     "rebuild": "electron-rebuild -f -w node-pty",
     "postinstall": "electron-rebuild -f -w node-pty"
@@ -34,7 +38,7 @@
   },
   "devDependencies": {
     "@electron/packager": "^20.0.2",
-    "@electron/rebuild": "^3.7.0",
-    "electron": "^33.2.0"
+    "@electron/rebuild": "^4.1.0",
+    "electron": "^43.0.0"
   }
 }

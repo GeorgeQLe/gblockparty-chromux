@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="en" data-visual-tier="document" data-interrogation-status="review" data-interrogation-round="1" data-interrogation-gate="continue">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chromux Docs Audit Interrogation - Round 1</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --orange: #d29922;
+      --purple: #bc8cff;
+      --question: #1c2333;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+    main {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 32px 0 56px;
+      max-width: 100%;
+      overflow-wrap: break-word;
+    }
+    h1, h2, h3 { color: #fff; line-height: 1.2; }
+    h1 { margin-bottom: 8px; }
+    h2 { margin-top: 32px; color: var(--accent); }
+    a { color: var(--accent); }
+    .summary, .toc, .panel, .compile {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px;
+    }
+    .summary { margin: 18px 0; }
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+      gap: 10px;
+      margin: 16px 0;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 32px;
+      padding: 4px 10px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      color: var(--text-muted);
+      background: #0f1624;
+      font-size: 0.92rem;
+    }
+    .toc ul { margin: 0; padding-left: 20px; }
+    .table-wrap { overflow-x: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      min-width: 720px;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #1c2333; color: #fff; }
+    .assumption {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      margin: 14px 0;
+    }
+    .assumption strong { color: #fff; }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    label.option {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 44px;
+      padding: 10px 16px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #0f1624;
+      cursor: pointer;
+    }
+    .correction {
+      margin-top: 10px;
+      width: 100%;
+      min-height: 76px;
+      background: #0b1220;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+    }
+    .question {
+      background: var(--question);
+      border: 1px solid var(--purple);
+      border-radius: 8px;
+      padding: 18px;
+      margin: 18px 0;
+    }
+    .question h3 { margin-top: 0; color: var(--purple); }
+    .recommendation {
+      border-left: 3px solid var(--accent);
+      padding: 10px 12px;
+      background: #111a2b;
+      margin: 12px 0;
+      color: var(--text);
+    }
+    .confidence {
+      display: inline-flex;
+      min-height: 32px;
+      align-items: center;
+      padding: 3px 9px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      color: var(--orange);
+      background: #1f1a10;
+      font-size: 0.9rem;
+    }
+    textarea[data-open-input], input[data-open-input] {
+      width: 100%;
+      min-height: 118px;
+      background: #0b1220;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 10px;
+    }
+    input[data-open-input] { min-height: 44px; }
+    button {
+      min-height: 44px;
+      padding: 10px 16px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #1f6feb;
+      color: #fff;
+      cursor: pointer;
+      font: inherit;
+    }
+    button.secondary { background: #21262d; }
+    .status { color: var(--text-muted); margin-left: 8px; }
+    .compile textarea {
+      width: 100%;
+      min-height: 280px;
+      margin-top: 12px;
+      background: #0b1220;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.9rem;
+    }
+    code { color: #a5d6ff; }
+    @media (max-width: 860px) {
+      main { width: min(100% - 24px, 1120px); padding-top: 22px; }
+    }
+    @media (max-width: 560px) {
+      .controls { flex-direction: column; }
+      label.option, button { width: 100%; justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Chromux Docs Audit Interrogation - Round 1</h1>
+  <p class="summary">This stage-zero page captures assumptions and missing context before a refreshed documentation audit. It is not the audit itself and does not approve canonical research updates.</p>
+
+  <div class="meta" aria-label="Round metadata">
+    <span class="pill">Skill: <code>$devtool-docs-audit</code></span>
+    <span class="pill">Round: 1</span>
+    <span class="pill">Branch/topic: chromux</span>
+    <span class="pill">Status: awaiting answers</span>
+  </div>
+
+  <nav class="toc" aria-label="Table of contents">
+    <h2>Table Of Contents</h2>
+    <ul>
+      <li><a href="#scope-evidence">Scope Evidence</a></li>
+      <li><a href="#assumptions">Assumptions Manifest</a></li>
+      <li><a href="#open-questions">Open Questions</a></li>
+      <li><a href="#compile">Compile Responses</a></li>
+    </ul>
+  </nav>
+
+  <section id="scope-evidence">
+    <h2>Scope Evidence</h2>
+    <p>Minimal repository inventory found these candidate documentation surfaces and prior artifacts. These are scope inputs, not findings.</p>
+    <div class="table-wrap" data-tts-narrative="The scope evidence table lists the documentation surfaces that may be included in the refreshed Chromux documentation audit.">
+      <table>
+        <thead>
+          <tr>
+            <th>Surface</th>
+            <th>Observed Path</th>
+            <th>Why It May Matter</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Root quickstart</td>
+            <td><code>README.md</code></td>
+            <td>Introduces Chromux and points users to the prototype.</td>
+          </tr>
+          <tr>
+            <td>Prototype guide</td>
+            <td><code>prototype/README.md</code></td>
+            <td>Contains the first local loop, install app command, troubleshooting, and storage map.</td>
+          </tr>
+          <tr>
+            <td>Capture payload contract</td>
+            <td><code>prototype/docs/capture-payload.md</code></td>
+            <td>Defines schema v1, field bounds, retention, and manual retry behavior.</td>
+          </tr>
+          <tr>
+            <td>Task queue</td>
+            <td><code>tasks/todo.md</code></td>
+            <td>Shows docs backlog status, including troubleshooting and privacy docs still unchecked.</td>
+          </tr>
+          <tr>
+            <td>Prior audit</td>
+            <td><code>research/devtool-docs-audit.md</code></td>
+            <td>Approved 2026-07-05 baseline audit, before the current README/prototype docs existed.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="assumptions">
+    <h2>Assumptions Manifest</h2>
+    <p>Confirm, correct, or flag these before I build the scope-approval alignment page.</p>
+
+    <article class="assumption" data-assumption-id="product-scope" data-source="[from repo]">
+      <strong>Assumption 1 - Product scope:</strong>
+      Chromux is currently an OSS Electron/Chromium macOS prototype for local and GBlockParty-managed agent/browser workspaces, with the active app in <code>prototype/</code>.
+      <div class="controls">
+        <label class="option"><input type="radio" name="assumption_product_scope" value="confirm"> Confirm</label>
+        <label class="option"><input type="radio" name="assumption_product_scope" value="correct"> Correct</label>
+        <label class="option"><input type="radio" name="assumption_product_scope" value="flag"> Flag</label>
+      </div>
+      <textarea class="correction" name="assumption_product_scope_correction" placeholder="Correction or flag detail"></textarea>
+    </article>
+
+    <article class="assumption" data-assumption-id="primary-surfaces" data-source="[from repo]">
+      <strong>Assumption 2 - Docs surfaces:</strong>
+      The refreshed audit should include <code>README.md</code>, <code>prototype/README.md</code>, <code>prototype/docs/capture-payload.md</code>, <code>tasks/todo.md</code>, and prior research artifacts as context.
+      <div class="controls">
+        <label class="option"><input type="radio" name="assumption_primary_surfaces" value="confirm"> Confirm</label>
+        <label class="option"><input type="radio" name="assumption_primary_surfaces" value="correct"> Correct</label>
+        <label class="option"><input type="radio" name="assumption_primary_surfaces" value="flag"> Flag</label>
+      </div>
+      <textarea class="correction" name="assumption_primary_surfaces_correction" placeholder="Add, remove, or limit docs surfaces"></textarea>
+    </article>
+
+    <article class="assumption" data-assumption-id="audit-reason" data-source="[from repo]">
+      <strong>Assumption 3 - Audit reason:</strong>
+      The earlier approved audit is stale because several previously missing docs now exist, including a root quickstart, prototype first-loop guide, and payload schema.
+      <div class="controls">
+        <label class="option"><input type="radio" name="assumption_audit_reason" value="confirm"> Confirm</label>
+        <label class="option"><input type="radio" name="assumption_audit_reason" value="correct"> Correct</label>
+        <label class="option"><input type="radio" name="assumption_audit_reason" value="flag"> Flag</label>
+      </div>
+      <textarea class="correction" name="assumption_audit_reason_correction" placeholder="Correction or flag detail"></textarea>
+    </article>
+
+    <article class="assumption" data-assumption-id="target-reader" data-source="[from research]">
+      <strong>Assumption 4 - Target reader:</strong>
+      The audit should judge docs for the builder and early OSS developers who already use terminal-native Codex or Claude Code, not enterprise buyers or broad team rollout.
+      <div class="controls">
+        <label class="option"><input type="radio" name="assumption_target_reader" value="confirm"> Confirm</label>
+        <label class="option"><input type="radio" name="assumption_target_reader" value="correct"> Correct</label>
+        <label class="option"><input type="radio" name="assumption_target_reader" value="flag"> Flag</label>
+      </div>
+      <textarea class="correction" name="assumption_target_reader_correction" placeholder="Correction or flag detail"></textarea>
+    </article>
+
+    <article class="assumption" data-assumption-id="known-backlog" data-source="[from repo]">
+      <strong>Assumption 5 - Known backlog:</strong>
+      The highest visible remaining docs gaps are standalone troubleshooting and privacy/local-data documentation, while capture schema and example proof artifacts appear present.
+      <div class="controls">
+        <label class="option"><input type="radio" name="assumption_known_backlog" value="confirm"> Confirm</label>
+        <label class="option"><input type="radio" name="assumption_known_backlog" value="correct"> Correct</label>
+        <label class="option"><input type="radio" name="assumption_known_backlog" value="flag"> Flag</label>
+      </div>
+      <textarea class="correction" name="assumption_known_backlog_correction" placeholder="Correction or flag detail"></textarea>
+    </article>
+  </section>
+
+  <section id="open-questions">
+    <h2>Open Questions</h2>
+
+    <article class="question" data-open-question>
+      <h3>1. What should be included or excluded from this refreshed audit?</h3>
+      <span class="confidence" data-agent-confidence="medium">Agent confidence: medium</span>
+      <div class="recommendation" data-recommended-answer>
+        Recommended: include the root README, prototype README, payload schema, task queue, examples inventory, and prior research as context; exclude implementation code except where it verifies whether a documented command or proof artifact exists.
+      </div>
+      <span data-agent-recommended-answer hidden>Include README.md, prototype/README.md, prototype/docs/capture-payload.md, tasks/todo.md, prototype/examples inventory, and prior research as context. Exclude implementation code except for checking whether documented commands, examples, and proof artifacts exist.</span>
+      <textarea data-open-input name="scope_include_exclude" placeholder="Accept the recommendation or list additions, exclusions, or constraints."></textarea>
+      <div class="controls">
+        <button type="button" data-apply-recommended>Apply recommended</button>
+        <button type="button" class="secondary" data-clarify-copy data-question-text="What should be included or excluded from this refreshed audit?">Need clarification</button>
+        <span class="status" data-apply-recommended-status></span>
+      </div>
+    </article>
+
+    <article class="question" data-open-question>
+      <h3>2. Which first-success path should the docs audit treat as canonical?</h3>
+      <span class="confidence" data-agent-confidence="medium">Agent confidence: medium</span>
+      <div class="recommendation" data-recommended-answer>
+        Recommended: judge the docs against the prototype README's path: install/run from <code>prototype/</code>, start a session, let a localhost or file preview route to the paired pane, capture evidence, then send via <code>claude -p</code> or file-drop.
+      </div>
+      <span data-agent-recommended-answer hidden>Use the prototype README's first local loop as canonical: install or run from prototype/, start a session, route a localhost or file preview to the paired browser pane, capture evidence, and send via claude -p or file-drop.</span>
+      <textarea data-open-input name="canonical_first_success" placeholder="Name the canonical path, or explain what should replace the recommended path."></textarea>
+      <div class="controls">
+        <button type="button" data-apply-recommended>Apply recommended</button>
+        <button type="button" class="secondary" data-clarify-copy data-question-text="Which first-success path should the docs audit treat as canonical?">Need clarification</button>
+        <span class="status" data-apply-recommended-status></span>
+      </div>
+    </article>
+
+    <article class="question" data-open-question>
+      <h3>3. What known support issues or user language should shape the audit?</h3>
+      <span class="confidence" data-agent-confidence="low">Agent confidence: low</span>
+      <div class="recommendation" data-recommended-answer>
+        Recommended: if there is no external support evidence yet, carry this as a source gap and rely on repo task backlog plus prototype troubleshooting notes.
+      </div>
+      <span data-agent-recommended-answer hidden>No external support evidence is available yet. Treat known support language as a source gap and use repo backlog plus prototype troubleshooting notes only as internal evidence.</span>
+      <textarea data-open-input name="support_issues_language" placeholder="Paste support notes, known blockers, customer/user phrasing, or say there is no external evidence yet."></textarea>
+      <div class="controls">
+        <button type="button" data-apply-recommended>Apply recommended</button>
+        <button type="button" class="secondary" data-clarify-copy data-question-text="What known support issues or user language should shape the audit?">Need clarification</button>
+        <span class="status" data-apply-recommended-status></span>
+      </div>
+    </article>
+
+    <article class="question" data-open-question>
+      <h3>4. What should be explicit non-goals for this audit?</h3>
+      <span class="confidence" data-agent-confidence="medium">Agent confidence: medium</span>
+      <div class="recommendation" data-recommended-answer>
+        Recommended: do not audit marketing copy, pricing, team rollout, release automation, or code quality except where they directly affect documentation accuracy.
+      </div>
+      <span data-agent-recommended-answer hidden>Non-goals: marketing copy, pricing, team rollout, release automation, and code quality, except where these directly affect documentation accuracy.</span>
+      <textarea data-open-input name="non_goals" placeholder="Accept, edit, or add non-goals."></textarea>
+      <div class="controls">
+        <button type="button" data-apply-recommended>Apply recommended</button>
+        <button type="button" class="secondary" data-clarify-copy data-question-text="What should be explicit non-goals for this audit?">Need clarification</button>
+        <span class="status" data-apply-recommended-status></span>
+      </div>
+    </article>
+
+    <article class="question" data-open-question>
+      <h3>5. What would make the audit useful rather than generic?</h3>
+      <span class="confidence" data-agent-confidence="low">Agent confidence: low</span>
+      <div class="recommendation" data-recommended-answer>
+        Recommended: prioritize concrete adoption blockers, stale claims from the old audit, missing proof artifacts, and exact doc-file edits that should follow after approval.
+      </div>
+      <span data-agent-recommended-answer hidden>Prioritize concrete adoption blockers, stale claims from the old audit, missing proof artifacts, and exact doc-file edits that should follow after approval.</span>
+      <textarea data-open-input name="usefulness_bar" placeholder="Describe the bar for a useful audit: depth, format, priorities, or decisions it must support."></textarea>
+      <div class="controls">
+        <button type="button" data-apply-recommended>Apply recommended</button>
+        <button type="button" class="secondary" data-clarify-copy data-question-text="What would make the audit useful rather than generic?">Need clarification</button>
+        <span class="status" data-apply-recommended-status></span>
+      </div>
+    </article>
+  </section>
+
+  <section id="compile" class="compile" data-answer-sidecar="research/_working/interrogation-devtool-docs-audit-r1.yaml">
+    <h2>Compile Responses</h2>
+    <p>Answer the assumptions and open questions, then compile YAML and paste it into a fresh agent session. The YAML routes back to <code>$devtool-docs-audit</code>.</p>
+    <div class="controls">
+      <button type="button" id="compile-yaml">Compile Responses</button>
+      <button type="button" class="secondary" id="copy-yaml">Copy YAML</button>
+      <span class="status" id="copy-status"></span>
+    </div>
+    <textarea id="yaml-output" readonly aria-label="Compiled YAML output"></textarea>
+  </section>
+</main>
+
+<script>
+function yamlQuote(value) {
+  const text = String(value ?? "");
+  return JSON.stringify(text);
+}
+function block(value, indent) {
+  const text = String(value ?? "").trim();
+  const pad = " ".repeat(indent);
+  if (!text) return pad + "''";
+  return "|-\n" + text.split("\n").map((line) => pad + line).join("\n");
+}
+function assumptionEntry(article) {
+  const id = article.dataset.assumptionId;
+  const source = article.dataset.source;
+  const checked = article.querySelector("input[type=radio]:checked");
+  const correction = article.querySelector("textarea")?.value.trim() || "";
+  return [
+    "  - id: " + yamlQuote(id),
+    "    source: " + yamlQuote(source),
+    "    decision: " + yamlQuote(checked ? checked.value : "unanswered"),
+    "    correction: " + block(correction, 6)
+  ].join("\n");
+}
+function openAnswerEntry(question, index) {
+  const title = question.querySelector("h3")?.textContent.trim() || "Open question " + index;
+  const input = question.querySelector("[data-open-input]");
+  const answer = input?.value.trim() || "";
+  const recommended = question.querySelector("[data-recommended-answer]")?.textContent.trim().replace(/\s+/g, " ") || "";
+  const agent = question.querySelector("[data-agent-recommended-answer]")?.textContent.trim() || "";
+  const confidence = question.querySelector("[data-agent-confidence]")?.dataset.agentConfidence || "low";
+  return [
+    "  - question: " + yamlQuote(title),
+    "    answer: " + block(answer, 6),
+    "    recommended_answer: " + block(recommended, 6),
+    "    agent_recommended_answer: " + block(agent, 6),
+    "    agent_confidence: " + yamlQuote(confidence)
+  ].join("\n");
+}
+function compileYaml() {
+  const assumptions = Array.from(document.querySelectorAll("[data-assumption-id]")).map(assumptionEntry).join("\n");
+  const answers = Array.from(document.querySelectorAll("[data-open-question]")).map(openAnswerEntry).join("\n");
+  const yaml = [
+    "# Invoke with: $devtool-docs-audit",
+    "command: \"$devtool-docs-audit\"",
+    "interrogation_page: interrogation/devtool-docs-audit-r1-chromux.html",
+    "round: 1",
+    "round_status: complete",
+    "gate_state: continue",
+    "answer_sidecar: research/_working/interrogation-devtool-docs-audit-r1.yaml",
+    "agent_routing:",
+    "  workflow: interrogation-loop",
+    "  parent_skill: devtool-docs-audit",
+    "  command: \"$devtool-docs-audit\"",
+    "  gate_owner: parent-orchestrator",
+    "  gate_type: interrogation-round",
+    "  round: 1",
+    "  answer_sidecar: research/_working/interrogation-devtool-docs-audit-r1.yaml",
+    "  next_resolution: parent-resolves-from-yaml-and-filesystem",
+    "assumptions:",
+    assumptions,
+    "open_answers:",
+    answers,
+    "gate_answers:",
+    "  - gate: confidence",
+    "    answer: \"Round 1 submitted for agent confidence-gate review.\""
+  ].join("\n");
+  document.getElementById("yaml-output").value = yaml;
+  return yaml;
+}
+async function copyText(text) {
+  const out = document.getElementById("yaml-output");
+  const status = document.getElementById("copy-status");
+  try {
+    await navigator.clipboard.writeText(text);
+    status.textContent = "Copied.";
+  } catch {
+    out.focus();
+    out.select();
+    status.textContent = "Select text to copy.";
+  }
+}
+document.getElementById("compile-yaml").addEventListener("click", () => {
+  const yaml = compileYaml();
+  copyText(yaml);
+});
+document.getElementById("copy-yaml").addEventListener("click", () => {
+  const yaml = document.getElementById("yaml-output").value || compileYaml();
+  copyText(yaml);
+});
+document.addEventListener("click", (event) => {
+  const applyButton = event.target.closest("[data-apply-recommended]");
+  if (applyButton) {
+    const blockEl = applyButton.closest("[data-open-question]");
+    const source = blockEl?.querySelector("[data-agent-recommended-answer]") ?? blockEl?.querySelector("[data-recommended-answer]");
+    const recommended = source ? source.textContent.trim() : "";
+    const input = blockEl?.querySelector("textarea[data-open-input], input[type='text'][data-open-input], input:not([type])[data-open-input]");
+    if (!input || !recommended) return;
+    if (input.value.trim() && !window.confirm("Replace your current answer with the recommended answer?")) return;
+    input.value = recommended;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    const status = blockEl.querySelector("[data-apply-recommended-status]");
+    if (status) status.textContent = "Recommended answer applied.";
+  }
+  const clarifyButton = event.target.closest("[data-clarify-copy]");
+  if (clarifyButton) {
+    const question = clarifyButton.dataset.questionText || clarifyButton.closest("[data-open-question]")?.querySelector("h3")?.textContent.trim() || "";
+    const text = "Question: \"" + question + "\"\nI need clarification on what this is asking before I can answer.";
+    navigator.clipboard.writeText(text).then(() => {
+      const status = clarifyButton.closest("[data-open-question]").querySelector("[data-apply-recommended-status]");
+      if (status) status.textContent = "Clarification request copied.";
+    }).catch(() => {
+      const input = clarifyButton.closest("[data-open-question]").querySelector("[data-open-input]");
+      input.value = text;
+      input.focus();
+      input.select();
+    });
+  }
+});
+</script>
+<script src="../scripts/alignment-tts-kokoro.js"></script>
+<script src="../scripts/alignment-question-nav.js"></script>
+</body>
+</html>

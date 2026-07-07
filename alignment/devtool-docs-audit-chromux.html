@@ -1,249 +1,316 @@
 <!DOCTYPE html>
-<html lang="en" data-alignment-category="qa-meta" data-visual-tier="document" data-alignment-status="confirmed" data-alignment-stage="stage-2">
+<html lang="en" data-alignment-category="qa-meta" data-visual-tier="document" data-alignment-status="confirmed" data-alignment-stage="stage-3">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Chromux - Devtool Docs Audit · Confirmed</title>
+<title>Chromux - Devtool Docs Audit Confirmed Artifact</title>
 <style>
-  :root{--bg:#0d1117;--surface:#161b22;--surface2:#101722;--border:#30363d;--text:#c9d1d9;--muted:#8b949e;--accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922;--purple:#bc8cff}
-  *{box-sizing:border-box} html,body{margin:0;padding:0}
-  body{background:var(--bg);color:var(--text);font:16px/1.58 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;padding:0 0 5rem}
-  .wrap{max-width:1120px;margin:0 auto;padding:2rem 1.2rem}
-  h1{color:#fff;font-size:2rem;line-height:1.2;margin:.2rem 0 .45rem} h2{color:var(--accent);font-size:1.3rem;margin:0 0 .75rem;scroll-margin-top:1rem} h3{color:#fff;font-size:1.05rem;margin:1rem 0 .35rem}
-  p{margin:.55rem 0} a{color:var(--accent)} code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.88em;background:#1c2333;border:1px solid var(--border);border-radius:5px;padding:.08em .38em}
-  ul,ol{margin:.38rem 0 .65rem 1.25rem;padding:0} li{margin:.28rem 0}
-  table{border-collapse:collapse;width:100%;font-size:.93rem} th,td{border:1px solid var(--border);padding:.55rem .68rem;text-align:left;vertical-align:top} th{background:#1a2230;color:#fff}
-  .card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1.18rem 1.25rem;margin:1rem 0}.status{border-left:4px solid var(--green)}.sub,.muted{color:var(--muted)}
-  .pill{display:inline-block;font-size:.72rem;font-weight:650;letter-spacing:.04em;text-transform:uppercase;padding:.18em .56em;border-radius:999px;border:1px solid var(--border);color:var(--muted);margin:.1rem .25rem .1rem 0}.confirmed{color:var(--green);border-color:var(--green)}.stage{color:var(--purple);border-color:var(--purple)}.doc{color:var(--green);border-color:var(--green)}
-  .tag{font-family:ui-monospace,monospace;font-size:.76rem;padding:.05em .42em;border-radius:5px;border:1px solid var(--border);color:var(--muted);white-space:nowrap}.ok{color:var(--green);border-color:#265a34}.med{color:var(--orange);border-color:#6b5216}.risk{color:var(--red);border-color:#6b2420}
-  .scroll{overflow-x:auto}.toc ol{columns:2;column-gap:2rem}.toc li{break-inside:avoid}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.75rem}.mini{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem}.mini strong{color:#fff}
-  .callout{background:var(--surface2);border:1px solid var(--border);border-left:4px solid var(--accent);border-radius:8px;padding:.9rem 1rem;margin:.8rem 0}
-  @media(max-width:760px){.grid{grid-template-columns:1fr}.toc ol{columns:1}.wrap{padding:1.2rem .9rem}}
+  :root{--bg:#0d1117;--surface:#161b22;--surface2:#111827;--border:#30363d;--text:#c9d1d9;--muted:#8b949e;--accent:#58a6ff;--green:#3fb950;--orange:#d29922;--red:#f85149;--purple:#bc8cff}
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--text);font:16px/1.58 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;margin:0;padding:2rem 1.25rem}
+  main{max-width:1180px;margin:0 auto;overflow-wrap:break-word}
+  h1{color:#fff;font-size:1.95rem;line-height:1.18;margin:.2rem 0 .55rem}
+  h2{color:var(--accent);font-size:1.24rem;margin:2rem 0 .8rem;border-bottom:1px solid var(--border);padding-bottom:.35rem}
+  h3{color:#fff;font-size:1rem;margin:1rem 0 .45rem}
+  p{margin:.55rem 0}
+  a{color:var(--accent)}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#0b1220;border:1px solid var(--border);border-radius:5px;padding:.08rem .28rem}
+  section,.card,.gate{background:rgba(22,27,34,.72);border:1px solid var(--border);border-radius:8px;padding:1rem;margin:1rem 0}
+  .sub{color:var(--muted);max-width:920px}
+  .pill{display:inline-block;font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:.18em .56em;border-radius:999px;border:1px solid var(--border);color:var(--muted);margin:.1rem .25rem .1rem 0}
+  .review{color:var(--orange);border-color:var(--orange)}.stage{color:var(--purple);border-color:var(--purple)}.doc{color:var(--green);border-color:var(--green)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr));gap:1rem}
+  .toc ul{columns:2;list-style:none;padding-left:0}.toc li{break-inside:avoid;margin:.25rem 0}
+  .table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:8px;margin:.7rem 0}
+  table{border-collapse:collapse;width:100%;min-width:820px}
+  th,td{border-bottom:1px solid var(--border);padding:.65rem .75rem;text-align:left;vertical-align:top}
+  th{background:var(--surface2);color:#fff}
+  tr:last-child td{border-bottom:0}
+  ul,ol{padding-left:1.25rem}
+  li{margin:.22rem 0}
+  .muted{color:var(--muted)}
+  .ok{color:var(--green);font-weight:700}.warn{color:var(--orange);font-weight:700}.risk{color:var(--red);font-weight:700}
+  .notice{border-left:4px solid var(--accent)}
+  .finding{border-left:4px solid var(--orange)}
+  .resolved{border-left:4px solid var(--green)}
+  .gap{border-left:4px solid var(--red)}
+  .gate{background:#1c2333;border-color:#3a4562}
+  .gate legend{font-weight:750;color:#fff}
+  label.option{display:block;min-height:44px;padding:.55rem .65rem;margin:.45rem 0;border:1px solid var(--border);border-radius:7px;background:var(--surface2)}
+  label.option input{margin-right:.45rem}
+  textarea,input[type=text],select{width:100%;border:1px solid var(--border);border-radius:7px;background:#0d1117;color:var(--text);padding:.65rem;font:inherit}
+  textarea{min-height:96px}
+  button{min-height:44px;padding:.62rem 1rem;border:1px solid var(--border);border-radius:7px;background:#21262d;color:#fff;font-weight:700;cursor:pointer}
+  button:hover{border-color:var(--accent)}
+  .compile-output{width:100%;min-height:390px;margin-top:1rem;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.9rem}
+  @media (max-width:860px){.toc ul{columns:1}body{padding:1.25rem .85rem}table{min-width:720px}}
+  @media (max-width:560px){h1{font-size:1.55rem}.grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div><span class="pill confirmed">confirmed</span><span class="pill stage">stage-2 · artifact approved</span><span class="pill doc">document tier</span></div>
-  <h1>Chromux - Devtool Docs Audit</h1>
-  <p class="sub">Confirmed page for <code>$devtool-docs-audit</code>. The approved canonical artifact is <code>research/devtool-docs-audit.md</code>. This page is current for the completed alignment cycle; later research can amend it only by archiving this confirmed page and highlighting the amendment.</p>
+<main>
+  <header>
+    <div><span class="pill doc">confirmed</span><span class="pill stage">stage 3 - finalized artifact</span><span class="pill doc">document tier</span></div>
+    <h1>Chromux - Devtool Docs Audit Confirmed Artifact</h1>
+    <p class="sub">Confirmed finalization record for the approved docs audit. The working packet has been archived and the canonical audit has been updated at <code>research/devtool-docs-audit.md</code>.</p>
+  </header>
 
-  <section class="card status" id="status">
-    <h2>Alignment Status</h2>
-    <table><tbody>
-      <tr><th>alignment_status</th><td>confirmed</td></tr>
-      <tr><th>confirmation date</th><td>2026-07-05</td></tr>
-      <tr><th>producing skill</th><td><code>$devtool-docs-audit</code></td></tr>
-      <tr><th>confirmed artifact</th><td><code>research/devtool-docs-audit.md</code></td></tr>
-      <tr><th>archived prior page</th><td><code>docs/history/archive/2026-07-05/012628/alignment/devtool-docs-audit-chromux.html</code></td></tr>
-      <tr><th>approval source</th><td>Final compiled YAML approved the artifact and canonical path, selected README quickstart as the lead backlog priority, and accepted the Executive Findings and Prioritized Documentation Backlog sections.</td></tr>
-      <tr><th>source basis</th><td>Repository-local documentation artifacts only; no implementation source, package manifest, README, or active docs directory was present.</td></tr>
-    </tbody></table>
-  </section>
-
-  <section class="card toc" id="toc">
-    <h2>Table of Contents</h2>
-    <ol>
-      <li><a href="#executive-findings">Executive Findings</a></li>
-      <li><a href="#scope">Scope And Source Basis</a></li>
-      <li><a href="#quickstart">Quickstart Clarity</a></li>
-      <li><a href="#examples">Examples</a></li>
-      <li><a href="#api">API Reference And Contracts</a></li>
-      <li><a href="#troubleshooting">Troubleshooting</a></li>
-      <li><a href="#migration">Migration Paths</a></li>
-      <li><a href="#proof">Missing Proof Artifacts</a></li>
-      <li><a href="#backlog">Prioritized Documentation Backlog</a></li>
-      <li><a href="#evidence">Evidence Matrix</a></li>
-      <li><a href="#assumptions">Confidence And Assumptions</a></li>
-      <li><a href="#alternatives">Alternatives Considered</a></li>
-      <li><a href="#gaps">Source Coverage Gaps</a></li>
-      <li><a href="#approval">Approval Record</a></li>
-    </ol>
-  </section>
-
-  <section class="card" id="executive-findings" data-section="Executive Findings">
-    <h2>Executive Findings</h2>
-    <p>Chromux does not yet have developer-facing product documentation. The current documentation surface is strategy and research: <code>research/idea-brief.md</code>, <code>research/devtool-positioning.md</code>, <code>research/devtool-monetization.md</code>, the original interview notes, and the alignment pages. That is appropriate for pre-implementation planning, but it is not enough for a developer to install, run, evaluate, contribute to, or debug Chromux.</p>
-    <p>The highest-risk docs gap is the absence of a quickstart that proves the intended loop: launch Chromux, start a Codex or Claude Code session, detect a <code>localhost</code> or <code>file://</code> preview, review it in the paired pane, and send a browser evidence payload to the right agent. Until that path is documented as a concrete command sequence, the value wedge remains conceptual.</p>
-    <p>The second adoption blocker is the missing capture payload contract. Existing research repeatedly names the payload contents: URL, selected element selector/HTML, console tail, screenshot path, timestamp, and originating session ID. But there is no schema, sample YAML, retention note, path convention, or delivery-mode contract.</p>
-    <p>The third blocker is missing troubleshooting and trust documentation. Chromux will touch terminal sessions, local URLs, <code>file://</code> pages, screenshots, DOM snippets, console logs, CLI auth state, and possibly cookies or browser profiles. The docs need to explain what is captured, where it is stored, what is never uploaded in local-only v1, how to delete captures, and how to debug failed preview detection or failed <code>claude -p</code> delivery.</p>
-  </section>
-
-  <section class="card" id="scope" data-section="Scope And Source Basis">
-    <h2>Scope And Source Basis</h2>
-    <p>This audit reviews the current repository documentation artifacts, not a shipped README or API reference, because no <code>README.md</code>, active <code>docs/</code>, package manifest, implementation source, or task queue exists in the active checkout.</p>
-    <ul>
-      <li><code>research/idea-brief.md</code></li>
-      <li><code>research/idea-brief-interview.md</code></li>
-      <li><code>research/devtool-positioning.md</code></li>
-      <li><code>research/devtool-monetization.md</code></li>
-      <li><code>alignment/idea-scope-brief-chromux.html</code></li>
-      <li><code>alignment/devtool-positioning-chromux.html</code></li>
-      <li><code>alignment/devtool-monetization-chromux.html</code></li>
-      <li><code>alignment/index.html</code></li>
-    </ul>
-  </section>
-
-  <section class="card" id="quickstart" data-section="Quickstart Clarity">
-    <h2>Quickstart Clarity</h2>
-    <p><strong>Finding:</strong> No quickstart exists.</p>
-    <p><strong>Evidence:</strong> The active checkout has no <code>README.md</code>, no active <code>docs/</code> guide, no package manifest, and no runnable app instructions. The current research says v1 should reduce setup to "add commands, launch sessions, auto-detect previews, review, capture," but that is product guidance rather than user documentation.</p>
-    <p><strong>Impact:</strong> A future OSS user or contributor cannot reach first success. Even the builder lacks a written acceptance path for validating the stack spike.</p>
-    <ul>
-      <li><code>README.md</code> with a "First local loop" quickstart.</li>
-      <li>Prerequisites for macOS, chosen stack, Codex CLI, Claude Code CLI, and authenticated CLI state.</li>
-      <li>Run-from-source commands once implementation exists.</li>
-      <li>Concrete example commands for paired sessions, preview opening, and browser evidence capture.</li>
-      <li>Observable verification checks for pane load, review queue badge, screenshot file, YAML payload, and <code>claude -p</code> delivery.</li>
-    </ul>
-  </section>
-
-  <section class="card" id="examples" data-section="Examples">
-    <h2>Examples</h2>
-    <p><strong>Finding:</strong> Existing examples describe intent but not executable usage.</p>
-    <p><strong>Evidence:</strong> The idea brief and positioning research repeatedly describe the target loop and payload contents, but there is no example session transcript, capture YAML, screenshot path, or failure case.</p>
-    <p><strong>Recommended examples:</strong></p>
-    <ul>
-      <li>Vite app preview: agent emits <code>http://localhost:5173</code>, Chromux queues or opens it, and capture sends evidence.</li>
-      <li>Local alignment page: <code>file://</code> HTML preview with no dev server.</li>
-      <li>Complete capture payload with URL, timestamp, session ID, selected element selector, selected element HTML excerpt, console log tail, screenshot path, and delivery target.</li>
-      <li>Failure case where preview detection finds multiple ports and asks the user to pick the intended one.</li>
-    </ul>
-  </section>
-
-  <section class="card" id="api" data-section="API Reference And Contracts">
-    <h2>API Reference And Contracts</h2>
-    <p><strong>Finding:</strong> There is no API reference or implementation contract for the main integration surfaces.</p>
-    <p><strong>Evidence:</strong> Current docs identify likely contracts but leave them prose-only: preview detection, session-to-pane pairing, review queue behavior, capture payload shape, <code>claude -p</code> delivery, file-drop fallback, local retention, and future stdin injection.</p>
-    <p><strong>Recommended contracts:</strong></p>
-    <ul>
-      <li>Capture payload schema, initially as versioned YAML.</li>
-      <li>Session identity and pairing model.</li>
-      <li>Preview detection rules for stdout parsing, explicit open commands, <code>localhost</code> patterns, <code>file://</code> paths, deduping, and queue behavior.</li>
-      <li>Delivery adapters: <code>claude -p</code> v1, file-drop fallback, and deferred live-session stdin injection.</li>
-      <li>Storage paths for screenshots, payload logs, browser profiles, and local history.</li>
-    </ul>
-  </section>
-
-  <section class="card" id="troubleshooting" data-section="Troubleshooting">
-    <h2>Troubleshooting</h2>
-    <p><strong>Finding:</strong> No troubleshooting guide exists for the highest-risk operational surfaces.</p>
-    <p><strong>Evidence:</strong> The positioning and monetization research both identify trust, install, support, browser capture permissions, CLI auth state, local ports, file permissions, retention, and Electron/Chromium issues as important future documentation or support costs. None are yet translated into troubleshooting steps.</p>
-    <div class="grid">
-      <div class="mini"><strong>Preview</strong><p>Preview does not open, wrong preview opened, current review replaced, or <code>file://</code> cannot load.</p></div>
-      <div class="mini"><strong>Capture</strong><p>Capture disabled, screenshot failed, console logs missing, payload too large, or wrong session target.</p></div>
-      <div class="mini"><strong>Delivery</strong><p><code>claude -p</code> failed, CLI auth state missing, file permissions blocked, or payload was not logged.</p></div>
+  <section class="notice" id="status">
+    <h2>Stage Status</h2>
+    <div class="table-wrap" data-tts-narrative="The stage status table explains that this Stage 3 docs audit artifact has been finalized.">
+      <table>
+        <tr><th>Field</th><th>Value</th></tr>
+        <tr><td>Command</td><td><code>$devtool-docs-audit</code></td></tr>
+        <tr><td>Stage</td><td>Stage 3 - finalized approved artifact</td></tr>
+        <tr><td>Archived working packet</td><td><code>docs/history/archive/2026-07-07/213501/research/_working/preliminary-devtool-docs-audit-research.md</code></td></tr>
+        <tr><td>Canonical artifact</td><td><code>research/devtool-docs-audit.md</code>, updated from the approved packet</td></tr>
+        <tr><td>Task edits</td><td>Not authorized; <code>tasks/todo.md</code> remains unchanged.</td></tr>
+      </table>
     </div>
   </section>
 
-  <section class="card" id="migration" data-section="Migration Paths">
-    <h2>Migration Paths</h2>
-    <p><strong>Finding:</strong> No migration docs exist from the current baseline workflows.</p>
-    <p><strong>Evidence:</strong> Current research defines the baseline as manual terminal plus Chrome, and compares Chromux against Cursor, Claude Code Desktop/Web/CLI, Playwright MCP, Chrome DevTools MCP, browser-use, VS Code preview panes, and <code>cmux</code>. But no migration guide turns that competitive framing into adoption steps.</p>
+  <section class="notice" id="approval-record">
+    <h2>Approval Record</h2>
+    <p>Final artifact approval was received with no unanswered required questions and no section feedback. Finalization archived the working packet, removed the active working copy, updated the canonical artifact, converted this page to confirmed, and left task files unchanged.</p>
+    <div class="table-wrap" data-tts-narrative="The approval record table preserves the final artifact gate decisions.">
+      <table>
+        <tr><th>Gate</th><th>Decision</th><th>Impact</th></tr>
+        <tr><td>Working packet artifact</td><td><code>approve</code></td><td>Approve the working packet substance for canonicalization.</td></tr>
+        <tr><td>Canonical path</td><td><code>approve</code></td><td>Write the approved artifact to <code>research/devtool-docs-audit.md</code>.</td></tr>
+        <tr><td>Backlog stance</td><td><code>approve_no_task_edits</code></td><td>Approve the backlog recommendations and keep <code>tasks/todo.md</code> unchanged.</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <section class="toc" id="toc">
+    <h2>Table Of Contents</h2>
     <ul>
-      <li>"From terminal plus Chrome" guide.</li>
-      <li>"From cmux" guide once the fork base is validated.</li>
-      <li>"From Cursor or IDE preview panes" guide focused on when terminal-native session pairing is better.</li>
-      <li>"From Playwright MCP or Chrome DevTools MCP" guide explaining that Chromux is a human review cockpit, not a replacement automation server.</li>
+      <li><a href="#boundary">Approved Scope</a></li>
+      <li><a href="#approval-record">Approval Record</a></li>
+      <li><a href="#executive">Executive Findings</a></li>
+      <li><a href="#surface">Current Documentation Surface</a></li>
+      <li><a href="#findings">Audit Findings</a></li>
+      <li><a href="#stale">Stale Claims To Correct</a></li>
+      <li><a href="#backlog">Prioritized Backlog</a></li>
+      <li><a href="#evidence">Evidence Matrix</a></li>
+      <li><a href="#assumptions">Assumptions And Confidence</a></li>
+      <li><a href="#gaps">Source Coverage Gaps</a></li>
+      <li><a href="#changes">Canonical Update Summary</a></li>
+      <li><a href="#finalization">Finalization</a></li>
     </ul>
   </section>
 
-  <section class="card" id="proof" data-section="Missing Proof Artifacts">
-    <h2>Missing Proof Artifacts</h2>
-    <p><strong>Finding:</strong> The docs lack proof artifacts that would make the wedge credible.</p>
-    <p><strong>Evidence:</strong> The research identifies two riskiest unknowns: <code>cmux</code> extensibility for embedded Chromium and payload-to-agent handoff. It also says no hands-on trials of key alternatives were run, and no current <code>cmux</code> codebase inspection was available.</p>
-    <ul>
-      <li>Stack spike note proving whether the <code>cmux</code> base can host the browser pane and capture hooks.</li>
-      <li>End-to-end demo transcript for <code>localhost</code> preview detection and capture to <code>claude -p</code>.</li>
-      <li>Example payload fixture stored in the repo.</li>
-      <li>Screenshot fixture showing the paired pane and review queue.</li>
-      <li>Storage and retention map for local captures.</li>
-      <li>Manual baseline timing comparison: terminal plus Chrome copy-paste vs. Chromux capture.</li>
-    </ul>
+  <section id="boundary">
+    <h2>Approved Scope</h2>
+    <p>This page preserves the approved research substance that was finalized into the canonical docs audit.</p>
+    <div class="table-wrap" data-tts-narrative="The approved scope table preserves the Stage 1 authorization boundaries.">
+      <table>
+        <tr><th>Approved item</th><th>Finalized treatment</th></tr>
+        <tr><td>Included sources</td><td><code>README.md</code>, <code>prototype/README.md</code>, <code>prototype/docs/capture-payload.md</code>, <code>tasks/todo.md</code>, <code>prototype/examples</code>, and prior research context.</td></tr>
+        <tr><td>Excluded sources</td><td>Implementation code except documented command, example, and proof-artifact verification.</td></tr>
+        <tr><td>Canonical first success</td><td>Install or run from <code>prototype/</code>, start a session, route a localhost or file preview to the paired browser pane, capture evidence, and send via <code>claude -p</code> or file drop.</td></tr>
+        <tr><td>Known evidence gap</td><td>No external support evidence or real user-language source is available yet.</td></tr>
+      </table>
+    </div>
   </section>
 
-  <section class="card" id="backlog" data-section="Prioritized Documentation Backlog">
+  <section id="executive">
+    <h2>Executive Findings</h2>
+    <div class="grid">
+      <div class="card resolved">
+        <h3>Docs Surface Improved</h3>
+        <p>Chromux now has a root README, prototype README, payload contract, proof fixtures, and task queue. The prior canonical claim that no developer-facing docs exist is stale.</p>
+      </div>
+      <div class="card finding">
+        <h3>Main Blocker Shifted</h3>
+        <p>The top blocker is no longer creating a README. It is splitting dense prototype README material into durable support and trust docs while preserving the first-success loop.</p>
+      </div>
+      <div class="card gap">
+        <h3>Troubleshooting Gap</h3>
+        <p>A standalone <code>prototype/docs/troubleshooting.md</code> is still missing for preview detection, file previews, screenshots, console logs, CLI auth, wrong-session routing, and storage cleanup.</p>
+      </div>
+      <div class="card gap">
+        <h3>Local Data Gap</h3>
+        <p>The docs make a useful local-data claim, but a complete <code>prototype/docs/privacy-and-local-data.md</code> is still needed before stronger public trust claims.</p>
+      </div>
+      <div class="card resolved">
+        <h3>Proof Artifacts Present</h3>
+        <p>The transcript, sample payload, and screenshot fixture exist. They should be linked from the prototype README as proof artifacts.</p>
+      </div>
+      <div class="card finding">
+        <h3>Migration Still Later</h3>
+        <p>Migration docs from terminal plus browser, <code>cmux</code>, IDE previews, and browser MCP tools remain absent but are lower priority than support and trust docs.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="surface">
+    <h2>Current Documentation Surface</h2>
+    <div class="table-wrap" data-tts-narrative="The documentation surface table lists each reviewed artifact and the audit implication.">
+      <table>
+        <tr><th>Surface</th><th>Current state</th><th>Audit implication</th></tr>
+        <tr><td><code>README.md</code></td><td>Defines Chromux, points to <code>prototype/</code>, lists <code>npm install</code> and <code>npm start</code>, and documents release tag/title conventions.</td><td>Good repo entry point; relies on prototype README for onboarding.</td></tr>
+        <tr><td><code>prototype/README.md</code></td><td>Comprehensive guide with prerequisites, run/install commands, session start, DETECT, preview routing, capture delivery, troubleshooting, and storage map.</td><td>Main first-success doc; dense enough to split support/trust material.</td></tr>
+        <tr><td><code>prototype/docs/capture-payload.md</code></td><td>Defines YAML schema v1, field bounds, retention, and versioning.</td><td>Strong initial API/contract reference.</td></tr>
+        <tr><td><code>prototype/examples/transcripts/first-local-loop.md</code></td><td>Scripted E2E transcript covering PTY, preview routing, console capture, queueing, capture, screenshot, file-drop, and adapter verification.</td><td>Strong proof artifact, with scripted-not-external caveat.</td></tr>
+        <tr><td><code>prototype/examples/captures/sample-capture.yaml</code></td><td>Sample v1 payload with session, page, selection, console, screenshot, delivery, and notes.</td><td>Useful fixture matching the schema shape.</td></tr>
+        <tr><td><code>prototype/examples/captures/sample-screenshot.png</code></td><td>Present screenshot fixture.</td><td>Concrete visual proof asset; README should make it discoverable.</td></tr>
+        <tr><td><code>tasks/todo.md</code></td><td>No active priority documentation item. Open docs tasks include troubleshooting, privacy/local-data, and first-success issue template.</td><td>Backlog matches remaining docs risks.</td></tr>
+        <tr><td><code>research/devtool-docs-audit.md</code></td><td>Canonical but stale; says no README, docs, examples, package manifest, source, or task queue existed.</td><td>Needs Stage 3 update after approval.</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <section id="findings">
+    <h2>Audit Findings</h2>
+    <div class="card finding">
+      <h3>Q1 - First-success path is documented, but scanability is strained.</h3>
+      <p><strong>Evidence:</strong> root README gives <code>cd prototype</code>, <code>npm install</code>, and <code>npm start</code>; prototype README defines prerequisites, session start/adopt, preview routing, capture, YAML review, and delivery; <code>prototype/package.json</code> has matching scripts.</p>
+      <p><strong>Impact:</strong> a developer can identify the path, but the prototype README carries onboarding, DETECT behavior, packaging, capture internals, troubleshooting, and storage in one long flow.</p>
+      <p><strong>Canonical recommendation:</strong> mark quickstart docs materially improved, preserve the root quickstart, add a short "Verify the loop" checklist, and link proof artifacts near the first-success steps.</p>
+    </div>
+    <div class="card finding">
+      <h3>Q2 - Installable app path is documented, but support boundaries are mixed into README.</h3>
+      <p><strong>Evidence:</strong> prototype README documents <code>npm run install-app</code>, unsigned app behavior, <code>/Applications/Chromux.app</code>, and login-shell PATH behavior; <code>package.json</code> has the corresponding script.</p>
+      <p><strong>Impact:</strong> sufficient for builder use, but unsigned app behavior, Automation permissions, CLI auth, and PATH belong in support docs before broader use.</p>
+    </div>
+    <div class="card resolved">
+      <h3>E1 - Proof artifacts exist and cover the riskiest loop, but discoverability is one-way.</h3>
+      <p><strong>Evidence:</strong> transcript reports scripted E2E coverage of session creation, PTY output, <code>file://</code> preview, console capture, queueing, capture modal, screenshot, file-drop payload, and separate <code>claude -p</code> adapter verification; sample YAML and screenshot exist.</p>
+      <p><strong>Impact:</strong> proof basis is much stronger than the prior canonical audit, but README pages should directly surface these examples.</p>
+    </div>
+    <div class="card gap">
+      <h3>E2 - Missing failure-recovery example remains a proof gap.</h3>
+      <p><strong>Evidence:</strong> examples cover happy-path and queue behavior but not failed <code>claude -p</code>, missing auth, screenshot failure, wrong route, or manual retry.</p>
+      <p><strong>Impact:</strong> support resilience is not yet proven as clearly as happy-path capture.</p>
+    </div>
+    <div class="card resolved">
+      <h3>A1 - Capture payload schema v1 is documented with useful bounds and retention notes.</h3>
+      <p><strong>Evidence:</strong> payload docs define schema fields, nullable selection, console and screenshot sections, delivery metadata, bounds for DOM and console values, retention, and breaking-change versioning.</p>
+      <p><strong>Impact:</strong> payload-contract blocker is resolved for v1. Add cross-links to the sample fixture.</p>
+    </div>
+    <div class="card finding">
+      <h3>A2 - Preview routing and delivery contracts are explained in prose but not reference-grade.</h3>
+      <p><strong>Evidence:</strong> prototype README explains loopback and absolute HTML path detection, empty-pane auto-fill, busy-pane queueing, popup queueing, throttled refresh, <code>claude -p</code>, and file-drop fallback.</p>
+      <p><strong>Impact:</strong> good enough for first use; stable reference sections can come through troubleshooting or future preview-routing docs.</p>
+    </div>
+    <div class="card gap">
+      <h3>T1 - Troubleshooting exists in README form but should become standalone.</h3>
+      <p><strong>Evidence:</strong> README covers <code>node-pty</code> build failure, preview not detected, <code>claude -p</code> non-zero exit, screenshot missing, DETECT title permissions, and wrong resume target; <code>tasks/todo.md</code> still tracks standalone troubleshooting.</p>
+      <p><strong>Impact:</strong> current bullets help, but self-service support needs symptom-oriented diagnostics, exact paths, retry steps, and escalation criteria.</p>
+    </div>
+    <div class="card gap">
+      <h3>T2 - Support-language evidence is still missing.</h3>
+      <p><strong>Evidence:</strong> approved scope says no external support evidence or user-language source is available; no issues, tickets, transcripts, or user quotes are in scope.</p>
+      <p><strong>Impact:</strong> troubleshooting priorities are internally evidenced, not user-reported.</p>
+    </div>
+    <div class="card gap">
+      <h3>P1 - Local-data claim needs a complete data-handling reference.</h3>
+      <p><strong>Evidence:</strong> README documents capture paths, delivery log, browser profile partition, and says nothing leaves except what <code>claude -p</code> sends; task queue still calls for privacy/local-data docs.</p>
+      <p><strong>Impact:</strong> add a data-handling reference naming captured data types, storage locations, retention/deletion behavior, and delivery boundary before stronger public claims.</p>
+    </div>
+    <div class="card finding">
+      <h3>M1 - Migration docs are absent and lower priority than support/trust docs.</h3>
+      <p><strong>Evidence:</strong> no migration docs exist; prior research identifies manual terminal plus Chrome, <code>cmux</code>, IDE preview panes, Playwright MCP, and Chrome DevTools MCP as baselines.</p>
+      <p><strong>Impact:</strong> useful before public adoption, but not required for the builder's first loop.</p>
+    </div>
+  </section>
+
+  <section id="stale">
+    <h2>Stale Claims To Correct</h2>
+    <div class="table-wrap" data-tts-narrative="The stale claims table shows how the canonical audit should change after approval.">
+      <table>
+        <tr><th>Stale canonical claim</th><th>Current evidence</th><th>Corrected position</th></tr>
+        <tr><td>No <code>README.md</code> exists.</td><td>Root README exists with description and quickstart.</td><td>Root README is a thin entry point.</td></tr>
+        <tr><td>No package manifest or runnable instructions exist.</td><td><code>prototype/package.json</code> and prototype README document <code>npm install</code>, <code>npm start</code>, and <code>npm run install-app</code>.</td><td>Prototype command path exists; runtime was not re-run in this audit.</td></tr>
+        <tr><td>No docs guide exists.</td><td><code>prototype/docs/capture-payload.md</code> exists.</td><td>Payload contract exists; troubleshooting and privacy docs are missing.</td></tr>
+        <tr><td>No example transcript, sample YAML, or screenshot exists.</td><td>Transcript, sample YAML, and sample screenshot exist under <code>prototype/examples</code>.</td><td>Proof artifacts exist; failure-recovery examples are still missing.</td></tr>
+        <tr><td>No task queue exists.</td><td><code>tasks/todo.md</code> exists and tracks docs tasks.</td><td>Backlog exists and accurately flags remaining docs gaps.</td></tr>
+        <tr><td>Stack and payload proofs are missing.</td><td>Task queue and examples indicate Electron prototype proof and scripted E2E proof.</td><td>Proof basis improved; external-user evidence still absent.</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <section id="backlog">
     <h2>Prioritized Documentation Backlog</h2>
     <ol>
-      <li>Create <code>README.md</code> with positioning, prerequisites, current status, and the first local loop once runnable commands exist.</li>
-      <li>Create <code>docs/capture-payload.md</code> with a versioned YAML schema and one complete sample payload.</li>
-      <li>Create <code>docs/troubleshooting.md</code> covering preview detection, <code>file://</code>, screenshots, console logs, <code>claude -p</code>, and storage cleanup.</li>
-      <li>Create <code>docs/privacy-and-local-data.md</code> before any "private/local-first" trust claim is published.</li>
-      <li>Create <code>docs/migration/manual-browser.md</code> for the manual terminal plus Chrome baseline.</li>
-      <li>Add proof artifacts under <code>examples/</code> after the stack spike: sample payload, sample screenshot path, and a short demo transcript.</li>
+      <li>Create <code>prototype/docs/troubleshooting.md</code> and link it from <code>prototype/README.md</code>.</li>
+      <li>Create <code>prototype/docs/privacy-and-local-data.md</code> and link it from the README storage map and capture payload docs.</li>
+      <li>Add an "Examples and proof artifacts" section to <code>prototype/README.md</code>.</li>
+      <li>Add a failure-recovery example after troubleshooting exists, focused on <code>claude -p</code> failure or missing auth with file-drop/manual retry.</li>
+      <li>Add a migration guide from manual terminal plus browser after support/trust docs are in place.</li>
+      <li>Add <code>.github/ISSUE_TEMPLATE/first-success-report.yml</code> only when controlled OSS preview is appropriate.</li>
     </ol>
   </section>
 
-  <section class="card" id="evidence" data-section="Evidence Matrix">
+  <section id="evidence">
     <h2>Evidence Matrix</h2>
-    <div class="scroll" data-tts-narrative="The evidence matrix maps each major docs-audit claim to repo evidence, inference, confidence, assumption status, and decision impact.">
-      <table><thead><tr><th>Claim</th><th>Evidence</th><th>Inference</th><th>Confidence</th><th>Assumption status</th><th>Decision impact</th></tr></thead><tbody>
-        <tr><td>Developer-facing docs do not yet exist</td><td>Active checkout has research and alignment artifacts but no <code>README.md</code>, no active <code>docs/</code>, and no implementation/package manifest.</td><td>The repo is still pre-implementation and pre-adoption-docs.</td><td><span class="tag ok">high</span></td><td>Evidence-backed</td><td>Treat docs audit as a gap map, not a polish pass.</td></tr>
-        <tr><td>Quickstart is the top blocker</td><td>Positioning research says v1 must reduce setup to "add commands, launch sessions, auto-detect previews, review, capture." No command sequence exists.</td><td>First success cannot be evaluated until this path is documented and later implemented.</td><td><span class="tag ok">high</span></td><td>Evidence-backed locally</td><td>Write README quickstart immediately after stack spike produces real commands.</td></tr>
-        <tr><td>Capture payload contract is the most important API doc</td><td>Idea brief and positioning research both name URL, selected DOM/selector, console tail, screenshot, timestamp/session context, and <code>claude -p</code> delivery.</td><td>The product wedge depends on a stable evidence bundle.</td><td><span class="tag ok">high</span></td><td>Evidence-backed locally</td><td>Create <code>docs/capture-payload.md</code> before broad contributor work.</td></tr>
-        <tr><td>Trust/troubleshooting docs are required before public claims</td><td>Monetization and positioning research warn against broad privacy/security claims without storage, screenshot retention, payload logs, and command behavior docs.</td><td>Local-first tooling still handles sensitive local evidence.</td><td><span class="tag ok">high</span></td><td>Evidence-backed locally</td><td>Document storage, deletion, and captured fields before publishing.</td></tr>
-        <tr><td>Migration docs can reuse positioning research</td><td>Positioning research already defines the alternatives and the manual baseline.</td><td>The comparison set can become practical migration guidance.</td><td><span class="tag med">medium-high</span></td><td>Evidence-backed locally</td><td>Create migration docs after the quickstart and payload schema.</td></tr>
-        <tr><td>Proof artifacts are missing</td><td>Research says <code>cmux</code> stack feasibility and payload handoff remain unverified.</td><td>Docs should not overclaim until these are tested.</td><td><span class="tag ok">high</span></td><td>Evidence-backed locally</td><td>Run stack and payload spikes before marketing/adoption docs.</td></tr>
-      </tbody></table>
+    <div class="table-wrap" data-tts-narrative="The evidence matrix ties each claim to source evidence, inference, confidence, and decision impact.">
+      <table>
+        <tr><th>Claim</th><th>Evidence</th><th>Inference</th><th>Confidence</th><th>Decision impact</th></tr>
+        <tr><td>Chromux now has a credible first-success doc path.</td><td>Root quickstart, prototype README first local loop, package scripts.</td><td>Old "no quickstart" finding is obsolete.</td><td>High</td><td>Shift canonical audit from creation to refinement.</td></tr>
+        <tr><td>Payload contract exists and is useful.</td><td>Payload schema, bounds, retention, versioning, sample fixture.</td><td>V1 API/reference blocker is mostly resolved.</td><td>High</td><td>Focus next API docs on routing/delivery semantics.</td></tr>
+        <tr><td>Proof artifacts are present but not discoverable enough.</td><td><code>prototype/examples</code> files exist; README pages do not collect them.</td><td>Users can verify the loop only if they browse.</td><td>High</td><td>Add links and short explanation to prototype README.</td></tr>
+        <tr><td>Troubleshooting remains a docs blocker.</td><td>README bullets plus unchecked standalone troubleshooting task.</td><td>Self-service support is not mature enough for public preview.</td><td>High</td><td>Make troubleshooting first remediation.</td></tr>
+        <tr><td>Privacy/local-data doc remains a trust blocker.</td><td>Storage map and local-data claim plus unchecked privacy task.</td><td>Trust claims need a dedicated data-handling reference.</td><td>High</td><td>Add local-data doc before stronger public claims.</td></tr>
+        <tr><td>Migration docs are missing but lower priority.</td><td>No migration docs; prior research identifies baselines.</td><td>Migration matters for adoption but not first proof.</td><td>Medium-high</td><td>Defer until support/trust docs exist.</td></tr>
+        <tr><td>External support language is unavailable.</td><td>Approved scope and no support evidence in repo scope.</td><td>Findings are internal-evidence based.</td><td>High</td><td>Do not present priorities as user-reported.</td></tr>
+      </table>
     </div>
   </section>
 
-  <section class="card" id="assumptions" data-section="Confidence And Assumptions">
-    <h2>Confidence And Assumption Register</h2>
-    <div class="scroll" data-tts-narrative="The assumption register separates evidence-backed documentation findings from unresolved implementation assumptions.">
-      <table><thead><tr><th>Item</th><th>Status</th><th>Confidence</th><th>What would change it</th></tr></thead><tbody>
-        <tr><td>Current repo is pre-implementation</td><td>Evidence-backed</td><td><span class="tag ok">high</span></td><td>Discovery of hidden runnable source/docs outside the visible checkout.</td></tr>
-        <tr><td><code>cmux</code> will be the fork base</td><td>Unproven</td><td><span class="tag med">medium</span></td><td>Stack spike rejects <code>cmux</code> and selects Chromium or VS Code.</td></tr>
-        <tr><td><code>claude -p</code> is the v1 delivery path</td><td>Provisional</td><td><span class="tag med">medium</span></td><td>End-to-end payload test shows one-off prompts lose too much session context.</td></tr>
-        <tr><td>Future OSS users need installation docs</td><td>Assumed</td><td><span class="tag med">medium</span></td><td>Project stays permanently private/personal-only.</td></tr>
-        <tr><td>Local capture data can include sensitive material</td><td>Evidence-backed by feature design</td><td><span class="tag ok">high</span></td><td>Capture payload scope is reduced to non-sensitive metadata only.</td></tr>
-      </tbody></table>
+  <section id="assumptions">
+    <h2>Assumptions And Confidence</h2>
+    <div class="table-wrap" data-tts-narrative="The assumptions register records which premises are confirmed and what could change them.">
+      <table>
+        <tr><th>Assumption or question</th><th>Status</th><th>Confidence</th><th>What would change it</th></tr>
+        <tr><td><code>prototype/</code> is the active app surface for docs.</td><td><span class="ok">Confirmed</span> by root README and approved scope.</td><td>High</td><td>User identifies a newer app path.</td></tr>
+        <tr><td>Canonical first success is the prototype local loop.</td><td><span class="ok">Confirmed</span> by approved YAML.</td><td>High</td><td>User chooses a different first-success path.</td></tr>
+        <tr><td>Documented command existence is enough verification.</td><td><span class="ok">Confirmed</span> by implementation-code exclusion.</td><td>Medium-high</td><td>User expands scope to runtime QA or code review.</td></tr>
+        <tr><td>Scripted E2E transcript is acceptable proof-artifact evidence.</td><td><span class="warn">Internal evidence</span>, not external validation.</td><td>Medium-high</td><td>Clean-checkout or external-user run contradicts it.</td></tr>
+        <tr><td>External support evidence is unavailable.</td><td><span class="ok">Confirmed</span> by approved scope.</td><td>High</td><td>User supplies tickets, issues, or interviews.</td></tr>
+        <tr><td>Public privacy claims should wait for local-data docs.</td><td><span class="ok">Supported</span> by task queue and prior research.</td><td>High</td><td>User decides the repo remains private/personal-only.</td></tr>
+      </table>
     </div>
   </section>
 
-  <section class="card" id="alternatives" data-section="Alternatives Considered">
-    <h2>Alternatives Considered</h2>
-    <div class="scroll"><table><thead><tr><th>Alternative</th><th>Why not selected</th></tr></thead><tbody>
-      <tr><td>Treat current research as sufficient docs</td><td>It helps strategy, but it cannot get a developer to first success.</td></tr>
-      <tr><td>Wait for full implementation before writing any docs</td><td>Quickstart and payload contracts can guide the implementation spike and prevent drift.</td></tr>
-      <tr><td>Lead with migration docs</td><td>Migration depends on first having a working quickstart and capture contract.</td></tr>
-      <tr><td>Lead with API reference only</td><td>The product value is workflow-first; API docs without a working loop would be too abstract.</td></tr>
-    </tbody></table></div>
-  </section>
-
-  <section class="card" id="gaps" data-section="Source Coverage Gaps">
+  <section id="gaps">
     <h2>Source Coverage Gaps</h2>
     <ul>
-      <li>No implementation source was present in the active checkout.</li>
-      <li>No <code>cmux</code> repository inspection was available in this audit.</li>
-      <li>No runnable commands, package scripts, or app screenshots were available.</li>
-      <li>No external user feedback or OSS issue data was available.</li>
-      <li>No current task queue existed at <code>tasks/todo.md</code>.</li>
+      <li>No external support tickets, GitHub issues, user interviews, or public feedback were available.</li>
+      <li>The Electron app and GUI E2E loop were not re-run; verification was limited to documented command/script presence and proof-artifact existence.</li>
+      <li>Implementation source was not inspected except through <code>package.json</code> command surfaces and file inventories.</li>
+      <li>No current external competitor or GitHub-doc browsing was performed because the approved Stage 2 scope centered on local docs and prior research.</li>
+      <li>The first-success transcript is scripted E2E evidence from the repo, not independent external-user evidence.</li>
     </ul>
   </section>
 
-  <section class="card" id="approval" data-section="Approval Record">
-    <h2>Approval Record</h2>
-    <p>Final compiled YAML approved this audit as the canonical artifact and left no unanswered required questions.</p>
-    <div class="scroll">
-      <table><thead><tr><th>Section</th><th>Gate type</th><th>Status</th><th>Answer</th><th>Target path</th></tr></thead><tbody>
-        <tr><td>Artifact Approval</td><td>artifact approval</td><td>answered</td><td><code>approve</code></td><td><code>research/devtool-docs-audit.md</code></td></tr>
-        <tr><td>Backlog Priority</td><td>backlog priority</td><td>answered</td><td><code>readme</code></td><td>README quickstart should lead the documentation backlog.</td></tr>
-        <tr><td>Canonical Path</td><td>canonical path</td><td>answered</td><td><code>approve</code></td><td><code>research/devtool-docs-audit.md</code></td></tr>
-      </tbody></table>
-    </div>
-    <h3>Accepted Section Feedback</h3>
+  <section id="changes">
+    <h2>Canonical Update Summary</h2>
+    <p>The approved canonical update was applied only to <code>research/devtool-docs-audit.md</code>. The final approval YAML did not authorize task or documentation remediation edits.</p>
     <ul>
-      <li>Executive Findings: accepted, sentiment <code>up</code>.</li>
-      <li>Prioritized Documentation Backlog: accepted, sentiment <code>up</code>.</li>
-    </ul>
-    <h3>Confirmation Changes</h3>
-    <ul>
-      <li>Updated <code>research/devtool-docs-audit.md</code> from review draft to approved canonical research.</li>
-      <li>Archived the prior review page to <code>docs/history/archive/2026-07-05/012628/alignment/devtool-docs-audit-chromux.html</code>.</li>
-      <li>Converted this alignment page to confirmed and removed review-only controls.</li>
+      <li>Preserved the new Stage 3 approval record.</li>
+      <li>Replaced stale "no developer-facing docs exist" framing with the current state.</li>
+      <li>Included findings-first sections for quickstart, examples/proof artifacts, API/reference, troubleshooting, privacy/local data, migration, and stale canonical claims.</li>
+      <li>Included the evidence matrix, assumptions/confidence register, and source coverage gaps from the working packet.</li>
+      <li>Kept <code>tasks/todo.md</code> unchanged because it already captures the highest-priority docs tasks.</li>
     </ul>
   </section>
-</div>
+
+  <section id="finalization">
+    <h2>Finalization</h2>
+    <div class="table-wrap" data-tts-narrative="The finalization table lists the completed Stage 3 actions.">
+      <table>
+        <tr><th>Action</th><th>Status</th></tr>
+        <tr><td>Archive working packet</td><td><span class="ok">Complete</span>: <code>docs/history/archive/2026-07-07/213501/research/_working/preliminary-devtool-docs-audit-research.md</code></td></tr>
+        <tr><td>Remove active working packet</td><td><span class="ok">Complete</span>: <code>research/_working/preliminary-devtool-docs-audit-research.md</code> removed.</td></tr>
+        <tr><td>Update canonical artifact</td><td><span class="ok">Complete</span>: <code>research/devtool-docs-audit.md</code> updated.</td></tr>
+        <tr><td>Task edits</td><td><span class="ok">Skipped as required</span>: final approval did not authorize edits to <code>tasks/todo.md</code>.</td></tr>
+      </table>
+    </div>
+  </section>
+</main>
+<script src="../scripts/alignment-question-nav.js"></script>
 <script src="../scripts/alignment-tts-kokoro.js"></script>
 </body>
 </html>

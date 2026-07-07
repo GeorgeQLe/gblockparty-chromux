@@ -14,7 +14,7 @@ unified-sidebar layout toggle, productization.
 
 ## Quickstart — the first local loop
 
-Requires: macOS, Node 20+, Xcode command-line tools (for the `node-pty` native build), and the
+Requires: macOS, Node 22.12+, Xcode command-line tools (for the `node-pty` native build), and the
 `claude` CLI on your PATH (only needed for delivery; everything else works without it).
 
 ```sh

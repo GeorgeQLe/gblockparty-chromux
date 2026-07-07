@@ -148,9 +148,20 @@ function writeClaudeHooksSettings() {
   return HOOKS_CLAUDE;
 }
 
+// Set in app.whenReady: true only after the corresponding hook file was
+// written successfully. When false, agents launch uninstrumented instead of
+// pointing --settings/notify at a path that was never written.
+const hookInstall = { claude: false, codex: false };
+
+// POSIX single-quoting: close the quote, emit an escaped ', reopen. Safe for
+// any byte the filesystem allows (spaces, quotes, backslashes).
+function shellQuote(value) {
+  return `'${String(value).replace(/'/g, `'\\''`)}'`;
+}
+
 function claudeCommand(resumeId = null) {
-  const base = `claude --settings '${HOOKS_CLAUDE}'`;
-  return resumeId ? `${base} --resume ${resumeId}` : base;
+  const base = hookInstall.claude ? `claude --settings ${shellQuote(HOOKS_CLAUDE)}` : 'claude';
+  return resumeId ? `${base} --resume ${shellQuote(resumeId)}` : base;
 }
 
 // Codex turn signals — verified on codex-cli 0.142.5: `codex -c notify=[...]`
@@ -181,8 +192,11 @@ function writeCodexNotifyScript() {
 }
 
 function codexCommand(resumeId = null) {
-  const base = `codex -c 'notify=["${CODEX_NOTIFY}"]'`;
-  return resumeId ? `${base} resume ${resumeId}` : base;
+  // The path sits inside a TOML string inside a shell arg — escape both
+  // layers: backslash-escape for TOML, then single-quote for the shell.
+  const notifyToml = `notify=["${CODEX_NOTIFY.replace(/[\\"]/g, '\\$&')}"]`;
+  const base = hookInstall.codex ? `codex -c ${shellQuote(notifyToml)}` : 'codex';
+  return resumeId ? `${base} resume ${shellQuote(resumeId)}` : base;
 }
 
 function sanitizeRestoreSession(session) {
@@ -838,8 +852,10 @@ ipcMain.handle('get-env', () => ({
   capturesDir: CAPTURES_DIR,
   deliveryLog: DELIVERY_LOG,
   restoreSessions: readRestoreSnapshot(),
-  hooksSettingsPath: HOOKS_CLAUDE,
-  codexNotifyPath: CODEX_NOTIFY,
+  // null when the hook install failed at startup: the renderer then launches
+  // agents uninstrumented instead of pointing them at broken paths.
+  hooksSettingsPath: hookInstall.claude ? HOOKS_CLAUDE : null,
+  codexNotifyPath: hookInstall.codex ? CODEX_NOTIFY : null,
   version: currentVersion(),
 }));
 
@@ -860,7 +876,14 @@ ipcMain.handle('resolve-restore-sessions', (_e, { sessions = [] } = {}) => (
 ));
 
 ipcMain.handle('confirm-app-close', (_e, { sessions = [] } = {}) => {
-  writeRestoreSnapshot({ reason: 'app-close', sessions });
+  // An idle quit (no open sessions) must not clobber a pending restore
+  // snapshot the user hasn't reopened yet.
+  const incoming = Array.isArray(sessions) ? sessions : [];
+  const existing = readRestoreSnapshot();
+  const pendingOnDisk = existing && !existing.consumed && existing.sessions.length > 0;
+  if (incoming.length > 0 || !pendingOnDisk) {
+    writeRestoreSnapshot({ reason: 'app-close', sessions: incoming });
+  }
   closeConfirmed = true;
   for (const p of ptys.values()) p.kill();
   if (win && !win.isDestroyed()) win.destroy();
@@ -878,8 +901,8 @@ ipcMain.handle('open-update-release', async (_e, opts = {}) => {
 app.whenReady().then(() => {
   ensureDirs();
   installAppMenu();
-  try { writeClaudeHooksSettings(); } catch (err) { console.error('hooks settings write failed:', err.message); }
-  try { writeCodexNotifyScript(); } catch (err) { console.error('codex notify script write failed:', err.message); }
+  try { writeClaudeHooksSettings(); hookInstall.claude = true; } catch (err) { console.error('hooks settings write failed:', err.message); }
+  try { writeCodexNotifyScript(); hookInstall.codex = true; } catch (err) { console.error('codex notify script write failed:', err.message); }
   createWindow();
   getUpdateStatus().then((status) => send('update-status', status)).catch(() => {});
   app.on('activate', () => {
