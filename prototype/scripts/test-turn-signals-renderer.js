@@ -56,7 +56,50 @@ fs.writeFileSync(e2ePath, `
   expect(bSignals.length === 1, 'split OSC must produce exactly one turn-signal event');
   expect(sig.written(b) === 'approval? tail', 'clean text around split OSC survives, got ' + JSON.stringify(sig.written(b)));
 
-  // 3 — typing answers in-terminal; stale text cannot resurrect COMPLETED.
+  // 3 — Codex completion notify and submitted-line inference.
+  const codexDone = sig.addFakeSession({ name: 'codex-done', agent: 'codex' });
+  sig.feedPtyChunk(codexDone, osc('turn-end', codexDone));
+  expect(sig.turnState(codexDone).state === 'completed', 'Codex notify turn-end should complete the turn');
+  expect(itemsFor('COMPLETED', 'codex-done').length === 1, 'Codex notify completion creates completed attention');
+  sig.focus(codexDone);
+  expect(itemsFor('COMPLETED', 'codex-done').length === 0, 'focused completed Codex session is display-hidden');
+  expect(sig.turnState(codexDone).state === 'completed', 'VIEW/focus must not clear completed state');
+  expect(sig.turnState(codexDone).acknowledged === false, 'VIEW/focus must not acknowledge completion');
+  sig.focus(holder);
+  expect(itemsFor('COMPLETED', 'codex-done').length === 1, 'completed Codex row reappears after blur');
+  sig.dismissItem('COMPLETED', 'codex-done');
+  expect(sig.turnState(codexDone).state === 'completed', 'DISMISS keeps completed state');
+  expect(sig.turnState(codexDone).acknowledged === true, 'DISMISS acknowledges completed row');
+  expect(itemsFor('COMPLETED', 'codex-done').length === 0, 'dismissed completed row stays hidden');
+
+  const codexIdleUnknown = sig.addFakeSession({ name: 'codex-idle-unknown', agent: 'codex' });
+  sig.feedPtyChunk(codexIdleUnknown, 'Choose an option:\\r\\n1. Wait until the rate limit resets\\r\\n› ');
+  expect(sig.turnState(codexIdleUnknown).state === 'unknown',
+    'Codex idle/rate-limit output from unknown must not complete');
+  expect(itemsFor('COMPLETED', 'codex-idle-unknown').length === 0,
+    'Codex idle/rate-limit output from unknown must not create attention');
+
+  const codexSubmit = sig.addFakeSession({ name: 'codex-submit', agent: 'codex' });
+  sig.typeInput(codexSubmit, 'implement this\\r');
+  expect(sig.turnState(codexSubmit).state === 'working', 'Codex submitted line from unknown should infer working');
+  expect(itemsFor('COMPLETED', 'codex-submit').length === 0, 'Codex submitted line should not create completed attention');
+  sig.feedPtyChunk(codexSubmit, 'Choose an option:\\r\\n1. Wait until the rate limit resets\\r\\n› ');
+  expect(sig.turnState(codexSubmit).state === 'completed',
+    'Codex rate-limit chooser from working should complete the turn');
+  expect(itemsFor('COMPLETED', 'codex-submit').length === 1,
+    'Codex fallback completion creates completed attention');
+  sig.focus(codexSubmit);
+  expect(itemsFor('COMPLETED', 'codex-submit').length === 0,
+    'focused fallback-completed Codex session is display-hidden');
+  sig.focus(holder);
+  expect(itemsFor('COMPLETED', 'codex-submit').length === 1,
+    'fallback-completed Codex row reappears after blur');
+  sig.typeInput(codexSubmit, 'next task\\r');
+  expect(sig.turnState(codexSubmit).state === 'working', 'new Codex input after fallback completion returns to working');
+  expect(itemsFor('COMPLETED', 'codex-submit').length === 0,
+    'new Codex input clears fallback completed attention');
+
+  // 4 — typing answers in-terminal; stale text cannot resurrect COMPLETED.
   sig.typeInput(a, 'y');
   expect(sig.turnState(a).state === 'working', 'user input after completed → working');
   expect(itemsFor('COMPLETED', 'claude-a').length === 0, 'COMPLETED item gone after typing');
@@ -64,7 +107,7 @@ fs.writeFileSync(e2ePath, `
   expect(sig.turnState(a).state === 'working', 'stale phrases must not resurrect completion');
   expect(itemsFor('COMPLETED', 'claude-a').length === 0, 'no resurrection in the queue either');
 
-  // 4 — focus hides, blur re-shows, DISMISS acknowledges without deleting.
+  // 5 — focus hides, blur re-shows, DISMISS acknowledges without deleting.
   expect(itemsFor('INPUT NEEDED', 'claude-b').length === 1, 'background needsInput visible');
   sig.focus(b);
   expect(itemsFor('INPUT NEEDED', 'claude-b').length === 0, 'focused session excluded from queue');
@@ -76,7 +119,7 @@ fs.writeFileSync(e2ePath, `
   expect(sig.turnState(b).state === 'needsInput', 'DISMISS never deletes state');
   expect(itemsFor('INPUT NEEDED', 'claude-b').length === 0, 'acknowledged item hidden');
 
-  // 5 — bare shell fed prompt-glyph/approval text: never agent attention.
+  // 6 — bare shell fed prompt-glyph/approval text: never agent attention.
   const shell = sig.addFakeSession({ name: 'shell', agent: '' });
   sig.feedPtyChunk(shell, '$ sudo make install\\r\\nContinue? y/n\\r\\n\\u276f ');
   await wait(850);
@@ -84,13 +127,17 @@ fs.writeFileSync(e2ePath, `
   expect(sig.turnState(shell).state === 'unknown', 'shell text/prompt glyph must not signal');
   expect(itemsFor('INPUT NEEDED', 'shell').length === 0, 'no agent attention for shell session');
 
-  // 6 — wrong-session-id OSC → signal-rejected, no state change.
+  // 7 — malformed and wrong-session-id OSC → signal-rejected, no state change.
   const beforeB = JSON.stringify(sig.turnState(b));
+  sig.feedPtyChunk(b, '\\x1b]777;chromux;v1;not-real;' + b + '\\x07');
+  expect(JSON.stringify(sig.turnState(b)) === beforeB, 'malformed signal must not mutate state');
   sig.feedPtyChunk(b, osc('turn-end', 'someone-else'));
   expect(JSON.stringify(sig.turnState(b)) === beforeB, 'foreign-id signal must not mutate state');
   const rejected = sig.events().filter((e) => e.type === 'signal-rejected');
-  expect(rejected.length === 1 && rejected[0].claimedSessionId === 'someone-else',
-    'foreign-id signal recorded as signal-rejected');
+  expect(rejected.length === 2, 'malformed and foreign-id signals recorded as signal-rejected');
+  expect(rejected.some((e) => e.claimedSessionId === null), 'malformed signal recorded without claimed session');
+  expect(rejected.some((e) => e.claimedSessionId === 'someone-else'),
+    'foreign-id signal recorded with claimed session');
 
   // exited sessions: dead dot only, never a queue item.
   sig.exit(shell, 1);

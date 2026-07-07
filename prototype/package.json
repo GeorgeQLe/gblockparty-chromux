@@ -1,6 +1,6 @@
 {
   "name": "chromux",
-  "version": "0.12.1",
+  "version": "0.12.4",
   "description": "OSS desktop front-end for local and GBlockParty-managed agent/browser workspaces.",
   "main": "main.js",
   "private": false,
@@ -21,6 +21,7 @@
     "test:osc-parser": "node scripts/test-osc-parser.js",
     "test:turn-signals-renderer": "node scripts/test-turn-signals-renderer.js",
     "test:capture-records-renderer": "node scripts/test-capture-records-renderer.js",
+    "test:preview-queue-renderer": "node scripts/test-preview-queue-renderer.js",
     "test:shortcuts-renderer": "node scripts/test-shortcuts-renderer.js",
     "test:browser-collapse-renderer": "node scripts/test-browser-collapse-renderer.js",
     "test:agent-command-quoting": "node scripts/test-agent-command-quoting.js",

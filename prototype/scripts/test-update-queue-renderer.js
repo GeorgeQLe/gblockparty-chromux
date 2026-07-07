@@ -17,8 +17,14 @@ fs.writeFileSync(e2ePath, `
 (async () => {
   const q = window.chromuxTestUpdateQueue;
   const sig = window.chromuxTestSignals;
-  if (!q || !sig) throw new Error('Missing update queue / signals test API');
+  const cap = window.chromuxTestCaptures;
+  if (!q || !sig || !cap) throw new Error('Missing update queue / signals / captures test API');
   const expect = (cond, msg) => { if (!cond) throw new Error(msg); };
+  const indexOf = (list, kind) => {
+    const index = list.indexOf(kind);
+    if (index === -1) throw new Error('Missing attention kind ' + kind + ' in ' + list.join(','));
+    return index;
+  };
 
   await new Promise((resolve) => setTimeout(resolve, 100));
   q.setStatus({ updateAvailable: true });
@@ -90,7 +96,7 @@ fs.writeFileSync(e2ePath, `
   await new Promise((resolve) => setTimeout(resolve, 50));
   q.flushRender();
   expect(q.phase() === 'failed', 'failed install should leave failed queue state, got ' + q.phase());
-  expect(q.attentionKinds()[0] === 'UPDATE FAILED', 'failed update should stay visible in attention queue');
+  expect(q.attentionKinds().includes('UPDATE FAILED'), 'failed update should stay visible in attention queue');
   expect(q.attentionButtons('UPDATE FAILED').includes('DISMISS'), 'failed update should expose DISMISS');
   expect(q.installButtonText() === 'RETRY INSTALL', 'failed settings action should retry');
   q.dismissItem('UPDATE FAILED');
@@ -98,6 +104,48 @@ fs.writeFileSync(e2ePath, `
   expect(!q.attentionKinds().includes('UPDATE FAILED'), 'dismissed failed update should leave attention queue');
   q.queue();
   expect(q.phase() === 'ready', 'queueing again after failed dismissal should return to ready');
+  expect(q.attentionKinds().includes('UPDATE READY'), 'ready update should stay visible behind direct agent items');
+
+  // Agent-first triage order: direct agent/user-action items outrank queued
+  // previews and completed turns; passive update waiting ranks below them.
+  const orderHolder = await q.addSession({ name: 'order-holder', agent: '', turnState: 'completed' });
+  sig.focus(orderHolder);
+  q.setSession(liveId, { turnState: 'completed' });
+  q.setSession(inputId, { turnState: 'needsInput' });
+  q.setSession(exitedId, { alive: true, turnState: 'completed' });
+  const orderInput = await q.addSession({ name: 'order-input', turnState: 'needsInput' });
+  const orderCompleted = await q.addSession({ name: 'order-completed', turnState: 'completed' });
+  const orderQueue = await q.addSession({
+    name: 'order-queue',
+    turnState: 'completed',
+    queue: [{ url: 'http://localhost:4321', ts: Date.now() }],
+  });
+  const orderDelivery = await q.addSession({ name: 'order-delivery', turnState: 'completed' });
+  sig.focus(orderHolder);
+  const captureId = cap.beginFakeCapture({ sessionId: orderDelivery, url: 'http://localhost:9999' });
+  const deliveryId = cap.beginFakeDelivery(captureId, { targetSessionId: orderDelivery });
+  cap.closeDelivery(deliveryId, 2, 'fixture delivery failure');
+
+  q.queue();
+  let kinds = q.attentionKinds();
+  expect(q.phase() === 'ready', 'all safe order sessions should make update ready');
+  expect(indexOf(kinds, 'INPUT NEEDED') < indexOf(kinds, 'DELIVERY FAIL'), 'INPUT NEEDED should outrank DELIVERY FAIL');
+  expect(indexOf(kinds, 'DELIVERY FAIL') < indexOf(kinds, 'UPDATE READY'), 'DELIVERY FAIL should outrank UPDATE READY');
+  expect(indexOf(kinds, 'UPDATE READY') < indexOf(kinds, 'QUEUE 1'), 'UPDATE READY should outrank queued previews');
+  expect(indexOf(kinds, 'QUEUE 1') < indexOf(kinds, 'COMPLETED'), 'queued previews should outrank completed turns');
+
+  q.setSession(orderQueue, { turnState: 'unknown' });
+  kinds = q.attentionKinds();
+  expect(q.phase() === 'waiting', 'unknown order queue session should make update waiting');
+  expect(indexOf(kinds, 'COMPLETED') < indexOf(kinds, 'UPDATE WAITING'), 'passive UPDATE WAITING should rank below completed turns');
+
+  sig.focus(orderInput);
+  expect(!sig.attentionItems().some((i) => i.kind === 'INPUT NEEDED' && i.name === 'order-input'),
+    'focus hides input-needed display item for the focused session');
+  expect(q.turnState(orderInput).state === 'needsInput', 'focus does not mutate input-needed state');
+  sig.focus(orderHolder);
+  expect(sig.attentionItems().some((i) => i.kind === 'INPUT NEEDED' && i.name === 'order-input'),
+    'blur re-shows still-actionable input-needed item');
 
   return JSON.stringify({
     ok: true,

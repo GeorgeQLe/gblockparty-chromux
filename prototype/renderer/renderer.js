@@ -72,28 +72,95 @@ const TERM_THEME = {
 const ANSI_RE = /\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?|\x1b[@-_]/g;
 // Requires a port or a path after the host — a bare "http://localhost" is
 // almost always a soft-wrapped fragment of a longer URL, not a dev server.
-const LOCALHOST_RE = /https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(?::\d+(?:\/[^\s"'<>)\]]*)?|\/[^\s"'<>)\]]*)/gi;
+const LOCALHOST_URL_START_RE = /https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])/gi;
 const HTMLFILE_RE = /(?:file:\/\/)?(\/(?:[^\s"'<>:*?]+\/)*[^\s"'<>:*?]+\.html?)\b/gi;
 const UPDATE_QUEUE_PHASES = new Set(['idle', 'waiting', 'ready', 'running', 'failed']);
 
+function stripTerminalControlsForPreview(raw) {
+  return String(raw || '')
+    .replace(ANSI_RE, ' ')
+    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, ' ');
+}
+
 function normalizePreviewUrl(raw) {
-  let url = raw.replace(/[.,;)\]]+$/, '');
+  let url = String(raw || '');
+  url = url.replace(/[.,;)\]]+$/, '');
   url = url.replace('://0.0.0.0', '://localhost').replace('://[::1]', '://localhost');
   return url;
+}
+
+function terminalTokenEnd(line, start) {
+  let i = start;
+  while (i < line.length) {
+    if (/[\s"'<>)\]]/.test(line[i]) && !line.slice(start, i + 1).match(/^https?:\/\/\[[^\]]+\]$/i)) break;
+    i += 1;
+  }
+  return i;
+}
+
+function localhostPreviewAt(line, start) {
+  const tokenEnd = terminalTokenEnd(line, start);
+  const token = line.slice(start, tokenEnd);
+  if (!token) return null;
+  if (/[›❯]/.test(token) || /https?:\/\//i.test(token.slice(1))) {
+    return { url: null, end: tokenEnd };
+  }
+
+  const host = token.match(/^https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])/i);
+  if (!host) return null;
+
+  let cursor = host[0].length;
+  if (token[cursor] === ':') {
+    const portStart = cursor + 1;
+    let portEnd = portStart;
+    while (/\d/.test(token[portEnd] || '')) portEnd += 1;
+    if (portEnd === portStart) return null;
+    cursor = portEnd;
+    if (token[cursor] === '/') cursor = token.length;
+    else if (cursor !== token.length) return { url: null, end: tokenEnd };
+  } else if (token[cursor] === '/') {
+    cursor = token.length;
+  } else {
+    return null;
+  }
+
+  const url = normalizePreviewUrl(token.slice(0, cursor));
+  return url ? { url, end: tokenEnd } : { url: null, end: tokenEnd };
 }
 
 function scanLineForPreviews(line) {
   const found = [];
   let m;
-  LOCALHOST_RE.lastIndex = 0;
-  while ((m = LOCALHOST_RE.exec(line)) !== null) {
-    found.push({ url: normalizePreviewUrl(m[0]), source: 'TERM' });
+  LOCALHOST_URL_START_RE.lastIndex = 0;
+  while ((m = LOCALHOST_URL_START_RE.exec(line)) !== null) {
+    const hit = localhostPreviewAt(line, m.index);
+    if (hit && hit.end > m.index) LOCALHOST_URL_START_RE.lastIndex = hit.end;
+    if (hit && hit.url) found.push({ url: hit.url, source: 'TERM' });
   }
   HTMLFILE_RE.lastIndex = 0;
   while ((m = HTMLFILE_RE.exec(line)) !== null) {
     found.push({ url: 'file://' + encodeURI(m[1]).replace(/#/g, '%23'), source: 'FILE' });
   }
   return found;
+}
+
+function trackTypedPreviewSuppressions(session, data) {
+  if (!session || !data) return;
+  const hits = scanLineForPreviews(stripTerminalControlsForPreview(data))
+    .filter((hit) => hit.source === 'TERM');
+  if (hits.length === 0) return;
+  const suppress = session.term.previewSuppress;
+  for (const hit of hits) suppress.set(hit.url, (suppress.get(hit.url) || 0) + 1);
+}
+
+function consumeTypedPreviewSuppression(session, url, source) {
+  if (!session || source !== 'TERM') return false;
+  const suppress = session.term.previewSuppress;
+  const count = suppress.get(url) || 0;
+  if (count <= 0) return false;
+  if (count === 1) suppress.delete(url);
+  else suppress.set(url, count - 1);
+  return true;
 }
 
 function feedDetector(session, chunk) {
@@ -103,7 +170,7 @@ function feedDetector(session, chunk) {
   t.lineBuf = parts.pop() || '';
   if (t.lineBuf.length > 2048) t.lineBuf = t.lineBuf.slice(-2048);
   for (const rawLine of parts) {
-    const line = rawLine.replace(ANSI_RE, '');
+    const line = stripTerminalControlsForPreview(rawLine);
     if (!line) continue;
     for (const hit of scanLineForPreviews(line)) {
       if (hit.source === 'FILE') {
@@ -274,44 +341,6 @@ function recordEvent(event) {
   }
 }
 
-const TURN_SIGNAL_STATES = {
-  'turn-start': 'working',
-  'input-needed': 'needsInput',
-  'turn-end': 'completed',
-};
-
-function applyTurnSignal(session, event) {
-  const next = TURN_SIGNAL_STATES[event.signal];
-  if (!next) return;
-  const turn = session.turn;
-  turn.state = next;
-  turn.instrumented = true;
-  turn.detail = event.detail || null;
-  turn.since = Date.now();
-  turn.acknowledged = false;
-}
-
-function applyUserInput(session, event) {
-  const turn = session.turn;
-  if (turn.state === 'needsInput' || turn.state === 'completed') {
-    // Any keystroke counts as answering in-terminal. An arrow key while
-    // needsInput yields a false "working" — a false negative, never a false
-    // positive alert; the next hook signal corrects it.
-    turn.state = 'working';
-    turn.detail = null;
-    turn.since = Date.now();
-    turn.acknowledged = false;
-    return true;
-  }
-  // Codex ships no turn-start hook — infer a turn from a submitted line.
-  if (session.agent === 'codex' && turn.state === 'unknown' && /\r/.test(event.data || '')) {
-    turn.state = 'working';
-    turn.since = Date.now();
-    return true;
-  }
-  return false;
-}
-
 function captureRecordOf(event) {
   return event.captureId ? state.captures.get(event.captureId) : null;
 }
@@ -321,12 +350,15 @@ function apply(event) {
   let recorded = false;
   switch (event.type) {
     case 'turn-signal':
-      if (session) applyTurnSignal(session, event);
+      if (session) {
+        window.chromuxAttention.applyTurnSignal(session.turn, event.signal, event.detail, Date.now());
+      }
       break;
     case 'user-input':
       // Only state-changing input is worth ring space — raw typing is noise.
       recorded = true;
-      if (session && applyUserInput(session, event)) {
+      if (session) trackTypedPreviewSuppressions(session, event.data);
+      if (session && window.chromuxAttention.applyUserInputTurnTransition(session, event.data, Date.now())) {
         recordEvent({ type: 'user-input', sessionId: session.id, turnState: session.turn.state });
       }
       break;
@@ -489,7 +521,14 @@ function newSessionShape({ id, name, cwd, agent }) {
       collapsed: false,
       expandedGridTemplate: 'minmax(320px, 46%) 6px minmax(360px, 1fr)',
     },
-    term: { term: null, fitAddon: null, fit: () => {}, lineBuf: '', signalBuf: '' },
+    term: {
+      term: null,
+      fitAddon: null,
+      fit: () => {},
+      lineBuf: '',
+      signalBuf: '',
+      previewSuppress: new Map(),
+    },
     els: null,
   };
 }
@@ -500,6 +539,7 @@ function newSessionShape({ id, name, cwd, agent }) {
 // ───────────────────────────────────────────────────────────────────────────
 
 function routePreview(session, url, source) {
+  if (consumeTypedPreviewSuppression(session, url, source)) return;
   const b = session.browser;
   if (b.currentUrl && b.currentUrl === url) {
     const now = Date.now();
@@ -1368,89 +1408,50 @@ function renderTabs() {
   }
 }
 
-// Attention is a pure projection over turn state, preview queues, and capture
-// records. The focused session is excluded as a display rule only — the
-// underlying state persists, so its items reappear when focus moves away.
-// Exited sessions get the dead tab dot, never a queue item.
-function attentionItemsFor(session) {
-  const items = [];
-  if (session.browser.queue.length > 0) {
-    const next = session.browser.queue[0];
-    items.push({
-      type: 'queue',
-      kind: `QUEUE ${session.browser.queue.length}`,
-      detail: next.url,
-      cls: 'queue',
-      primary: 'OPEN',
-      dismiss: null,
-      action: () => {
-        activateSession(session.id);
-        session.els.queuePanel.classList.remove('hidden');
-      },
-    });
-  }
-  const turn = session.turn;
-  if (!turn.acknowledged && turn.state === 'needsInput') {
-    items.push({
-      type: 'input',
-      kind: 'INPUT NEEDED',
-      detail: turn.detail || 'Agent is waiting on your input',
-      cls: 'input',
-      primary: 'FOCUS',
-      dismiss: () => apply({ type: 'attention-dismissed', sessionId: session.id }),
-      action: () => activateSession(session.id),
-    });
-  }
-  if (!turn.acknowledged && turn.state === 'completed') {
-    items.push({
-      type: 'completed',
-      kind: 'COMPLETED',
-      detail: turn.detail || 'Agent turn finished',
-      cls: 'completed',
-      primary: 'VIEW',
-      dismiss: () => apply({ type: 'attention-dismissed', sessionId: session.id }),
-      action: () => activateSession(session.id),
-    });
-  }
-  return items;
-}
-
-// Failed deliveries attribute to the record's own target/capturing session —
-// never to whichever session happens to be focused.
-function captureFailureItems() {
-  const items = [];
-  for (const rec of state.captures.values()) {
-    if (rec.status !== 'failed' || rec.acknowledged) continue;
-    const session = state.sessions.get(rec.targetSessionId || rec.sessionId)
-      || state.sessions.get(rec.sessionId);
-    if (!session || session.id === state.activeId) continue;
-    items.push({
-      session,
-      item: {
-        type: 'delivery',
-        kind: 'DELIVERY FAIL',
-        detail: `Exit ${rec.exitCode}${rec.error ? ': ' + rec.error : ''}${rec.url ? ' — ' + rec.url : ''}`,
-        cls: 'exited',
-        primary: 'VIEW',
-        dismiss: () => apply({ type: 'capture-acknowledged', captureId: rec.id }),
-        action: () => activateSession(session.id),
-      },
-    });
-  }
-  return items;
-}
-
 function attentionItems() {
-  const items = [];
-  // The update-queue item is global — it is never focus-filtered.
-  const updateItem = updateQueueAttentionItem();
-  if (updateItem) items.push(updateItem);
-  for (const session of orderedSessions()) {
-    if (session.id === state.activeId) continue;
-    for (const item of attentionItemsFor(session)) items.push({ session, item });
+  reconcileUpdateQueue();
+  return window.chromuxAttention.projectAttentionItems({
+    sessions: orderedSessions(),
+    activeId: state.activeId,
+    captures: state.captures.values(),
+    updateQueue: state.updateQueue,
+    updateStatus: state.updateStatus,
+  }).map((item) => ({
+    session: item.sessionId
+      ? state.sessions.get(item.sessionId)
+      : { name: 'Chromux update', cwd: '' },
+    item,
+  })).filter((row) => row.session);
+}
+
+function attentionAction(item) {
+  if (item.scope === 'global') {
+    if (item.type === 'updateReady' || item.type === 'updateFailed') {
+      const blockers = updateBlockers();
+      if (item.type === 'updateFailed' && blockers.length > 0) return openSettings;
+      return () => installUpdate().catch(showUpdateInstallError);
+    }
+    if (item.type === 'updateWaiting') return focusFirstUpdateBlocker;
+    return openSettings;
   }
-  items.push(...captureFailureItems());
-  return items;
+  return () => {
+    const session = state.sessions.get(item.sessionId);
+    if (!session) return;
+    activateSession(session.id);
+    if (item.type === 'queue') session.els.queuePanel.classList.remove('hidden');
+  };
+}
+
+function dismissAttentionItem(item) {
+  if (item.scope === 'global') {
+    if (item.type !== 'updateRunning') dismissUpdateQueue();
+    return;
+  }
+  if (item.type === 'delivery' && item.captureId) {
+    apply({ type: 'capture-acknowledged', captureId: item.captureId });
+  } else if (item.type === 'input' || item.type === 'completed') {
+    apply({ type: 'attention-dismissed', sessionId: item.sessionId });
+  }
 }
 
 function renderAttentionQueue() {
@@ -1468,7 +1469,8 @@ function renderAttentionQueue() {
   for (const { session, item } of items) {
     const row = document.createElement('div');
     row.className = `attention-item ${item.cls || ''}`;
-    row.onclick = item.action;
+    const action = attentionAction(item);
+    row.onclick = action;
     const top = document.createElement('div');
     top.className = 'attention-top';
     const kind = document.createElement('span');
@@ -1486,19 +1488,19 @@ function renderAttentionQueue() {
     actions.className = 'attention-actions';
     const primary = document.createElement('button');
     primary.className = 'qi-btn open';
-    primary.textContent = item.primary || 'VIEW';
+    primary.textContent = item.primaryAction || 'VIEW';
     primary.onclick = (e) => {
       e.stopPropagation();
-      item.action();
+      action();
     };
     actions.appendChild(primary);
-    if (item.dismiss) {
+    if (item.type !== 'queue' && item.type !== 'updateRunning') {
       const dismiss = document.createElement('button');
       dismiss.className = 'qi-btn';
       dismiss.textContent = 'DISMISS';
       dismiss.onclick = (e) => {
         e.stopPropagation();
-        item.dismiss();
+        dismissAttentionItem(item);
       };
       actions.appendChild(dismiss);
     }
@@ -1617,13 +1619,7 @@ function updateAvailable() {
 // and focusing a session cannot change its turn state — so looking at a
 // completed session no longer regresses the update queue.
 function updateSessionSafety(session) {
-  if (!session.lifecycle.alive) return { safe: true, reason: 'exited' };
-  if (session.turn.state === 'needsInput') return { safe: true, reason: 'waiting for input' };
-  if (session.turn.state === 'completed') return { safe: true, reason: 'completed' };
-  return {
-    safe: false,
-    reason: session.turn.state === 'working' ? 'agent turn in progress' : 'live work state unknown',
-  };
+  return window.chromuxAttention.sessionUpdateSafety(session);
 }
 
 function updateBlockers() {
@@ -1655,70 +1651,6 @@ function dismissUpdateQueue() {
 function focusFirstUpdateBlocker() {
   const blocker = updateBlockers()[0];
   if (blocker) activateSession(blocker.session.id);
-}
-
-function updateQueueAttentionItem() {
-  if (!updateAvailable()) return null;
-  reconcileUpdateQueue();
-  const phase = state.updateQueue.phase;
-  if (phase === 'idle') return null;
-  const blockers = updateBlockers();
-  if (phase === 'waiting') {
-    return {
-      session: { name: 'Chromux update', cwd: '' },
-      item: {
-        type: 'update',
-        kind: 'UPDATE WAITING',
-        detail: `${blockers.length} live session${blockers.length === 1 ? '' : 's'} must complete, ask for input, or exit before installing the update.`,
-        cls: 'update waiting',
-        primary: 'FOCUS',
-        dismiss: dismissUpdateQueue,
-        action: focusFirstUpdateBlocker,
-      },
-    };
-  }
-  if (phase === 'ready') {
-    return {
-      session: { name: 'Chromux update', cwd: '' },
-      item: {
-        type: 'update',
-        kind: 'UPDATE READY',
-        detail: 'All sessions are safe. Install the update from the managed local source.',
-        cls: 'update completed',
-        primary: 'INSTALL',
-        dismiss: dismissUpdateQueue,
-        action: () => installUpdate().catch(showUpdateInstallError),
-      },
-    };
-  }
-  if (phase === 'running') {
-    return {
-      session: { name: 'Chromux update', cwd: '' },
-      item: {
-        type: 'update',
-        kind: 'UPDATE RUNNING',
-        detail: 'Installing the Chromux update.',
-        cls: 'update',
-        primary: 'DETAILS',
-        action: openSettings,
-      },
-    };
-  }
-  if (phase === 'failed') {
-    return {
-      session: { name: 'Chromux update', cwd: '' },
-      item: {
-        type: 'update',
-        kind: 'UPDATE FAILED',
-        detail: state.updateQueue.error || 'Could not install the update. Review details in Settings.',
-        cls: 'update exited',
-        primary: blockers.length === 0 ? 'RETRY' : 'DETAILS',
-        dismiss: dismissUpdateQueue,
-        action: blockers.length === 0 ? () => installUpdate().catch(showUpdateInstallError) : openSettings,
-      },
-    };
-  }
-  return null;
 }
 
 function updateStatusMessage(status) {
@@ -1968,6 +1900,9 @@ function handlePtyData(id, data) {
   }
   if (res.clean) {
     s.term.term.write(res.clean);
+    if (window.chromuxAttention.applyCodexOutputCompletionFallback(s, res.clean, Date.now())) {
+      invalidate('update', 'attention', 'badges');
+    }
     feedDetector(s, res.clean);
   }
 }
@@ -2765,6 +2700,33 @@ if (window.chromuxTest) {
       throw new Error(`No attention item ${kind}`);
     },
     events: () => state.events.map((e) => ({ ...e })),
+    flushRender,
+  };
+
+  window.chromuxTestPreviews = {
+    addSession: async (opts) => addFakeSession(opts),
+    scan(line) {
+      return scanLineForPreviews(stripTerminalControlsForPreview(line)).map((hit) => ({ ...hit }));
+    },
+    typeInput(id, data) {
+      apply({ type: 'user-input', sessionId: id, data });
+      flushRender();
+    },
+    feed(id, chunk) {
+      handlePtyData(id, chunk);
+      flushRender();
+    },
+    queueUrls: (id) => testSession(id).browser.queue.map((item) => item.url),
+    queueCount: (id) => testSession(id).browser.queue.length,
+    currentUrl: (id) => testSession(id).browser.currentUrl,
+    openQueued(id, url) {
+      const session = testSession(id);
+      const buttons = [...session.els.queueList.querySelectorAll('.qi-btn.open')];
+      const button = buttons.find((candidate) => candidate.dataset.queueOpenUrl === url);
+      if (!button) throw new Error(`No queued OPEN for ${url}`);
+      button.click();
+      flushRender();
+    },
     flushRender,
   };
 

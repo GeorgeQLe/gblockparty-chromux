@@ -1,5 +1,29 @@
 # Release Notes
 
+## GBlockParty Chromux v0.12.4
+
+Planned tag: `chromux-v0.12.4`
+
+- Add a Codex-only renderer fallback that marks an already-working turn completed when Codex reaches a known idle or rate-limit interstitial state, while preserving OSC `turn-end` as the primary signal.
+- Reject malformed localhost preview tokens that concatenate nested URLs or include prompt glyph contamination, and preserve delimiters while stripping terminal control sequences so status redraws cannot corrupt preview URLs.
+- Suppress localhost previews echoed from typed Codex prompt input once per occurrence, while still allowing the same URL to route when later printed by agent output.
+
+## GBlockParty Chromux v0.12.3
+
+Planned tag: `chromux-v0.12.3`
+
+- Keep completed attention rows display-hidden only while their own session is focused; they now reliably reappear after blur unless explicitly dismissed or superseded by new input.
+- Stop queuing malformed terminal preview URLs when Codex output wraps or concatenates localhost URLs; nested `http://` / `https://` starts are split and prompt glyphs terminate the current URL.
+
+## GBlockParty Chromux v0.12.2
+
+Planned tag: `chromux-v0.12.2`
+
+- Move renderer attention and turn-transition rules into a dedicated `renderer/attention.js` domain module, leaving DOM rendering and activation actions in `renderer.js`.
+- Normalize deterministic Claude/Codex lifecycle inputs through one turn vocabulary while keeping malformed or wrong-session OSC sequences diagnostic-only.
+- Reorder the attention rail as an actionable triage queue: input needed, delivery failures, actionable update states, queued previews, completed turns, then passive update waiting.
+- Keep focused-session hiding, dismiss acknowledgements, user-input turn transitions, and update safety derived from canonical turn state instead of rendered queue rows.
+
 ## GBlockParty Chromux v0.12.1
 
 Tag: `chromux-v0.12.1`
