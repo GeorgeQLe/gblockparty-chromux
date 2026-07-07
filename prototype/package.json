@@ -1,6 +1,6 @@
 {
   "name": "chromux",
-  "version": "0.12.4",
+  "version": "0.12.7",
   "description": "OSS desktop front-end for local and GBlockParty-managed agent/browser workspaces.",
   "main": "main.js",
   "private": false,

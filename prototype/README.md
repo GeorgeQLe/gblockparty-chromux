@@ -55,7 +55,8 @@ Then complete the loop:
    prints `http://localhost:5173` (or any loopback URL, or an absolute `/path/to/page.html`),
    the paired browser pane auto-opens it. An empty pane auto-fills; a busy pane never gets
    hot-swapped — later URLs land in the badged **QUEUE**, and popups from the page do too.
-   Re-emitting the same URL auto-refreshes the pane (throttled).
+   Re-emitting the same URL auto-refreshes the pane (throttled). Use **COLLAPSE** or
+   `Command+Shift+B` to hide/show the paired browser for the active session.
 3. **Capture evidence** — hit **⌖ PICK ELEMENT**, hover to highlight, click the broken thing
    (Esc cancels). Or **⚡ CAPTURE** for a page-level capture. Review the YAML payload, add a
    note, pick a target (paired session by default, redirectable), then:

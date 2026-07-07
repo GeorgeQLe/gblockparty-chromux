@@ -75,6 +75,22 @@ fs.writeFileSync(e2ePath, `
   expect(first.currentUrl === 'http://localhost:5173/current', 'restore must preserve current URL');
   expect(first.queueCount === 1, 'restore must preserve queue state');
 
+  const shortcutCollapsed = b.shortcutToggle();
+  await tick();
+  first = b.state(firstId);
+  expect(shortcutCollapsed && shortcutCollapsed.sessionId === firstId, 'Command+Shift+B should target active session');
+  expect(shortcutCollapsed.collapsed === true, 'Command+Shift+B should report collapsed state');
+  expect(first.collapsed, 'Command+Shift+B should collapse the active paired browser');
+
+  const shortcutRestored = b.shortcutToggle();
+  await tick();
+  first = b.state(firstId);
+  expect(shortcutRestored && shortcutRestored.sessionId === firstId, 'second Command+Shift+B should target active session');
+  expect(shortcutRestored.collapsed === false, 'second Command+Shift+B should report restored state');
+  expect(!first.collapsed, 'second Command+Shift+B should restore the active paired browser');
+  expect(first.currentUrl === 'http://localhost:5173/current', 'shortcut restore must preserve current URL');
+  expect(first.queueCount === 1, 'shortcut restore must preserve queue state');
+
   return JSON.stringify({
     ok: true,
     firstCollapsed: first.collapsed,

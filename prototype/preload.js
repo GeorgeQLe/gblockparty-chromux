@@ -47,6 +47,7 @@ contextBridge.exposeInMainWorld('chromux', {
   onLifecycleConfirmClose: (cb) => ipcRenderer.on('lifecycle-confirm-close', (_e, m) => cb(m)),
   onShortcutActivateSessionIndex: (cb) => ipcRenderer.on('shortcut-activate-session-index', (_e, m) => cb(m)),
   onShortcutFocusNextQueueItem: (cb) => ipcRenderer.on('shortcut-focus-next-queue-item', () => cb()),
+  onShortcutToggleBrowser: (cb) => ipcRenderer.on('shortcut-toggle-browser', () => cb()),
   webviewPreloadPath: 'file://' + path.join(__dirname, 'webview-preload.js'),
 });
 

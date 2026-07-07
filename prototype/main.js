@@ -11,6 +11,7 @@ const { spawn, execFile } = require('child_process');
 const pty = require('node-pty');
 const yaml = require('js-yaml');
 const { checkForUpdates } = require('./update-checker');
+const { sessionShortcutDigit } = require('./shortcut-input');
 
 const SMOKE = process.argv.includes('--smoke');
 
@@ -24,6 +25,12 @@ const RESTORE_SESSIONS = path.join(CHROMUX_HOME, 'restore-sessions.json');
 const HOOKS_CLAUDE = path.join(CHROMUX_HOME, 'hooks-claude.json');
 const CODEX_NOTIFY = path.join(CHROMUX_HOME, 'codex-notify.sh');
 const PACKAGE_PATH = path.join(__dirname, 'package.json');
+const QUEUE_REASON_BY_SOURCE = {
+  TERM: 'detected in agent output',
+  FILE: 'local HTML path exists',
+  POPUP: 'opened by page popup',
+  RESTORE: 'restored from previous session',
+};
 
 let win = null;
 const ptys = new Map(); // sessionId -> IPty
@@ -84,6 +91,12 @@ function installAppMenu() {
       submenu: [
         { role: 'reload' },
         { role: 'toggleDevTools' },
+        { type: 'separator' },
+        {
+          label: 'Toggle Paired Browser',
+          accelerator: 'Command+Shift+B',
+          click: () => send('shortcut-toggle-browser'),
+        },
         { type: 'separator' },
         { role: 'resetZoom' },
         { role: 'zoomIn' },
@@ -208,7 +221,13 @@ function sanitizeRestoreSession(session) {
   const queue = Array.isArray(session.queue)
     ? session.queue.map((item) => ({
       url: typeof item.url === 'string' ? item.url : '',
-      source: typeof item.source === 'string' ? item.source : 'RESTORE',
+      source: typeof item.reason === 'string' && item.reason.trim() && typeof item.source === 'string' && item.source
+        ? item.source
+        : 'RESTORE',
+      reason: typeof item.reason === 'string' && item.reason.trim()
+        ? item.reason.trim()
+        : QUEUE_REASON_BY_SOURCE.RESTORE,
+      detectedText: typeof item.detectedText === 'string' && item.detectedText ? item.detectedText : null,
       ts: Number.isFinite(item.ts) ? item.ts : Date.now(),
     })).filter((item) => item.url)
     : [];
@@ -405,14 +424,20 @@ function createWindow() {
     if (!input.meta || input.alt || input.control) return;
     if (input.type !== 'keyDown') return;
     const key = String(input.key || '').toLowerCase();
-    if (/^[1-9]$/.test(key)) {
+    const sessionDigit = sessionShortcutDigit(input);
+    if (sessionDigit) {
       event.preventDefault();
-      send('shortcut-activate-session-index', { index: Number(key) - 1 });
+      send('shortcut-activate-session-index', { index: Number(sessionDigit) - 1 });
       return;
     }
     if (key === 'j') {
       event.preventDefault();
       send('shortcut-focus-next-queue-item');
+      return;
+    }
+    if (key === 'b' && input.shift) {
+      event.preventDefault();
+      send('shortcut-toggle-browser');
       return;
     }
     if (key === 'q') {

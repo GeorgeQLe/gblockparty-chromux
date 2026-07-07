@@ -1,5 +1,26 @@
 # Release Notes
 
+## GBlockParty Chromux v0.12.7
+
+Planned tag: `chromux-v0.12.7`
+
+- Suppress preview detection from completed user-typed localhost and local `.html` command echoes, including commands assembled across terminal input chunks.
+- Add queue source/reason metadata so review queue rows and attention details explain why each preview exists, with legacy restored queue records labeled as restored from a previous session.
+
+## GBlockParty Chromux v0.12.6
+
+Planned tag: `chromux-v0.12.6`
+
+- Fix Command+1..9 session switching when Electron reports top-row number keys through `input.code` as `Digit1` through `Digit9` instead of a plain digit `input.key`.
+
+## GBlockParty Chromux v0.12.5
+
+Planned tag: `chromux-v0.12.5`
+
+- Add Command+Shift+B and a View menu item to toggle the active session's paired browser between collapsed and restored states.
+- Keep the browser collapse shortcut guarded while modals or editable fields are focused, matching the existing shell-level shortcut behavior.
+- Extend the browser-collapse renderer smoke test to cover the shortcut path in addition to the collapse/restore control.
+
 ## GBlockParty Chromux v0.12.4
 
 Planned tag: `chromux-v0.12.4`

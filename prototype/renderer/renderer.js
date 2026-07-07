@@ -75,6 +75,14 @@ const ANSI_RE = /\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?|\x
 const LOCALHOST_URL_START_RE = /https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])/gi;
 const HTMLFILE_RE = /(?:file:\/\/)?(\/(?:[^\s"'<>:*?]+\/)*[^\s"'<>:*?]+\.html?)\b/gi;
 const UPDATE_QUEUE_PHASES = new Set(['idle', 'waiting', 'ready', 'running', 'failed']);
+const PREVIEW_SUPPRESS_MAX = 40;
+const PREVIEW_SUPPRESS_LINE_TTL = 3;
+const QUEUE_REASON_BY_SOURCE = {
+  TERM: 'detected in agent output',
+  FILE: 'local HTML path exists',
+  POPUP: 'opened by page popup',
+  RESTORE: 'restored from previous session',
+};
 
 function stripTerminalControlsForPreview(raw) {
   return String(raw || '')
@@ -144,23 +152,92 @@ function scanLineForPreviews(line) {
   return found;
 }
 
-function trackTypedPreviewSuppressions(session, data) {
-  if (!session || !data) return;
-  const hits = scanLineForPreviews(stripTerminalControlsForPreview(data))
-    .filter((hit) => hit.source === 'TERM');
-  if (hits.length === 0) return;
-  const suppress = session.term.previewSuppress;
-  for (const hit of hits) suppress.set(hit.url, (suppress.get(hit.url) || 0) + 1);
+function queueReasonForSource(source) {
+  return QUEUE_REASON_BY_SOURCE[source] || QUEUE_REASON_BY_SOURCE.TERM;
 }
 
-function consumeTypedPreviewSuppression(session, url, source) {
-  if (!session || source !== 'TERM') return false;
+function normalizeQueueItem(item, fallbackSource = 'RESTORE') {
+  if (!item || typeof item !== 'object' || typeof item.url !== 'string' || !item.url) return null;
+  const hasReason = typeof item.reason === 'string' && item.reason.trim();
+  const source = hasReason && typeof item.source === 'string' && item.source
+    ? item.source
+    : fallbackSource;
+  return {
+    url: item.url,
+    source,
+    reason: hasReason ? item.reason.trim() : queueReasonForSource(source),
+    detectedText: typeof item.detectedText === 'string' && item.detectedText ? item.detectedText : null,
+    ts: Number.isFinite(item.ts) ? item.ts : Date.now(),
+  };
+}
+
+function queueItemForPreview(url, source, detail = {}) {
+  return normalizeQueueItem({
+    url,
+    source,
+    reason: detail.reason || queueReasonForSource(source),
+    detectedText: detail.detectedText || null,
+    ts: Date.now(),
+  }, source);
+}
+
+function queueDetailText(item) {
+  if (!item) return '';
+  return item.reason ? `${item.reason}: ${item.url}` : item.url;
+}
+
+function submittedInputText(raw) {
+  return stripTerminalControlsForPreview(raw).replace(/\s+/g, ' ').trim();
+}
+
+function trackTypedPreviewSuppressions(session, data) {
+  if (!session || !data) return;
+  const t = session.term;
+  for (const ch of String(data)) {
+    if (ch === '\r' || ch === '\n') {
+      const submitted = submittedInputText(t.typedInputBuf);
+      t.typedInputBuf = '';
+      if (!submitted) continue;
+      const hits = scanLineForPreviews(submitted);
+      for (const hit of hits) {
+        t.previewSuppress.push({
+          url: hit.url,
+          source: hit.source,
+          submittedText: submitted,
+          remainingLines: PREVIEW_SUPPRESS_LINE_TTL,
+          ts: Date.now(),
+        });
+      }
+      if (t.previewSuppress.length > PREVIEW_SUPPRESS_MAX) {
+        t.previewSuppress.splice(0, t.previewSuppress.length - PREVIEW_SUPPRESS_MAX);
+      }
+    } else if (ch === '\b' || ch === '\x7f') {
+      t.typedInputBuf = t.typedInputBuf.slice(0, -1);
+    } else {
+      t.typedInputBuf += ch;
+      if (t.typedInputBuf.length > 4096) t.typedInputBuf = t.typedInputBuf.slice(-4096);
+    }
+  }
+}
+
+function consumeTypedPreviewSuppression(session, hit, line) {
+  if (!session || !hit) return false;
   const suppress = session.term.previewSuppress;
-  const count = suppress.get(url) || 0;
-  if (count <= 0) return false;
-  if (count === 1) suppress.delete(url);
-  else suppress.set(url, count - 1);
+  if (!Array.isArray(suppress) || suppress.length === 0) return false;
+  const lineText = submittedInputText(line);
+  const index = suppress.findIndex((item) => item.url === hit.url
+    && item.source === hit.source
+    && lineText.includes(item.submittedText));
+  if (index === -1) return false;
+  suppress.splice(index, 1);
   return true;
+}
+
+function ageTypedPreviewSuppressions(session) {
+  if (!session || !Array.isArray(session.term.previewSuppress)) return;
+  session.term.previewSuppress = session.term.previewSuppress
+    .map((item) => ({ ...item, remainingLines: item.remainingLines - 1 }))
+    .filter((item) => item.remainingLines > 0);
 }
 
 function feedDetector(session, chunk) {
@@ -173,17 +250,19 @@ function feedDetector(session, chunk) {
     const line = stripTerminalControlsForPreview(rawLine);
     if (!line) continue;
     for (const hit of scanLineForPreviews(line)) {
+      if (consumeTypedPreviewSuppression(session, hit, line)) continue;
       if (hit.source === 'FILE') {
         // Soft-wrapped terminal lines can split a long path into a shorter,
         // still-plausible one — only route paths that exist on disk.
         const p = decodeURIComponent(hit.url.replace(/^file:\/\//, ''));
         window.chromux.fileExists(p).then((ok) => {
-          if (ok) routePreview(session, hit.url, hit.source);
+          if (ok) routePreview(session, hit.url, hit.source, { detectedText: line });
         });
       } else {
-        routePreview(session, hit.url, hit.source);
+        routePreview(session, hit.url, hit.source, { detectedText: line });
       }
     }
+    ageTypedPreviewSuppressions(session);
   }
 }
 
@@ -378,7 +457,13 @@ function apply(event) {
       if (session) session.turn.acknowledged = true;
       break;
     case 'preview-queued':
-      if (session) session.browser.queue.push({ url: event.url, source: event.source, ts: Date.now() });
+      if (session) {
+        const item = queueItemForPreview(event.url, event.source || 'TERM', {
+          reason: event.reason,
+          detectedText: event.detectedText,
+        });
+        if (item) session.browser.queue.push(item);
+      }
       break;
     case 'preview-opened':
     case 'preview-dismissed':
@@ -527,7 +612,8 @@ function newSessionShape({ id, name, cwd, agent }) {
       fit: () => {},
       lineBuf: '',
       signalBuf: '',
-      previewSuppress: new Map(),
+      typedInputBuf: '',
+      previewSuppress: [],
     },
     els: null,
   };
@@ -538,8 +624,7 @@ function newSessionShape({ id, name, cwd, agent }) {
 // refresh only when the pane's own URL is re-emitted; everything else queues.
 // ───────────────────────────────────────────────────────────────────────────
 
-function routePreview(session, url, source) {
-  if (consumeTypedPreviewSuppression(session, url, source)) return;
+function routePreview(session, url, source, detail = {}) {
   const b = session.browser;
   if (b.currentUrl && b.currentUrl === url) {
     const now = Date.now();
@@ -555,7 +640,14 @@ function routePreview(session, url, source) {
     return;
   }
   if (b.queue.some((q) => q.url === url)) return;
-  apply({ type: 'preview-queued', sessionId: session.id, url, source });
+  apply({
+    type: 'preview-queued',
+    sessionId: session.id,
+    url,
+    source,
+    reason: detail.reason,
+    detectedText: detail.detectedText,
+  });
   renderQueue(session);
 }
 
@@ -582,10 +674,17 @@ function renderQueue(session) {
     const src = document.createElement('span');
     src.className = 'qi-src';
     src.textContent = item.source;
+    const main = document.createElement('span');
+    main.className = 'qi-main';
+    const reason = document.createElement('span');
+    reason.className = 'qi-reason';
+    reason.textContent = item.reason || queueReasonForSource(item.source);
     const u = document.createElement('span');
     u.className = 'qi-url';
     u.textContent = item.url;
+    main.title = queueDetailText(item);
     u.title = item.url;
+    main.append(reason, u);
     const open = document.createElement('button');
     open.className = 'qi-btn open';
     open.dataset.queueOpenUrl = item.url;
@@ -602,7 +701,7 @@ function renderQueue(session) {
       apply({ type: 'preview-dismissed', sessionId: session.id, url: item.url });
       renderQueue(session);
     };
-    row.append(src, u, open, dismiss);
+    row.append(src, main, open, dismiss);
     host.appendChild(row);
   }
   session.els.queueBadge.textContent = String(queue.length);
@@ -1556,11 +1655,7 @@ async function createSession({ name, cwd, agent, initialUrl = null, initialQueue
   });
 
   session.browser.queue = Array.isArray(initialQueue)
-    ? initialQueue.map((item) => ({
-      url: item.url,
-      source: item.source || 'RESTORE',
-      ts: Number.isFinite(item.ts) ? item.ts : Date.now(),
-    })).filter((item) => item.url)
+    ? initialQueue.map((item) => normalizeQueueItem(item, 'RESTORE')).filter(Boolean)
     : [];
   renderQueue(session);
   if (initialUrl) openInPane(session, initialUrl);
@@ -1754,7 +1849,9 @@ function snapshotOpenSessions() {
     currentUrl: session.browser.currentUrl || null,
     queue: session.browser.queue.map((item) => ({
       url: item.url,
-      source: item.source || 'QUEUE',
+      source: item.source || 'RESTORE',
+      reason: item.reason || queueReasonForSource(item.source || 'RESTORE'),
+      detectedText: item.detectedText || null,
       ts: item.ts || Date.now(),
     })),
     savedAt: new Date().toISOString(),
@@ -2456,6 +2553,7 @@ window.chromux.onLifecycleConfirmClose(async (payload = {}) => {
 
 window.chromux.onShortcutActivateSessionIndex(handleShortcutActivateSessionIndex);
 window.chromux.onShortcutFocusNextQueueItem(handleShortcutFocusNextQueueItem);
+window.chromux.onShortcutToggleBrowser(handleShortcutToggleBrowser);
 
 $('#btn-log').onclick = async () => {
   const drawer = $('#drawer-log');
@@ -2539,6 +2637,14 @@ function handleShortcutFocusNextQueueItem() {
   return focusNextQueuedPreview();
 }
 
+function handleShortcutToggleBrowser() {
+  if (modalOpen() || editableFocused()) return null;
+  const session = state.sessions.get(state.activeId);
+  if (!session) return null;
+  setBrowserCollapsed(session, !session.browser.collapsed);
+  return { sessionId: session.id, collapsed: session.browser.collapsed };
+}
+
 if (window.chromuxTest) {
   window.chromuxTestDetect = {
     setDetectRows(rows) {
@@ -2580,7 +2686,9 @@ if (window.chromuxTest) {
     const session = newSessionShape({ id: 's' + state.counter, name, cwd, agent });
     session.lifecycle.alive = alive;
     session.turn.state = turnState;
-    session.browser.queue = queue;
+    session.browser.queue = Array.isArray(queue)
+      ? queue.map((item) => normalizeQueueItem(item, 'RESTORE')).filter(Boolean)
+      : [];
     const written = [];
     session._written = written;
     session.term.term = { write: (d) => written.push(d), focus() {}, dispose() {} };
@@ -2717,8 +2825,23 @@ if (window.chromuxTest) {
       flushRender();
     },
     queueUrls: (id) => testSession(id).browser.queue.map((item) => item.url),
+    queueItems: (id) => testSession(id).browser.queue.map((item) => ({ ...item })),
+    queueRows: (id) => [...testSession(id).els.queueList.querySelectorAll('.queue-item')].map((el) => ({
+      source: el.querySelector('.qi-src')?.textContent || '',
+      reason: el.querySelector('.qi-reason')?.textContent || '',
+      url: el.querySelector('.qi-url')?.textContent || '',
+    })),
     queueCount: (id) => testSession(id).browser.queue.length,
     currentUrl: (id) => testSession(id).browser.currentUrl,
+    focus(id) {
+      activateSession(id);
+      flushRender();
+    },
+    attentionItems: () => [...document.querySelectorAll('#attention-list .attention-item')].map((el) => ({
+      kind: el.querySelector('.attention-kind')?.textContent || '',
+      name: el.querySelector('.attention-name')?.textContent || '',
+      detail: el.querySelector('.attention-detail')?.textContent || '',
+    })),
     openQueued(id, url) {
       const session = testSession(id);
       const buttons = [...session.els.queueList.querySelectorAll('.qi-btn.open')];
@@ -2823,11 +2946,7 @@ if (window.chromuxTest) {
       session.els = { ...viewEls, ...tabEls };
       state.sessions.set(session.id, session);
       apply({ type: 'session-created', sessionId: session.id, name, cwd, agent });
-      session.browser.queue = queue.map((item) => ({
-        url: item.url,
-        source: item.source || 'TEST',
-        ts: Number.isFinite(item.ts) ? item.ts : Date.now(),
-      })).filter((item) => item.url);
+      session.browser.queue = queue.map((item) => normalizeQueueItem(item, 'RESTORE')).filter(Boolean);
       if (url) {
         session.browser.currentUrl = url;
         session.els.urlBar.value = url;
@@ -2844,6 +2963,11 @@ if (window.chromuxTest) {
     restore(id) {
       setBrowserCollapsed(testSession(id), false);
       flushRender();
+    },
+    shortcutToggle() {
+      const result = handleShortcutToggleBrowser();
+      flushRender();
+      return result;
     },
     focus(id) {
       activateSession(id);

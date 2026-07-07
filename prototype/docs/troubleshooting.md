@@ -41,6 +41,8 @@ Chromux does not hot-swap a busy browser pane. The first detected preview fills 
 
 Use QUEUE to open the next preview intentionally. Command-J reveals and focuses the next queued OPEN button without opening it. If a page seems stale, check whether the updated URL is waiting in QUEUE.
 
+Use the browser pane's COLLAPSE control or Command-Shift-B when you need the active terminal to take the full workspace width; the same shortcut restores the paired browser without clearing its URL, queue, or capture state.
+
 ## Screenshots
 
 Capture tries to save the visible viewport as `screenshot.png` next to the YAML payload. Screenshot failure does not cancel the capture. The payload is still written and `screenshot.mode` becomes `unavailable`.

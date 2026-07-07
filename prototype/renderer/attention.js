@@ -123,11 +123,12 @@
     const queue = session.browser && Array.isArray(session.browser.queue) ? session.browser.queue : [];
     if (queue.length > 0) {
       const next = queue[0];
+      const detail = next.reason ? `${next.reason}: ${next.url}` : next.url;
       items.push(scopedItem({
         type: 'queue',
         kind: `QUEUE ${queue.length}`,
         session,
-        detail: next.url,
+        detail,
         cls: 'queue',
         primaryAction: 'OPEN',
         createdAt: next.ts,

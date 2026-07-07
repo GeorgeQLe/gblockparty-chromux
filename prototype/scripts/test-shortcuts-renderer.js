@@ -4,6 +4,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawn } = require('child_process');
+const { sessionShortcutDigit } = require('../shortcut-input');
 
 const appDir = path.resolve(__dirname, '..');
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'chromux-shortcuts-'));
@@ -12,6 +13,13 @@ const e2ePath = path.join(tmpDir, 'shortcuts-e2e.js');
 const e2eOutPath = path.join(tmpDir, 'e2e.out');
 
 fs.mkdirSync(homeDir, { recursive: true });
+
+const expectShortcut = (cond, msg) => { if (!cond) throw new Error(msg); };
+expectShortcut(sessionShortcutDigit({ key: '1' }) === '1', 'shortcut digit should accept key 1');
+expectShortcut(sessionShortcutDigit({ key: '3' }) === '3', 'shortcut digit should accept key 3');
+expectShortcut(sessionShortcutDigit({ key: '', code: 'Digit1' }) === '1', 'shortcut digit should accept code Digit1');
+expectShortcut(sessionShortcutDigit({ key: 'Unidentified', code: 'Digit3' }) === '3', 'shortcut digit should accept code Digit3');
+expectShortcut(sessionShortcutDigit({ key: '', code: 'Numpad1' }) === null, 'shortcut digit should ignore numpad codes');
 
 fs.writeFileSync(e2ePath, `
 (async () => {
