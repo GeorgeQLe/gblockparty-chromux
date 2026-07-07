@@ -20,9 +20,8 @@ Chromux checks GitHub Releases at:
 
 `https://api.github.com/repos/GeorgeQLe/gblockparty-chromux/releases/latest`
 
-Release tags must use `chromux-vX.Y.Z`, and release titles must use `GBlockParty Chromux vX.Y.Z`. The app only opens the GitHub Release URL when a newer release exists; it does not auto-install binaries.
+Release tags must use `chromux-vX.Y.Z`, and release titles must use `GBlockParty Chromux vX.Y.Z`. When installed through `prototype`'s `npm run install-app`, the app records its local source and can run a managed update install from that source. The GitHub Release URL remains visible as a reference for manual recovery.
 
 ## License
 
 MIT. See [`LICENSE`](LICENSE).
-

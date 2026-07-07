@@ -25,17 +25,32 @@ fs.writeFileSync(e2ePath, `
   q.queue();
   expect(q.phase() === 'ready', 'zero sessions should queue as ready, got ' + q.phase());
   expect(q.attentionKinds()[0] === 'UPDATE READY', 'ready update should be first attention item');
-  expect(q.installButtonText() === 'OPEN RELEASE', 'ready settings action should open release');
+  expect(q.installButtonText() === 'INSTALL UPDATE', 'ready settings action should install update');
 
   const liveId = await q.addSession({ name: 'live-unknown' });
   q.queue();
   expect(q.phase() === 'waiting', 'live unknown-turn session should block, got ' + q.phase());
   expect(q.blockers().join(',') === 'live-unknown', 'expected live-unknown blocker');
   expect(q.attentionKinds()[0] === 'UPDATE WAITING', 'waiting update should be first attention item');
+  expect(q.attentionButtons('UPDATE WAITING').includes('DISMISS'), 'waiting update should expose DISMISS');
   expect(q.installButtonText() === 'FOCUS BLOCKER', 'waiting settings action should focus blocker');
+
+  q.dismissItem('UPDATE WAITING');
+  expect(q.phase() === 'idle', 'dismissing waiting update should return queue to idle');
+  expect(!q.attentionKinds().includes('UPDATE WAITING'), 'dismissed waiting update should leave attention queue');
+  q.queue();
+  expect(q.phase() === 'waiting', 'queueing again with blockers should return to waiting');
+  expect(q.attentionKinds()[0] === 'UPDATE WAITING', 're-queued waiting update should return to attention');
 
   q.setSession(liveId, { turnState: 'completed' });
   expect(q.phase() === 'ready', 'completed turn should make queued update ready');
+  q.dismissItem('UPDATE READY');
+  expect(q.phase() === 'idle', 'dismissing ready update should return queue to idle');
+  expect(!q.attentionKinds().includes('UPDATE READY'), 'dismissed ready update should leave attention queue');
+  q.queue();
+  expect(q.phase() === 'ready', 'queueing again with no blockers should return to ready');
+  expect(q.attentionKinds()[0] === 'UPDATE READY', 're-queued ready update should return to attention');
+
   q.markUserInput(liveId);
   expect(q.turnState(liveId).state === 'working', 'typing after completed should start a working turn');
   expect(q.phase() === 'waiting', 'typing after completed should block updates again');
@@ -76,7 +91,13 @@ fs.writeFileSync(e2ePath, `
   q.flushRender();
   expect(q.phase() === 'failed', 'failed install should leave failed queue state, got ' + q.phase());
   expect(q.attentionKinds()[0] === 'UPDATE FAILED', 'failed update should stay visible in attention queue');
-  expect(q.installButtonText() === 'RETRY OPEN', 'failed settings action should retry');
+  expect(q.attentionButtons('UPDATE FAILED').includes('DISMISS'), 'failed update should expose DISMISS');
+  expect(q.installButtonText() === 'RETRY INSTALL', 'failed settings action should retry');
+  q.dismissItem('UPDATE FAILED');
+  expect(q.phase() === 'idle', 'dismissing failed update should return queue to idle');
+  expect(!q.attentionKinds().includes('UPDATE FAILED'), 'dismissed failed update should leave attention queue');
+  q.queue();
+  expect(q.phase() === 'ready', 'queueing again after failed dismissal should return to ready');
 
   return JSON.stringify({
     ok: true,

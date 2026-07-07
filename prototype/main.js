@@ -18,6 +18,8 @@ const CHROMUX_HOME = path.join(os.homedir(), '.chromux');
 const CAPTURES_DIR = path.join(CHROMUX_HOME, 'captures');
 const DELIVERY_LOG = path.join(CHROMUX_HOME, 'delivery-log.jsonl');
 const UPDATE_CACHE = path.join(CHROMUX_HOME, 'update-cache.json');
+const UPDATE_SOURCE = path.join(CHROMUX_HOME, 'update-source.json');
+const UPDATE_INSTALL_LOG = path.join(CHROMUX_HOME, 'update-install.log');
 const RESTORE_SESSIONS = path.join(CHROMUX_HOME, 'restore-sessions.json');
 const HOOKS_CLAUDE = path.join(CHROMUX_HOME, 'hooks-claude.json');
 const CODEX_NOTIFY = path.join(CHROMUX_HOME, 'codex-notify.sh');
@@ -303,13 +305,69 @@ function currentVersion() {
   return app.getVersion() || pkg.version || '0.0.0';
 }
 
+function shellQuote(value) {
+  return `'${String(value).replace(/'/g, `'\\''`)}'`;
+}
+
+function managedUpdateSource() {
+  const manifest = readJson(UPDATE_SOURCE);
+  const sourceDir = manifest && typeof manifest.sourceDir === 'string' ? manifest.sourceDir : '';
+  if (!sourceDir) {
+    return {
+      available: false,
+      reason: 'missing-source',
+      message: 'No managed install source is recorded for this app.',
+    };
+  }
+  const pkg = readJson(path.join(sourceDir, 'package.json'));
+  if (!pkg || pkg.name !== 'chromux' || !pkg.scripts || typeof pkg.scripts['install-app'] !== 'string') {
+    return {
+      available: false,
+      reason: 'invalid-source',
+      sourceDir,
+      message: 'The recorded install source is not a Chromux app checkout with an install-app script.',
+    };
+  }
+  return {
+    available: true,
+    sourceDir,
+    installedAt: typeof manifest.installedAt === 'string' ? manifest.installedAt : null,
+    command: 'npm run install-app',
+  };
+}
+
+function scheduleManagedUpdateInstall(source) {
+  const command = [
+    `echo "Chromux managed update started at $(date)"`,
+    `while kill -0 ${process.pid} 2>/dev/null; do sleep 0.2; done`,
+    `cd ${shellQuote(source.sourceDir)}`,
+    'npm run install-app',
+    `open ${shellQuote('/Applications/Chromux.app')}`,
+  ].join('\n');
+  const child = spawn('/bin/zsh', ['-lc', `${command} > ${shellQuote(UPDATE_INSTALL_LOG)} 2>&1`], {
+    detached: true,
+    stdio: 'ignore',
+  });
+  child.unref();
+}
+
+function quitForManagedUpdate() {
+  closeConfirmed = true;
+  for (const p of ptys.values()) p.kill();
+  if (win && !win.isDestroyed()) win.destroy();
+  app.quit();
+}
+
 function getUpdateStatus(opts = {}) {
   return checkForUpdates({
     currentVersion: currentVersion(),
     cacheFile: UPDATE_CACHE,
     manual: Boolean(opts.manual),
     releasesUrl: process.env.CHROMUX_RELEASES_URL,
-  });
+  }).then((status) => ({
+    ...status,
+    managedInstall: managedUpdateSource(),
+  }));
 }
 
 function focusMainWindow() {
@@ -896,6 +954,39 @@ ipcMain.handle('open-update-release', async (_e, opts = {}) => {
   if (!status || !status.releaseUrl) return { ok: false, message: 'No GitHub Release URL is available.' };
   await shell.openExternal(status.releaseUrl);
   return { ok: true, releaseUrl: status.releaseUrl };
+});
+
+ipcMain.handle('install-update', async (_e, opts = {}) => {
+  const status = opts.status && opts.status.updateAvailable ? opts.status : await getUpdateStatus({ manual: true });
+  if (!status || !status.updateAvailable) {
+    return { ok: false, message: 'No newer Chromux release is available.' };
+  }
+  const source = managedUpdateSource();
+  if (!source.available) {
+    return {
+      ok: false,
+      message: source.message,
+      reason: source.reason,
+      releaseUrl: status.releaseUrl || null,
+    };
+  }
+  try {
+    scheduleManagedUpdateInstall(source);
+    setTimeout(quitForManagedUpdate, 250);
+    return {
+      ok: true,
+      sourceDir: source.sourceDir,
+      command: source.command,
+      logPath: UPDATE_INSTALL_LOG,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      message: `Could not start managed update install: ${err.message}`,
+      sourceDir: source.sourceDir,
+      logPath: UPDATE_INSTALL_LOG,
+    };
+  }
 });
 
 app.whenReady().then(() => {

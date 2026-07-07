@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld('chromux', {
   getEnv: () => ipcRenderer.invoke('get-env'),
   checkUpdates: (opts) => ipcRenderer.invoke('check-updates', opts || {}),
   openUpdateRelease: (opts) => ipcRenderer.invoke('open-update-release', opts || {}),
+  installUpdate: (opts) => ipcRenderer.invoke('install-update', opts || {}),
   onUpdateStatus: (cb) => ipcRenderer.on('update-status', (_e, m) => cb(m)),
   saveRestoreSnapshot: (opts) => ipcRenderer.invoke('save-restore-snapshot', opts || {}),
   getRestoreSnapshot: () => ipcRenderer.invoke('get-restore-snapshot'),

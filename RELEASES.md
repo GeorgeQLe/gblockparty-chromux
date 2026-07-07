@@ -1,5 +1,28 @@
 # Release Notes
 
+## GBlockParty Chromux v0.12.1
+
+Tag: `chromux-v0.12.1`
+
+- Show the running app's actual version in Settings even when update release metadata comes from the one-day cache.
+- Recompute cached update availability against the live app version so newer local builds do not display stale update prompts.
+- Reopen the exact installed `/Applications/Chromux.app` bundle after managed update installs instead of resolving by bundle name.
+
+## GBlockParty Chromux v0.12.0
+
+Planned tag: `chromux-v0.12.0`
+
+- Change the update action from opening GitHub Releases to a managed install flow that runs the recorded local `npm run install-app` source.
+- Save a workspace restore snapshot before managed update installs, quit Chromux, run the installer after the current app exits, and reopen Chromux when installation finishes.
+- Keep the GitHub Release URL visible as a reference link, while Settings and update attention now label the primary action as INSTALL UPDATE / RETRY INSTALL.
+
+## GBlockParty Chromux v0.11.1
+
+Planned tag: `chromux-v0.11.1`
+
+- Let queued update attention items be dismissed from WAITING, READY, and FAILED states; dismissal clears the stale reminder back to idle while preserving the available release.
+- Allow the update queue to be queued again after dismissal, so cleared or newly opened Codex windows can bring back UPDATE WAITING or UPDATE READY as current session safety changes.
+
 ## GBlockParty Chromux v0.11.0
 
 Planned tag: `chromux-v0.11.0`

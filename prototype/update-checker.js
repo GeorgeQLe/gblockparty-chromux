@@ -50,12 +50,18 @@ function writeJson(file, value) {
   fs.writeFileSync(file, JSON.stringify(value, null, 2) + '\n');
 }
 
-function cachedStatus(cacheFile, nowMs, cacheTtlMs) {
+function cachedStatus(cacheFile, nowMs, cacheTtlMs, currentVersion) {
   const cached = readJson(cacheFile);
   if (!cached || !cached.checkedAt) return null;
   const checkedAtMs = Date.parse(cached.checkedAt);
   if (!Number.isFinite(checkedAtMs) || nowMs - checkedAtMs >= cacheTtlMs) return null;
-  return { ...cached, cached: true };
+  const status = { ...cached, currentVersion, cached: true };
+  if (status.latestVersion) {
+    const updateAvailable = compareVersions(status.latestVersion, currentVersion) > 0;
+    status.updateAvailable = updateAvailable;
+    status.reason = updateAvailable ? 'release' : 'current';
+  }
+  return status;
 }
 
 function fetchJson(url, timeoutMs = 10000) {
@@ -98,7 +104,7 @@ async function checkForUpdates({
 }) {
   const nowMs = now.getTime();
   if (!manual) {
-    const cached = cachedStatus(cacheFile, nowMs, cacheTtlMs);
+    const cached = cachedStatus(cacheFile, nowMs, cacheTtlMs, currentVersion);
     if (cached) return cached;
   }
 

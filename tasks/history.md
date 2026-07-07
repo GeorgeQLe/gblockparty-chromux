@@ -1,5 +1,18 @@
 # Session History
 
+## 2026-07-07 — Chromux v0.12.1 update release completion
+
+- Prepared `0.12.1` for publication so Settings update checks can converge on the running app version and GitHub Releases latest tag.
+- Preserved the cache recomputation fix for stale latest-release metadata, the managed install flow, queue dismissal coverage, and release-process docs requiring actual tag and GitHub Release publication.
+- Validation: `npm --prefix prototype run test:github-update-check`, `npm --prefix prototype run test:update-queue-renderer`, `npm --prefix prototype run smoke`, and `npm --prefix prototype run package` passed. Packaging still prints Electron Packager's existing `.icon` probe warning; accepted because the build completes and writes `prototype/dist/Chromux-darwin-arm64`.
+
+## 2026-07-07 — Chromux GitHub release backfill for update checks
+
+- Root cause: the updater was correctly reading `https://api.github.com/repos/GeorgeQLe/gblockparty-chromux/releases/latest`, but GitHub Releases were stale at `chromux-v0.9.0`, so installed `0.9.0` builds reported themselves current.
+- Backfilled published GitHub Releases for `chromux-v0.10.0` at `12c7e9b2689fa112d81ac8a2ea2d5975e497e179`, `chromux-v0.10.1` at `64248a0561e627f51a9acb3c851533ecd09168f3`, and `chromux-v0.11.0` at `93b95fc6708e1399ca7f341ca1c76e11808f5970`; marked `v0.11.0` latest.
+- Updated `AGENTS.md` and `CLAUDE.md` so future ships require the actual Git tag and GitHub Release, and explicitly call out that update checks depend on GitHub Releases `/releases/latest`.
+- Validation: before backfill, `gh api repos/GeorgeQLe/gblockparty-chromux/releases/latest --jq '.tag_name'` returned `chromux-v0.9.0`; after backfill it returned `chromux-v0.11.0`, `gh api repos/GeorgeQLe/gblockparty-chromux/releases --jq '.[].tag_name'` listed `chromux-v0.11.0`, `chromux-v0.10.1`, `chromux-v0.10.0`, and `chromux-v0.9.0`, and `npm run test:github-update-check` passed from `prototype/`.
+
 ## 2026-07-07 — Chromux v0.11.0 paired-browser collapse
 
 - Shipped per-session paired-browser collapse/restore behavior: collapsed sessions expand the terminal, keep a narrow restore rail visible, disable divider resizing, preserve browser URL/queue/webview/capture state, and restore to the previous split width.

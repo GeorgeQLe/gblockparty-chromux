@@ -55,6 +55,37 @@ async function main() {
   assert.equal(cached.cached, true);
   assert.equal(calls, 1);
 
+  const staleCacheFile = path.join(tmp, 'stale-version-cache.json');
+  fs.writeFileSync(staleCacheFile, JSON.stringify({
+    currentVersion: '0.9.0',
+    releasesUrl: 'https://example.test/releases/latest',
+    checkedAt: '2026-07-06T12:00:00.000Z',
+    cached: false,
+    updateAvailable: true,
+    reason: 'release',
+    latestVersion: '0.11.0',
+    latestTag: 'chromux-v0.11.0',
+    releaseUrl: 'https://github.com/GeorgeQLe/gblockparty-chromux/releases/tag/chromux-v0.11.0',
+    releaseTitle: 'GBlockParty Chromux v0.11.0',
+    publishedAt: '2026-07-06T00:00:00Z',
+    prerelease: false,
+  }, null, 2));
+  const freshRuntimeFromStaleCache = await checkForUpdates({
+    currentVersion: '0.12.1',
+    cacheFile: staleCacheFile,
+    now: new Date('2026-07-06T13:00:00Z'),
+    fetcher: async () => {
+      calls += 1;
+      throw new Error('stale cache should prevent this call');
+    },
+  });
+  assert.equal(freshRuntimeFromStaleCache.currentVersion, '0.12.1');
+  assert.equal(freshRuntimeFromStaleCache.cached, true);
+  assert.equal(freshRuntimeFromStaleCache.updateAvailable, false);
+  assert.equal(freshRuntimeFromStaleCache.reason, 'current');
+  assert.equal(freshRuntimeFromStaleCache.latestTag, 'chromux-v0.11.0');
+  assert.equal(calls, 1);
+
   const manual = await checkForUpdates({
     currentVersion: '0.8.0',
     cacheFile,

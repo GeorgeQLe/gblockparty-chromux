@@ -425,6 +425,14 @@ function apply(event) {
       state.updateQueue = { ...state.updateQueue, ...event.patch, phase: event.phase };
       reconcileUpdateQueue();
       break;
+    case 'update-queue-dismissed':
+      state.updateQueue = {
+        ...state.updateQueue,
+        phase: 'idle',
+        error: null,
+        output: '',
+      };
+      break;
     case 'signal-rejected':
     case 'session-created':
     case 'session-closed':
@@ -1640,6 +1648,10 @@ function queueUpdate() {
   setUpdateQueuePhase(updateBlockers().length === 0 ? 'ready' : 'waiting', { error: null, output: '' });
 }
 
+function dismissUpdateQueue() {
+  apply({ type: 'update-queue-dismissed' });
+}
+
 function focusFirstUpdateBlocker() {
   const blocker = updateBlockers()[0];
   if (blocker) activateSession(blocker.session.id);
@@ -1657,9 +1669,10 @@ function updateQueueAttentionItem() {
       item: {
         type: 'update',
         kind: 'UPDATE WAITING',
-        detail: `${blockers.length} live session${blockers.length === 1 ? '' : 's'} must complete, ask for input, or exit before opening the release.`,
+        detail: `${blockers.length} live session${blockers.length === 1 ? '' : 's'} must complete, ask for input, or exit before installing the update.`,
         cls: 'update waiting',
         primary: 'FOCUS',
+        dismiss: dismissUpdateQueue,
         action: focusFirstUpdateBlocker,
       },
     };
@@ -1670,10 +1683,11 @@ function updateQueueAttentionItem() {
       item: {
         type: 'update',
         kind: 'UPDATE READY',
-        detail: 'All sessions are safe. Open the GitHub Release to download or build the update.',
+        detail: 'All sessions are safe. Install the update from the managed local source.',
         cls: 'update completed',
-        primary: 'OPEN RELEASE',
-        action: () => openUpdateRelease().catch(showUpdateInstallError),
+        primary: 'INSTALL',
+        dismiss: dismissUpdateQueue,
+        action: () => installUpdate().catch(showUpdateInstallError),
       },
     };
   }
@@ -1683,7 +1697,7 @@ function updateQueueAttentionItem() {
       item: {
         type: 'update',
         kind: 'UPDATE RUNNING',
-        detail: 'Opening the GitHub Release.',
+        detail: 'Installing the Chromux update.',
         cls: 'update',
         primary: 'DETAILS',
         action: openSettings,
@@ -1696,10 +1710,11 @@ function updateQueueAttentionItem() {
       item: {
         type: 'update',
         kind: 'UPDATE FAILED',
-        detail: state.updateQueue.error || 'Could not open the GitHub Release. Review details in Settings.',
+        detail: state.updateQueue.error || 'Could not install the update. Review details in Settings.',
         cls: 'update exited',
         primary: blockers.length === 0 ? 'RETRY' : 'DETAILS',
-        action: blockers.length === 0 ? () => openUpdateRelease().catch(showUpdateInstallError) : openSettings,
+        dismiss: dismissUpdateQueue,
+        action: blockers.length === 0 ? () => installUpdate().catch(showUpdateInstallError) : openSettings,
       },
     };
   }
@@ -1746,33 +1761,38 @@ function renderUpdateControls() {
   if (!available) {
     statusEl.textContent = updateStatusMessage(status);
   } else if (phase === 'waiting') {
-    statusEl.textContent = `Update queued. Waiting for ${blockers.length} live session${blockers.length === 1 ? '' : 's'} to complete, ask for input, or exit before opening the release.`;
+    statusEl.textContent = `Update queued. Waiting for ${blockers.length} live session${blockers.length === 1 ? '' : 's'} to complete, ask for input, or exit before installing.`;
   } else if (phase === 'ready') {
-    statusEl.textContent = 'Update queued and ready. Open the GitHub Release to download or build the update.';
+    statusEl.textContent = status.managedInstall && status.managedInstall.available
+      ? 'Update queued and ready. Install from the managed local source.'
+      : 'Update queued, but no managed install source is available. Use the release URL to update manually.';
   } else if (phase === 'running') {
-    statusEl.textContent = 'Opening the GitHub Release.';
+    statusEl.textContent = 'Installing the Chromux update.';
   } else if (phase === 'failed') {
-    statusEl.textContent = state.updateQueue.error || 'Could not open the GitHub Release. Review details below and retry when ready.';
+    statusEl.textContent = state.updateQueue.error || 'Could not install the update. Review details below and retry when ready.';
   } else {
     statusEl.textContent = updateStatusMessage(status);
   }
 
-  if (available && status.releaseUrl) {
+  if (available) {
     command.classList.remove('hidden');
-    command.textContent = state.updateQueue.output || status.releaseUrl;
+    command.textContent = state.updateQueue.output
+      || (status.managedInstall && status.managedInstall.available
+        ? `${status.managedInstall.command} in ${status.managedInstall.sourceDir}`
+        : (status.managedInstall && status.managedInstall.message) || status.releaseUrl || '');
   } else {
     command.classList.add('hidden');
     command.textContent = '';
   }
 
-  install.classList.toggle('hidden', !available || !status.releaseUrl);
-  install.disabled = !available || !status.releaseUrl || phase === 'running';
+  install.classList.toggle('hidden', !available);
+  install.disabled = !available || phase === 'running';
   if (phase === 'waiting') {
     install.textContent = 'FOCUS BLOCKER';
   } else if (phase === 'ready') {
-    install.textContent = 'OPEN RELEASE';
+    install.textContent = 'INSTALL UPDATE';
   } else if (phase === 'failed') {
-    install.textContent = blockers.length === 0 ? 'RETRY OPEN' : 'FOCUS BLOCKER';
+    install.textContent = blockers.length === 0 ? 'RETRY INSTALL' : 'FOCUS BLOCKER';
   } else {
     install.textContent = 'QUEUE UPDATE';
   }
@@ -1856,7 +1876,7 @@ function showLifecyclePrompt(reason) {
   return promise;
 }
 
-async function openUpdateRelease() {
+async function installUpdate() {
   const btn = $('#settings-install-update');
   const check = $('#settings-check-updates');
   const statusEl = $('#settings-update-status');
@@ -1872,6 +1892,13 @@ async function openUpdateRelease() {
     return;
   }
   setUpdateQueuePhase('ready');
+  if (!state.testInstallUpdateResult) {
+    if (!(await showLifecyclePrompt('update-install'))) return;
+    await window.chromux.saveRestoreSnapshot({
+      reason: 'update-install',
+      sessions: snapshotOpenSessions(),
+    });
+  }
   setUpdateQueuePhase('running', {
     error: null,
     output: '',
@@ -1880,24 +1907,24 @@ async function openUpdateRelease() {
   btn.disabled = true;
   check.disabled = true;
   statusEl.className = 'settings-status ready';
-  statusEl.textContent = 'Opening the GitHub Release.';
+  statusEl.textContent = 'Installing the Chromux update.';
   try {
     const res = state.testInstallUpdateResult
       ? state.testInstallUpdateResult
-      : await window.chromux.openUpdateRelease({ status: state.updateStatus });
+      : await window.chromux.installUpdate({ status: state.updateStatus });
     command.classList.remove('hidden');
-    command.textContent = res.releaseUrl || res.output || res.error || res.message || '';
+    command.textContent = res.output || res.logPath || res.sourceDir || res.releaseUrl || res.error || res.message || '';
     if (res.ok) {
-      setUpdateQueuePhase('idle', { error: null, output: res.output || '' });
+      setUpdateQueuePhase('running', { error: null, output: res.logPath || res.output || '' });
       statusEl.className = 'settings-status current';
-      statusEl.textContent = 'Opened the GitHub Release in your browser.';
+      statusEl.textContent = 'Installing update. Chromux will quit and reopen when the install finishes.';
     } else {
       setUpdateQueuePhase('failed', {
-        error: res.message || res.error || 'Could not open the GitHub Release.',
+        error: res.message || res.error || 'Could not install the update.',
         output: res.output || res.error || res.message || '',
       });
       statusEl.className = 'settings-status fail';
-      statusEl.textContent = res.message || res.error || 'Could not open the GitHub Release.';
+      statusEl.textContent = res.message || res.error || 'Could not install the update.';
       btn.disabled = false;
     }
   } finally {
@@ -1908,7 +1935,7 @@ async function openUpdateRelease() {
 
 function showUpdateInstallError(err) {
   setUpdateQueuePhase('failed', {
-    error: 'Could not open update release — ' + err.message,
+    error: 'Could not install update: ' + err.message,
     output: err.stack || err.message,
   });
 }
@@ -2477,7 +2504,7 @@ $('#settings-source-dir').onclick = () => {
   if (state.updateStatus && state.updateStatus.releaseUrl) window.chromux.openUpdateRelease({ status: state.updateStatus });
 };
 $('#settings-check-updates').onclick = () => checkUpdates(true).catch(() => {});
-$('#settings-install-update').onclick = () => openUpdateRelease().catch(showUpdateInstallError);
+$('#settings-install-update').onclick = () => installUpdate().catch(showUpdateInstallError);
 
 function answerLifecyclePrompt(answer) {
   if (state.lifecyclePrompt) state.lifecyclePrompt.cleanup(answer);
@@ -2651,6 +2678,25 @@ if (window.chromuxTest) {
     phase: () => state.updateQueue.phase,
     blockers: () => updateBlockers().map((row) => row.session.name),
     attentionKinds: () => [...document.querySelectorAll('#attention-list .attention-kind')].map((el) => el.textContent),
+    attentionButtons(kind) {
+      for (const el of document.querySelectorAll('#attention-list .attention-item')) {
+        if (el.querySelector('.attention-kind')?.textContent !== kind) continue;
+        return [...el.querySelectorAll('.attention-actions .qi-btn')].map((button) => button.textContent);
+      }
+      return [];
+    },
+    dismissItem(kind) {
+      for (const el of document.querySelectorAll('#attention-list .attention-item')) {
+        if (el.querySelector('.attention-kind')?.textContent !== kind) continue;
+        const dismiss = [...el.querySelectorAll('.attention-actions .qi-btn')]
+          .find((button) => button.textContent === 'DISMISS');
+        if (!dismiss) throw new Error(`No DISMISS on ${kind}`);
+        dismiss.click();
+        flushRender();
+        return true;
+      }
+      throw new Error(`No attention item ${kind}`);
+    },
     installButtonText: () => $('#settings-install-update').textContent,
     topButtonText: () => $('#btn-update-ready').textContent,
     setInstallResult(result) {
