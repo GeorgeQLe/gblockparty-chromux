@@ -1,5 +1,14 @@
 # Session History
 
+## 2026-07-07 — Chromux v0.11.0 paired-browser collapse
+
+- Shipped per-session paired-browser collapse/restore behavior: collapsed sessions expand the terminal, keep a narrow restore rail visible, disable divider resizing, preserve browser URL/queue/webview/capture state, and restore to the previous split width.
+- Made the browser header controls a single-row horizontal toolbar so Queue, Pick Element, Capture, and Collapse remain reachable when the browser pane is narrow.
+- Added `test:browser-collapse-renderer` coverage for collapse/restore, per-session tab switching, terminal refit, disabled divider behavior, state preservation, and narrow-toolbar reachability.
+- Bumped prototype metadata to `0.11.0` and added `GBlockParty Chromux v0.11.0` release notes with planned tag `chromux-v0.11.0`.
+- Validation: `npm run test:browser-collapse-renderer` and `npm run test:shortcuts-renderer` passed from `prototype/`. No lint/typecheck/build scripts exist in `prototype/package.json`; full packaging was skipped because this change is renderer-layout scoped and Electron smoke tests exercise the mutated runtime path.
+- Ship manifest: user goal was paired browser collapse plus scrollable narrow toolbar. Changed files: `prototype/renderer/renderer.js` for session browser UI state/layout/test API, `prototype/renderer/styles.css` for toolbar/rail layout, `prototype/scripts/test-browser-collapse-renderer.js` for renderer smoke coverage, `prototype/package.json`/`package-lock.json` for version and script metadata, `RELEASES.md` for v0.11.0 release notes, and `tasks/todo.md`/`tasks/history.md` for task bookkeeping. Adversarial review checked state preservation, divider disablement, split restore, toolbar reachability, and shortcut/queue regression; residual risk is untested real interactive drag/collapse behavior outside the smoke harness. Rollback is `git revert` of the v0.11.0 commit. Next command: `$exec` for `prototype/docs/privacy-and-local-data.md`.
+
 ## 2026-07-06 — Chromux troubleshooting guide
 
 - Added `prototype/docs/troubleshooting.md` covering preview detection, file previews, queue behavior, screenshots, console logs, CLI auth and delivery, wrong-session routing, storage cleanup, and manual retry commands.

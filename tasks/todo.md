@@ -8,6 +8,7 @@ No active priority documentation items.
 
 - [x] Run a `cmux` stack spike to validate embedded Chromium pane feasibility and capture hooks. _(source: `research/devtool-dx-journey.md`; evidence: Electron prototype under `prototype/` with paired webviews, capture modal, screenshots, and `node-pty` sessions)_
 - [x] Prototype preview detection for `localhost`, loopback URLs, and local HTML paths from terminal output. _(source: `research/devtool-dx-journey.md`; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-shortcuts-renderer.js`, `prototype/scripts/test-update-queue-renderer.js`)_
+- [x] Add per-session paired-browser collapse and narrow-toolbar scrolling for terminal-first workflows. _(source: user request; evidence: `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`, `prototype/scripts/test-browser-collapse-renderer.js`)_
 - [x] Create `docs/capture-payload.md` with a versioned YAML schema, field bounds, retention notes, and one sample payload. _(source: `research/devtool-dx-journey.md`; evidence: `prototype/docs/capture-payload.md`, `prototype/examples/captures/sample-capture.yaml`)_
 - [x] Build an end-to-end capture-to-delivery proof using `claude -p` plus file-drop fallback. _(source: `research/devtool-dx-journey.md`; evidence: `prototype/main.js`, `prototype/renderer/renderer.js`, `prototype/scripts/test-capture-records-renderer.js`)_
 - [x] Write `README.md` with the first local loop quickstart after runnable commands exist. _(source: `research/devtool-dx-journey.md`; evidence: `prototype/README.md`)_

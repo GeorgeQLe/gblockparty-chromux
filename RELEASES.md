@@ -1,5 +1,14 @@
 # Release Notes
 
+## GBlockParty Chromux v0.11.0
+
+Planned tag: `chromux-v0.11.0`
+
+- Add a per-session paired-browser collapse control: collapsed sessions expand the terminal, keep a narrow restore rail visible, disable divider resizing, and preserve browser URL, queue, webview, and capture state.
+- Restore each browser pane to its previous split width and refit the paired terminal after collapse, restore, divider drag, and session activation.
+- Make the paired browser header controls horizontally scrollable when the pane is narrow, keeping Queue, Pick Element, and Capture reachable instead of squeezing controls into overlap.
+- New test: `test:browser-collapse-renderer` covers collapse/restore state preservation, per-session tab switching, terminal refit, disabled divider behavior, and narrow-toolbar reachability.
+
 ## GBlockParty Chromux v0.10.1
 
 Planned tag: `chromux-v0.10.1`

@@ -478,6 +478,8 @@ function newSessionShape({ id, name, cwd, agent }) {
     browser: {
       webview: null, webContentsId: null, currentUrl: null, lastReload: 0,
       queue: [], consoleBuf: [], consoleTotal: 0, picking: false,
+      collapsed: false,
+      expandedGridTemplate: 'minmax(320px, 46%) 6px minmax(360px, 1fr)',
     },
     term: { term: null, fitAddon: null, fit: () => {}, lineBuf: '', signalBuf: '' },
     els: null,
@@ -646,6 +648,37 @@ function renderConsoleChip(session) {
   const chip = session.els.consoleChip;
   chip.textContent = errors > 0 ? `⚠ ${errors} err · ${b.consoleTotal} logs` : `${b.consoleTotal} logs`;
   chip.classList.toggle('has-errors', errors > 0);
+}
+
+function refitTerminal(session) {
+  requestAnimationFrame(() => session.term.fit());
+}
+
+function applyBrowserLayout(session) {
+  if (!session.els) return;
+  const collapsed = Boolean(session.browser.collapsed);
+  session.els.view.classList.toggle('browser-collapsed', collapsed);
+  session.els.webPane.classList.toggle('collapsed', collapsed);
+  session.els.divider.classList.toggle('disabled', collapsed);
+  session.els.divider.setAttribute('aria-disabled', collapsed ? 'true' : 'false');
+  if (collapsed) {
+    session.els.view.style.gridTemplateColumns = 'minmax(320px, 1fr) 6px 40px';
+  } else {
+    session.els.view.style.gridTemplateColumns = session.browser.expandedGridTemplate;
+  }
+  session.els.collapseBtn.textContent = collapsed ? 'RESTORE' : 'COLLAPSE';
+  session.els.collapseBtn.title = collapsed ? 'Restore paired browser' : 'Collapse paired browser';
+  session.els.collapseBtn.setAttribute('aria-label', session.els.collapseBtn.title);
+  refitTerminal(session);
+}
+
+function setBrowserCollapsed(session, collapsed) {
+  const next = Boolean(collapsed);
+  if (session.browser.collapsed === next) return;
+  if (next) session.browser.expandedGridTemplate = session.els.view.style.gridTemplateColumns || session.browser.expandedGridTemplate;
+  session.browser.collapsed = next;
+  if (next) session.els.queuePanel.classList.add('hidden');
+  applyBrowserLayout(session);
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -1130,7 +1163,7 @@ function openSessionContextMenu(session, x, y) {
 function buildSessionView(session) {
   const view = document.createElement('section');
   view.className = 'session-view offstage';
-  view.style.gridTemplateColumns = 'minmax(320px, 46%) 6px minmax(360px, 1fr)';
+  view.style.gridTemplateColumns = session.browser.expandedGridTemplate;
 
   // terminal pane
   const termPane = document.createElement('div');
@@ -1160,9 +1193,16 @@ function buildSessionView(session) {
   const webLabel = document.createElement('span');
   webLabel.className = 'pane-label';
   webLabel.innerHTML = 'PAIRED <span class="lit">BROWSER</span>';
+  const browserToolbar = document.createElement('div');
+  browserToolbar.className = 'browser-toolbar';
 
   const back = document.createElement('button'); back.className = 'nav-btn'; back.textContent = '‹'; back.title = 'Back';
   const reload = document.createElement('button'); reload.className = 'nav-btn'; reload.textContent = '⟳'; reload.title = 'Reload';
+  const collapseBtn = document.createElement('button');
+  collapseBtn.className = 'head-btn collapse-btn';
+  collapseBtn.textContent = 'COLLAPSE';
+  collapseBtn.title = 'Collapse paired browser';
+  collapseBtn.setAttribute('aria-label', 'Collapse paired browser');
   const urlBar = document.createElement('input');
   urlBar.className = 'url-bar'; urlBar.type = 'text'; urlBar.spellcheck = false;
   urlBar.placeholder = 'awaiting preview — or type a URL and hit ⏎';
@@ -1188,7 +1228,8 @@ function buildSessionView(session) {
   captureBtn.className = 'head-btn'; captureBtn.textContent = '⚡ CAPTURE'; captureBtn.disabled = true;
   captureBtn.title = 'Capture page (console + screenshot + URL) without picking an element';
 
-  webHead.append(webLabel, back, reload, urlBar, consoleChip, captureChip, queueBtn, pickBtn, captureBtn);
+  browserToolbar.append(back, reload, urlBar, consoleChip, captureChip, queueBtn, pickBtn, captureBtn, collapseBtn);
+  webHead.append(webLabel, browserToolbar);
 
   const queuePanel = document.createElement('div');
   queuePanel.className = 'queue-panel hidden';
@@ -1230,17 +1271,20 @@ function buildSessionView(session) {
     }
   });
   queueBtn.onclick = () => queuePanel.classList.toggle('hidden');
+  collapseBtn.onclick = () => setBrowserCollapsed(session, !session.browser.collapsed);
   pickBtn.onclick = () => (session.browser.picking ? null : startPick(session));
   captureBtn.onclick = () => openCaptureModal(session, { selector: null, outerHTML: null, pageTitle: null, pageUrl: session.browser.currentUrl });
 
   // divider drag
   divider.addEventListener('mousedown', (e) => {
+    if (session.browser.collapsed) return;
     e.preventDefault();
     document.body.classList.add('dragging');
     const onMove = (ev) => {
       const rect = view.getBoundingClientRect();
       const pct = Math.min(72, Math.max(18, ((ev.clientX - rect.left) / rect.width) * 100));
-      view.style.gridTemplateColumns = `${pct}% 6px 1fr`;
+      session.browser.expandedGridTemplate = `${pct}% 6px 1fr`;
+      view.style.gridTemplateColumns = session.browser.expandedGridTemplate;
       session.term.fit();
     };
     const onUp = () => {
@@ -1256,6 +1300,7 @@ function buildSessionView(session) {
   return {
     view, termHost, urlBar, queueBtn, queueBadge, queuePanel, queueList,
     consoleChip, captureChip, pickBtn, captureBtn, webHost, placeholder, refreshFlash,
+    divider, webPane, browserToolbar, collapseBtn,
   };
 }
 
@@ -2754,6 +2799,81 @@ if (window.chromuxTest) {
       flushRender();
     },
     currentUrl: (id) => testSession(id).browser.currentUrl,
+    flushRender,
+  };
+
+  window.chromuxTestBrowser = {
+    addSession({ name = 'browser-test', agent = 'codex', cwd = '/tmp', url = null, queue = [] } = {}) {
+      state.counter += 1;
+      const session = newSessionShape({ id: 's' + state.counter, name, cwd, agent });
+      const viewEls = buildSessionView(session);
+      const tabEls = buildSessionTab(session);
+      let fitCount = 0;
+      session.term.term = { focus() {}, dispose() {} };
+      session.term.fit = () => { fitCount += 1; };
+      session._fitCount = () => fitCount;
+      session.els = { ...viewEls, ...tabEls };
+      state.sessions.set(session.id, session);
+      apply({ type: 'session-created', sessionId: session.id, name, cwd, agent });
+      session.browser.queue = queue.map((item) => ({
+        url: item.url,
+        source: item.source || 'TEST',
+        ts: Number.isFinite(item.ts) ? item.ts : Date.now(),
+      })).filter((item) => item.url);
+      if (url) {
+        session.browser.currentUrl = url;
+        session.els.urlBar.value = url;
+      }
+      renderQueue(session);
+      activateSession(session.id);
+      flushRender();
+      return session.id;
+    },
+    collapse(id) {
+      setBrowserCollapsed(testSession(id), true);
+      flushRender();
+    },
+    restore(id) {
+      setBrowserCollapsed(testSession(id), false);
+      flushRender();
+    },
+    focus(id) {
+      activateSession(id);
+      flushRender();
+    },
+    narrow(id, browserPx = 240) {
+      const session = testSession(id);
+      session.browser.expandedGridTemplate = `minmax(320px, 1fr) 6px ${browserPx}px`;
+      applyBrowserLayout(session);
+      flushRender();
+    },
+    scrollCaptureIntoView(id) {
+      testSession(id).els.captureBtn.scrollIntoView({ block: 'nearest', inline: 'end' });
+      flushRender();
+    },
+    state(id) {
+      const session = testSession(id);
+      const toolbar = session.els.browserToolbar;
+      const toolbarRect = toolbar.getBoundingClientRect();
+      const captureRect = session.els.captureBtn.getBoundingClientRect();
+      return {
+        active: state.activeId === id,
+        collapsed: session.browser.collapsed,
+        grid: session.els.view.style.gridTemplateColumns,
+        webCollapsed: session.els.webPane.classList.contains('collapsed'),
+        webHostHidden: getComputedStyle(session.els.webHost).display === 'none',
+        dividerDisabled: session.els.divider.classList.contains('disabled'),
+        collapseText: session.els.collapseBtn.textContent,
+        collapseTitle: session.els.collapseBtn.title,
+        currentUrl: session.browser.currentUrl,
+        urlBar: session.els.urlBar.value,
+        queueCount: session.browser.queue.length,
+        queuePanelHidden: session.els.queuePanel.classList.contains('hidden'),
+        fitCount: session._fitCount(),
+        toolbarOverflow: toolbar.scrollWidth > toolbar.clientWidth,
+        captureReachable: captureRect.right <= toolbarRect.right + 1 && captureRect.left >= toolbarRect.left - 1,
+      };
+    },
     flushRender,
   };
 
