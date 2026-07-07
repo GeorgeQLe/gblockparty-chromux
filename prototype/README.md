@@ -80,6 +80,8 @@ failure screen shows the exact retry command. Every attempt is logged to
 
 ## Troubleshooting
 
+See [`docs/troubleshooting.md`](docs/troubleshooting.md) for the full support guide.
+
 - **`node-pty` failed to build** — install Xcode CLT (`xcode-select --install`), then
   `npm run rebuild`.
 - **Preview not detected** — detection scans complete terminal lines for
