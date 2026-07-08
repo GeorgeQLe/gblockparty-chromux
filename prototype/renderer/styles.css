@@ -697,6 +697,7 @@ body.dragging webview { pointer-events: none; }
 #statusbar {
   height: 26px; flex: none;
   display: flex; align-items: center; justify-content: space-between;
+  gap: 10px;
   padding: 0 12px;
   border-top: 1px solid var(--line);
   background:
@@ -704,7 +705,7 @@ body.dragging webview { pointer-events: none; }
     var(--bg1);
   font-size: 10.5px;
 }
-.sb-left, .sb-right { display: flex; align-items: center; gap: 8px; }
+.sb-left, .sb-right { flex: none; display: flex; align-items: center; gap: 8px; }
 .sb-val { color: var(--dim); }
 .sb-sep { width: 1px; height: 12px; background: var(--line-hi); margin: 0 6px; }
 .sb-btn {
@@ -715,6 +716,108 @@ body.dragging webview { pointer-events: none; }
 }
 .sb-btn:hover { color: var(--amber); }
 .sb-ver { color: var(--faint); }
+
+.shortcut-debug {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  overflow: hidden;
+  color: var(--dim);
+}
+.shortcut-debug-keys,
+.shortcut-debug-context,
+.shortcut-debug-catalog,
+.shortcut-debug-source {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.shortcut-debug-context {
+  max-width: 30%;
+  overflow: hidden;
+}
+.shortcut-debug-catalog {
+  flex: 1 1 auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.shortcut-debug-catalog::-webkit-scrollbar { display: none; }
+.kbd-key,
+.sd-chip,
+.shortcut-chip {
+  height: 18px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  background: var(--bg0);
+  color: var(--faint);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+.kbd-key {
+  min-width: 20px;
+  padding: 0 5px;
+}
+.kbd-key.on {
+  color: #14100a;
+  background: var(--amber);
+  border-color: var(--amber);
+  box-shadow: 0 0 8px rgba(255, 180, 84, 0.32);
+}
+.kbd-key.latest {
+  min-width: 28px;
+  color: var(--text);
+  border-color: var(--line-hi);
+}
+.kbd-key.latest.active {
+  color: var(--cyan);
+  border-color: rgba(95, 198, 255, 0.55);
+}
+.sd-chip {
+  padding: 0 6px;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sd-chip.warn {
+  color: var(--amber);
+  border-color: rgba(255, 180, 84, 0.34);
+}
+.sd-chip.ok {
+  color: var(--green);
+  border-color: rgba(99, 217, 139, 0.34);
+}
+.sd-chip.hot {
+  color: var(--cyan);
+  border-color: rgba(95, 198, 255, 0.34);
+}
+.shortcut-chip {
+  gap: 4px;
+  padding: 0 6px;
+  color: var(--green);
+  border-color: rgba(99, 217, 139, 0.28);
+}
+.shortcut-chip.matched {
+  color: #14100a;
+  background: var(--cyan);
+  border-color: var(--cyan);
+}
+.shortcut-chip.disabled {
+  color: var(--faint);
+  border-color: var(--line);
+}
+.shortcut-chip .reason {
+  color: var(--dim);
+}
 
 /* ── modals ───────────────────────────────────────────────────────────── */
 

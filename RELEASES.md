@@ -1,5 +1,14 @@
 # Release Notes
 
+## GBlockParty Chromux v0.13.0
+
+Planned tag: `chromux-v0.13.0`
+
+- Add an always-visible hotkey diagnostics strip to the bottom status bar, showing sanitized shortcut keys, active modifiers, event source, focus context, and shortcut availability.
+- Add a renderer-owned shortcut catalog for Command+1..9, Command+J, Command+Shift+B, Command+Q, Command+T, Command+D, and Esc, including contextual disabled reasons for modal, host editable, guest editable, empty queue, and missing-session states.
+- Emit sanitized shortcut diagnostic input from host-window and paired-webview `before-input-event` handlers without changing existing shortcut action IPC names or behavior.
+- Add hotkey debug renderer and smoke coverage for catalog state, host/webview key source reporting, and guest editable suppression.
+
 ## GBlockParty Chromux v0.12.10
 
 Planned tag: `chromux-v0.12.10`

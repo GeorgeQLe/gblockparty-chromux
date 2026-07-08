@@ -40,6 +40,15 @@ let closeConfirmed = false;
 if (SMOKE && !process.env.CHROMUX_KEEP_USER_DATA) {
   app.setPath('userData', fs.mkdtempSync(path.join(os.tmpdir(), 'chromux-smoke-user-data-')));
 }
+
+if (SMOKE) {
+  ipcMain.handle('test-send-host-input', (_e, input) => {
+    if (!win || win.isDestroyed()) return false;
+    win.webContents.sendInputEvent(input || {});
+    return true;
+  });
+}
+
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
   app.quit();
@@ -54,6 +63,44 @@ function send(channel, payload) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
 }
 
+function shortcutDebugKey(input) {
+  const key = String(input && input.key ? input.key : '');
+  const code = String(input && input.code ? input.code : '');
+  const digit = sessionShortcutDigit(input || {});
+  if (digit) return digit;
+
+  const lower = key.toLowerCase();
+  if (['j', 'b', 't', 'd', 'q'].includes(lower)) return lower.toUpperCase();
+  if (lower === 'escape' || code === 'Escape') return 'Esc';
+  if (lower === 'arrowup' || code === 'ArrowUp') return '↑';
+  if (lower === 'arrowdown' || code === 'ArrowDown') return '↓';
+  if (lower === 'arrowleft' || code === 'ArrowLeft') return '←';
+  if (lower === 'arrowright' || code === 'ArrowRight') return '→';
+  if (lower === 'meta' || lower === 'command' || code === 'MetaLeft' || code === 'MetaRight') return '⌘';
+  if (lower === 'shift' || code === 'ShiftLeft' || code === 'ShiftRight') return '⇧';
+  if (lower === 'alt' || lower === 'option' || code === 'AltLeft' || code === 'AltRight') return '⌥';
+  if (lower === 'control' || code === 'ControlLeft' || code === 'ControlRight') return '⌃';
+  return null;
+}
+
+function emitShortcutDebugInput(input, source, webContentsId = null) {
+  const key = shortcutDebugKey(input);
+  send('shortcut-debug-input', {
+    source,
+    webContentsId,
+    type: input && input.type ? String(input.type) : 'unknown',
+    key,
+    modifiers: {
+      meta: Boolean(input && input.meta),
+      shift: Boolean(input && input.shift),
+      alt: Boolean(input && input.alt),
+      control: Boolean(input && input.control),
+    },
+    repeat: Boolean(input && input.isAutoRepeat),
+    ts: Date.now(),
+  });
+}
+
 function requestGuardedQuit(reason = 'app-quit') {
   send('lifecycle-confirm-close', {
     reason,
@@ -62,7 +109,8 @@ function requestGuardedQuit(reason = 'app-quit') {
   });
 }
 
-function handleShellShortcutInput(event, input) {
+function handleShellShortcutInput(event, input, source = 'host', webContentsId = null) {
+  emitShortcutDebugInput(input, source, webContentsId);
   if (!input.meta || input.alt || input.control) return false;
   if (input.type !== 'keyDown') return false;
   const key = String(input.key || '').toLowerCase();
@@ -448,7 +496,9 @@ function createWindow() {
 
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
-  win.webContents.on('before-input-event', handleShellShortcutInput);
+  win.webContents.on('before-input-event', (event, input) => {
+    handleShellShortcutInput(event, input, 'host', win.webContents.id);
+  });
 
   if (SMOKE) {
     win.webContents.on('console-message', (_e, level, message) => {
@@ -499,7 +549,9 @@ app.on('second-instance', () => {
 // paired session's review queue (never steal attention — idea-brief wedge #4).
 app.on('web-contents-created', (_event, contents) => {
   if (contents.getType() === 'webview') {
-    contents.on('before-input-event', handleShellShortcutInput);
+    contents.on('before-input-event', (event, input) => {
+      handleShellShortcutInput(event, input, 'webview', contents.id);
+    });
     contents.setWindowOpenHandler(({ url }) => {
       send('webview-popup', { webContentsId: contents.id, url });
       return { action: 'deny' };

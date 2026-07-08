@@ -35,6 +35,14 @@ const state = {
     output: '',
     lastAttemptAt: null,
   },
+  shortcutDebug: {
+    source: null,
+    webContentsId: null,
+    type: null,
+    latestKey: null,
+    modifiers: { meta: false, shift: false, alt: false, control: false },
+    lastEventAt: 0,
+  },
 };
 
 const BOUNDS = {
@@ -42,6 +50,7 @@ const BOUNDS = {
   consoleMsgChars: 500,
   outerHtmlChars: 8000,
   reloadThrottleMs: 3000,
+  shortcutDebugStaleMs: 1500,
 };
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -636,6 +645,7 @@ function flushRender() {
   if (dirty.has('attention')) renderAttentionQueue();
   if (dirty.has('badges')) updateBadges();
   if (dirty.has('captureChips')) renderCaptureChips();
+  if (dirty.has('shortcutDebug')) renderShortcutDebug();
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -762,7 +772,7 @@ function renderQueue(session) {
   session.els.queueBadge.textContent = String(queue.length);
   session.els.queueBadge.classList.toggle('zero', queue.length === 0);
   session.els.queueBtn.classList.toggle('attention', queue.length > 0);
-  invalidate('attention', 'badges');
+  invalidate('attention', 'badges', 'shortcutDebug');
 }
 
 function deliveredCaptureCount() {
@@ -785,6 +795,290 @@ function updateBadges() {
   $('#g-sessions').textContent = String(state.sessions.size);
   // "SENT" counts exactly what its label says: deliveries that exited 0.
   $('#g-captures').textContent = String(deliveredCaptureCount());
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Shortcut diagnostics — display-only telemetry for app/window/webview key
+// events. Raw typed characters are intentionally never recorded or rendered.
+// ───────────────────────────────────────────────────────────────────────────
+
+const SHORTCUT_DEBUG_MODIFIER_KEYS = new Set(['⌘', '⇧', '⌥', '⌃']);
+let shortcutDebugClearTimer = null;
+
+function normalizeShortcutDebugKey(raw) {
+  const key = String(raw || '');
+  if (!key) return null;
+  if (/^[1-9]$/.test(key)) return key;
+  const lower = key.toLowerCase();
+  if (['j', 'b', 't', 'd', 'q'].includes(lower)) return lower.toUpperCase();
+  if (lower === 'escape' || lower === 'esc') return 'Esc';
+  if (lower === 'arrowup') return '↑';
+  if (lower === 'arrowdown') return '↓';
+  if (lower === 'arrowleft') return '←';
+  if (lower === 'arrowright') return '→';
+  if (key === '↑' || key === '↓' || key === '←' || key === '→') return key;
+  if (lower === 'meta' || lower === 'command' || key === '⌘') return '⌘';
+  if (lower === 'shift' || key === '⇧') return '⇧';
+  if (lower === 'alt' || lower === 'option' || key === '⌥') return '⌥';
+  if (lower === 'control' || lower === 'ctrl' || key === '⌃') return '⌃';
+  return null;
+}
+
+function shortcutDebugInputFromDomEvent(e, source = 'renderer') {
+  return {
+    source,
+    type: e.type === 'keyup' ? 'keyUp' : 'keyDown',
+    key: normalizeShortcutDebugKey(e.key),
+    modifiers: {
+      meta: Boolean(e.metaKey),
+      shift: Boolean(e.shiftKey),
+      alt: Boolean(e.altKey),
+      control: Boolean(e.ctrlKey),
+    },
+    repeat: Boolean(e.repeat),
+    ts: Date.now(),
+  };
+}
+
+function scheduleShortcutDebugClear() {
+  if (shortcutDebugClearTimer) clearTimeout(shortcutDebugClearTimer);
+  shortcutDebugClearTimer = setTimeout(() => {
+    if (Date.now() - state.shortcutDebug.lastEventAt < BOUNDS.shortcutDebugStaleMs) {
+      scheduleShortcutDebugClear();
+      return;
+    }
+    state.shortcutDebug.latestKey = null;
+    state.shortcutDebug.modifiers = { meta: false, shift: false, alt: false, control: false };
+    invalidate('shortcutDebug');
+  }, BOUNDS.shortcutDebugStaleMs + 20);
+}
+
+function noteShortcutDebugInput(payload = {}) {
+  const key = normalizeShortcutDebugKey(payload.key);
+  const modifiers = {
+    meta: Boolean(payload.modifiers && payload.modifiers.meta),
+    shift: Boolean(payload.modifiers && payload.modifiers.shift),
+    alt: Boolean(payload.modifiers && payload.modifiers.alt),
+    control: Boolean(payload.modifiers && payload.modifiers.control),
+  };
+  if (payload.type === 'keyDown') {
+    if (key === '⌘') modifiers.meta = true;
+    if (key === '⇧') modifiers.shift = true;
+    if (key === '⌥') modifiers.alt = true;
+    if (key === '⌃') modifiers.control = true;
+  } else if (payload.type === 'keyUp') {
+    if (key === '⌘') modifiers.meta = false;
+    if (key === '⇧') modifiers.shift = false;
+    if (key === '⌥') modifiers.alt = false;
+    if (key === '⌃') modifiers.control = false;
+  }
+
+  state.shortcutDebug.source = payload.source || 'host';
+  state.shortcutDebug.webContentsId = Number.isFinite(payload.webContentsId) ? payload.webContentsId : null;
+  state.shortcutDebug.type = payload.type || 'unknown';
+  state.shortcutDebug.modifiers = modifiers;
+  if (key && !SHORTCUT_DEBUG_MODIFIER_KEYS.has(key)) state.shortcutDebug.latestKey = key;
+  else if (payload.type === 'keyDown') state.shortcutDebug.latestKey = null;
+  state.shortcutDebug.lastEventAt = Number.isFinite(payload.ts) ? payload.ts : Date.now();
+  scheduleShortcutDebugClear();
+  invalidate('shortcutDebug');
+}
+
+function shortcutDebugChord() {
+  const stale = !state.shortcutDebug.lastEventAt
+    || Date.now() - state.shortcutDebug.lastEventAt > BOUNDS.shortcutDebugStaleMs;
+  return {
+    key: stale ? null : state.shortcutDebug.latestKey,
+    modifiers: stale
+      ? { meta: false, shift: false, alt: false, control: false }
+      : { ...state.shortcutDebug.modifiers },
+  };
+}
+
+function shortcutFocusContext() {
+  const activeSession = state.sessions.get(state.activeId) || null;
+  let queueCount = 0;
+  for (const session of state.sessions.values()) queueCount += session.browser.queue.length;
+  return {
+    modalOpen: modalOpen(),
+    hostEditable: hostEditableFocused(),
+    guestEditable: guestEditableFocused(),
+    activeSessionId: activeSession ? activeSession.id : null,
+    activeSessionName: activeSession ? activeSession.name : null,
+    sessionCount: state.sessions.size,
+    queueCount,
+    browserCollapsed: activeSession ? Boolean(activeSession.browser.collapsed) : null,
+  };
+}
+
+function guardedShortcutDisabledReason(context) {
+  if (context.modalOpen) return 'modal open';
+  if (context.hostEditable) return 'host editable';
+  if (context.guestEditable) return 'guest editable';
+  return null;
+}
+
+function shortcutMatchesChord(shortcut, chord) {
+  if (!chord.key || shortcut.key !== chord.key) return false;
+  const required = shortcut.modifiers || {};
+  return Boolean(required.meta) === Boolean(chord.modifiers.meta)
+    && Boolean(required.shift) === Boolean(chord.modifiers.shift)
+    && Boolean(required.alt) === Boolean(chord.modifiers.alt)
+    && Boolean(required.control) === Boolean(chord.modifiers.control);
+}
+
+function computeShortcutCatalog() {
+  const context = shortcutFocusContext();
+  const chord = shortcutDebugChord();
+  const sessions = orderedSessions();
+  const guardReason = guardedShortcutDisabledReason(context);
+  const activeSession = context.activeSessionId ? state.sessions.get(context.activeSessionId) : null;
+  const definitions = [];
+
+  for (let i = 0; i < 9; i += 1) {
+    definitions.push({
+      id: `session-${i + 1}`,
+      label: `⌘${i + 1}`,
+      key: String(i + 1),
+      modifiers: { meta: true },
+      kind: 'guarded',
+      index: i,
+      order: i,
+    });
+  }
+  definitions.push(
+    { id: 'queue-next', label: '⌘J', key: 'J', modifiers: { meta: true }, kind: 'guarded', order: 20 },
+    { id: 'browser-toggle', label: '⌘⇧B', key: 'B', modifiers: { meta: true, shift: true }, kind: 'guarded', order: 21 },
+    { id: 'quit', label: '⌘Q', key: 'Q', modifiers: { meta: true }, kind: 'global', order: 30 },
+    { id: 'new-session', label: '⌘T', key: 'T', modifiers: { meta: true }, kind: 'document', order: 31 },
+    { id: 'detect', label: '⌘D', key: 'D', modifiers: { meta: true }, kind: 'document', order: 32 },
+    { id: 'escape', label: 'Esc', key: 'Esc', modifiers: {}, kind: 'document', order: 33 },
+  );
+
+  return definitions.map((shortcut) => {
+    let disabledReason = null;
+    let description = '';
+
+    if (shortcut.id.startsWith('session-')) {
+      const target = sessions[shortcut.index];
+      disabledReason = guardReason || (target ? null : `no session ${shortcut.index + 1}`);
+      description = target ? `activate ${target.name}` : 'session slot empty';
+    } else if (shortcut.id === 'queue-next') {
+      disabledReason = guardReason || (context.queueCount > 0 ? null : 'queue empty');
+      description = context.queueCount > 0 ? `${context.queueCount} queued` : 'queue empty';
+    } else if (shortcut.id === 'browser-toggle') {
+      disabledReason = guardReason || (activeSession ? null : 'no active session');
+      description = activeSession
+        ? (activeSession.browser.collapsed ? 'restore browser' : 'collapse browser')
+        : 'no active session';
+    } else if (shortcut.id === 'quit') {
+      description = 'guarded quit';
+    } else if (shortcut.id === 'new-session') {
+      description = 'new session';
+    } else if (shortcut.id === 'detect') {
+      description = 'detect terminals';
+    } else if (shortcut.id === 'escape') {
+      description = context.modalOpen || state.contextMenu || !$('#drawer-log').classList.contains('hidden')
+        ? 'close overlay'
+        : 'close overlay';
+    }
+
+    return {
+      id: shortcut.id,
+      label: shortcut.label,
+      key: shortcut.key,
+      modifiers: { ...shortcut.modifiers },
+      kind: shortcut.kind,
+      description,
+      available: !disabledReason,
+      matchedByCurrentChord: shortcutMatchesChord(shortcut, chord),
+      disabledReason,
+      order: shortcut.order,
+    };
+  }).sort((a, b) => {
+    const rank = (item) => (item.matchedByCurrentChord ? 0 : (item.available ? 1 : 2));
+    return rank(a) - rank(b) || a.order - b.order;
+  });
+}
+
+function shortcutDebugSourceLabel(source) {
+  if (source === 'webview') return 'webview';
+  if (source === 'renderer') return 'renderer doc';
+  if (source === 'host') return 'host window';
+  return 'no key events';
+}
+
+function appendShortcutChip(host, text, className = '') {
+  const chip = document.createElement('span');
+  chip.className = `sd-chip ${className}`.trim();
+  chip.textContent = text;
+  chip.title = text;
+  host.appendChild(chip);
+}
+
+function renderShortcutDebug() {
+  const root = $('#shortcut-debug');
+  if (!root) return;
+  const chord = shortcutDebugChord();
+  const context = shortcutFocusContext();
+
+  const keys = $('#shortcut-debug-keys');
+  keys.innerHTML = '';
+  const mods = [
+    ['meta', '⌘'],
+    ['shift', '⇧'],
+    ['alt', '⌥'],
+    ['control', '⌃'],
+  ];
+  for (const [name, label] of mods) {
+    const el = document.createElement('span');
+    el.className = `kbd-key${chord.modifiers[name] ? ' on' : ''}`;
+    el.textContent = label;
+    keys.appendChild(el);
+  }
+  const latest = document.createElement('span');
+  latest.className = `kbd-key latest${chord.key ? ' active' : ''}`;
+  latest.textContent = chord.key || '·';
+  latest.title = chord.key ? 'Latest shortcut key' : 'No current shortcut key';
+  keys.appendChild(latest);
+
+  const source = $('#shortcut-debug-source');
+  source.innerHTML = '';
+  appendShortcutChip(source, `src ${shortcutDebugSourceLabel(state.shortcutDebug.source)}`, state.shortcutDebug.source ? 'hot' : '');
+
+  const contextHost = $('#shortcut-debug-context');
+  contextHost.innerHTML = '';
+  appendShortcutChip(contextHost, context.modalOpen ? 'modal open' : 'no modal', context.modalOpen ? 'warn' : '');
+  appendShortcutChip(
+    contextHost,
+    context.hostEditable ? 'host editable' : (context.guestEditable ? 'guest editable' : 'no editable'),
+    (context.hostEditable || context.guestEditable) ? 'warn' : '',
+  );
+  appendShortcutChip(contextHost, context.activeSessionId ? 'active session' : 'no active', context.activeSessionId ? 'ok' : 'warn');
+  appendShortcutChip(contextHost, context.queueCount > 0 ? `queue ${context.queueCount}` : 'queue empty', context.queueCount > 0 ? 'ok' : '');
+  appendShortcutChip(
+    contextHost,
+    context.browserCollapsed === null ? 'browser none' : (context.browserCollapsed ? 'browser collapsed' : 'browser restored'),
+    context.browserCollapsed ? 'warn' : '',
+  );
+
+  const catalog = $('#shortcut-debug-catalog');
+  catalog.innerHTML = '';
+  for (const shortcut of computeShortcutCatalog()) {
+    const chip = document.createElement('span');
+    chip.className = `shortcut-chip${shortcut.matchedByCurrentChord ? ' matched' : ''}${shortcut.available ? '' : ' disabled'}`;
+    const label = document.createElement('span');
+    label.textContent = shortcut.label;
+    chip.appendChild(label);
+    if (shortcut.disabledReason) {
+      const reason = document.createElement('span');
+      reason.className = 'reason';
+      reason.textContent = shortcut.disabledReason;
+      chip.appendChild(reason);
+    }
+    chip.title = `${shortcut.label}: ${shortcut.disabledReason || shortcut.description}`;
+    catalog.appendChild(chip);
+  }
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -840,6 +1134,7 @@ function openInPane(session, url) {
       else if (e.channel === 'chromux-pick-cancel') setPicking(session, false);
       else if (e.channel === 'chromux-focused-editable') {
         b.guestEditableFocused = Boolean((e.args[0] || {}).editable);
+        invalidate('shortcutDebug');
       }
     });
 
@@ -889,6 +1184,7 @@ function setBrowserCollapsed(session, collapsed) {
   session.browser.collapsed = next;
   if (next) session.els.queuePanel.classList.add('hidden');
   applyBrowserLayout(session);
+  invalidate('shortcutDebug');
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -1107,6 +1403,7 @@ async function openCaptureModal(session, selection) {
   $('#cap-foot-deliver').classList.add('hidden');
   $('#cap-title').textContent = 'CAPTURE → AGENT';
   $('#modal-capture').classList.remove('hidden');
+  invalidate('shortcutDebug');
 }
 
 function buildPayload() {
@@ -1743,6 +2040,7 @@ function activateSession(id) {
   }
   $('#empty-state').classList.toggle('hidden', state.sessions.size > 0);
   renderTabs();
+  invalidate('shortcutDebug');
 }
 
 function closeSession(id) {
@@ -1761,6 +2059,7 @@ function closeSession(id) {
   }
   $('#empty-state').classList.toggle('hidden', state.sessions.size > 0);
   renderTabs();
+  invalidate('shortcutDebug');
 }
 
 function setUpdateQueuePhase(phase, patch = {}) {
@@ -2045,6 +2344,7 @@ function showUpdateInstallError(err) {
 
 function openSettings() {
   $('#modal-settings').classList.remove('hidden');
+  invalidate('shortcutDebug');
   checkUpdates(false).catch(() => {});
 }
 
@@ -2428,6 +2728,7 @@ async function scanExternal() {
 
 function openDetectModal() {
   $('#modal-detect').classList.remove('hidden');
+  invalidate('shortcutDebug');
   renderRestoreSessions();
   scanExternal().catch(() => {});
   setTimeout(() => $('#detect-search')?.focus(), 0);
@@ -2534,6 +2835,7 @@ function openNewSessionModal() {
   $('#ns-name').value = `session-${state.counter + 1}`;
   $('#ns-cwd').value = state.lastCwd || (state.env ? state.env.home : '');
   $('#modal-new').classList.remove('hidden');
+  invalidate('shortcutDebug');
   $('#ns-name').focus();
   $('#ns-name').select();
 }
@@ -2582,6 +2884,7 @@ document.querySelectorAll('[data-close]').forEach((btn) => {
     // Closing the modal drops only the compose context — the capture record
     // survives, so in-flight deliveries still resolve and stay attributable.
     if (btn.dataset.close === 'modal-capture') state.ui.captureModal = null;
+    invalidate('shortcutDebug');
   });
 });
 
@@ -2627,6 +2930,7 @@ window.chromux.onLifecycleConfirmClose(async (payload = {}) => {
   await window.chromux.confirmAppClose({ sessions: snapshotOpenSessions() });
 });
 
+window.chromux.onShortcutDebugInput(noteShortcutDebugInput);
 window.chromux.onShortcutActivateSessionIndex(handleShortcutActivateSessionIndex);
 window.chromux.onShortcutFocusNextQueueItem(handleShortcutFocusNextQueueItem);
 window.chromux.onShortcutToggleBrowser(handleShortcutToggleBrowser);
@@ -2667,16 +2971,25 @@ function modalOpen() {
   return [...document.querySelectorAll('.overlay')].some((el) => !el.classList.contains('hidden'));
 }
 
-function editableFocused() {
+function hostEditableFocused() {
   const el = document.activeElement;
   if (el) {
     if (el.closest('.hidden')) return false;
     if (el.isContentEditable) return true;
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) return true;
   }
+  return false;
+}
+
+function guestEditableFocused() {
+  const el = document.activeElement;
   const session = state.sessions.get(state.activeId);
   const webview = session && session.browser.webview;
   return Boolean(webview && el === webview && session.browser.guestEditableFocused);
+}
+
+function editableFocused() {
+  return hostEditableFocused() || guestEditableFocused();
 }
 
 function activateSessionByIndex(index) {
@@ -3031,6 +3344,115 @@ if (window.chromuxTest) {
     flushRender,
   };
 
+  let hotkeyTestFocusEl = null;
+  const removeHotkeyTestFocusEl = () => {
+    if (hotkeyTestFocusEl && hotkeyTestFocusEl.parentElement) hotkeyTestFocusEl.remove();
+    hotkeyTestFocusEl = null;
+  };
+  const hotkeyCatalogSnapshot = () => computeShortcutCatalog().map((shortcut) => ({
+    id: shortcut.id,
+    label: shortcut.label,
+    available: shortcut.available,
+    matchedByCurrentChord: shortcut.matchedByCurrentChord,
+    disabledReason: shortcut.disabledReason,
+    description: shortcut.description,
+  }));
+
+  window.chromuxTestHotkeys = {
+    addSession: async (opts) => addFakeSession(opts),
+    focus(id) {
+      activateSession(id);
+      flushRender();
+    },
+    setQueue(id, queue = []) {
+      const session = testSession(id);
+      session.browser.queue = queue.map((item) => normalizeQueueItem(item, 'RESTORE')).filter(Boolean);
+      renderQueue(session);
+      flushRender();
+    },
+    clearQueues() {
+      for (const session of state.sessions.values()) {
+        session.browser.queue = [];
+        if (session.els) renderQueue(session);
+      }
+      flushRender();
+    },
+    setCollapsed(id, collapsed) {
+      testSession(id).browser.collapsed = Boolean(collapsed);
+      invalidate('shortcutDebug');
+      flushRender();
+    },
+    openModal() {
+      $('#modal-settings').classList.remove('hidden');
+      invalidate('shortcutDebug');
+      flushRender();
+    },
+    closeModals() {
+      for (const el of document.querySelectorAll('.overlay')) el.classList.add('hidden');
+      state.ui.captureModal = null;
+      invalidate('shortcutDebug');
+      flushRender();
+    },
+    focusHostEditable() {
+      removeHotkeyTestFocusEl();
+      const input = document.createElement('input');
+      document.body.appendChild(input);
+      hotkeyTestFocusEl = input;
+      input.focus();
+      invalidate('shortcutDebug');
+      flushRender();
+    },
+    focusGuestEditable(id) {
+      removeHotkeyTestFocusEl();
+      const session = testSession(id);
+      const webview = document.createElement('div');
+      webview.tabIndex = 0;
+      document.body.appendChild(webview);
+      hotkeyTestFocusEl = webview;
+      session.browser.webview = webview;
+      session.browser.guestEditableFocused = true;
+      activateSession(session.id);
+      webview.focus();
+      invalidate('shortcutDebug');
+      flushRender();
+    },
+    clearFocus() {
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      for (const session of state.sessions.values()) {
+        if (session.browser.webview === hotkeyTestFocusEl) {
+          session.browser.webview = null;
+          session.browser.guestEditableFocused = false;
+        }
+      }
+      removeHotkeyTestFocusEl();
+      invalidate('shortcutDebug');
+      flushRender();
+    },
+    note(payload) {
+      noteShortcutDebugInput(payload);
+      flushRender();
+    },
+    catalog() {
+      renderShortcutDebug();
+      return hotkeyCatalogSnapshot();
+    },
+    context() {
+      return { ...shortcutFocusContext() };
+    },
+    debug() {
+      renderShortcutDebug();
+      return {
+        source: state.shortcutDebug.source,
+        latestKey: shortcutDebugChord().key,
+        modifiers: { ...shortcutDebugChord().modifiers },
+        context: { ...shortcutFocusContext() },
+        catalog: hotkeyCatalogSnapshot(),
+        text: $('#shortcut-debug') ? $('#shortcut-debug').textContent : '',
+      };
+    },
+    flushRender,
+  };
+
   window.chromuxTestBrowser = {
     addSession({ name = 'browser-test', agent = 'codex', cwd = '/tmp', url = null, queue = [] } = {}) {
       state.counter += 1;
@@ -3156,10 +3578,12 @@ function fakeSessionEls() {
 
 document.addEventListener('keydown', (e) => {
   if (e.metaKey && e.key === 't') {
+    noteShortcutDebugInput(shortcutDebugInputFromDomEvent(e, 'renderer'));
     e.preventDefault();
     openNewSessionModal();
   }
   if (e.metaKey && e.key === 'd') {
+    noteShortcutDebugInput(shortcutDebugInputFromDomEvent(e, 'renderer'));
     e.preventDefault();
     openDetectModal();
   }
@@ -3168,16 +3592,26 @@ document.addEventListener('keydown', (e) => {
     handleShortcutActivateSessionIndex({ index: Number(e.key) - 1 });
   }
   if (e.key === 'Escape') {
+    noteShortcutDebugInput(shortcutDebugInputFromDomEvent(e, 'renderer'));
     closeSessionContextMenu();
     $('#modal-settings').classList.add('hidden');
     $('#modal-new').classList.add('hidden');
     $('#modal-detect').classList.add('hidden');
     $('#drawer-log').classList.add('hidden');
+    invalidate('shortcutDebug');
   }
 });
 
-document.addEventListener('click', closeSessionContextMenu);
-window.addEventListener('blur', closeSessionContextMenu);
+document.addEventListener('click', () => {
+  closeSessionContextMenu();
+  invalidate('shortcutDebug');
+});
+document.addEventListener('focusin', () => invalidate('shortcutDebug'));
+document.addEventListener('focusout', () => setTimeout(() => invalidate('shortcutDebug'), 0));
+window.addEventListener('blur', () => {
+  closeSessionContextMenu();
+  invalidate('shortcutDebug');
+});
 
 // boot
 (async () => {
@@ -3192,4 +3626,5 @@ window.addEventListener('blur', closeSessionContextMenu);
   await checkUpdates(false).catch(() => {});
   updateBadges();
   renderAttentionQueue();
+  renderShortcutDebug();
 })();
