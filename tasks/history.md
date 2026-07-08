@@ -1,5 +1,14 @@
 # Session History
 
+## 2026-07-08 — Chromux v0.12.10 webview shortcut delivery
+
+- Fixed app-scoped shortcut delivery from paired browser webviews by sharing the main-process `before-input-event` handler across host and guest webContents.
+- Preserved renderer-side modal/editable guards by reporting focused editable state from guest pages and consulting it before session switching, queue focus, or browser toggling.
+- Added `test:webview-shortcuts-smoke` coverage that sends real Command key events into a focused webview and checks non-editable delivery plus input, textarea, and contenteditable suppression.
+- Bumped prototype metadata to `0.12.10`; planned tag is `chromux-v0.12.10`.
+- Validation: `npm run test:shortcuts-renderer`, `npm run test:browser-collapse-renderer`, and `npm run test:webview-shortcuts-smoke` passed from `prototype/`; `node --check main.js`, `node --check renderer/renderer.js`, `node --check webview-preload.js`, and `node --check scripts/test-webview-shortcuts-smoke.js` passed from `prototype/`.
+- Ship manifest: user goal was to make Command+1..9, Command+J, Command+Shift+B, and guarded quit continue working with focus in a paired browser webview while preserving modal/editable suppression. Changed files are `prototype/main.js`, `prototype/webview-preload.js`, `prototype/renderer/renderer.js`, `prototype/scripts/test-webview-shortcuts-smoke.js`, `prototype/package.json`, `prototype/package-lock.json`, `prototype/README.md`, `RELEASES.md`, and `tasks/history.md`. Adversarial review focused on preserving IPC channel names, avoiding `globalShortcut`, preventing guest editable shortcuts from reaching renderer actions, and exercising real guest `sendInputEvent` delivery. No `docs/quality-gate-contract.md` exists in this repo. Residual risk is limited to Electron key-event shape differences outside the smoke harness; rollback is `git revert` of the v0.12.10 commit and deletion of tag/release `chromux-v0.12.10` if already published. Next command: `$exec` for `prototype/docs/privacy-and-local-data.md`.
+
 ## 2026-07-08 — Chromux v0.12.9 settings-only update override
 
 - Added a Settings-only INSTALL ANYWAY action for UPDATE WAITING when a managed install source is available, allowing explicit user override of live-session blockers.

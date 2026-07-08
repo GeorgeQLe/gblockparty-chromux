@@ -657,6 +657,7 @@ function newSessionShape({ id, name, cwd, agent }) {
     browser: {
       webview: null, webContentsId: null, currentUrl: null, lastReload: 0,
       queue: [], consoleBuf: [], consoleTotal: 0, picking: false,
+      guestEditableFocused: false,
       collapsed: false,
       expandedGridTemplate: 'minmax(320px, 46%) 6px minmax(360px, 1fr)',
     },
@@ -801,6 +802,7 @@ function openInPane(session, url) {
     wv.setAttribute('partition', 'persist:chromux');
     wv.setAttribute('preload', window.chromux.webviewPreloadPath);
     wv.setAttribute('src', url);
+    wv.dataset.sessionId = session.id;
     b.webview = wv;
 
     wv.addEventListener('console-message', (e) => {
@@ -815,6 +817,7 @@ function openInPane(session, url) {
       renderConsoleChip(session);
     });
     wv.addEventListener('did-navigate', (e) => {
+      b.guestEditableFocused = false;
       b.currentUrl = e.url;
       session.els.urlBar.value = e.url;
       invalidate('captureChips');
@@ -829,9 +832,15 @@ function openInPane(session, url) {
     wv.addEventListener('dom-ready', () => {
       try { b.webContentsId = wv.getWebContentsId(); } catch { /* ok */ }
     });
+    wv.addEventListener('blur', () => {
+      b.guestEditableFocused = false;
+    });
     wv.addEventListener('ipc-message', (e) => {
       if (e.channel === 'chromux-pick') onElementPicked(session, e.args[0] || {});
       else if (e.channel === 'chromux-pick-cancel') setPicking(session, false);
+      else if (e.channel === 'chromux-focused-editable') {
+        b.guestEditableFocused = Boolean((e.args[0] || {}).editable);
+      }
     });
 
     session.els.placeholder.classList.add('hidden');
@@ -2660,10 +2669,14 @@ function modalOpen() {
 
 function editableFocused() {
   const el = document.activeElement;
-  if (!el) return false;
-  if (el.closest('.hidden')) return false;
-  if (el.isContentEditable) return true;
-  return ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName);
+  if (el) {
+    if (el.closest('.hidden')) return false;
+    if (el.isContentEditable) return true;
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) return true;
+  }
+  const session = state.sessions.get(state.activeId);
+  const webview = session && session.browser.webview;
+  return Boolean(webview && el === webview && session.browser.guestEditableFocused);
 }
 
 function activateSessionByIndex(index) {
@@ -3040,6 +3053,17 @@ if (window.chromuxTest) {
       activateSession(session.id);
       flushRender();
       return session.id;
+    },
+    open(id, url) {
+      openInPane(testSession(id), url);
+      flushRender();
+      return true;
+    },
+    webview(id) {
+      return testSession(id).browser.webview;
+    },
+    guestEditableFocused(id) {
+      return Boolean(testSession(id).browser.guestEditableFocused);
     },
     collapse(id) {
       setBrowserCollapsed(testSession(id), true);

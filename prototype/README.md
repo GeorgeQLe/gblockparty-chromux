@@ -75,7 +75,7 @@ failure screen shows the exact retry command. Every attempt is logged to
 | --- | --- | --- |
 | Main process | `main.js` | PTYs (`node-pty`), capture persistence, `claude -p` adapter, popup interception, external terminal/agent-session detection |
 | Bridge | `preload.js` | narrow `window.chromux` API, no node in the page |
-| Guest bridge | `webview-preload.js` | element-picker results only |
+| Guest bridge | `webview-preload.js` | element-picker results and focused-editable status |
 | UI | `renderer/` | sessions, xterm terminals, paired webviews, review queue, capture modal |
 | Payload contract | `docs/capture-payload.md` | schema v1, field bounds, retention |
 

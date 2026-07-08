@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.12.10
+
+Planned tag: `chromux-v0.12.10`
+
+- Deliver app-scoped Command+1..9, Command+J, Command+Shift+B, and guarded quit shortcuts from paired browser webviews as well as the host window.
+- Track focused editable elements inside guest pages so session, queue, and browser-toggle shortcuts remain suppressed while preview-page inputs are active.
+- Add a webview shortcut smoke test that sends real Command key events into a guest webview and verifies both delivery and editable suppression.
+
 ## GBlockParty Chromux v0.12.9
 
 Planned tag: `chromux-v0.12.9`

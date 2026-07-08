@@ -62,6 +62,34 @@ function requestGuardedQuit(reason = 'app-quit') {
   });
 }
 
+function handleShellShortcutInput(event, input) {
+  if (!input.meta || input.alt || input.control) return false;
+  if (input.type !== 'keyDown') return false;
+  const key = String(input.key || '').toLowerCase();
+  const sessionDigit = sessionShortcutDigit(input);
+  if (sessionDigit) {
+    event.preventDefault();
+    send('shortcut-activate-session-index', { index: Number(sessionDigit) - 1 });
+    return true;
+  }
+  if (key === 'j') {
+    event.preventDefault();
+    send('shortcut-focus-next-queue-item');
+    return true;
+  }
+  if (key === 'b' && input.shift) {
+    event.preventDefault();
+    send('shortcut-toggle-browser');
+    return true;
+  }
+  if (key === 'q') {
+    event.preventDefault();
+    requestGuardedQuit('app-quit');
+    return true;
+  }
+  return false;
+}
+
 function installAppMenu() {
   const template = [
     {
@@ -420,31 +448,7 @@ function createWindow() {
 
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
-  win.webContents.on('before-input-event', (event, input) => {
-    if (!input.meta || input.alt || input.control) return;
-    if (input.type !== 'keyDown') return;
-    const key = String(input.key || '').toLowerCase();
-    const sessionDigit = sessionShortcutDigit(input);
-    if (sessionDigit) {
-      event.preventDefault();
-      send('shortcut-activate-session-index', { index: Number(sessionDigit) - 1 });
-      return;
-    }
-    if (key === 'j') {
-      event.preventDefault();
-      send('shortcut-focus-next-queue-item');
-      return;
-    }
-    if (key === 'b' && input.shift) {
-      event.preventDefault();
-      send('shortcut-toggle-browser');
-      return;
-    }
-    if (key === 'q') {
-      event.preventDefault();
-      requestGuardedQuit('app-quit');
-    }
-  });
+  win.webContents.on('before-input-event', handleShellShortcutInput);
 
   if (SMOKE) {
     win.webContents.on('console-message', (_e, level, message) => {
@@ -495,6 +499,7 @@ app.on('second-instance', () => {
 // paired session's review queue (never steal attention — idea-brief wedge #4).
 app.on('web-contents-created', (_event, contents) => {
   if (contents.getType() === 'webview') {
+    contents.on('before-input-event', handleShellShortcutInput);
     contents.setWindowOpenHandler(({ url }) => {
       send('webview-popup', { webContentsId: contents.id, url });
       return { action: 'deny' };

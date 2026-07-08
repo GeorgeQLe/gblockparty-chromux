@@ -1,6 +1,6 @@
 {
   "name": "chromux",
-  "version": "0.12.9",
+  "version": "0.12.10",
   "description": "OSS desktop front-end for local and GBlockParty-managed agent/browser workspaces.",
   "main": "main.js",
   "private": false,
@@ -24,6 +24,7 @@
     "test:preview-queue-renderer": "node scripts/test-preview-queue-renderer.js",
     "test:shortcuts-renderer": "node scripts/test-shortcuts-renderer.js",
     "test:browser-collapse-renderer": "node scripts/test-browser-collapse-renderer.js",
+    "test:webview-shortcuts-smoke": "node scripts/test-webview-shortcuts-smoke.js",
     "test:agent-command-quoting": "node scripts/test-agent-command-quoting.js",
     "test:github-update-check": "node scripts/test-github-update-check.js",
     "test:update-queue-renderer": "node scripts/test-update-queue-renderer.js",
