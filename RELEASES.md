@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.12.8
+
+Planned tag: `chromux-v0.12.8`
+
+- Harden terminal preview parsing so code, diff, search, test fixture, markdown, and release-note examples containing localhost URLs do not open or queue fake previews.
+- Preserve real dev-server/prose preview detection for lines such as `Local: http://localhost:5173/` and `ready on http://localhost:3000`.
+- Document the future explicit Chromux preview OSC signal path, with MCP planned as an adapter over the same internal preview action.
+
 ## GBlockParty Chromux v0.12.7
 
 Planned tag: `chromux-v0.12.7`

@@ -1,5 +1,14 @@
 # Session History
 
+## 2026-07-08 — Chromux v0.12.8 preview parser hardening
+
+- Hardened terminal preview routing so localhost URLs inside `rg` output, diffs, JS/test fixtures, markdown tables, and release-note prose do not open or queue fake previews.
+- Preserved valid dev-server/prose preview routing for lines like `Local: http://localhost:5173/` and later distinct agent output, including queue source/reason metadata.
+- Added `docs/explicit-preview-signal.md` to define the future OSC preview signal shape, with MCP planned as an adapter over the same internal routing action rather than a separate preview system.
+- Bumped prototype metadata to `0.12.8`; planned tag is `chromux-v0.12.8`.
+- UAT manifest: `docs/testing/chromux-0.12.8-preview-shortcuts-uat-2026-07-08.md` records seven PASS runs covering baseline empty queue, false-positive filtering, real preview output, typed echo suppression, queue explanations and legacy restore, browser/digit shortcuts, and attention ordering. Computer Use app-state reads timed out, so UAT evidence was collected from isolated Electron smoke-mode renderer DOM runs.
+- Validation: `npm run test:preview-queue-renderer`, `npm run test:shortcuts-renderer`, `npm run test:browser-collapse-renderer`, `npm run test:update-queue-renderer`, `npm run test:turn-signals-renderer`, `npm run test:detect-filter-renderer`, `npm run test:capture-records-renderer`, `npm run test:osc-parser`, `npm run test:agent-command-quoting`, and `npm run test:github-update-check` passed from `prototype/`; `node --check prototype/main.js`, `node --check prototype/renderer/renderer.js`, `node --check prototype/scripts/test-preview-queue-renderer.js`, and `git diff --check` passed.
+
 ## 2026-07-07 — Chromux v0.12.7 preview queue explanations and shortcut fixes
 
 - Shipped a patch release that suppresses preview routing from immediate user-typed localhost and local `.html` command echoes, including submitted input assembled across terminal chunks, while preserving later agent-printed previews.

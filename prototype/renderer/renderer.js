@@ -152,6 +152,55 @@ function scanLineForPreviews(line) {
   return found;
 }
 
+function looksLikeFileMatchLine(line) {
+  return /^\s*(?:[./~]|[\w@+.-][\w@+./ -]*\.[A-Za-z0-9_-]{1,12}:)\S*:\d+(?::\d+)?:/.test(line)
+    || /^\s*(?:[./~]?[\w@+.-]+\/)+[\w@+.-]+:\d+(?::\d+)?:/.test(line);
+}
+
+function looksLikeDiffOrPatchLine(line) {
+  return /^\s*(?:diff --git|index [0-9a-f]+\.\.|@@\s|[+-]{3}\s)/.test(line)
+    || /^\s*[+-]\s*(?:['"`[{(<]|\w|\$|\/\/|#|[*])/.test(line);
+}
+
+function looksLikeQuotedPreviewExample(line) {
+  return /['"`]https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])/i.test(line)
+    || /https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])[^'"`\s]*['"`]/i.test(line)
+    || /['"`](?:file:\/\/)?\/[^'"`]*\.html?['"`]/i.test(line);
+}
+
+function looksLikeCodePreviewExample(line) {
+  const codeSignals = [
+    /\b(?:q\.feed|feedPtyChunk|expect|assert|it|test|describe)\s*\(/,
+    /\b(?:const|let|var)\s+[\w$]+\s*=/,
+    /\b(?:return|throw)\s+/,
+    /\b(?:url|href|src|currentUrl|detectedText)\s*[:=]/i,
+    /=>\s*/,
+    /[{}[\];]\s*$/,
+  ];
+  return codeSignals.some((re) => re.test(line));
+}
+
+function looksLikeDocumentationPreviewExample(line) {
+  return /^\s*\|.*\|\s*$/.test(line)
+    || /^\s*(?:[-*]|\d+\.)\s+/.test(line)
+    || /^\s*#{1,6}\s+/.test(line)
+    || /\b(?:release notes?|expected|actual|markdown|history)\b/i.test(line);
+}
+
+function shouldRoutePreviewLine(line, hits) {
+  if (!Array.isArray(hits) || hits.length === 0) return false;
+  const text = String(line || '').trim();
+  if (!text) return false;
+
+  if (looksLikeFileMatchLine(text)) return false;
+  if (looksLikeDiffOrPatchLine(text)) return false;
+  if (looksLikeQuotedPreviewExample(text)) return false;
+  if (looksLikeCodePreviewExample(text)) return false;
+  if (looksLikeDocumentationPreviewExample(text)) return false;
+
+  return true;
+}
+
 function queueReasonForSource(source) {
   return QUEUE_REASON_BY_SOURCE[source] || QUEUE_REASON_BY_SOURCE.TERM;
 }
@@ -249,7 +298,12 @@ function feedDetector(session, chunk) {
   for (const rawLine of parts) {
     const line = stripTerminalControlsForPreview(rawLine);
     if (!line) continue;
-    for (const hit of scanLineForPreviews(line)) {
+    const hits = scanLineForPreviews(line);
+    if (!shouldRoutePreviewLine(line, hits)) {
+      ageTypedPreviewSuppressions(session);
+      continue;
+    }
+    for (const hit of hits) {
       if (consumeTypedPreviewSuppression(session, hit, line)) continue;
       if (hit.source === 'FILE') {
         // Soft-wrapped terminal lines can split a long path into a shorter,
@@ -635,7 +689,7 @@ function routePreview(session, url, source, detail = {}) {
     }
     return;
   }
-  if (!b.webview) {
+  if (!b.currentUrl && !b.webview) {
     openInPane(session, url); // empty pane: auto-fill is not attention-stealing
     return;
   }
@@ -2815,6 +2869,11 @@ if (window.chromuxTest) {
     addSession: async (opts) => addFakeSession(opts),
     scan(line) {
       return scanLineForPreviews(stripTerminalControlsForPreview(line)).map((hit) => ({ ...hit }));
+    },
+    routableScan(line) {
+      const clean = stripTerminalControlsForPreview(line);
+      const hits = scanLineForPreviews(clean);
+      return shouldRoutePreviewLine(clean, hits) ? hits.map((hit) => ({ ...hit })) : [];
     },
     typeInput(id, data) {
       apply({ type: 'user-input', sessionId: id, data });

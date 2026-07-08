@@ -42,7 +42,36 @@ fs.writeFileSync(e2ePath, `
   expect(normalized[0] === 'http://localhost:5173/a', '0.0.0.0 should normalize to localhost');
   expect(normalized[1] === 'http://localhost:5173/b', '[::1] should normalize to localhost');
 
-  const id = await q.addSession({ name: 'preview-session', agent: 'codex' });
+  const falsePositiveLines = [
+    "prototype/renderer/renderer.js:252: q.feed(id, 'http://localhost:5173/fixture\\\\r\\\\n');",
+    "+ const url = 'http://localhost:5173/from-diff';",
+    "- expect(q.currentUrl(id) === 'http://localhost:5173/old');",
+    " const fixture = { url: 'http://localhost:5173/context' };",
+    "| Expected | http://localhost:5173/uat-doc | Queue stays empty |",
+    "- Release note documents http://localhost:5173/release-note as an example.",
+    "const localFixture = { url: '" + htmlPath + "' };",
+  ];
+  for (const line of falsePositiveLines) {
+    expect(q.routableScan(line).length === 0, 'false-positive context should not be routable: ' + line);
+  }
+
+  const falseId = await q.addSession({ name: 'false-positive-session', agent: 'codex' });
+  for (const line of falsePositiveLines) q.feed(falseId, line + '\\r\\n');
+  await wait(80);
+  expect(q.currentUrl(falseId) === null, 'code/search/diff/docs localhost output should not open a pane');
+  expect(q.queueCount(falseId) === 0, 'code/search/diff/docs localhost output should not queue previews');
+
+  const realId = await q.addSession({ name: 'real-preview-session', agent: 'codex' });
+  q.feed(realId, 'Local: http://localhost:5173/\\r\\n');
+  expect(q.currentUrl(realId) === 'http://localhost:5173/', 'dev-server Local output should open empty pane');
+  q.feed(realId, 'ready on http://localhost:3000\\r\\n');
+  expect(JSON.stringify(q.queueUrls(realId)) === JSON.stringify(['http://localhost:3000']),
+    'dev-server ready output should queue when pane is occupied: ' + JSON.stringify(q.queueUrls(realId)));
+  const realItem = q.queueItems(realId)[0];
+  expect(realItem.reason === 'detected in agent output',
+    'queued real preview should retain terminal reason: ' + JSON.stringify(realItem));
+
+  const id = await q.addSession({ name: 'typed-preview-session', agent: 'codex' });
   q.feed(id, 'http://localhost:49151/uat-ahttp://localhost:49151/uat-b\\r\\n');
   expect(q.currentUrl(id) === null, 'malformed concatenated token should not open empty pane');
   expect(q.queueCount(id) === 0, 'malformed concatenated token should not queue');
@@ -68,9 +97,6 @@ fs.writeFileSync(e2ePath, `
   q.feed(id, 'agent later printed http://localhost:49151/chunked-typed\\r\\n');
   expect(JSON.stringify(q.queueUrls(id)) === JSON.stringify(['http://localhost:49151/chunked-typed']),
     'later agent output of chunked typed URL should still queue');
-  q.openQueued(id, 'http://localhost:49151/chunked-typed');
-  expect(q.currentUrl(id) === 'http://localhost:49151/chunked-typed',
-    'opened chunked URL should become current before file path checks');
 
   const fileId = await q.addSession({ name: 'file-preview-session', agent: 'codex' });
   q.typeInput(fileId, 'open ' + htmlPath + '\\r');
@@ -83,40 +109,45 @@ fs.writeFileSync(e2ePath, `
   expect(q.currentUrl(fileId) === htmlFileUrl,
     'same local .html path should route when later printed by agent output: ' + q.currentUrl(fileId));
 
-  q.feed(id, 'now http://localhost:49151/uat-a\\r\\n');
-  expect(JSON.stringify(q.queueUrls(id)) === JSON.stringify(['http://localhost:49151/uat-a']),
-    'valid URL printed as its own token should queue after current pane is occupied: ' + JSON.stringify(q.queueUrls(id)));
-  const firstItem = q.queueItems(id)[0];
+  const queueId = await q.addSession({ name: 'preview-session', agent: 'codex' });
+  q.feed(queueId, 'Local: http://localhost:49151/current\\r\\n');
+  expect(q.currentUrl(queueId) === 'http://localhost:49151/current',
+    'queue test session should start with an occupied pane');
+
+  q.feed(queueId, 'now http://localhost:49151/uat-a\\r\\n');
+  expect(JSON.stringify(q.queueUrls(queueId)) === JSON.stringify(['http://localhost:49151/uat-a']),
+    'valid URL printed as its own token should queue after current pane is occupied: ' + JSON.stringify(q.queueUrls(queueId)));
+  const firstItem = q.queueItems(queueId)[0];
   expect(firstItem.source === 'TERM', 'queued terminal preview should store TERM source');
   expect(firstItem.reason === 'detected in agent output',
     'queued terminal preview should store human reason: ' + JSON.stringify(firstItem));
-  const firstRow = q.queueRows(id)[0];
+  const firstRow = q.queueRows(queueId)[0];
   expect(firstRow.reason === 'detected in agent output' && firstRow.url === 'http://localhost:49151/uat-a',
     'queue row should expose reason and URL: ' + JSON.stringify(firstRow));
 
-  q.feed(id, 'then http://localhost:49151/uat-b\\r\\n');
-  expect(JSON.stringify(q.queueUrls(id)) === JSON.stringify([
+  q.feed(queueId, 'then http://localhost:49151/uat-b\\r\\n');
+  expect(JSON.stringify(q.queueUrls(queueId)) === JSON.stringify([
     'http://localhost:49151/uat-a',
     'http://localhost:49151/uat-b',
-  ]), 'valid distinct previews should queue in order: ' + JSON.stringify(q.queueUrls(id)));
+  ]), 'valid distinct previews should queue in order: ' + JSON.stringify(q.queueUrls(queueId)));
 
-  q.feed(id, 'again http://localhost:49151/uat-b\\r\\n');
-  expect(q.queueCount(id) === 2, 'duplicate queued URL should be ignored');
+  q.feed(queueId, 'again http://localhost:49151/uat-b\\r\\n');
+  expect(q.queueCount(queueId) === 2, 'duplicate queued URL should be ignored');
 
-  q.feed(id, 'next http://localhost:49151/uat-c\\r\\n');
-  expect(q.queueCount(id) === 3, 'different queued URL should be added');
+  q.feed(queueId, 'next http://localhost:49151/uat-c\\r\\n');
+  expect(q.queueCount(queueId) === 3, 'different queued URL should be added');
 
   const holder = await q.addSession({ name: 'attention-holder', agent: '' });
   q.focus(holder);
   const attention = q.attentionItems().find((item) => item.kind === 'QUEUE 3' && item.name === 'preview-session');
   expect(attention && attention.detail === 'detected in agent output: http://localhost:49151/uat-a',
     'attention queue detail should include reason and URL: ' + JSON.stringify(attention));
-  q.focus(id);
+  q.focus(queueId);
 
-  q.openQueued(id, 'http://localhost:49151/uat-a');
-  expect(q.currentUrl(id) === 'http://localhost:49151/uat-a', 'opened queued preview should become current URL');
-  expect(q.queueCount(id) === 2, 'opening one queued preview should decrement queue count by one');
-  expect(JSON.stringify(q.queueUrls(id)) === JSON.stringify([
+  q.openQueued(queueId, 'http://localhost:49151/uat-a');
+  expect(q.currentUrl(queueId) === 'http://localhost:49151/uat-a', 'opened queued preview should become current URL');
+  expect(q.queueCount(queueId) === 2, 'opening one queued preview should decrement queue count by one');
+  expect(JSON.stringify(q.queueUrls(queueId)) === JSON.stringify([
     'http://localhost:49151/uat-b',
     'http://localhost:49151/uat-c',
   ]), 'opening one queued preview should leave the other queued URLs');
@@ -131,7 +162,7 @@ fs.writeFileSync(e2ePath, `
   expect(legacyItem.reason === 'restored from previous session',
     'legacy queue item should default to restored reason: ' + JSON.stringify(legacyItem));
 
-  return JSON.stringify({ ok: true, queue: q.queueUrls(id), current: q.currentUrl(id), file: q.currentUrl(fileId) });
+  return JSON.stringify({ ok: true, queue: q.queueUrls(queueId), current: q.currentUrl(queueId), file: q.currentUrl(fileId) });
 })()
 `);
 
