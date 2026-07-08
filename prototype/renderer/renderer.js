@@ -634,6 +634,7 @@ function apply(event) {
 
 function invalidate(...areas) {
   for (const area of areas) state.ui.dirty.add(area);
+  if (areas.includes('shortcutDebug')) scheduleShortcutFocusContextReport();
   if (state.ui.rafScheduled) return;
   state.ui.rafScheduled = true;
   requestAnimationFrame(() => flushRender());
@@ -807,6 +808,7 @@ function updateBadges() {
 
 const SHORTCUT_DEBUG_MODIFIER_KEYS = new Set(['⌘', '⇧', '⌥', '⌃']);
 let shortcutDebugClearTimer = null;
+let shortcutFocusContextReportTimer = null;
 
 function normalizeShortcutDebugKey(raw) {
   const key = String(raw || '');
@@ -898,14 +900,55 @@ function shortcutDebugChord() {
   };
 }
 
+function shortcutContextKind(context) {
+  if (window.chromux && typeof window.chromux.shortcutContextKind === 'function') {
+    return window.chromux.shortcutContextKind(context);
+  }
+  if (context.modalOpen) return 'modal';
+  if (context.hostEditable) return 'hostEditable';
+  if (context.guestEditable) return 'guestEditable';
+  if (context.terminal) return 'terminal';
+  return 'appSurface';
+}
+
+function shortcutContextDisabledReason(context) {
+  if (window.chromux && typeof window.chromux.shortcutContextDisabledReason === 'function') {
+    return window.chromux.shortcutContextDisabledReason(context);
+  }
+  if (context.focusKind === 'modal') return 'modal open';
+  if (context.focusKind === 'hostEditable') return 'host editable';
+  if (context.focusKind === 'guestEditable') return 'guest editable';
+  return null;
+}
+
+function shortcutFocusKindLabel(kind) {
+  if (kind === 'terminal') return 'terminal';
+  if (kind === 'hostEditable') return 'host editable';
+  if (kind === 'guestEditable') return 'guest editable';
+  if (kind === 'modal') return 'modal';
+  return 'app surface';
+}
+
 function shortcutFocusContext() {
   const activeSession = state.sessions.get(state.activeId) || null;
   let queueCount = 0;
   for (const session of state.sessions.values()) queueCount += session.browser.queue.length;
+  const modal = modalOpen();
+  const terminal = terminalFocused();
+  const hostEditable = hostEditableFocused();
+  const guestEditable = guestEditableFocused();
+  const focusKind = shortcutContextKind({
+    modalOpen: modal,
+    terminal,
+    hostEditable,
+    guestEditable,
+  });
   return {
-    modalOpen: modalOpen(),
-    hostEditable: hostEditableFocused(),
-    guestEditable: guestEditableFocused(),
+    focusKind,
+    modalOpen: modal,
+    terminal,
+    hostEditable,
+    guestEditable,
     activeSessionId: activeSession ? activeSession.id : null,
     activeSessionName: activeSession ? activeSession.name : null,
     sessionCount: state.sessions.size,
@@ -915,10 +958,29 @@ function shortcutFocusContext() {
 }
 
 function guardedShortcutDisabledReason(context) {
-  if (context.modalOpen) return 'modal open';
-  if (context.hostEditable) return 'host editable';
-  if (context.guestEditable) return 'guest editable';
-  return null;
+  return shortcutContextDisabledReason(context);
+}
+
+function reportShortcutFocusContext() {
+  if (!window.chromux || typeof window.chromux.reportShortcutFocusContext !== 'function') return;
+  const context = shortcutFocusContext();
+  window.chromux.reportShortcutFocusContext({ focusKind: context.focusKind });
+  for (const session of state.sessions.values()) {
+    const id = Number(session.browser.webContentsId);
+    if (!Number.isFinite(id) || id <= 0) continue;
+    window.chromux.reportShortcutFocusContext({
+      webContentsId: id,
+      focusKind: session.browser.guestEditableFocused ? 'guestEditable' : 'appSurface',
+    });
+  }
+}
+
+function scheduleShortcutFocusContextReport() {
+  if (shortcutFocusContextReportTimer) return;
+  shortcutFocusContextReportTimer = setTimeout(() => {
+    shortcutFocusContextReportTimer = null;
+    reportShortcutFocusContext();
+  }, 0);
 }
 
 function shortcutMatchesChord(shortcut, chord) {
@@ -975,10 +1037,13 @@ function computeShortcutCatalog() {
         ? (activeSession.browser.collapsed ? 'restore browser' : 'collapse browser')
         : 'no active session';
     } else if (shortcut.id === 'quit') {
+      disabledReason = guardReason;
       description = 'guarded quit';
     } else if (shortcut.id === 'new-session') {
+      disabledReason = guardReason;
       description = 'new session';
     } else if (shortcut.id === 'detect') {
+      disabledReason = guardReason;
       description = 'detect terminals';
     } else if (shortcut.id === 'escape') {
       description = context.modalOpen || state.contextMenu || !$('#drawer-log').classList.contains('hidden')
@@ -1054,8 +1119,8 @@ function renderShortcutDebug() {
   appendShortcutChip(contextHost, context.modalOpen ? 'modal open' : 'no modal', context.modalOpen ? 'warn' : '');
   appendShortcutChip(
     contextHost,
-    context.hostEditable ? 'host editable' : (context.guestEditable ? 'guest editable' : 'no editable'),
-    (context.hostEditable || context.guestEditable) ? 'warn' : '',
+    shortcutFocusKindLabel(context.focusKind),
+    guardedShortcutDisabledReason(context) ? 'warn' : (context.focusKind === 'terminal' ? 'ok' : ''),
   );
   appendShortcutChip(contextHost, context.activeSessionId ? 'active session' : 'no active', context.activeSessionId ? 'ok' : 'warn');
   appendShortcutChip(contextHost, context.queueCount > 0 ? `queue ${context.queueCount}` : 'queue empty', context.queueCount > 0 ? 'ok' : '');
@@ -1117,7 +1182,7 @@ function openInPane(session, url) {
       b.guestEditableFocused = false;
       b.currentUrl = e.url;
       session.els.urlBar.value = e.url;
-      invalidate('captureChips');
+      invalidate('captureChips', 'shortcutDebug');
     });
     wv.addEventListener('did-navigate-in-page', (e) => {
       if (e.isMainFrame) {
@@ -1128,9 +1193,11 @@ function openInPane(session, url) {
     });
     wv.addEventListener('dom-ready', () => {
       try { b.webContentsId = wv.getWebContentsId(); } catch { /* ok */ }
+      invalidate('shortcutDebug');
     });
     wv.addEventListener('blur', () => {
       b.guestEditableFocused = false;
+      invalidate('shortcutDebug');
     });
     wv.addEventListener('ipc-message', (e) => {
       if (e.channel === 'chromux-pick') onElementPicked(session, e.args[0] || {});
@@ -3078,6 +3145,8 @@ window.chromux.onShortcutDebugInput(noteShortcutDebugInput);
 window.chromux.onShortcutActivateSessionIndex(handleShortcutActivateSessionIndex);
 window.chromux.onShortcutFocusNextQueueItem(handleShortcutFocusNextQueueItem);
 window.chromux.onShortcutToggleBrowser(handleShortcutToggleBrowser);
+window.chromux.onShortcutOpenNewSession(handleShortcutOpenNewSession);
+window.chromux.onShortcutOpenDetectModal(handleShortcutOpenDetectModal);
 
 $('#btn-log').onclick = async () => {
   const drawer = $('#drawer-log');
@@ -3115,11 +3184,20 @@ function modalOpen() {
   return [...document.querySelectorAll('.overlay')].some((el) => !el.classList.contains('hidden'));
 }
 
+function terminalFocused() {
+  const el = document.activeElement;
+  if (!el || el === document.body || el === document.documentElement) return false;
+  if (el.classList && el.classList.contains('xterm-helper-textarea')) return true;
+  if (el.closest && el.closest('.term-host')) return true;
+  return false;
+}
+
 function hostEditableFocused() {
   const el = document.activeElement;
   if (el) {
     if (el.closest('.hidden')) return false;
-    if (el.isContentEditable) return true;
+    if (terminalFocused()) return false;
+    if (el.isContentEditable || (el.closest && el.closest('[contenteditable="true"]'))) return true;
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) return true;
   }
   return false;
@@ -3165,13 +3243,16 @@ function focusNextQueuedPreview(now = Date.now()) {
 
 function handleShortcutActivateSessionIndex(payload) {
   const index = Number(payload && payload.index);
-  if (!Number.isInteger(index) || modalOpen() || editableFocused()) return;
+  if (!Number.isInteger(index) || modalOpen() || editableFocused()) return null;
+  const session = orderedSessions()[index];
+  if (!session) return null;
   activateSessionByIndex(index);
+  return { index, sessionId: session.id };
 }
 
-function handleShortcutFocusNextQueueItem() {
+function handleShortcutFocusNextQueueItem(now = Date.now()) {
   if (modalOpen() || editableFocused()) return null;
-  return focusNextQueuedPreview();
+  return focusNextQueuedPreview(now);
 }
 
 function handleShortcutToggleBrowser() {
@@ -3180,6 +3261,64 @@ function handleShortcutToggleBrowser() {
   if (!session) return null;
   setBrowserCollapsed(session, !session.browser.collapsed);
   return { sessionId: session.id, collapsed: session.browser.collapsed };
+}
+
+function handleShortcutOpenNewSession() {
+  if (guardedShortcutDisabledReason(shortcutFocusContext())) return null;
+  openNewSessionModal();
+  return { opened: true };
+}
+
+function handleShortcutOpenDetectModal() {
+  if (guardedShortcutDisabledReason(shortcutFocusContext())) return null;
+  openDetectModal();
+  return { opened: true };
+}
+
+function shortcutInputFromDomEvent(e) {
+  return {
+    type: e.type === 'keyup' ? 'keyUp' : 'keyDown',
+    key: e.key,
+    code: e.code,
+    meta: Boolean(e.metaKey),
+    shift: Boolean(e.shiftKey),
+    alt: Boolean(e.altKey),
+    control: Boolean(e.ctrlKey),
+  };
+}
+
+function chromuxShortcutActionFromInput(input) {
+  if (window.chromux && typeof window.chromux.shortcutAction === 'function') {
+    return window.chromux.shortcutAction(input);
+  }
+  if (!input.meta || input.alt || input.control || input.type !== 'keyDown') return null;
+  const key = String(input.key || '').toUpperCase();
+  if (/^[1-9]$/.test(key) && !input.shift) return { id: 'session-index', index: Number(key) - 1 };
+  if (key === 'T' && !input.shift) return { id: 'new-session' };
+  if (key === 'D' && !input.shift) return { id: 'detect' };
+  if (key === 'J' && !input.shift) return { id: 'queue-focus' };
+  if (key === 'B' && input.shift) return { id: 'browser-toggle' };
+  return null;
+}
+
+function handleRendererShortcutKeydown(e) {
+  const input = shortcutInputFromDomEvent(e);
+  const action = chromuxShortcutActionFromInput(input);
+  if (!action) return;
+  if (guardedShortcutDisabledReason(shortcutFocusContext())) return;
+
+  let result = null;
+  if (action.id === 'session-index') result = handleShortcutActivateSessionIndex({ index: action.index });
+  else if (action.id === 'queue-focus') result = handleShortcutFocusNextQueueItem();
+  else if (action.id === 'browser-toggle') result = handleShortcutToggleBrowser();
+  else if (action.id === 'new-session') result = handleShortcutOpenNewSession();
+  else if (action.id === 'detect') result = handleShortcutOpenDetectModal();
+  else return;
+
+  if (result !== null) {
+    noteShortcutDebugInput(shortcutDebugInputFromDomEvent(e, 'renderer'));
+    e.preventDefault();
+  }
 }
 
 if (window.chromuxTest) {
@@ -3537,6 +3676,28 @@ if (window.chromuxTest) {
     flushRender,
   };
 
+  let hotkeyTestFocusEl = null;
+  const removeHotkeyTestFocusEl = () => {
+    if (hotkeyTestFocusEl && hotkeyTestFocusEl.parentElement) hotkeyTestFocusEl.remove();
+    hotkeyTestFocusEl = null;
+  };
+  const focusSyntheticTerminalTextarea = () => {
+    removeHotkeyTestFocusEl();
+    const host = document.createElement('div');
+    host.className = 'term-host';
+    const xterm = document.createElement('div');
+    xterm.className = 'xterm';
+    const textarea = document.createElement('textarea');
+    textarea.className = 'xterm-helper-textarea';
+    xterm.appendChild(textarea);
+    host.appendChild(xterm);
+    document.body.appendChild(host);
+    hotkeyTestFocusEl = host;
+    textarea.focus();
+    invalidate('shortcutDebug');
+    flushRender();
+  };
+
   window.chromuxTestShortcuts = {
     addSession: async (opts) => addFakeSession(opts),
     activateIndex(index) {
@@ -3550,14 +3711,36 @@ if (window.chromuxTest) {
     },
     // The guarded IPC path (modal/editable checks), unlike focusNextQueuedPreview
     // above which calls straight past the guard.
-    shortcutFocusNextQueueItem() {
-      const result = handleShortcutFocusNextQueueItem();
+    shortcutFocusNextQueueItem(now) {
+      const result = handleShortcutFocusNextQueueItem(now);
       flushRender();
       return result;
+    },
+    shortcutToggleBrowser() {
+      const result = handleShortcutToggleBrowser();
+      flushRender();
+      return result;
+    },
+    focusTerminalTextarea: focusSyntheticTerminalTextarea,
+    focusHostEditable() {
+      removeHotkeyTestFocusEl();
+      const input = document.createElement('input');
+      document.body.appendChild(input);
+      hotkeyTestFocusEl = input;
+      input.focus();
+      invalidate('shortcutDebug');
+      flushRender();
+    },
+    clearFocus() {
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      removeHotkeyTestFocusEl();
+      invalidate('shortcutDebug');
+      flushRender();
     },
     activeId: () => state.activeId,
     queueCount: (id) => testSession(id).browser.queue.length,
     queuePanelHidden: (id) => testSession(id).els.queuePanel.classList.contains('hidden'),
+    browserCollapsed: (id) => testSession(id).browser.collapsed,
     focusedOpenUrl: () => document.activeElement?.dataset?.queueOpenUrl || null,
     clickFocused() {
       if (!document.activeElement) throw new Error('Nothing focused');
@@ -3565,14 +3748,10 @@ if (window.chromuxTest) {
       flushRender();
     },
     currentUrl: (id) => testSession(id).browser.currentUrl,
+    context: () => ({ ...shortcutFocusContext() }),
     flushRender,
   };
 
-  let hotkeyTestFocusEl = null;
-  const removeHotkeyTestFocusEl = () => {
-    if (hotkeyTestFocusEl && hotkeyTestFocusEl.parentElement) hotkeyTestFocusEl.remove();
-    hotkeyTestFocusEl = null;
-  };
   const hotkeyCatalogSnapshot = () => computeShortcutCatalog().map((shortcut) => ({
     id: shortcut.id,
     label: shortcut.label,
@@ -3626,6 +3805,7 @@ if (window.chromuxTest) {
       invalidate('shortcutDebug');
       flushRender();
     },
+    focusTerminalTextarea: focusSyntheticTerminalTextarea,
     focusGuestEditable(id) {
       removeHotkeyTestFocusEl();
       const session = testSession(id);
@@ -3656,6 +3836,18 @@ if (window.chromuxTest) {
       noteShortcutDebugInput(payload);
       flushRender();
     },
+    shortcutNewSession() {
+      const result = handleShortcutOpenNewSession();
+      flushRender();
+      return result;
+    },
+    shortcutDetect() {
+      const result = handleShortcutOpenDetectModal();
+      flushRender();
+      return result;
+    },
+    newModalOpen: () => !$('#modal-new').classList.contains('hidden'),
+    detectModalOpen: () => !$('#modal-detect').classList.contains('hidden'),
     catalog() {
       renderShortcutDebug();
       return hotkeyCatalogSnapshot();
@@ -3778,6 +3970,10 @@ function fakeSessionEls() {
   const queueBtn = document.createElement('button');
   const queueBadge = document.createElement('span');
   const webHost = document.createElement('div');
+  const webPane = document.createElement('div');
+  const divider = document.createElement('div');
+  const browserToolbar = document.createElement('div');
+  const collapseBtn = document.createElement('button');
   const placeholder = document.createElement('div');
   webHost.appendChild(placeholder);
   document.body.appendChild(queuePanel);
@@ -3795,26 +3991,17 @@ function fakeSessionEls() {
     tab: document.createElement('button'),
     dot: document.createElement('span'),
     view: document.createElement('section'),
+    webPane,
+    divider,
+    browserToolbar,
+    collapseBtn,
     urlBar: document.createElement('input'),
     captureChip: document.createElement('span'),
   };
 }
 
 document.addEventListener('keydown', (e) => {
-  if (e.metaKey && e.key === 't') {
-    noteShortcutDebugInput(shortcutDebugInputFromDomEvent(e, 'renderer'));
-    e.preventDefault();
-    openNewSessionModal();
-  }
-  if (e.metaKey && e.key === 'd') {
-    noteShortcutDebugInput(shortcutDebugInputFromDomEvent(e, 'renderer'));
-    e.preventDefault();
-    openDetectModal();
-  }
-  if (e.metaKey && /^[1-9]$/.test(e.key) && !modalOpen() && !editableFocused()) {
-    e.preventDefault();
-    handleShortcutActivateSessionIndex({ index: Number(e.key) - 1 });
-  }
+  handleRendererShortcutKeydown(e);
   if (e.key === 'Escape') {
     noteShortcutDebugInput(shortcutDebugInputFromDomEvent(e, 'renderer'));
     closeSessionContextMenu();
@@ -3851,4 +4038,5 @@ window.addEventListener('blur', () => {
   updateBadges();
   renderAttentionQueue();
   renderShortcutDebug();
+  reportShortcutFocusContext();
 })();

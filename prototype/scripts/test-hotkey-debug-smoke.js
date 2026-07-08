@@ -56,6 +56,11 @@ fs.writeFileSync(e2ePath, `
     b.flushRender();
   }
 
+  async function latestRouteFor(key) {
+    const routes = await host.shortcutRouteLog();
+    return [...routes].reverse().find((route) => route.type === 'keyDown' && route.key === key);
+  }
+
   async function sendHostCommandProbe() {
     await host.sendHostInput({ type: 'keyDown', keyCode: 'Meta', modifiers: ['meta'] });
     await wait(120);
@@ -88,8 +93,37 @@ fs.writeFileSync(e2ePath, `
   expect(commandOnly.source === 'host', 'Command key probe should be received from host window');
   expect(commandOnly.modifiers.meta === true || commandOnly.text.includes('⌘'), 'Command key probe should light the Command modifier');
 
+  let debug = null;
+
+  h.focusTerminalTextarea();
+  await wait(120);
+  await sendHostShortcut('T', ['meta']);
+  debug = h.debug();
+  expect(h.newModalOpen(), 'terminal-focused host Command+T should open the new session modal');
+  expect((await latestRouteFor('T')).action === 'new-session', 'Command+T should route as new-session');
+  expect((await latestRouteFor('T')).intercepted === true, 'Command+T should be intercepted by Chromux');
+  h.closeModals();
+  await wait(120);
+
+  h.focusTerminalTextarea();
+  await wait(120);
+  await sendHostShortcut('D', ['meta']);
+  debug = h.debug();
+  expect(h.detectModalOpen(), 'terminal-focused host Command+D should open the detect modal');
+  expect((await latestRouteFor('D')).action === 'detect', 'Command+D should route as detect');
+  expect((await latestRouteFor('D')).intercepted === true, 'Command+D should be intercepted by Chromux');
+  h.closeModals();
+  await wait(120);
+
+  await sendHostShortcut('C', ['meta']);
+  await sendHostShortcut('V', ['meta']);
+  const copyRoute = await latestRouteFor('C');
+  const pasteRoute = await latestRouteFor('V');
+  expect(copyRoute && copyRoute.action === null && copyRoute.intercepted === false, 'Command+C should not be owned or intercepted');
+  expect(pasteRoute && pasteRoute.action === null && pasteRoute.intercepted === false, 'Command+V should not be owned or intercepted');
+
   await sendHostShortcut('J', ['meta']);
-  let debug = h.debug();
+  debug = h.debug();
   expect(debug.source === 'host', 'Command+J should be received from host window');
   expect(debug.latestKey === 'J', 'Command+J should show J as latest key');
   expect(byId(debug.catalog, 'queue-next').matchedByCurrentChord, 'Command+J should match the queue shortcut');
@@ -147,6 +181,20 @@ fs.writeFileSync(e2ePath, `
   }
 
   await focusGuest('#noneditable', false);
+  await sendWebviewShortcut(wv, 'T', ['meta']);
+  debug = h.debug();
+  expect(h.newModalOpen(), 'webview Command+T from non-editable focus should open new session modal');
+  expect(debug.source === 'webview', 'Command+T should be received from webview');
+  h.closeModals();
+
+  await focusGuest('#noneditable', false);
+  await sendWebviewShortcut(wv, 'D', ['meta']);
+  debug = h.debug();
+  expect(h.detectModalOpen(), 'webview Command+D from non-editable focus should open detect modal');
+  expect(debug.source === 'webview', 'Command+D should be received from webview');
+  h.closeModals();
+
+  await focusGuest('#noneditable', false);
   await sendWebviewShortcut(wv, 'J', ['meta']);
   debug = h.debug();
   expect(debug.source === 'webview', 'Command+J should be received from webview');
@@ -177,7 +225,14 @@ fs.writeFileSync(e2ePath, `
     expect(byId(debug.catalog, 'queue-next').disabledReason === 'guest editable', 'Command+J should show guest editable suppression for ' + selector);
     expect(byId(debug.catalog, 'browser-toggle').disabledReason === 'guest editable', 'Command+Shift+B should show guest editable suppression for ' + selector);
     expect(byId(debug.catalog, 'session-1').disabledReason === 'guest editable', 'Command+1 should show guest editable suppression for ' + selector);
+    expect(byId(debug.catalog, 'new-session').disabledReason === 'guest editable', 'Command+T should show guest editable suppression for ' + selector);
+    expect(byId(debug.catalog, 'detect').disabledReason === 'guest editable', 'Command+D should show guest editable suppression for ' + selector);
     expect(b.state(firstId).active, 'editable ' + selector + ' should suppress Command+J activation');
+
+    await sendWebviewShortcut(wv, 'T', ['meta']);
+    expect(h.newModalOpen() === false, 'editable ' + selector + ' should suppress Command+T modal');
+    await sendWebviewShortcut(wv, 'D', ['meta']);
+    expect(h.detectModalOpen() === false, 'editable ' + selector + ' should suppress Command+D modal');
   }
 
   return JSON.stringify({

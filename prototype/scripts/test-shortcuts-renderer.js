@@ -4,7 +4,11 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawn } = require('child_process');
-const { sessionShortcutDigit } = require('../shortcut-input');
+const {
+  chromuxShortcutAction,
+  sessionShortcutDigit,
+  shouldRouteChromuxShortcut,
+} = require('../shortcut-input');
 
 const appDir = path.resolve(__dirname, '..');
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'chromux-shortcuts-'));
@@ -20,6 +24,12 @@ expectShortcut(sessionShortcutDigit({ key: '3' }) === '3', 'shortcut digit shoul
 expectShortcut(sessionShortcutDigit({ key: '', code: 'Digit1' }) === '1', 'shortcut digit should accept code Digit1');
 expectShortcut(sessionShortcutDigit({ key: 'Unidentified', code: 'Digit3' }) === '3', 'shortcut digit should accept code Digit3');
 expectShortcut(sessionShortcutDigit({ key: '', code: 'Numpad1' }) === null, 'shortcut digit should ignore numpad codes');
+expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 't', meta: true }).id === 'new-session', 'Command+T should be Chromux-owned');
+expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'd', meta: true }).id === 'detect', 'Command+D should be Chromux-owned');
+expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'c', meta: true }) === null, 'Command+C should stay unowned');
+expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'v', meta: true }) === null, 'Command+V should stay unowned');
+expectShortcut(shouldRouteChromuxShortcut({ type: 'keyDown', key: '1', meta: true }, { focusKind: 'terminal' }), 'terminal focus should allow Chromux shortcuts');
+expectShortcut(!shouldRouteChromuxShortcut({ type: 'keyDown', key: '1', meta: true }, { focusKind: 'hostEditable' }), 'host editable focus should suppress Chromux shortcuts');
 
 fs.writeFileSync(e2ePath, `
 (async () => {
@@ -39,12 +49,22 @@ fs.writeFileSync(e2ePath, `
   });
   const thirdId = await q.addSession({ name: 'third', queue: [] });
 
-  q.activateIndex(0);
-  expect(q.activeId() === firstId, 'Command+1 should activate first session');
-  q.activateIndex(2);
-  expect(q.activeId() === thirdId, 'Command+3 should activate third session');
+  q.focusTerminalTextarea();
+  expect(q.context().focusKind === 'terminal', 'xterm helper textarea should classify as terminal focus');
+  expect(q.context().hostEditable === false, 'xterm helper textarea must not count as host editable');
 
-  const focused = q.focusNextQueuedPreview(1000);
+  q.activateIndex(0);
+  expect(q.activeId() === firstId, 'terminal-focused Command+1 should activate first session');
+  q.activateIndex(2);
+  expect(q.activeId() === thirdId, 'terminal-focused Command+3 should activate third session');
+
+  q.focusTerminalTextarea();
+  const terminalToggle = q.shortcutToggleBrowser();
+  expect(terminalToggle && terminalToggle.sessionId === thirdId, 'terminal-focused Command+Shift+B should toggle browser');
+  expect(q.browserCollapsed(thirdId) === true, 'terminal-focused Command+Shift+B should collapse active browser');
+
+  q.focusTerminalTextarea();
+  const focused = q.shortcutFocusNextQueueItem(1000);
   expect(focused && focused.sessionId === secondId, 'Command+J should target first queued session');
   expect(q.activeId() === secondId, 'Command+J should activate queued session');
   expect(q.queuePanelHidden(secondId) === false, 'Command+J should reveal queue panel');
@@ -68,6 +88,7 @@ fs.writeFileSync(e2ePath, `
   input.focus();
   expect(q.shortcutFocusNextQueueItem() === null, 'Command+J must be a no-op while an editable is focused');
   expect(document.activeElement === input, 'Command+J must not steal focus from an editable');
+  expect(q.shortcutToggleBrowser() === null, 'Command+Shift+B must be a no-op while an editable is focused');
   q.activateIndex(0);
   expect(q.activeId() === secondId, 'Command+1..9 must be a no-op while an editable is focused');
   input.blur();

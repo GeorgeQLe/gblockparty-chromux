@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.13.2
+
+Planned tag: `chromux-v0.13.2`
+
+- Route terminal-focused Chromux shortcuts through an explicit allowlist, preserving terminal/system shortcuts such as copy, paste, and interrupt.
+- Deliver Command+T and Command+D through main-process shortcut routing so new-session and detect modals open from terminal and non-editable paired-browser focus.
+- Keep real host editables and guest-page editables suppressing Chromux-owned shortcuts while treating xterm's helper textarea as terminal focus.
+
 ## GBlockParty Chromux v0.13.1
 
 Planned tag: `chromux-v0.13.1`

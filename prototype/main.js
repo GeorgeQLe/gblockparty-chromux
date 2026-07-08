@@ -11,7 +11,13 @@ const { spawn, execFile } = require('child_process');
 const pty = require('node-pty');
 const yaml = require('js-yaml');
 const { checkForUpdates } = require('./update-checker');
-const { sessionShortcutDigit } = require('./shortcut-input');
+const {
+  CHROMUX_SHORTCUT_ACTIONS,
+  chromuxShortcutAction,
+  classifyShortcutFocusContext,
+  sessionShortcutDigit,
+  shouldRouteChromuxShortcut,
+} = require('./shortcut-input');
 
 const SMOKE = process.argv.includes('--smoke');
 
@@ -36,6 +42,8 @@ let win = null;
 const ptys = new Map(); // sessionId -> IPty
 const deliveries = new Map(); // deliveryId -> ChildProcess
 let closeConfirmed = false;
+const shortcutFocusContexts = new Map(); // webContentsId -> { focusKind }
+const shortcutRouteLog = [];
 
 if (SMOKE && !process.env.CHROMUX_KEEP_USER_DATA) {
   app.setPath('userData', fs.mkdtempSync(path.join(os.tmpdir(), 'chromux-smoke-user-data-')));
@@ -47,6 +55,7 @@ if (SMOKE) {
     win.webContents.sendInputEvent(input || {});
     return true;
   });
+  ipcMain.handle('test-shortcut-route-log', () => shortcutRouteLog.slice(-100));
 }
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
@@ -65,12 +74,14 @@ function send(channel, payload) {
 
 function shortcutDebugKey(input) {
   const key = String(input && input.key ? input.key : '');
+  const keyCode = String(input && input.keyCode ? input.keyCode : '');
   const code = String(input && input.code ? input.code : '');
   const digit = sessionShortcutDigit(input || {});
   if (digit) return digit;
 
-  const lower = key.toLowerCase();
+  const lower = key && key.toLowerCase() !== 'unidentified' ? key.toLowerCase() : keyCode.toLowerCase();
   if (['j', 'b', 't', 'd', 'q'].includes(lower)) return lower.toUpperCase();
+  if (['c', 'v'].includes(lower) && input && (input.meta || input.control)) return lower.toUpperCase();
   if (lower === 'escape' || code === 'Escape') return 'Esc';
   if (lower === 'arrowup' || code === 'ArrowUp') return '↑';
   if (lower === 'arrowdown' || code === 'ArrowDown') return '↓';
@@ -101,6 +112,21 @@ function emitShortcutDebugInput(input, source, webContentsId = null) {
   });
 }
 
+function recordShortcutRoute(input, source, webContentsId, action, intercepted, focusKind) {
+  if (!SMOKE) return;
+  shortcutRouteLog.push({
+    source,
+    webContentsId,
+    type: input && input.type ? String(input.type) : 'unknown',
+    key: shortcutDebugKey(input),
+    action: action ? action.id : null,
+    intercepted: Boolean(intercepted),
+    focusKind,
+    ts: Date.now(),
+  });
+  if (shortcutRouteLog.length > 200) shortcutRouteLog.shift();
+}
+
 function requestGuardedQuit(reason = 'app-quit') {
   send('lifecycle-confirm-close', {
     reason,
@@ -109,30 +135,58 @@ function requestGuardedQuit(reason = 'app-quit') {
   });
 }
 
+function shortcutFocusContextForSource(source, webContentsId = null) {
+  const id = source === 'host' && win && !win.isDestroyed()
+    ? win.webContents.id
+    : webContentsId;
+  const stored = Number.isFinite(id) ? shortcutFocusContexts.get(id) : null;
+  return stored || { focusKind: 'appSurface' };
+}
+
+ipcMain.on('shortcut-focus-context', (event, payload = {}) => {
+  const requestedId = Number(payload && payload.webContentsId);
+  const webContentsId = Number.isFinite(requestedId) && requestedId > 0
+    ? requestedId
+    : event.sender.id;
+  shortcutFocusContexts.set(webContentsId, {
+    focusKind: classifyShortcutFocusContext(payload && (payload.focusKind || payload)),
+  });
+});
+
 function handleShellShortcutInput(event, input, source = 'host', webContentsId = null) {
   emitShortcutDebugInput(input, source, webContentsId);
-  if (!input.meta || input.alt || input.control) return false;
-  if (input.type !== 'keyDown') return false;
-  const key = String(input.key || '').toLowerCase();
-  const sessionDigit = sessionShortcutDigit(input);
-  if (sessionDigit) {
-    event.preventDefault();
-    send('shortcut-activate-session-index', { index: Number(sessionDigit) - 1 });
+  const action = chromuxShortcutAction(input || {});
+  const context = shortcutFocusContextForSource(source, webContentsId);
+  const focusKind = classifyShortcutFocusContext(context);
+  if (!action || !shouldRouteChromuxShortcut(input || {}, context)) {
+    recordShortcutRoute(input || {}, source, webContentsId, action, false, focusKind);
+    return false;
+  }
+
+  event.preventDefault();
+  recordShortcutRoute(input || {}, source, webContentsId, action, true, focusKind);
+  if (action.id === CHROMUX_SHORTCUT_ACTIONS.SESSION_INDEX) {
+    send('shortcut-activate-session-index', { index: action.index });
     return true;
   }
-  if (key === 'j') {
-    event.preventDefault();
+  if (action.id === CHROMUX_SHORTCUT_ACTIONS.QUEUE_FOCUS) {
     send('shortcut-focus-next-queue-item');
     return true;
   }
-  if (key === 'b' && input.shift) {
-    event.preventDefault();
+  if (action.id === CHROMUX_SHORTCUT_ACTIONS.BROWSER_TOGGLE) {
     send('shortcut-toggle-browser');
     return true;
   }
-  if (key === 'q') {
-    event.preventDefault();
+  if (action.id === CHROMUX_SHORTCUT_ACTIONS.GUARDED_QUIT) {
     requestGuardedQuit('app-quit');
+    return true;
+  }
+  if (action.id === CHROMUX_SHORTCUT_ACTIONS.NEW_SESSION) {
+    send('shortcut-open-new-session');
+    return true;
+  }
+  if (action.id === CHROMUX_SHORTCUT_ACTIONS.DETECT) {
+    send('shortcut-open-detect-modal');
     return true;
   }
   return false;
@@ -145,7 +199,6 @@ function installAppMenu() {
       submenu: [
         {
           label: 'Quit Chromux',
-          accelerator: 'Command+Q',
           click: () => requestGuardedQuit('app-quit'),
         },
       ],
@@ -170,7 +223,6 @@ function installAppMenu() {
         { type: 'separator' },
         {
           label: 'Toggle Paired Browser',
-          accelerator: 'Command+Shift+B',
           click: () => send('shortcut-toggle-browser'),
         },
         { type: 'separator' },

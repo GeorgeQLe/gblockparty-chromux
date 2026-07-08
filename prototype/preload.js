@@ -4,6 +4,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 const path = require('path');
 const yaml = require('js-yaml');
+const shortcutInput = require('./shortcut-input');
 
 contextBridge.exposeInMainWorld('chromux', {
   // pty
@@ -45,15 +46,22 @@ contextBridge.exposeInMainWorld('chromux', {
   resolveRestoreSessions: (opts) => ipcRenderer.invoke('resolve-restore-sessions', opts || {}),
   confirmAppClose: (opts) => ipcRenderer.invoke('confirm-app-close', opts || {}),
   onLifecycleConfirmClose: (cb) => ipcRenderer.on('lifecycle-confirm-close', (_e, m) => cb(m)),
+  reportShortcutFocusContext: (payload) => ipcRenderer.send('shortcut-focus-context', payload || {}),
+  shortcutAction: (input) => shortcutInput.chromuxShortcutAction(input || {}),
+  shortcutContextKind: (context) => shortcutInput.classifyShortcutFocusContext(context || {}),
+  shortcutContextDisabledReason: (context) => shortcutInput.shortcutContextDisabledReason(context || {}),
   onShortcutDebugInput: (cb) => ipcRenderer.on('shortcut-debug-input', (_e, m) => cb(m)),
   onShortcutActivateSessionIndex: (cb) => ipcRenderer.on('shortcut-activate-session-index', (_e, m) => cb(m)),
   onShortcutFocusNextQueueItem: (cb) => ipcRenderer.on('shortcut-focus-next-queue-item', () => cb()),
   onShortcutToggleBrowser: (cb) => ipcRenderer.on('shortcut-toggle-browser', () => cb()),
+  onShortcutOpenNewSession: (cb) => ipcRenderer.on('shortcut-open-new-session', () => cb()),
+  onShortcutOpenDetectModal: (cb) => ipcRenderer.on('shortcut-open-detect-modal', () => cb()),
   webviewPreloadPath: 'file://' + path.join(__dirname, 'webview-preload.js'),
 });
 
 if (process.env.CHROMUX_E2E) {
   contextBridge.exposeInMainWorld('chromuxTest', {
     sendHostInput: (input) => ipcRenderer.invoke('test-send-host-input', input),
+    shortcutRouteLog: () => ipcRenderer.invoke('test-shortcut-route-log'),
   });
 }

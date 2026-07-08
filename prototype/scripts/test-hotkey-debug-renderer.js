@@ -43,18 +43,34 @@ fs.writeFileSync(e2ePath, `
   expect(byId('session-1').disabledReason === 'modal open', 'session shortcuts should explain modal suppression');
   expect(byId('queue-next').disabledReason === 'modal open', 'Command+J should explain modal suppression');
   expect(byId('browser-toggle').disabledReason === 'modal open', 'Command+Shift+B should explain modal suppression');
+  expect(byId('new-session').disabledReason === 'modal open', 'Command+T should explain modal suppression');
+  expect(byId('detect').disabledReason === 'modal open', 'Command+D should explain modal suppression');
   h.closeModals();
 
   h.focusHostEditable();
+  expect(h.context().focusKind === 'hostEditable', 'host input should classify as host editable');
   expect(byId('session-1').disabledReason === 'host editable', 'session shortcuts should explain host editable suppression');
   expect(byId('queue-next').disabledReason === 'host editable', 'Command+J should explain host editable suppression');
   expect(byId('browser-toggle').disabledReason === 'host editable', 'Command+Shift+B should explain host editable suppression');
+  expect(byId('new-session').disabledReason === 'host editable', 'Command+T should explain host editable suppression');
+  expect(byId('detect').disabledReason === 'host editable', 'Command+D should explain host editable suppression');
+  h.clearFocus();
+
+  h.focusTerminalTextarea();
+  expect(h.context().focusKind === 'terminal', 'xterm helper textarea should classify as terminal focus');
+  expect(h.context().hostEditable === false, 'xterm helper textarea should not be host editable');
+  expect(byId('session-1').available, 'Command+1 should be available from terminal focus');
+  expect(byId('queue-next').available, 'Command+J should be available from terminal focus');
+  expect(byId('browser-toggle').available, 'Command+Shift+B should be available from terminal focus');
   h.clearFocus();
 
   h.focusGuestEditable(firstId);
+  expect(h.context().focusKind === 'guestEditable', 'guest input should classify as guest editable');
   expect(byId('session-1').disabledReason === 'guest editable', 'session shortcuts should explain guest editable suppression');
   expect(byId('queue-next').disabledReason === 'guest editable', 'Command+J should explain guest editable suppression');
   expect(byId('browser-toggle').disabledReason === 'guest editable', 'Command+Shift+B should explain guest editable suppression');
+  expect(byId('new-session').disabledReason === 'guest editable', 'Command+T should explain guest editable suppression');
+  expect(byId('detect').disabledReason === 'guest editable', 'Command+D should explain guest editable suppression');
   h.clearFocus();
 
   h.clearQueues();
@@ -76,6 +92,7 @@ fs.writeFileSync(e2ePath, `
   expect(debug.latestKey === 'J', 'debug latest key should record shortcut key only');
   expect(debug.modifiers.meta === true, 'debug modifier state should record Command');
   expect(byId('queue-next').matchedByCurrentChord, 'current Command+J chord should sort and mark as matched');
+  expect(debug.text.includes('app surface') || debug.text.includes('terminal'), 'debug strip should show refined focus context');
 
   return JSON.stringify({
     ok: true,

@@ -28,7 +28,8 @@ const guestUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(guestHtml)
 fs.writeFileSync(e2ePath, `
 (async () => {
   const b = window.chromuxTestBrowser;
-  if (!b) throw new Error('Missing browser test API');
+  const h = window.chromuxTestHotkeys;
+  if (!b || !h) throw new Error('Missing browser / hotkey test API');
   const expect = (cond, msg) => { if (!cond) throw new Error(msg); };
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const waitFor = async (fn, msg, timeout = 8000) => {
@@ -96,6 +97,16 @@ fs.writeFileSync(e2ePath, `
   }
 
   await focusGuest('#noneditable', false);
+  await sendShortcut('T', ['meta']);
+  expect(h.newModalOpen(), 'Command+T from non-editable guest focus should open the new session modal');
+  h.closeModals();
+
+  await focusGuest('#noneditable', false);
+  await sendShortcut('D', ['meta']);
+  expect(h.detectModalOpen(), 'Command+D from non-editable guest focus should open the detect modal');
+  h.closeModals();
+
+  await focusGuest('#noneditable', false);
   await sendShortcut('J', ['meta']);
   expect(b.state(secondId).active, 'Command+J from non-editable guest focus should activate queued session');
   expect(b.state(secondId).queuePanelHidden === false, 'Command+J from guest focus should reveal queued preview controls');
@@ -122,6 +133,12 @@ fs.writeFileSync(e2ePath, `
 
     await sendShortcut('3', ['meta']);
     expect(b.state(firstId).active, 'Command+3 should be suppressed while guest editable is focused: ' + selector);
+
+    await sendShortcut('T', ['meta']);
+    expect(h.newModalOpen() === false, 'Command+T should be suppressed while guest editable is focused: ' + selector);
+
+    await sendShortcut('D', ['meta']);
+    expect(h.detectModalOpen() === false, 'Command+D should be suppressed while guest editable is focused: ' + selector);
   }
 
   return JSON.stringify({
