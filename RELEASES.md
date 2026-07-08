@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.12.9
+
+Planned tag: `chromux-v0.12.9`
+
+- Keep UPDATE WAITING dismissal as a non-destructive reminder clear; it returns the queue to idle and never grants permission to stop live sessions.
+- Add a Settings-only INSTALL ANYWAY path for managed updates blocked by live sessions, preserving the existing live-session confirmation, restore snapshot, managed installer, and session reopen flow.
+- Keep attention rail UPDATE WAITING focused on triage: FOCUS still activates the first blocker, while Settings explains the managed override and only offers it when a managed install source is available.
+
 ## GBlockParty Chromux v0.12.8
 
 Planned tag: `chromux-v0.12.8`

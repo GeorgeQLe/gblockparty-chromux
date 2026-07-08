@@ -27,7 +27,14 @@ fs.writeFileSync(e2ePath, `
   };
 
   await new Promise((resolve) => setTimeout(resolve, 100));
-  q.setStatus({ updateAvailable: true });
+  q.setStatus({
+    updateAvailable: true,
+    managedInstall: {
+      available: true,
+      sourceDir: '/tmp/chromux-source',
+      command: 'npm run install-app',
+    },
+  });
   q.queue();
   expect(q.phase() === 'ready', 'zero sessions should queue as ready, got ' + q.phase());
   expect(q.attentionKinds()[0] === 'UPDATE READY', 'ready update should be first attention item');
@@ -38,8 +45,30 @@ fs.writeFileSync(e2ePath, `
   expect(q.phase() === 'waiting', 'live unknown-turn session should block, got ' + q.phase());
   expect(q.blockers().join(',') === 'live-unknown', 'expected live-unknown blocker');
   expect(q.attentionKinds()[0] === 'UPDATE WAITING', 'waiting update should be first attention item');
+  expect(q.attentionButtons('UPDATE WAITING').includes('FOCUS'), 'waiting update should expose FOCUS');
   expect(q.attentionButtons('UPDATE WAITING').includes('DISMISS'), 'waiting update should expose DISMISS');
-  expect(q.installButtonText() === 'FOCUS BLOCKER', 'waiting settings action should focus blocker');
+  expect(q.installButtonText() === 'INSTALL ANYWAY', 'waiting settings action should allow managed override');
+  expect(/install anyway/i.test(q.statusText()), 'waiting settings copy should explain managed override');
+
+  q.setStatus({
+    updateAvailable: true,
+    managedInstall: {
+      available: false,
+      reason: 'missing-source',
+      message: 'No managed install source is recorded for this app.',
+    },
+  });
+  expect(q.phase() === 'waiting', 'no-source status should keep waiting blockers');
+  expect(q.installButtonText() === 'FOCUS BLOCKER', 'waiting without managed source should not offer override');
+  q.setStatus({
+    updateAvailable: true,
+    managedInstall: {
+      available: true,
+      sourceDir: '/tmp/chromux-source',
+      command: 'npm run install-app',
+    },
+  });
+  expect(q.installButtonText() === 'INSTALL ANYWAY', 'managed source should restore waiting override');
 
   q.dismissItem('UPDATE WAITING');
   expect(q.phase() === 'idle', 'dismissing waiting update should return queue to idle');
@@ -47,6 +76,40 @@ fs.writeFileSync(e2ePath, `
   q.queue();
   expect(q.phase() === 'waiting', 'queueing again with blockers should return to waiting');
   expect(q.attentionKinds()[0] === 'UPDATE WAITING', 're-queued waiting update should return to attention');
+
+  q.setInstallResult({ ok: true, output: 'fixture install started' });
+  q.clickAttentionPrimary('UPDATE WAITING');
+  q.flushRender();
+  expect(q.phase() === 'waiting', 'attention UPDATE WAITING primary should not install');
+  expect(q.activeName() === 'live-unknown', 'attention UPDATE WAITING primary should focus blocker');
+  q.setStatus({
+    updateAvailable: true,
+    managedInstall: {
+      available: true,
+      sourceDir: '/tmp/chromux-source',
+      command: 'npm run install-app',
+    },
+  });
+  q.queue();
+  expect(q.installButtonText() === 'INSTALL ANYWAY', 'managed source should be active before override click');
+  await document.querySelector('#settings-install-update').click();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  q.flushRender();
+  expect(q.phase() === 'running', 'settings INSTALL ANYWAY should enter install path with blockers, got ' + q.phase());
+  q.setInstallResult(null);
+  q.setStatus({ updateAvailable: false });
+  q.setStatus({
+    updateAvailable: true,
+    managedInstall: {
+      available: true,
+      sourceDir: '/tmp/chromux-source',
+      command: 'npm run install-app',
+    },
+  });
+  q.setSession(liveId, { turnState: 'working' });
+  q.queue();
+  expect(q.phase() === 'waiting', 'working blocker should requeue waiting after override assertion');
 
   q.setSession(liveId, { turnState: 'completed' });
   expect(q.phase() === 'ready', 'completed turn should make queued update ready');

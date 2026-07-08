@@ -1,5 +1,12 @@
 # Session History
 
+## 2026-07-08 — Chromux v0.12.9 settings-only update override
+
+- Added a Settings-only INSTALL ANYWAY action for UPDATE WAITING when a managed install source is available, allowing explicit user override of live-session blockers.
+- Preserved attention rail behavior: UPDATE WAITING still focuses the first blocker, and DISMISS still clears only the reminder/queue state.
+- Kept the existing update-install lifecycle path for overrides, including the live-session confirmation, restore snapshot, managed install handoff, and restart flow.
+- Bumped prototype metadata to `0.12.9`; planned tag is `chromux-v0.12.9`.
+
 ## 2026-07-08 — Chromux v0.12.8 preview parser hardening
 
 - Hardened terminal preview routing so localhost URLs inside `rg` output, diffs, JS/test fixtures, markdown tables, and release-note prose do not open or queue fake previews.

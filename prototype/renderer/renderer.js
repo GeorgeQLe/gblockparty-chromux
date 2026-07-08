@@ -1763,6 +1763,14 @@ function updateAvailable() {
   return Boolean(state.updateStatus && state.updateStatus.updateAvailable);
 }
 
+function hasManagedInstallSource() {
+  return Boolean(
+    state.updateStatus
+    && state.updateStatus.managedInstall
+    && state.updateStatus.managedInstall.available
+  );
+}
+
 // Safety derives from turn state alone: exited/needsInput/completed are safe;
 // working/unknown block. `acknowledged` (a display flag) never affects safety,
 // and focusing a session cannot change its turn state — so looking at a
@@ -1842,7 +1850,9 @@ function renderUpdateControls() {
   if (!available) {
     statusEl.textContent = updateStatusMessage(status);
   } else if (phase === 'waiting') {
-    statusEl.textContent = `Update queued. Waiting for ${blockers.length} live session${blockers.length === 1 ? '' : 's'} to complete, ask for input, or exit before installing.`;
+    statusEl.textContent = hasManagedInstallSource()
+      ? `Update blocked by ${blockers.length} live session${blockers.length === 1 ? '' : 's'}. You can install anyway after Chromux saves a restore snapshot and restarts through the managed local source.`
+      : `Update queued, but ${blockers.length} live session${blockers.length === 1 ? '' : 's'} block installation and no managed install source is available. Use the release URL to update manually.`;
   } else if (phase === 'ready') {
     statusEl.textContent = status.managedInstall && status.managedInstall.available
       ? 'Update queued and ready. Install from the managed local source.'
@@ -1869,7 +1879,7 @@ function renderUpdateControls() {
   install.classList.toggle('hidden', !available);
   install.disabled = !available || phase === 'running';
   if (phase === 'waiting') {
-    install.textContent = 'FOCUS BLOCKER';
+    install.textContent = hasManagedInstallSource() ? 'INSTALL ANYWAY' : 'FOCUS BLOCKER';
   } else if (phase === 'ready') {
     install.textContent = 'INSTALL UPDATE';
   } else if (phase === 'failed') {
@@ -1959,7 +1969,7 @@ function showLifecyclePrompt(reason) {
   return promise;
 }
 
-async function installUpdate() {
+async function installUpdate({ forceBlockers = false } = {}) {
   const btn = $('#settings-install-update');
   const check = $('#settings-check-updates');
   const statusEl = $('#settings-update-status');
@@ -1970,11 +1980,12 @@ async function installUpdate() {
     return;
   }
   const blockers = updateBlockers();
-  if (blockers.length > 0) {
+  const allowBlockedInstall = forceBlockers && hasManagedInstallSource();
+  if (blockers.length > 0 && !allowBlockedInstall) {
     focusFirstUpdateBlocker();
     return;
   }
-  setUpdateQueuePhase('ready');
+  if (blockers.length === 0) setUpdateQueuePhase('ready');
   if (!state.testInstallUpdateResult) {
     if (!(await showLifecyclePrompt('update-install'))) return;
     await window.chromux.saveRestoreSnapshot({
@@ -2590,7 +2601,9 @@ $('#settings-source-dir').onclick = () => {
   if (state.updateStatus && state.updateStatus.releaseUrl) window.chromux.openUpdateRelease({ status: state.updateStatus });
 };
 $('#settings-check-updates').onclick = () => checkUpdates(true).catch(() => {});
-$('#settings-install-update').onclick = () => installUpdate().catch(showUpdateInstallError);
+$('#settings-install-update').onclick = () => installUpdate({
+  forceBlockers: state.updateQueue.phase === 'waiting' && hasManagedInstallSource(),
+}).catch(showUpdateInstallError);
 
 function answerLifecyclePrompt(answer) {
   if (state.lifecyclePrompt) state.lifecyclePrompt.cleanup(answer);
@@ -2782,6 +2795,17 @@ if (window.chromuxTest) {
       }
       return [];
     },
+    clickAttentionPrimary(kind) {
+      for (const el of document.querySelectorAll('#attention-list .attention-item')) {
+        if (el.querySelector('.attention-kind')?.textContent !== kind) continue;
+        const primary = el.querySelector('.attention-actions .qi-btn.open');
+        if (!primary) throw new Error(`No primary action on ${kind}`);
+        primary.click();
+        flushRender();
+        return true;
+      }
+      throw new Error(`No attention item ${kind}`);
+    },
     dismissItem(kind) {
       for (const el of document.querySelectorAll('#attention-list .attention-item')) {
         if (el.querySelector('.attention-kind')?.textContent !== kind) continue;
@@ -2795,7 +2819,9 @@ if (window.chromuxTest) {
       throw new Error(`No attention item ${kind}`);
     },
     installButtonText: () => $('#settings-install-update').textContent,
+    statusText: () => $('#settings-update-status').textContent,
     topButtonText: () => $('#btn-update-ready').textContent,
+    activeName: () => state.sessions.get(state.activeId)?.name || null,
     setInstallResult(result) {
       state.testInstallUpdateResult = result;
     },
