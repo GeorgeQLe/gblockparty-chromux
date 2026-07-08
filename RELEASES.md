@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.13.1
+
+Planned tag: `chromux-v0.13.1`
+
+- Detect quick exits from Codex restore/resume launches and show a footer warning with the exact `codex resume <id>` command.
+- Add a RETRY RESUME action that sends the saved resume command back into the same session terminal, preserving the failed output context.
+- Add renderer smoke coverage for resume-retry display, retry input, dismissal, non-resume exits, and exits outside the startup window.
+
 ## GBlockParty Chromux v0.13.0
 
 Planned tag: `chromux-v0.13.0`

@@ -26,7 +26,9 @@ const state = {
   detect: null, // last external-terminal scan
   detectQuery: '',
   restoreSessions: null,
+  restoreWarningRows: [],
   restoreWarningDismissed: false,
+  resumeRetryWarning: null,
   lifecyclePrompt: null,
   testInstallUpdateResult: null,
   updateQueue: {
@@ -51,6 +53,7 @@ const BOUNDS = {
   outerHtmlChars: 8000,
   reloadThrottleMs: 3000,
   shortcutDebugStaleMs: 1500,
+  resumeStartupExitMs: 15000,
 };
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -656,7 +659,7 @@ function flushRender() {
 function newSessionShape({ id, name, cwd, agent }) {
   return {
     id, name, cwd, agent,
-    lifecycle: { alive: true, exitCode: null, exitedAt: null },
+    lifecycle: { alive: true, exitCode: null, exitedAt: null, resumeLaunch: null },
     turn: {
       state: 'unknown', // 'unknown' | 'working' | 'needsInput' | 'completed'
       instrumented: false, // true once a deterministic signal has arrived
@@ -1590,6 +1593,30 @@ function agentCommand(agent, resumeId = null) {
   return null;
 }
 
+function resumeIdForRow(row) {
+  const id = row && row.resume && typeof row.resume.id === 'string' ? row.resume.id : null;
+  return id && /^[0-9a-f-]+$/i.test(id) ? id : null;
+}
+
+function resumeLaunchForRow(row, { name = null, command = null, source = 'detect', autoRestored = false } = {}) {
+  const resumeId = resumeIdForRow(row);
+  const resumeCommand = command || (row ? (row.command || resumeCommandFor(row)) : null);
+  if (!row || !row.agent || !resumeId || !resumeCommand) return null;
+  return {
+    agent: row.agent,
+    resumeId,
+    command: resumeCommand,
+    launchedAt: Date.now(),
+    source,
+    sourceName: row.name || row.tty || name || null,
+    sessionName: name || row.name || row.tty || null,
+    cwd: row.cwd || null,
+    autoRestored: Boolean(autoRestored),
+    failedAt: null,
+    retriedAt: null,
+  };
+}
+
 function agentLabel(agent) {
   return AGENT_LABELS[agent || ''] || (agent || 'shell').toUpperCase();
 }
@@ -1968,10 +1995,18 @@ function renderAttentionQueue() {
   }
 }
 
-async function createSession({ name, cwd, agent, initialUrl = null, initialQueue = [], command = undefined }) {
+async function createSession({ name, cwd, agent, initialUrl = null, initialQueue = [], command = undefined, resumeLaunch = null }) {
   state.counter += 1;
   const id = 's' + state.counter;
   const session = newSessionShape({ id, name, cwd, agent });
+  if (resumeLaunch) {
+    session.lifecycle.resumeLaunch = {
+      ...resumeLaunch,
+      launchedAt: Number.isFinite(resumeLaunch.launchedAt) ? resumeLaunch.launchedAt : Date.now(),
+      sessionName: resumeLaunch.sessionName || name,
+      cwd: resumeLaunch.cwd || cwd || null,
+    };
+  }
 
   const viewEls = buildSessionView(session);
   const tabEls = buildSessionTab(session);
@@ -2380,14 +2415,43 @@ function handlePtyData(id, data) {
 
 window.chromux.onPtyData(({ id, data }) => handlePtyData(id, data));
 
-window.chromux.onPtyExit(({ id, exitCode }) => {
+function isQuickCodexResumeExit(session, now = Date.now()) {
+  const resume = session && session.lifecycle && session.lifecycle.resumeLaunch;
+  if (!resume || resume.agent !== 'codex' || !resume.command || !resume.resumeId) return false;
+  if (resume.failedAt) return false;
+  const launchedAt = Number.isFinite(resume.launchedAt) ? resume.launchedAt : 0;
+  return launchedAt > 0 && now - launchedAt <= BOUNDS.resumeStartupExitMs;
+}
+
+function showResumeRetryWarning(session, exitCode, now = Date.now()) {
+  const resume = session.lifecycle.resumeLaunch;
+  resume.failedAt = now;
+  state.resumeRetryWarning = {
+    sessionId: session.id,
+    sessionName: session.name,
+    cwd: session.cwd || resume.cwd || null,
+    agent: resume.agent,
+    resumeId: resume.resumeId,
+    command: resume.command,
+    exitCode: Number.isFinite(exitCode) ? exitCode : null,
+    source: resume.source || null,
+    autoRestored: Boolean(resume.autoRestored),
+    failedAt: now,
+  };
+  renderWorkspaceWarning();
+}
+
+function handlePtyExit({ id, exitCode }) {
   const s = state.sessions.get(id);
   if (!s) return;
   apply({ type: 'session-exited', sessionId: id, exitCode });
   s.els.dot.classList.remove('live');
   s.els.dot.classList.add('dead');
   s.term.term.write(`\r\n\x1b[38;5;210m── session exited (${exitCode}) ──\x1b[0m\r\n`);
-});
+  if (isQuickCodexResumeExit(s)) showResumeRetryWarning(s, exitCode);
+}
+
+window.chromux.onPtyExit(handlePtyExit);
 
 // popups intercepted in main → paired session's review queue
 window.chromux.onWebviewPopup(({ webContentsId, url }) => {
@@ -2522,13 +2586,20 @@ async function openRestoredSession(row) {
     resolved = res.sessions && res.sessions[0] ? { ...row, ...res.sessions[0] } : row;
   }
   const name = uniqueSessionName(row.name || (row.cwd ? row.cwd.split('/').filter(Boolean).pop() : 'restored'));
+  const command = resolved.command || undefined;
   const session = await createSession({
     name,
     cwd: resolved.cwd || (state.env ? state.env.home : '~'),
     agent: resolved.agent || '',
     initialUrl: resolved.currentUrl || null,
     initialQueue: resolved.queue || [],
-    command: resolved.command || undefined,
+    command,
+    resumeLaunch: resumeLaunchForRow(resolved, {
+      name,
+      command,
+      source: 'restore-row',
+      autoRestored: false,
+    }),
   });
   row.opened = true;
   row.restoredAt = new Date().toISOString();
@@ -2609,7 +2680,15 @@ async function openDetectedRow(row, mode) {
   const base = row.cwd ? row.cwd.split('/').filter(Boolean).pop() : row.tty;
   const name = uniqueSessionName(mode === 'resume' ? `${base}-resumed` : base);
   const command = mode === 'resume' ? resumeCommandFor(row) : agentCommand(row.agent);
-  await createSession({ name, cwd: row.cwd || (state.env ? state.env.home : '~'), agent: row.agent, command });
+  await createSession({
+    name,
+    cwd: row.cwd || (state.env ? state.env.home : '~'),
+    agent: row.agent,
+    command,
+    resumeLaunch: mode === 'resume'
+      ? resumeLaunchForRow(row, { name, command, source: 'detect', autoRestored: false })
+      : null,
+  });
   row.opened = true;
 }
 
@@ -2762,11 +2841,64 @@ async function openAllRestoredSessions() {
   }
 }
 
-function renderRestoreWarning(unresolved) {
+function sendResumeRetryCommand(warning = state.resumeRetryWarning) {
+  if (!warning || !warning.command || !warning.sessionId) return false;
+  const session = state.sessions.get(warning.sessionId);
+  if (!session) return false;
+  const data = `${warning.command}\r`;
+  if (Array.isArray(session._ptyInputs)) session._ptyInputs.push(data);
+  window.chromux.ptyInput(session.id, data);
+  if (session.lifecycle && session.lifecycle.resumeLaunch) {
+    const now = Date.now();
+    session.lifecycle.resumeLaunch.launchedAt = now;
+    session.lifecycle.resumeLaunch.retriedAt = now;
+    session.lifecycle.resumeLaunch.failedAt = null;
+  }
+  state.resumeRetryWarning = null;
+  renderWorkspaceWarning();
+  return true;
+}
+
+function renderWorkspaceWarning() {
   const host = $('#restore-warning');
   if (!host) return;
   host.innerHTML = '';
-  const rows = Array.isArray(unresolved) ? unresolved : [];
+
+  const retry = state.resumeRetryWarning;
+  if (retry) {
+    const main = document.createElement('div');
+    main.className = 'rw-main';
+    const title = document.createElement('div');
+    title.className = 'rw-title';
+    title.textContent = 'Codex resume exited quickly';
+    const detail = document.createElement('div');
+    detail.className = 'rw-detail';
+    const name = retry.sessionName || retry.resumeId || 'session';
+    detail.textContent = `${name} did not stay open after loading the saved conversation. Retry: ${retry.command}`;
+    detail.title = detail.textContent;
+    main.append(title, detail);
+
+    const actions = document.createElement('div');
+    actions.className = 'rw-actions';
+    const retryButton = document.createElement('button');
+    retryButton.className = 'rw-action rw-primary';
+    retryButton.textContent = 'RETRY RESUME';
+    retryButton.title = retry.command;
+    retryButton.onclick = () => { sendResumeRetryCommand(); };
+    const dismiss = document.createElement('button');
+    dismiss.className = 'rw-action rw-dismiss';
+    dismiss.textContent = 'DISMISS';
+    dismiss.onclick = () => {
+      state.resumeRetryWarning = null;
+      renderWorkspaceWarning();
+    };
+    actions.append(retryButton, dismiss);
+    host.append(main, actions);
+    host.classList.remove('hidden');
+    return;
+  }
+
+  const rows = Array.isArray(state.restoreWarningRows) ? state.restoreWarningRows : [];
   if (rows.length === 0 || state.restoreWarningDismissed) {
     host.classList.add('hidden');
     return;
@@ -2783,7 +2915,7 @@ function renderRestoreWarning(unresolved) {
   detail.title = detail.textContent;
   main.append(title, detail);
   const dismiss = document.createElement('button');
-  dismiss.className = 'rw-dismiss';
+  dismiss.className = 'rw-action rw-dismiss';
   dismiss.textContent = 'DISMISS';
   dismiss.onclick = () => {
     state.restoreWarningDismissed = true;
@@ -2791,6 +2923,11 @@ function renderRestoreWarning(unresolved) {
   };
   host.append(main, dismiss);
   host.classList.remove('hidden');
+}
+
+function renderRestoreWarning(unresolved) {
+  state.restoreWarningRows = Array.isArray(unresolved) ? unresolved : [];
+  renderWorkspaceWarning();
 }
 
 async function autoRestoreWorkspace() {
@@ -2805,13 +2942,20 @@ async function autoRestoreWorkspace() {
   for (const row of res.sessions || []) {
     try {
       const name = uniqueSessionName(row.name || (row.cwd ? row.cwd.split('/').filter(Boolean).pop() : 'restored'));
+      const command = row.command || undefined;
       const session = await createSession({
         name,
         cwd: row.cwd || (state.env ? state.env.home : '~'),
         agent: row.agent || '',
         initialUrl: row.currentUrl || null,
         initialQueue: row.queue || [],
-        command: row.command || undefined,
+        command,
+        resumeLaunch: resumeLaunchForRow(row, {
+          name,
+          command,
+          source: 'auto-restore',
+          autoRestored: true,
+        }),
       });
       restored.push({ name: row.name, cwd: row.cwd, agent: row.agent, sessionId: session.id });
       row.opened = true;
@@ -3074,16 +3218,24 @@ if (window.chromuxTest) {
     return session;
   };
 
-  const addFakeSession = ({ name = 'test-session', agent = 'codex', cwd = '/tmp', alive = true, turnState = 'unknown', queue = [] } = {}) => {
+  const addFakeSession = ({ name = 'test-session', agent = 'codex', cwd = '/tmp', alive = true, turnState = 'unknown', queue = [], resumeLaunch = null } = {}) => {
     state.counter += 1;
     const session = newSessionShape({ id: 's' + state.counter, name, cwd, agent });
     session.lifecycle.alive = alive;
+    if (resumeLaunch) {
+      session.lifecycle.resumeLaunch = {
+        ...resumeLaunch,
+        agent: resumeLaunch.agent || agent,
+        launchedAt: Number.isFinite(resumeLaunch.launchedAt) ? resumeLaunch.launchedAt : Date.now(),
+      };
+    }
     session.turn.state = turnState;
     session.browser.queue = Array.isArray(queue)
       ? queue.map((item) => normalizeQueueItem(item, 'RESTORE')).filter(Boolean)
       : [];
     const written = [];
     session._written = written;
+    session._ptyInputs = [];
     session.term.term = { write: (d) => written.push(d), focus() {}, dispose() {} };
     session.els = fakeSessionEls();
     state.sessions.set(session.id, session);
@@ -3215,6 +3367,78 @@ if (window.chromuxTest) {
     },
     events: () => state.events.map((e) => ({ ...e })),
     flushRender,
+  };
+
+  window.chromuxTestResumeRetry = {
+    addSession({
+      name = 'resume-test',
+      agent = 'codex',
+      cwd = '/tmp',
+      resumeId = '11111111-2222-3333-4444-555555555555',
+      command = null,
+      launchedAt = Date.now(),
+      source = 'detect',
+      autoRestored = false,
+    } = {}) {
+      return addFakeSession({
+        name,
+        agent,
+        cwd,
+        resumeLaunch: resumeId ? {
+          agent,
+          resumeId,
+          command: command || agentCommand(agent, resumeId),
+          launchedAt,
+          source,
+          sourceName: name,
+          sessionName: name,
+          cwd,
+          autoRestored,
+          failedAt: null,
+          retriedAt: null,
+        } : null,
+      });
+    },
+    addPlainSession(opts = {}) {
+      return addFakeSession({ name: 'plain-test', agent: 'codex', cwd: '/tmp', ...opts });
+    },
+    exit(id, exitCode = 1) {
+      handlePtyExit({ id, exitCode });
+      flushRender();
+    },
+    warning() {
+      const host = $('#restore-warning');
+      const retry = host.querySelector('.rw-primary');
+      return {
+        hidden: host.classList.contains('hidden'),
+        title: host.querySelector('.rw-title')?.textContent || '',
+        detail: host.querySelector('.rw-detail')?.textContent || '',
+        buttons: [...host.querySelectorAll('button')].map((button) => button.textContent),
+        retryTitle: retry ? retry.title : '',
+      };
+    },
+    clickRetry() {
+      const button = $('#restore-warning .rw-primary');
+      if (!button) throw new Error('No RETRY RESUME button');
+      button.click();
+      flushRender();
+    },
+    clickDismiss() {
+      const button = [...document.querySelectorAll('#restore-warning button')]
+        .find((candidate) => candidate.textContent === 'DISMISS');
+      if (!button) throw new Error('No DISMISS button');
+      button.click();
+      flushRender();
+    },
+    ptyInputs: (id) => (testSession(id)._ptyInputs || []).join(''),
+    startupWindowMs: () => BOUNDS.resumeStartupExitMs,
+    clear() {
+      state.resumeRetryWarning = null;
+      state.restoreWarningRows = [];
+      state.restoreWarningDismissed = false;
+      renderWorkspaceWarning();
+      flushRender();
+    },
   };
 
   window.chromuxTestPreviews = {

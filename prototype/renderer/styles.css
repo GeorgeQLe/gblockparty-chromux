@@ -263,7 +263,13 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.restore-warning .rw-dismiss {
+.restore-warning .rw-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.restore-warning .rw-action {
   flex: none;
   border: 1px solid rgba(242, 112, 124, 0.35);
   background: rgba(242, 112, 124, 0.08);
@@ -275,6 +281,12 @@ body {
   padding: 3px 8px;
   cursor: pointer;
 }
+.restore-warning .rw-primary {
+  border-color: rgba(255, 180, 84, 0.55);
+  background: rgba(255, 180, 84, 0.1);
+  color: var(--amber);
+}
+.restore-warning .rw-primary:hover { border-color: var(--amber); }
 .restore-warning .rw-dismiss:hover { border-color: var(--red); }
 
 #tab-list {
