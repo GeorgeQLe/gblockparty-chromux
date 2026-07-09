@@ -4,6 +4,10 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawn } = require('child_process');
+const {
+  chromuxShortcutAction,
+  shouldRouteChromuxShortcut,
+} = require('../shortcut-input');
 
 const appDir = path.resolve(__dirname, '..');
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'chromux-hotkey-debug-renderer-'));
@@ -12,6 +16,16 @@ const e2ePath = path.join(tmpDir, 'hotkey-debug-renderer-e2e.js');
 const e2eOutPath = path.join(tmpDir, 'e2e.out');
 
 fs.mkdirSync(homeDir, { recursive: true });
+
+const expectShortcut = (cond, msg) => { if (!cond) throw new Error(msg); };
+expectShortcut(
+  chromuxShortcutAction({ type: 'keyDown', key: 't', control: true }) === null,
+  'Control+T should not be a Chromux-owned shortcut',
+);
+expectShortcut(
+  !shouldRouteChromuxShortcut({ type: 'keyDown', key: 't', control: true }, { focusKind: 'terminal' }),
+  'Control+T should not route through Chromux shortcut handling',
+);
 
 fs.writeFileSync(e2ePath, `
 (async () => {
@@ -80,6 +94,68 @@ fs.writeFileSync(e2ePath, `
   expect(byId('queue-next').available, 'Command+J should become available when a queue item returns');
   expect(byId('queue-next').description === '1 queued', 'Command+J should expose queued preview count');
 
+  let debug = null;
+
+  h.note({
+    source: 'host',
+    type: 'keyDown',
+    key: 't',
+    modifiers: { meta: false, shift: false, alt: false, control: false },
+    ts: Date.now(),
+  });
+  debug = h.debug();
+  expect(debug.detailsActive === false, 'bare t should keep shortcut details inactive');
+  expect(debug.latestKey === null, 'bare t should not set the latest shortcut key');
+  expect(debug.modifiers.meta === false && debug.modifiers.control === false, 'bare t should not light wake modifiers');
+  expect(byId('new-session').matchedByCurrentChord === false, 'bare t should not match Command+T');
+
+  h.note({
+    source: 'host',
+    type: 'keyDown',
+    key: 'Meta',
+    modifiers: { meta: false, shift: false, alt: false, control: false },
+    ts: Date.now(),
+  });
+  debug = h.debug();
+  expect(debug.detailsActive === true, 'Command keydown should activate shortcut details');
+  expect(debug.modifiers.meta === true, 'Command keydown should light the Command modifier chip');
+
+  h.note({
+    source: 'host',
+    type: 'keyUp',
+    key: 'Meta',
+    modifiers: { meta: true, shift: false, alt: false, control: false },
+    ts: Date.now(),
+  });
+  debug = h.debug();
+  expect(debug.detailsActive === false, 'Command keyup should quiet shortcut details');
+  expect(debug.modifiers.meta === false, 'Command keyup should clear the Command modifier chip');
+
+  h.note({
+    source: 'host',
+    type: 'keyDown',
+    key: 'T',
+    modifiers: { meta: true, shift: false, alt: false, control: false },
+    ts: Date.now(),
+  });
+  debug = h.debug();
+  expect(debug.detailsActive === true, 'Command+T should activate shortcut details');
+  expect(debug.latestKey === 'T', 'Command+T should set T as the latest shortcut key');
+  expect(byId('new-session').matchedByCurrentChord, 'Command+T should match the new-session shortcut');
+
+  h.note({
+    source: 'host',
+    type: 'keyDown',
+    key: 'T',
+    modifiers: { meta: false, shift: false, alt: false, control: true },
+    ts: Date.now(),
+  });
+  debug = h.debug();
+  expect(debug.detailsActive === true, 'Control+T should activate shortcut details for display');
+  expect(debug.latestKey === 'T', 'Control+T should show T as the latest display key');
+  expect(debug.modifiers.control === true, 'Control+T should light the Control modifier chip');
+  expect(byId('new-session').matchedByCurrentChord === false, 'Control+T should not match Command+T');
+
   h.note({
     source: 'host',
     type: 'keyDown',
@@ -87,7 +163,7 @@ fs.writeFileSync(e2ePath, `
     modifiers: { meta: true, shift: false, alt: false, control: false },
     ts: Date.now(),
   });
-  const debug = h.debug();
+  debug = h.debug();
   expect(debug.source === 'host', 'debug source should record host input');
   expect(debug.latestKey === 'J', 'debug latest key should record shortcut key only');
   expect(debug.modifiers.meta === true, 'debug modifier state should record Command');

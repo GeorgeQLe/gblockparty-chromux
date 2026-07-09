@@ -72,25 +72,40 @@ function send(channel, payload) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
 }
 
+function shortcutDebugModifierActive(input, name) {
+  const direct = Boolean(input && input[name]);
+  const dom = Boolean(input && input[`${name}Key`]);
+  const modifiers = Array.isArray(input && input.modifiers)
+    ? input.modifiers.map((value) => String(value).toLowerCase())
+    : [];
+  if (name === 'meta') return direct || dom || modifiers.includes('meta') || modifiers.includes('command') || modifiers.includes('cmd');
+  if (name === 'control') return direct || dom || modifiers.includes('control') || modifiers.includes('ctrl');
+  if (name === 'alt') return direct || dom || modifiers.includes('alt') || modifiers.includes('option');
+  if (name === 'shift') return direct || dom || modifiers.includes('shift');
+  return direct || dom;
+}
+
 function shortcutDebugKey(input) {
   const key = String(input && input.key ? input.key : '');
   const keyCode = String(input && input.keyCode ? input.keyCode : '');
   const code = String(input && input.code ? input.code : '');
+  const detailsActive = shortcutDebugModifierActive(input, 'meta') || shortcutDebugModifierActive(input, 'control');
   const digit = sessionShortcutDigit(input || {});
-  if (digit) return digit;
 
   const lower = key && key.toLowerCase() !== 'unidentified' ? key.toLowerCase() : keyCode.toLowerCase();
+  if (lower === 'meta' || lower === 'command' || code === 'MetaLeft' || code === 'MetaRight') return '⌘';
+  if (lower === 'shift' || code === 'ShiftLeft' || code === 'ShiftRight') return '⇧';
+  if (lower === 'alt' || lower === 'option' || code === 'AltLeft' || code === 'AltRight') return '⌥';
+  if (lower === 'control' || code === 'ControlLeft' || code === 'ControlRight') return '⌃';
+  if (!detailsActive) return null;
+  if (digit) return digit;
   if (['j', 'b', 't', 'd', 'q'].includes(lower)) return lower.toUpperCase();
-  if (['c', 'v'].includes(lower) && input && (input.meta || input.control)) return lower.toUpperCase();
+  if (['c', 'v'].includes(lower)) return lower.toUpperCase();
   if (lower === 'escape' || code === 'Escape') return 'Esc';
   if (lower === 'arrowup' || code === 'ArrowUp') return '↑';
   if (lower === 'arrowdown' || code === 'ArrowDown') return '↓';
   if (lower === 'arrowleft' || code === 'ArrowLeft') return '←';
   if (lower === 'arrowright' || code === 'ArrowRight') return '→';
-  if (lower === 'meta' || lower === 'command' || code === 'MetaLeft' || code === 'MetaRight') return '⌘';
-  if (lower === 'shift' || code === 'ShiftLeft' || code === 'ShiftRight') return '⇧';
-  if (lower === 'alt' || lower === 'option' || code === 'AltLeft' || code === 'AltRight') return '⌥';
-  if (lower === 'control' || code === 'ControlLeft' || code === 'ControlRight') return '⌃';
   return null;
 }
 
@@ -102,10 +117,10 @@ function emitShortcutDebugInput(input, source, webContentsId = null) {
     type: input && input.type ? String(input.type) : 'unknown',
     key,
     modifiers: {
-      meta: Boolean(input && input.meta),
-      shift: Boolean(input && input.shift),
-      alt: Boolean(input && input.alt),
-      control: Boolean(input && input.control),
+      meta: shortcutDebugModifierActive(input, 'meta'),
+      shift: shortcutDebugModifierActive(input, 'shift'),
+      alt: shortcutDebugModifierActive(input, 'alt'),
+      control: shortcutDebugModifierActive(input, 'control'),
     },
     repeat: Boolean(input && input.isAutoRepeat),
     ts: Date.now(),

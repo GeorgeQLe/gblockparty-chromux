@@ -796,6 +796,12 @@ body.dragging webview { pointer-events: none; }
   scrollbar-width: none;
 }
 .shortcut-debug-catalog::-webkit-scrollbar { display: none; }
+.shortcut-debug.details-inactive .shortcut-debug-source,
+.shortcut-debug.details-inactive .shortcut-debug-context,
+.shortcut-debug.details-inactive .shortcut-debug-catalog {
+  visibility: hidden;
+  pointer-events: none;
+}
 .kbd-key,
 .sd-chip,
 .shortcut-chip {

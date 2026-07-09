@@ -814,36 +814,42 @@ const SHORTCUT_DEBUG_MODIFIER_KEYS = new Set(['⌘', '⇧', '⌥', '⌃']);
 let shortcutDebugClearTimer = null;
 let shortcutFocusContextReportTimer = null;
 
-function normalizeShortcutDebugKey(raw) {
+function shortcutDebugDetailsActive(modifiers = {}) {
+  return Boolean(modifiers.meta || modifiers.control);
+}
+
+function normalizeShortcutDebugKey(raw, modifiers = {}) {
   const key = String(raw || '');
   if (!key) return null;
-  if (/^[1-9]$/.test(key)) return key;
   const lower = key.toLowerCase();
-  if (['j', 'b', 't', 'd', 'q'].includes(lower)) return lower.toUpperCase();
+  if (lower === 'meta' || lower === 'command' || key === '⌘') return '⌘';
+  if (lower === 'shift' || key === '⇧') return '⇧';
+  if (lower === 'alt' || lower === 'option' || key === '⌥') return '⌥';
+  if (lower === 'control' || lower === 'ctrl' || key === '⌃') return '⌃';
+  if (!shortcutDebugDetailsActive(modifiers)) return null;
+  if (/^[1-9]$/.test(key)) return key;
+  if (['j', 'b', 't', 'd', 'q', 'c', 'v'].includes(lower)) return lower.toUpperCase();
   if (lower === 'escape' || lower === 'esc') return 'Esc';
   if (lower === 'arrowup') return '↑';
   if (lower === 'arrowdown') return '↓';
   if (lower === 'arrowleft') return '←';
   if (lower === 'arrowright') return '→';
   if (key === '↑' || key === '↓' || key === '←' || key === '→') return key;
-  if (lower === 'meta' || lower === 'command' || key === '⌘') return '⌘';
-  if (lower === 'shift' || key === '⇧') return '⇧';
-  if (lower === 'alt' || lower === 'option' || key === '⌥') return '⌥';
-  if (lower === 'control' || lower === 'ctrl' || key === '⌃') return '⌃';
   return null;
 }
 
 function shortcutDebugInputFromDomEvent(e, source = 'renderer') {
+  const modifiers = {
+    meta: Boolean(e.metaKey),
+    shift: Boolean(e.shiftKey),
+    alt: Boolean(e.altKey),
+    control: Boolean(e.ctrlKey),
+  };
   return {
     source,
     type: e.type === 'keyup' ? 'keyUp' : 'keyDown',
-    key: normalizeShortcutDebugKey(e.key),
-    modifiers: {
-      meta: Boolean(e.metaKey),
-      shift: Boolean(e.shiftKey),
-      alt: Boolean(e.altKey),
-      control: Boolean(e.ctrlKey),
-    },
+    key: normalizeShortcutDebugKey(e.key, modifiers),
+    modifiers,
     repeat: Boolean(e.repeat),
     ts: Date.now(),
   };
@@ -863,13 +869,13 @@ function scheduleShortcutDebugClear() {
 }
 
 function noteShortcutDebugInput(payload = {}) {
-  const key = normalizeShortcutDebugKey(payload.key);
   const modifiers = {
     meta: Boolean(payload.modifiers && payload.modifiers.meta),
     shift: Boolean(payload.modifiers && payload.modifiers.shift),
     alt: Boolean(payload.modifiers && payload.modifiers.alt),
     control: Boolean(payload.modifiers && payload.modifiers.control),
   };
+  const key = normalizeShortcutDebugKey(payload.key, modifiers);
   if (payload.type === 'keyDown') {
     if (key === '⌘') modifiers.meta = true;
     if (key === '⇧') modifiers.shift = true;
@@ -896,11 +902,14 @@ function noteShortcutDebugInput(payload = {}) {
 function shortcutDebugChord() {
   const stale = !state.shortcutDebug.lastEventAt
     || Date.now() - state.shortcutDebug.lastEventAt > BOUNDS.shortcutDebugStaleMs;
+  const modifiers = stale
+    ? { meta: false, shift: false, alt: false, control: false }
+    : { ...state.shortcutDebug.modifiers };
+  const detailsActive = shortcutDebugDetailsActive(modifiers);
   return {
-    key: stale ? null : state.shortcutDebug.latestKey,
-    modifiers: stale
-      ? { meta: false, shift: false, alt: false, control: false }
-      : { ...state.shortcutDebug.modifiers },
+    key: stale || !detailsActive ? null : state.shortcutDebug.latestKey,
+    modifiers,
+    detailsActive,
   };
 }
 
@@ -1093,6 +1102,8 @@ function renderShortcutDebug() {
   if (!root) return;
   const chord = shortcutDebugChord();
   const context = shortcutFocusContext();
+  root.classList.toggle('details-active', chord.detailsActive);
+  root.classList.toggle('details-inactive', !chord.detailsActive);
 
   const keys = $('#shortcut-debug-keys');
   keys.innerHTML = '';
@@ -4037,10 +4048,12 @@ if (window.chromuxTest) {
     },
     debug() {
       renderShortcutDebug();
+      const chord = shortcutDebugChord();
       return {
         source: state.shortcutDebug.source,
-        latestKey: shortcutDebugChord().key,
-        modifiers: { ...shortcutDebugChord().modifiers },
+        latestKey: chord.key,
+        modifiers: { ...chord.modifiers },
+        detailsActive: chord.detailsActive,
         context: { ...shortcutFocusContext() },
         catalog: hotkeyCatalogSnapshot(),
         text: $('#shortcut-debug') ? $('#shortcut-debug').textContent : '',

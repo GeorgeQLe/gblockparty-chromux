@@ -1,5 +1,12 @@
 # Release Notes
 
+## GBlockParty Chromux v0.14.1
+
+Planned tag: `chromux-v0.14.1`
+
+- Quiet the status-bar hotkey diagnostics during ordinary typing, keeping only the modifier chips visible until Command or Control is held.
+- Keep Command shortcut diagnostics fully active, including latest-key and catalog matching, while letting Control wake the display without creating new Control-routed app shortcuts.
+
 ## GBlockParty Chromux v0.14.0
 
 Planned tag: `chromux-v0.14.0`
