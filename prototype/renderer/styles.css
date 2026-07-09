@@ -336,13 +336,50 @@ body {
 .tab-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
 .tab-dot.live { background: var(--green); box-shadow: 0 0 6px var(--green); }
 .tab-dot.dead { background: var(--red); box-shadow: none; }
-.tab-name {
+.tab-label-wrap {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  position: relative;
+}
+.tab-label {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 600;
+}
+.session-tab.marquee .tab-label,
+.session-tab.hover-scroll .tab-label {
+  display: inline-block;
+  min-width: max-content;
+  overflow: visible;
+  text-overflow: clip;
+  animation: tabTitleMarquee var(--tab-marquee-duration, 5s) ease-in-out infinite alternate;
+  will-change: transform;
+}
+.session-tab.hover-scroll .tab-label {
+  animation-duration: var(--tab-hover-scroll-duration, 3.5s);
+}
+.session-tab.paused .tab-label {
+  animation-play-state: paused;
+}
+@keyframes tabTitleMarquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(var(--tab-scroll-distance, 0)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .session-tab.marquee .tab-label,
+  .session-tab.hover-scroll .tab-label {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    animation: none;
+    transform: none;
+    will-change: auto;
+  }
 }
 .tab-badge {
   min-width: 16px;

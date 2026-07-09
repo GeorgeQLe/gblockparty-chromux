@@ -1,6 +1,6 @@
 {
   "name": "chromux",
-  "version": "0.13.2",
+  "version": "0.14.0",
   "description": "OSS desktop front-end for local and GBlockParty-managed agent/browser workspaces.",
   "main": "main.js",
   "private": false,
@@ -20,6 +20,7 @@
     "test:attention-signals-renderer": "npm run test:turn-signals-renderer",
     "test:osc-parser": "node scripts/test-osc-parser.js",
     "test:turn-signals-renderer": "node scripts/test-turn-signals-renderer.js",
+    "test:tab-titles-renderer": "node scripts/test-tab-titles-renderer.js",
     "test:resume-retry-renderer": "node scripts/test-resume-retry-renderer.js",
     "test:capture-records-renderer": "node scripts/test-capture-records-renderer.js",
     "test:preview-queue-renderer": "node scripts/test-preview-queue-renderer.js",

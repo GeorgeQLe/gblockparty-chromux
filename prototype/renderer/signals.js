@@ -13,6 +13,10 @@
 (function attachChromuxSignals(global) {
   const MARKER = '\x1b]777;chromux;';
   const MAX_SEQ_BYTES = 512;
+  const OSC = '\x1b]';
+  const TITLE_CODES = new Set(['0', '1', '2']);
+  const MAX_TITLE_SEQ_BYTES = 2048;
+  const MAX_TITLE_CHARS = 160;
   const EVENTS = new Set(['turn-start', 'input-needed', 'turn-end']);
   const ID_RE = /^[A-Za-z0-9_-]+$/;
 
@@ -64,6 +68,58 @@
     return null;
   }
 
+  function oscPrefixStart(data, from) {
+    if (data.length > from && data.endsWith(OSC)) return data.length - OSC.length;
+    if (data.length > from && data.endsWith('\x1b')) return data.length - 1;
+    return data.length;
+  }
+
+  function sanitizeTerminalTitle(raw) {
+    const title = String(raw || '')
+      .replace(/[\x00-\x1f\x7f]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return title ? title.slice(0, MAX_TITLE_CHARS) : '';
+  }
+
+  function extractTerminalTitles(buf, chunk) {
+    const data = (buf || '') + (chunk || '');
+    const titles = [];
+    let i = 0;
+    for (;;) {
+      const at = data.indexOf(OSC, i);
+      if (at === -1) {
+        const hold = Math.max(i, oscPrefixStart(data, i));
+        return { buf: data.slice(hold), titles };
+      }
+      if (data.length - at < 4) {
+        return { buf: data.slice(at), titles };
+      }
+
+      const code = data[at + 2];
+      const sep = data[at + 3];
+      if (!TITLE_CODES.has(code) || sep !== ';') {
+        i = at + OSC.length;
+        continue;
+      }
+
+      const term = findTerminator(data, at + 4);
+      if (!term) {
+        if (data.length - at > MAX_TITLE_SEQ_BYTES) {
+          i = at + OSC.length;
+          continue;
+        }
+        return { buf: data.slice(at), titles };
+      }
+
+      if (term.end - at <= MAX_TITLE_SEQ_BYTES) {
+        const title = sanitizeTerminalTitle(data.slice(at + 4, term.end));
+        if (title) titles.push({ code, title });
+      }
+      i = term.next;
+    }
+  }
+
   function extractChromuxSignals(buf, chunk) {
     const data = (buf || '') + (chunk || '');
     let clean = '';
@@ -94,7 +150,7 @@
     }
   }
 
-  const api = { extractChromuxSignals, MARKER };
+  const api = { extractChromuxSignals, extractTerminalTitles, MARKER };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (global) global.chromuxSignals = api;
 })(typeof window !== 'undefined' ? window : globalThis);

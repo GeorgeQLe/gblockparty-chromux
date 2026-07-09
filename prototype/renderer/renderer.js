@@ -19,6 +19,7 @@ const state = {
     dirty: new Set(),
     rafScheduled: false,
     lastQueueShortcutFocus: null,
+    hoverTabSessionId: null,
   },
   lastCwd: null,
   contextMenu: null,
@@ -647,6 +648,7 @@ function flushRender() {
   state.ui.dirty = new Set();
   if (dirty.has('update')) renderUpdateControls();
   if (dirty.has('attention')) renderAttentionQueue();
+  if (dirty.has('tabs')) renderTabs();
   if (dirty.has('badges')) updateBadges();
   if (dirty.has('captureChips')) renderCaptureChips();
   if (dirty.has('shortcutDebug')) renderShortcutDebug();
@@ -681,6 +683,8 @@ function newSessionShape({ id, name, cwd, agent }) {
       fit: () => {},
       lineBuf: '',
       signalBuf: '',
+      titleBuf: '',
+      title: '',
       typedInputBuf: '',
       previewSuppress: [],
     },
@@ -1934,31 +1938,127 @@ function orderedSessions() {
   return [...state.sessions.values()];
 }
 
+function sessionTabLabel(session) {
+  return (session.term && session.term.title) || session.name;
+}
+
+function sessionTabTooltip(session) {
+  const label = sessionTabLabel(session);
+  const cwd = session.cwd || '~';
+  return session.term && session.term.title && session.term.title !== session.name
+    ? `${label} — ${cwd}\nLaunch name: ${session.name}`
+    : `${label} — ${cwd}`;
+}
+
+function updateSessionTabText(session) {
+  if (!session || !session.els || !session.els.tab) return;
+  const label = sessionTabLabel(session);
+  session.els.tab.title = sessionTabTooltip(session);
+  if (session.els.tabLabel && session.els.tabLabel.textContent !== label) {
+    session.els.tabLabel.textContent = label;
+  }
+}
+
+function tabMotionAllowed() {
+  return !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+}
+
+function tabLabelOverflows(session) {
+  const wrap = session.els && session.els.tabLabelWrap;
+  const label = session.els && session.els.tabLabel;
+  if (!wrap || !label) return false;
+  return label.scrollWidth > wrap.clientWidth + 1;
+}
+
+function setTabScrollVars(session, overflow) {
+  const tab = session.els && session.els.tab;
+  const wrap = session.els && session.els.tabLabelWrap;
+  const label = session.els && session.els.tabLabel;
+  if (!tab || !wrap || !label || !overflow) {
+    if (tab) {
+      tab.style.removeProperty('--tab-scroll-distance');
+      tab.style.removeProperty('--tab-marquee-duration');
+      tab.style.removeProperty('--tab-hover-scroll-duration');
+    }
+    return;
+  }
+  const distance = Math.max(0, label.scrollWidth - wrap.clientWidth);
+  const duration = Math.max(3, Math.min(12, distance / 16 + 2));
+  tab.style.setProperty('--tab-scroll-distance', `-${Math.ceil(distance)}px`);
+  tab.style.setProperty('--tab-marquee-duration', `${duration.toFixed(1)}s`);
+  tab.style.setProperty('--tab-hover-scroll-duration', `${Math.max(2.5, Math.min(7, duration * 0.75)).toFixed(1)}s`);
+}
+
+function updateTabOverflowState() {
+  const motionAllowed = tabMotionAllowed();
+  const overflowById = new Map();
+  for (const session of state.sessions.values()) {
+    if (!session.els || !session.els.tab) continue;
+    session.els.tab.classList.remove('marquee', 'paused', 'hover-scroll');
+    const overflow = tabLabelOverflows(session);
+    overflowById.set(session.id, overflow);
+    session.els.tab.classList.toggle('truncated', overflow);
+    setTabScrollVars(session, overflow);
+  }
+
+  const hovered = state.ui.hoverTabSessionId
+    && state.ui.hoverTabSessionId !== state.activeId
+    && overflowById.get(state.ui.hoverTabSessionId)
+    ? state.ui.hoverTabSessionId
+    : null;
+  if (!hovered && state.ui.hoverTabSessionId) state.ui.hoverTabSessionId = null;
+
+  for (const session of state.sessions.values()) {
+    if (!session.els || !session.els.tab) continue;
+    const active = session.id === state.activeId;
+    const overflow = overflowById.get(session.id);
+    const hoverScroll = motionAllowed && session.id === hovered;
+    const activeMarquee = motionAllowed && active && overflow;
+    session.els.tab.classList.toggle('marquee', activeMarquee);
+    session.els.tab.classList.toggle('paused', activeMarquee && Boolean(hovered));
+    session.els.tab.classList.toggle('hover-scroll', hoverScroll);
+  }
+}
+
 function buildSessionTab(session) {
   const tab = document.createElement('button');
   tab.className = 'session-tab';
-  tab.title = `${session.name} — ${session.cwd}`;
+  tab.title = sessionTabTooltip(session);
   const dot = document.createElement('span'); dot.className = 'tab-dot live';
-  const name = document.createElement('span'); name.className = 'tab-name'; name.textContent = session.name;
+  const labelWrap = document.createElement('span'); labelWrap.className = 'tab-label-wrap';
+  const label = document.createElement('span'); label.className = 'tab-label'; label.textContent = sessionTabLabel(session);
+  labelWrap.appendChild(label);
   const badge = document.createElement('span'); badge.className = 'tab-badge zero'; badge.textContent = '0';
   const x = document.createElement('button'); x.className = 'tab-x'; x.textContent = '✕'; x.title = 'Close session';
   x.onclick = (e) => { e.stopPropagation(); closeSession(session.id); };
-  tab.append(dot, name, badge, x);
+  tab.append(dot, labelWrap, badge, x);
   tab.onclick = () => activateSession(session.id);
   tab.oncontextmenu = (e) => {
     e.preventDefault();
     activateSession(session.id);
     openSessionContextMenu(session, e.clientX, e.clientY);
   };
+  tab.addEventListener('mouseenter', () => {
+    if (session.id === state.activeId) return;
+    state.ui.hoverTabSessionId = session.id;
+    renderTabs();
+  });
+  tab.addEventListener('mouseleave', () => {
+    if (state.ui.hoverTabSessionId !== session.id) return;
+    state.ui.hoverTabSessionId = null;
+    renderTabs();
+  });
   $('#tab-list').appendChild(tab);
-  return { tab, dot, tabBadge: badge };
+  return { tab, dot, tabLabelWrap: labelWrap, tabLabel: label, tabBadge: badge };
 }
 
 function renderTabs() {
   for (const s of state.sessions.values()) {
     if (!s.els || !s.els.tab) continue;
     s.els.tab.classList.toggle('active', s.id === state.activeId);
+    updateSessionTabText(s);
   }
+  updateTabOverflowState();
 }
 
 function attentionItems() {
@@ -2450,6 +2550,16 @@ function openSettings() {
   checkUpdates(false).catch(() => {});
 }
 
+function applyTerminalTitleUpdates(session, data) {
+  const res = window.chromuxSignals.extractTerminalTitles(session.term.titleBuf, data);
+  session.term.titleBuf = res.buf;
+  if (res.titles.length === 0) return;
+  const latest = res.titles[res.titles.length - 1].title;
+  if (!latest || latest === session.term.title) return;
+  session.term.title = latest;
+  invalidate('tabs');
+}
+
 // pty event routing — Chromux OSC signals are extracted (chunk-boundary safe)
 // before anything reaches the terminal or the preview detector. A signal whose
 // session id does not match the PTY it arrived on is dropped and recorded as
@@ -2457,6 +2567,7 @@ function openSettings() {
 function handlePtyData(id, data) {
   const s = state.sessions.get(id);
   if (!s) return;
+  applyTerminalTitleUpdates(s, data);
   const res = window.chromuxSignals.extractChromuxSignals(s.term.signalBuf, data);
   s.term.signalBuf = res.buf;
   for (const sig of res.signals) {
@@ -3383,6 +3494,75 @@ if (window.chromuxTest) {
     renderQueue(session);
     flushRender();
     return session.id;
+  };
+
+  const addRenderableTestSession = ({ name = 'tab-test', agent = 'codex', cwd = '/tmp' } = {}) => {
+    state.counter += 1;
+    const session = newSessionShape({ id: 's' + state.counter, name, cwd, agent });
+    const viewEls = buildSessionView(session);
+    const tabEls = buildSessionTab(session);
+    const written = [];
+    session._written = written;
+    session.term.term = { write: (d) => written.push(d), focus() {}, dispose() {} };
+    session.term.fit = () => {};
+    session.els = { ...viewEls, ...tabEls };
+    state.sessions.set(session.id, session);
+    apply({ type: 'session-created', sessionId: session.id, name, cwd, agent });
+    renderQueue(session);
+    activateSession(session.id);
+    flushRender();
+    return session.id;
+  };
+
+  window.chromuxTestTabs = {
+    addSession: addRenderableTestSession,
+    feed(id, chunk) {
+      handlePtyData(id, chunk);
+      flushRender();
+    },
+    focus(id) {
+      activateSession(id);
+      flushRender();
+    },
+    forceTabWidth(id, px) {
+      const tab = testSession(id).els.tab;
+      tab.style.flex = `0 0 ${px}px`;
+      tab.style.width = `${px}px`;
+      tab.style.minWidth = `${px}px`;
+      tab.style.maxWidth = `${px}px`;
+      renderTabs();
+      flushRender();
+    },
+    hover(id) {
+      testSession(id).els.tab.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+      flushRender();
+    },
+    unhover(id) {
+      testSession(id).els.tab.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
+      flushRender();
+    },
+    label: (id) => testSession(id).els.tabLabel.textContent,
+    terminalTitle: (id) => testSession(id).term.title,
+    tooltip: (id) => testSession(id).els.tab.title,
+    written: (id) => (testSession(id)._written || []).join(''),
+    state(id) {
+      const session = testSession(id);
+      const tab = session.els.tab;
+      const wrap = session.els.tabLabelWrap;
+      const label = session.els.tabLabel;
+      return {
+        active: tab.classList.contains('active'),
+        truncated: tab.classList.contains('truncated'),
+        marquee: tab.classList.contains('marquee'),
+        paused: tab.classList.contains('paused'),
+        hoverScroll: tab.classList.contains('hover-scroll'),
+        label: label.textContent,
+        title: tab.title,
+        wrapWidth: wrap.clientWidth,
+        labelWidth: label.scrollWidth,
+      };
+    },
+    flushRender,
   };
 
   window.chromuxTestUpdateQueue = {

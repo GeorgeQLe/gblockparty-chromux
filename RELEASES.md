@@ -1,5 +1,14 @@
 # Release Notes
 
+## GBlockParty Chromux v0.14.0
+
+Planned tag: `chromux-v0.14.0`
+
+- Update session tab labels from terminal OSC 0/1/2 title sequences emitted by agents and shells while leaving the title control bytes flowing through to xterm.
+- Keep launch names as tab fallbacks, retain full title/cwd tooltip context, and sanitize empty/control-heavy titles before display.
+- Add overflow-aware tab labels with active-title marquee, inactive hover handoff, and reduced-motion static ellipsis fallback.
+- Extend OSC parser coverage and add renderer smoke coverage for title updates, fallback labels, truncation, marquee selection, and hover handoff.
+
 ## GBlockParty Chromux v0.13.2
 
 Planned tag: `chromux-v0.13.2`
