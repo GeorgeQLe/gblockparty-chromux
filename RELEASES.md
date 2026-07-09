@@ -1,5 +1,11 @@
 # Release Notes
 
+## GBlockParty Chromux v0.14.2
+
+Planned tag: `chromux-v0.14.2`
+
+- Hide the native scrollbar inside narrow paired-browser toolbars while preserving horizontal scrolling so Queue, Pick Element, Capture, and Collapse remain reachable.
+
 ## GBlockParty Chromux v0.14.1
 
 Planned tag: `chromux-v0.14.1`

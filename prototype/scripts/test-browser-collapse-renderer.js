@@ -36,6 +36,7 @@ fs.writeFileSync(e2ePath, `
   b.narrow(firstId, 245);
   let first = b.state(firstId);
   expect(first.toolbarOverflow, 'narrow browser toolbar should horizontally overflow');
+  expect(first.toolbarScrollbarWidth === 'none', 'browser toolbar scrollbar should be hidden, got ' + first.toolbarScrollbarWidth);
   b.scrollCaptureIntoView(firstId);
   await tick();
   first = b.state(firstId);

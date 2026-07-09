@@ -561,10 +561,9 @@ body.dragging webview { pointer-events: none; }
   overflow-x: auto;
   overflow-y: hidden;
   white-space: nowrap;
-  scrollbar-width: thin;
+  scrollbar-width: none;
 }
-.browser-toolbar::-webkit-scrollbar { height: 6px; }
-.browser-toolbar::-webkit-scrollbar-thumb { background: var(--line-hi); }
+.browser-toolbar::-webkit-scrollbar { display: none; }
 
 .nav-btn {
   flex: 0 0 24px;

@@ -4126,6 +4126,7 @@ if (window.chromuxTest) {
     state(id) {
       const session = testSession(id);
       const toolbar = session.els.browserToolbar;
+      const toolbarStyle = getComputedStyle(toolbar);
       const toolbarRect = toolbar.getBoundingClientRect();
       const captureRect = session.els.captureBtn.getBoundingClientRect();
       return {
@@ -4143,6 +4144,7 @@ if (window.chromuxTest) {
         queuePanelHidden: session.els.queuePanel.classList.contains('hidden'),
         fitCount: session._fitCount(),
         toolbarOverflow: toolbar.scrollWidth > toolbar.clientWidth,
+        toolbarScrollbarWidth: toolbarStyle.getPropertyValue('scrollbar-width'),
         captureReachable: captureRect.right <= toolbarRect.right + 1 && captureRect.left >= toolbarRect.left - 1,
       };
     },
