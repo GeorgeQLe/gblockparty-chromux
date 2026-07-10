@@ -21,14 +21,6 @@ Planned tag: `chromux-v0.14.4`
 
 - Suppress bare Shift and ordinary shifted typing in the hotkey diagnostics strip while preserving Shift highlighting and catalog matching for Command+Shift+B.
 
-## GBlockParty Chromux v0.14.3
-
-Planned tag: `chromux-v0.14.3`
-
-- Adopt Claude and Codex sessions launched from a Chromux Shell tab by rewriting simple `claude ...` and `codex ...` submissions into Chromux-instrumented commands while preserving user arguments.
-- Leave complex shell syntax, wrappers, redirects, and existing Claude/Codex hook flags untouched, then fall back to read-only process scanning for Chromux-owned PTYs.
-- Save adopted shell-started agents as Claude/Codex sessions in restore snapshots so update safety and workspace restore use the corrected session identity.
-
 ## GBlockParty Chromux v0.14.2
 
 Planned tag: `chromux-v0.14.2`

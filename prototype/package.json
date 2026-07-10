@@ -32,7 +32,6 @@
     "test:agent-command-quoting": "node scripts/test-agent-command-quoting.js",
     "test:github-update-check": "node scripts/test-github-update-check.js",
     "test:update-queue-renderer": "node scripts/test-update-queue-renderer.js",
-    "test:shell-adoption-renderer": "node scripts/test-shell-adoption-renderer.js",
     "package": "electron-packager . Chromux --platform=darwin --arch=arm64 --icon=build/icon --app-bundle-id=dev.georgele.chromux --overwrite --out=dist --ignore='^/dist' --ignore='^/build/icon.iconset' --asar.unpack='**/node_modules/node-pty/**'",
     "install-app": "npm run package && node scripts/record-install-source.js && rm -rf /Applications/Chromux.app && cp -R dist/Chromux-darwin-arm64/Chromux.app /Applications/Chromux.app",
     "rebuild": "electron-rebuild -f -w node-pty",
