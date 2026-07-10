@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.15.0
+
+Planned tag: `chromux-v0.15.0`
+
+- Introduce a unified Chromux brand mark: three dots in a right-facing chevron — orange (Claude), purple (Codex), green (Gemini) — replacing the previous mismatched marks across surfaces.
+- Regenerate the macOS app icon (`build/icon.icns`) from the new mark on a dark tile, and reuse the same mark for the in-app titlebar and the landing page.
+- Add the missing landing-page favicon and Apple touch icon derived from the app tile so the browser tab matches the Dock icon.
+
 ## GBlockParty Chromux v0.14.5
 
 Planned tag: `chromux-v0.14.5`
