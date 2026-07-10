@@ -818,12 +818,24 @@ function shortcutDebugDetailsActive(modifiers = {}) {
   return Boolean(modifiers.meta || modifiers.control);
 }
 
+function sanitizeShortcutDebugModifiers(modifiers = {}, key = null, type = 'unknown') {
+  const normalized = {
+    meta: Boolean(modifiers.meta),
+    shift: Boolean(modifiers.shift),
+    alt: Boolean(modifiers.alt),
+    control: Boolean(modifiers.control),
+  };
+  const primaryModifierKeyDown = type === 'keyDown' && (key === '⌘' || key === '⌃');
+  normalized.shift = normalized.shift && (shortcutDebugDetailsActive(normalized) || primaryModifierKeyDown);
+  return normalized;
+}
+
 function normalizeShortcutDebugKey(raw, modifiers = {}) {
   const key = String(raw || '');
   if (!key) return null;
   const lower = key.toLowerCase();
   if (lower === 'meta' || lower === 'command' || key === '⌘') return '⌘';
-  if (lower === 'shift' || key === '⇧') return '⇧';
+  if (lower === 'shift' || key === '⇧') return shortcutDebugDetailsActive(modifiers) ? '⇧' : null;
   if (lower === 'alt' || lower === 'option' || key === '⌥') return '⌥';
   if (lower === 'control' || lower === 'ctrl' || key === '⌃') return '⌃';
   if (!shortcutDebugDetailsActive(modifiers)) return null;
@@ -839,17 +851,19 @@ function normalizeShortcutDebugKey(raw, modifiers = {}) {
 }
 
 function shortcutDebugInputFromDomEvent(e, source = 'renderer') {
+  const type = e.type === 'keyup' ? 'keyUp' : 'keyDown';
   const modifiers = {
     meta: Boolean(e.metaKey),
     shift: Boolean(e.shiftKey),
     alt: Boolean(e.altKey),
     control: Boolean(e.ctrlKey),
   };
+  const key = normalizeShortcutDebugKey(e.key, modifiers);
   return {
     source,
-    type: e.type === 'keyup' ? 'keyUp' : 'keyDown',
-    key: normalizeShortcutDebugKey(e.key, modifiers),
-    modifiers,
+    type,
+    key,
+    modifiers: sanitizeShortcutDebugModifiers(modifiers, key, type),
     repeat: Boolean(e.repeat),
     ts: Date.now(),
   };
@@ -869,7 +883,7 @@ function scheduleShortcutDebugClear() {
 }
 
 function noteShortcutDebugInput(payload = {}) {
-  const modifiers = {
+  let modifiers = {
     meta: Boolean(payload.modifiers && payload.modifiers.meta),
     shift: Boolean(payload.modifiers && payload.modifiers.shift),
     alt: Boolean(payload.modifiers && payload.modifiers.alt),
@@ -887,6 +901,7 @@ function noteShortcutDebugInput(payload = {}) {
     if (key === '⌥') modifiers.alt = false;
     if (key === '⌃') modifiers.control = false;
   }
+  modifiers = sanitizeShortcutDebugModifiers(modifiers, key, payload.type || 'unknown');
 
   state.shortcutDebug.source = payload.source || 'host';
   state.shortcutDebug.webContentsId = Number.isFinite(payload.webContentsId) ? payload.webContentsId : null;
@@ -4026,6 +4041,13 @@ if (window.chromuxTest) {
     note(payload) {
       noteShortcutDebugInput(payload);
       flushRender();
+    },
+    noteDom(event) {
+      noteShortcutDebugInput(shortcutDebugInputFromDomEvent(event, 'renderer'));
+      flushRender();
+    },
+    domInput(event) {
+      return shortcutDebugInputFromDomEvent(event, 'renderer');
     },
     shortcutNewSession() {
       const result = handleShortcutOpenNewSession();

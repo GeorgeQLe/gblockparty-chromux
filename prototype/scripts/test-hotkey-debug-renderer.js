@@ -112,6 +112,41 @@ fs.writeFileSync(e2ePath, `
   h.note({
     source: 'host',
     type: 'keyDown',
+    key: 'Shift',
+    modifiers: { meta: false, shift: true, alt: false, control: false },
+    ts: Date.now(),
+  });
+  debug = h.debug();
+  expect(debug.detailsActive === false, 'bare Shift should keep shortcut details inactive');
+  expect(debug.latestKey === null, 'bare Shift should not set the latest shortcut key');
+  expect(debug.modifiers.shift === false, 'bare Shift should not light the Shift modifier chip');
+
+  h.note({
+    source: 'host',
+    type: 'keyDown',
+    key: 'T',
+    modifiers: { meta: false, shift: true, alt: false, control: false },
+    ts: Date.now(),
+  });
+  debug = h.debug();
+  expect(debug.detailsActive === false, 'shifted typing should keep shortcut details inactive');
+  expect(debug.latestKey === null, 'shifted typing should not set the latest shortcut key');
+  expect(debug.modifiers.shift === false, 'shifted typing should not light the Shift modifier chip');
+
+  const bareDomShift = h.domInput({
+    type: 'keydown',
+    key: 'Shift',
+    metaKey: false,
+    shiftKey: true,
+    altKey: false,
+    ctrlKey: false,
+  });
+  expect(bareDomShift.key === null, 'renderer DOM bare Shift should not become a diagnostic key');
+  expect(bareDomShift.modifiers.shift === false, 'renderer DOM bare Shift should not report an active Shift chip');
+
+  h.note({
+    source: 'host',
+    type: 'keyDown',
     key: 'Meta',
     modifiers: { meta: false, shift: false, alt: false, control: false },
     ts: Date.now(),
@@ -142,6 +177,19 @@ fs.writeFileSync(e2ePath, `
   expect(debug.detailsActive === true, 'Command+T should activate shortcut details');
   expect(debug.latestKey === 'T', 'Command+T should set T as the latest shortcut key');
   expect(byId('new-session').matchedByCurrentChord, 'Command+T should match the new-session shortcut');
+
+  h.note({
+    source: 'host',
+    type: 'keyDown',
+    key: 'B',
+    modifiers: { meta: true, shift: true, alt: false, control: false },
+    ts: Date.now(),
+  });
+  debug = h.debug();
+  expect(debug.detailsActive === true, 'Command+Shift+B should activate shortcut details');
+  expect(debug.latestKey === 'B', 'Command+Shift+B should set B as the latest shortcut key');
+  expect(debug.modifiers.shift === true, 'Command+Shift+B should light the Shift modifier chip');
+  expect(byId('browser-toggle').matchedByCurrentChord, 'Command+Shift+B should match the browser-toggle shortcut');
 
   h.note({
     source: 'host',

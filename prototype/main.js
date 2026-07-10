@@ -85,16 +85,20 @@ function shortcutDebugModifierActive(input, name) {
   return direct || dom;
 }
 
+function shortcutDebugPrimaryModifierActive(input) {
+  return shortcutDebugModifierActive(input, 'meta') || shortcutDebugModifierActive(input, 'control');
+}
+
 function shortcutDebugKey(input) {
   const key = String(input && input.key ? input.key : '');
   const keyCode = String(input && input.keyCode ? input.keyCode : '');
   const code = String(input && input.code ? input.code : '');
-  const detailsActive = shortcutDebugModifierActive(input, 'meta') || shortcutDebugModifierActive(input, 'control');
+  const detailsActive = shortcutDebugPrimaryModifierActive(input);
   const digit = sessionShortcutDigit(input || {});
 
   const lower = key && key.toLowerCase() !== 'unidentified' ? key.toLowerCase() : keyCode.toLowerCase();
   if (lower === 'meta' || lower === 'command' || code === 'MetaLeft' || code === 'MetaRight') return '⌘';
-  if (lower === 'shift' || code === 'ShiftLeft' || code === 'ShiftRight') return '⇧';
+  if (lower === 'shift' || code === 'ShiftLeft' || code === 'ShiftRight') return detailsActive ? '⇧' : null;
   if (lower === 'alt' || lower === 'option' || code === 'AltLeft' || code === 'AltRight') return '⌥';
   if (lower === 'control' || code === 'ControlLeft' || code === 'ControlRight') return '⌃';
   if (!detailsActive) return null;
@@ -111,16 +115,21 @@ function shortcutDebugKey(input) {
 
 function emitShortcutDebugInput(input, source, webContentsId = null) {
   const key = shortcutDebugKey(input);
+  const type = input && input.type ? String(input.type) : 'unknown';
+  const meta = shortcutDebugModifierActive(input, 'meta');
+  const control = shortcutDebugModifierActive(input, 'control');
+  const shiftActive = shortcutDebugModifierActive(input, 'shift');
+  const shiftDiagnostic = shiftActive && (meta || control || (type === 'keyDown' && (key === '⌘' || key === '⌃')));
   send('shortcut-debug-input', {
     source,
     webContentsId,
-    type: input && input.type ? String(input.type) : 'unknown',
+    type,
     key,
     modifiers: {
-      meta: shortcutDebugModifierActive(input, 'meta'),
-      shift: shortcutDebugModifierActive(input, 'shift'),
+      meta,
+      shift: shiftDiagnostic,
       alt: shortcutDebugModifierActive(input, 'alt'),
-      control: shortcutDebugModifierActive(input, 'control'),
+      control,
     },
     repeat: Boolean(input && input.isAutoRepeat),
     ts: Date.now(),

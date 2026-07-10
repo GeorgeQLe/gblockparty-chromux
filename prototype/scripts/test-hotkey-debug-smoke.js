@@ -70,6 +70,16 @@ fs.writeFileSync(e2ePath, `
     return debug;
   }
 
+  async function sendHostDiagnosticProbe(keyCode, modifiers = []) {
+    await host.sendHostInput({ type: 'keyDown', keyCode, modifiers });
+    await wait(120);
+    const debug = h.debug();
+    await host.sendHostInput({ type: 'keyUp', keyCode, modifiers });
+    await wait(80);
+    b.flushRender();
+    return debug;
+  }
+
   async function sendWebviewShortcut(wv, keyCode, modifiers = []) {
     wv.sendInputEvent({ type: 'keyDown', keyCode, modifiers });
     await wait(80);
@@ -92,6 +102,16 @@ fs.writeFileSync(e2ePath, `
   const commandOnly = await sendHostCommandProbe();
   expect(commandOnly.source === 'host', 'Command key probe should be received from host window');
   expect(commandOnly.modifiers.meta === true || commandOnly.text.includes('⌘'), 'Command key probe should light the Command modifier');
+
+  const bareShift = await sendHostDiagnosticProbe('Shift', ['shift']);
+  expect(bareShift.detailsActive === false, 'bare Shift should not activate shortcut details');
+  expect(bareShift.latestKey === null, 'bare Shift should not set the latest shortcut key');
+  expect(bareShift.modifiers.shift === false, 'bare Shift should not light the Shift modifier chip');
+
+  const shiftedTyping = await sendHostDiagnosticProbe('T', ['shift']);
+  expect(shiftedTyping.detailsActive === false, 'ordinary shifted typing should not activate shortcut details');
+  expect(shiftedTyping.latestKey === null, 'ordinary shifted typing should not set the latest shortcut key');
+  expect(shiftedTyping.modifiers.shift === false, 'ordinary shifted typing should not light the Shift modifier chip');
 
   let debug = null;
 
@@ -135,6 +155,7 @@ fs.writeFileSync(e2ePath, `
   debug = h.debug();
   expect(debug.source === 'host', 'Command+Shift+B should be received from host window');
   expect(debug.latestKey === 'B', 'Command+Shift+B should show B as latest key');
+  expect(debug.modifiers.shift === true, 'Command+Shift+B should light the Shift modifier chip');
   expect(byId(debug.catalog, 'browser-toggle').matchedByCurrentChord, 'Command+Shift+B should match browser toggle');
   expect(b.state(firstId).collapsed, 'host Command+Shift+B should collapse active browser');
 
@@ -206,6 +227,8 @@ fs.writeFileSync(e2ePath, `
   debug = h.debug();
   expect(debug.source === 'webview', 'Command+Shift+B should be received from webview');
   expect(debug.latestKey === 'B', 'webview Command+Shift+B should show B as latest key');
+  expect(debug.modifiers.shift === true, 'webview Command+Shift+B should light the Shift modifier chip');
+  expect(byId(debug.catalog, 'browser-toggle').matchedByCurrentChord, 'webview Command+Shift+B should match browser toggle');
   expect(b.state(firstId).collapsed, 'webview Command+Shift+B should collapse the first session browser');
 
   await focusGuest('#noneditable', false);

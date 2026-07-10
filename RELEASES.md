@@ -1,5 +1,11 @@
 # Release Notes
 
+## GBlockParty Chromux v0.14.4
+
+Planned tag: `chromux-v0.14.4`
+
+- Suppress bare Shift and ordinary shifted typing in the hotkey diagnostics strip while preserving Shift highlighting and catalog matching for Command+Shift+B.
+
 ## GBlockParty Chromux v0.14.2
 
 Planned tag: `chromux-v0.14.2`
