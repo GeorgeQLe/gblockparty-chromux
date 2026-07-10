@@ -1964,12 +1964,12 @@ function orderedSessions() {
   return [...state.sessions.values()];
 }
 
-function sessionTabLabel(session) {
+function sessionDisplayLabel(session) {
   return (session.term && session.term.title) || session.name;
 }
 
 function sessionTabTooltip(session) {
-  const label = sessionTabLabel(session);
+  const label = sessionDisplayLabel(session);
   const cwd = session.cwd || '~';
   return session.term && session.term.title && session.term.title !== session.name
     ? `${label} — ${cwd}\nLaunch name: ${session.name}`
@@ -1978,7 +1978,7 @@ function sessionTabTooltip(session) {
 
 function updateSessionTabText(session) {
   if (!session || !session.els || !session.els.tab) return;
-  const label = sessionTabLabel(session);
+  const label = sessionDisplayLabel(session);
   session.els.tab.title = sessionTabTooltip(session);
   if (session.els.tabLabel && session.els.tabLabel.textContent !== label) {
     session.els.tabLabel.textContent = label;
@@ -2052,7 +2052,7 @@ function buildSessionTab(session) {
   tab.title = sessionTabTooltip(session);
   const dot = document.createElement('span'); dot.className = 'tab-dot live';
   const labelWrap = document.createElement('span'); labelWrap.className = 'tab-label-wrap';
-  const label = document.createElement('span'); label.className = 'tab-label'; label.textContent = sessionTabLabel(session);
+  const label = document.createElement('span'); label.className = 'tab-label'; label.textContent = sessionDisplayLabel(session);
   labelWrap.appendChild(label);
   const badge = document.createElement('span'); badge.className = 'tab-badge zero'; badge.textContent = '0';
   const x = document.createElement('button'); x.className = 'tab-x'; x.textContent = '✕'; x.title = 'Close session';
@@ -2157,7 +2157,7 @@ function renderAttentionQueue() {
     kind.textContent = item.kind;
     const name = document.createElement('span');
     name.className = 'attention-name';
-    name.textContent = session.name;
+    name.textContent = sessionDisplayLabel(session);
     top.append(kind, name);
     const detail = document.createElement('div');
     detail.className = 'attention-detail';
@@ -2583,7 +2583,7 @@ function applyTerminalTitleUpdates(session, data) {
   const latest = res.titles[res.titles.length - 1].title;
   if (!latest || latest === session.term.title) return;
   session.term.title = latest;
-  invalidate('tabs');
+  invalidate('tabs', 'attention');
 }
 
 // pty event routing — Chromux OSC signals are extracted (chunk-boundary safe)

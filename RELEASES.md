@@ -1,5 +1,12 @@
 # Release Notes
 
+## GBlockParty Chromux v0.14.5
+
+Planned tag: `chromux-v0.14.5`
+
+- Keep attention-queue session labels aligned with dynamic terminal titles shown in the top session tabs, with the original launch name retained as the shared fallback.
+- Refresh visible attention rows when terminal titles change and cover the cross-surface label behavior with a renderer regression test.
+
 ## GBlockParty Chromux v0.14.4
 
 Planned tag: `chromux-v0.14.4`

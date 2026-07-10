@@ -23,6 +23,7 @@ fs.writeFileSync(e2ePath, `
   const expect = (cond, msg) => { if (!cond) throw new Error(msg); };
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const osc = (event, id) => '\\x1b]777;chromux;v1;' + event + ';' + id + '\\x07';
+  const titleOsc = (title) => '\\x1b]0;' + title + '\\x07';
   const itemsFor = (kind, name) => sig.attentionItems()
     .filter((i) => i.kind === kind && (!name || i.name === name));
 
@@ -139,7 +140,19 @@ fs.writeFileSync(e2ePath, `
   expect(rejected.some((e) => e.claimedSessionId === 'someone-else'),
     'foreign-id signal recorded with claimed session');
 
-  // exited sessions: dead dot only, never a queue item.
+  // 8 — attention labels share the tab's dynamic terminal title and stay live.
+  const titled = sig.addFakeSession({ name: 'session-3', agent: 'codex' });
+  sig.feedPtyChunk(titled, titleOsc('chromux'));
+  sig.emitSignal(titled, 'turn-end');
+  expect(itemsFor('COMPLETED', 'chromux').length === 1,
+    'attention item should use the same dynamic label as the session tab');
+  expect(itemsFor('COMPLETED', 'session-3').length === 0,
+    'attention item should not retain the launch name after a terminal title arrives');
+  sig.feedPtyChunk(titled, titleOsc('chromux renamed'));
+  expect(itemsFor('COMPLETED', 'chromux renamed').length === 1,
+    'visible attention item should update when the terminal title changes');
+
+  // Exited sessions: dead dot only, never a queue item.
   sig.exit(shell, 1);
   expect(sig.attentionItems().every((i) => i.kind !== 'EXITED'), 'no EXITED attention items');
 
