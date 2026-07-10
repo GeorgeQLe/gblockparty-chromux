@@ -73,8 +73,9 @@ body {
     linear-gradient(180deg, var(--bg2), var(--bg1));
 }
 
-.brand { display: flex; align-items: baseline; gap: 10px; }
-.brand-mark { color: var(--amber); font-size: 15px; text-shadow: var(--glow-amber); }
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-mark { display: inline-flex; align-items: center; color: var(--text); }
+.brand-mark svg { display: block; }
 .brand-name {
   font-family: var(--font-display);
   font-size: 17px;

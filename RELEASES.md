@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.15.0
+
+Planned tag: `chromux-v0.15.0`
+
+- Introduce a unified Chromux brand mark: three dots in a right-facing chevron — orange (Claude), purple (Codex), green (Gemini) — replacing the previous mismatched marks across surfaces.
+- Regenerate the macOS app icon (`build/icon.icns`) from the new mark on a dark tile, and reuse the same mark for the in-app titlebar and the landing page.
+- Add the missing landing-page favicon and Apple touch icon derived from the app tile so the browser tab matches the Dock icon.
+
 ## GBlockParty Chromux v0.14.5
 
 Planned tag: `chromux-v0.14.5`
@@ -12,6 +20,14 @@ Planned tag: `chromux-v0.14.5`
 Planned tag: `chromux-v0.14.4`
 
 - Suppress bare Shift and ordinary shifted typing in the hotkey diagnostics strip while preserving Shift highlighting and catalog matching for Command+Shift+B.
+
+## GBlockParty Chromux v0.14.3
+
+Planned tag: `chromux-v0.14.3`
+
+- Adopt Claude and Codex sessions launched from a Chromux Shell tab by rewriting simple `claude ...` and `codex ...` submissions into Chromux-instrumented commands while preserving user arguments.
+- Leave complex shell syntax, wrappers, redirects, and existing Claude/Codex hook flags untouched, then fall back to read-only process scanning for Chromux-owned PTYs.
+- Save adopted shell-started agents as Claude/Codex sessions in restore snapshots so update safety and workspace restore use the corrected session identity.
 
 ## GBlockParty Chromux v0.14.2
 
