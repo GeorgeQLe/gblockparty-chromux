@@ -30,7 +30,11 @@ const UPDATE_INSTALL_LOG = path.join(CHROMUX_HOME, 'update-install.log');
 const RESTORE_SESSIONS = path.join(CHROMUX_HOME, 'restore-sessions.json');
 const HOOKS_CLAUDE = path.join(CHROMUX_HOME, 'hooks-claude.json');
 const CODEX_NOTIFY = path.join(CHROMUX_HOME, 'codex-notify.sh');
+const GROK_HOOK_SCRIPT = path.join(CHROMUX_HOME, 'grok-hook.sh');
+const HOOKS_GROK = path.join(CHROMUX_HOME, 'hooks-grok.json');
+const GROK_HOOKS_INSTALL_NAME = 'chromux-turn-signals.json';
 const PACKAGE_PATH = path.join(__dirname, 'package.json');
+const KNOWN_AGENTS = ['claude', 'codex', 'grok', ''];
 const QUEUE_REASON_BY_SOURCE = {
   TERM: 'detected in agent output',
   FILE: 'local HTML path exists',
@@ -56,6 +60,9 @@ if (SMOKE) {
     return true;
   });
   ipcMain.handle('test-shortcut-route-log', () => shortcutRouteLog.slice(-100));
+  ipcMain.handle('test-classify-pty-agent-descendants', (_e, { procs = [], roots = [] } = {}) => ({
+    rows: classifyPtyAgentDescendants(procs, roots),
+  }));
 }
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
@@ -318,7 +325,7 @@ function writeClaudeHooksSettings() {
 // Set in app.whenReady: true only after the corresponding hook file was
 // written successfully. When false, agents launch uninstrumented instead of
 // pointing --settings/notify at a path that was never written.
-const hookInstall = { claude: false, codex: false };
+const hookInstall = { claude: false, codex: false, grok: false };
 
 // POSIX single-quoting: close the quote, emit an escaped ', reopen. Safe for
 // any byte the filesystem allows (spaces, quotes, backslashes).
@@ -366,10 +373,73 @@ function codexCommand(resumeId = null) {
   return resumeId ? `${base} resume ${shellQuote(resumeId)}` : base;
 }
 
+// Grok Build turn signals — Grok discovers hooks from ~/.grok/hooks/*.json
+// (always trusted; no per-launch --settings flag). Chromux rewrites a
+// dependency-free notify script and a matching hook JSON into both
+// ~/.chromux/ and ~/.grok/hooks/chromux-turn-signals.json. The script no-ops
+// unless CHROMUX_SESSION_ID is set, so non-Chromux Grok sessions are untouched.
+// Passive Grok hooks ignore stdout, so the OSC is written to /dev/tty (same
+// path as Codex notify) and rides the PTY Chromux already owns.
+function grokHomeDir() {
+  const override = process.env.GROK_HOME;
+  return override && typeof override === 'string' && override.trim()
+    ? override.trim()
+    : path.join(os.homedir(), '.grok');
+}
+
+function writeGrokHooks() {
+  ensureDirs();
+  const script = [
+    '#!/bin/sh',
+    '# Chromux Grok Build hook. Emits a turn OSC to the controlling terminal',
+    '# so the signal arrives on the PTY Chromux owns. The session id comes',
+    '# from CHROMUX_SESSION_ID in the PTY env; the renderer drops any signal',
+    '# whose id does not match the PTY it arrived on. Outside Chromux the env',
+    '# var is unset and this exits immediately.',
+    '[ -n "$CHROMUX_SESSION_ID" ] || exit 0',
+    'event="$1"',
+    'case "$event" in',
+    '  turn-start|input-needed|turn-end) ;;',
+    '  *) exit 0 ;;',
+    'esac',
+    'printf \'\\033]777;chromux;v1;%s;%s\\007\' "$event" "$CHROMUX_SESSION_ID" > /dev/tty 2>/dev/null || true',
+    '',
+  ].join('\n');
+  fs.writeFileSync(GROK_HOOK_SCRIPT, script, { mode: 0o755 });
+  fs.chmodSync(GROK_HOOK_SCRIPT, 0o755);
+
+  // Absolute path is single-quoted so HOME with spaces/quotes still works when
+  // Grok runs the hook command through a shell.
+  const run = (event) => `${shellQuote(GROK_HOOK_SCRIPT)} ${event}`;
+  const hook = (event) => [{ hooks: [{ type: 'command', command: run(event) }] }];
+  const settings = {
+    hooks: {
+      // No SubagentStop: a subagent finishing must not read as session-level
+      // turn completion (same policy as Claude Code hooks).
+      UserPromptSubmit: hook('turn-start'),
+      Notification: hook('input-needed'),
+      Stop: hook('turn-end'),
+    },
+  };
+  const json = JSON.stringify(settings, null, 2) + '\n';
+  fs.writeFileSync(HOOKS_GROK, json);
+
+  const grokHooksDir = path.join(grokHomeDir(), 'hooks');
+  fs.mkdirSync(grokHooksDir, { recursive: true });
+  fs.writeFileSync(path.join(grokHooksDir, GROK_HOOKS_INSTALL_NAME), json);
+  return HOOKS_GROK;
+}
+
+function grokCommand(resumeId = null) {
+  // Launch flags are not required: hooks install into Grok's global discovery
+  // path. Resume uses the public CLI form verified on grok 0.2.x.
+  return resumeId ? `grok --resume ${shellQuote(resumeId)}` : 'grok';
+}
+
 function sanitizeRestoreSession(session) {
   if (!session || typeof session !== 'object') return null;
   const cwd = typeof session.cwd === 'string' && session.cwd ? session.cwd : os.homedir();
-  const agent = ['claude', 'codex', ''].includes(session.agent) ? session.agent : '';
+  const agent = KNOWN_AGENTS.includes(session.agent) ? session.agent : '';
   const queue = Array.isArray(session.queue)
     ? session.queue.map((item) => ({
       url: typeof item.url === 'string' ? item.url : '',
@@ -445,6 +515,14 @@ function markRestoreSnapshotConsumed(restoreId, restoredSessions = []) {
   });
 }
 
+function agentResumeCommand(agent, resumeId) {
+  if (!resumeId) return null;
+  if (agent === 'claude') return claudeCommand(resumeId);
+  if (agent === 'codex') return codexCommand(resumeId);
+  if (agent === 'grok') return grokCommand(resumeId);
+  return null;
+}
+
 function resolveRestoreSessions(sessions) {
   const codexIndex = codexSessionIndex();
   const resolved = [];
@@ -455,9 +533,8 @@ function resolveRestoreSessions(sessions) {
     let resume = null;
     if (session.agent === 'claude') resume = latestClaudeSession(session.cwd);
     else if (session.agent === 'codex') resume = codexIndex.get(session.cwd) || null;
-    const command = resume && session.agent === 'claude'
-      ? claudeCommand(resume.id)
-      : (resume && session.agent === 'codex' ? codexCommand(resume.id) : null);
+    else if (session.agent === 'grok') resume = latestGrokSession(session.cwd);
+    const command = agentResumeCommand(session.agent, resume && resume.id);
     const row = { ...session, resume, command };
     resolved.push(row);
     if (session.agent && !command) {
@@ -787,7 +864,7 @@ ipcMain.on('log-filedrop', (_e, { payloadPath, targetSession, cwd }) => {
 
 // ---------------------------------------------------------------------------
 // External-session detection — scan the machine for open terminal tabs and the
-// claude/codex sessions running inside them, so they can be adopted into
+// claude/codex/grok sessions running inside them, so they can be adopted into
 // Chromux (resume the CLI's own saved conversation, or start fresh).
 // Read-only: ps + lsof + AppleScript + session-store file mtimes.
 // ---------------------------------------------------------------------------
@@ -810,9 +887,18 @@ async function listTtyProcesses() {
   return procs;
 }
 
-// 'claude' | 'codex' | null. Matches the CLI entrypoints only ('claude',
-// 'node …/codex'), not helpers like codex's SkyComputerUseClient, and skips
-// one-off `claude -p` deliveries (including our own adapter's).
+// Subcommands / headless entrypoints that are not interactive agent sessions.
+const GROK_NON_SESSION_TOKENS = new Set([
+  'agent', 'completions', 'dashboard', 'export', 'help', 'import', 'inspect',
+  'leader', 'login', 'logout', 'mcp', 'memory', 'models', 'plugin', 'sessions',
+  'setup', 'trace', 'update', 'version', 'v', 'worktree', 'wrap',
+  '-p', '--single', '--prompt-file', '--prompt-json',
+]);
+
+// 'claude' | 'codex' | 'grok' | null. Matches the CLI entrypoints only
+// ('claude', 'node …/codex', 'grok'), not helpers like codex's
+// SkyComputerUseClient, and skips one-off headless deliveries (`claude -p`,
+// `grok -p` / `grok --single`, including our own adapter's).
 function classifyAgentCommand(command) {
   const tokens = command.split(/\s+/);
   let head = tokens.shift() || '';
@@ -820,6 +906,16 @@ function classifyAgentCommand(command) {
   const name = path.basename(head);
   if (name === 'claude') return tokens[0] === '-p' ? null : 'claude';
   if (name === 'codex') return 'codex';
+  if (name === 'grok') {
+    if (GROK_NON_SESSION_TOKENS.has(tokens[0])) return null;
+    // Headless flags may appear after other options: `grok -m x -p "…"`.
+    if (tokens.some((t) => t === '-p' || t === '--single' || t.startsWith('--single=')
+      || t === '--prompt-file' || t.startsWith('--prompt-file=')
+      || t === '--prompt-json' || t.startsWith('--prompt-json='))) {
+      return null;
+    }
+    return 'grok';
+  }
   return null;
 }
 
@@ -837,6 +933,54 @@ function descendsFrom(pid, ancestorPid, byPid) {
     cur = proc.ppid;
   }
   return false;
+}
+
+function ancestryDepth(pid, ancestorPid, byPid) {
+  let cur = pid;
+  for (let depth = 0; depth < 64; depth += 1) {
+    if (cur === ancestorPid) return depth;
+    const proc = byPid.get(cur);
+    if (!proc || proc.ppid <= 1) return Number.MAX_SAFE_INTEGER;
+    cur = proc.ppid;
+  }
+  return Number.MAX_SAFE_INTEGER;
+}
+
+function classifyPtyAgentDescendants(procs, roots) {
+  const byPid = new Map(procs.map((p) => [p.pid, p]));
+  const agentPids = new Set(
+    procs.filter((p) => classifyAgentCommand(p.command)).map((p) => p.pid),
+  );
+  const rows = [];
+  for (const root of roots) {
+    const rootPid = Number(root && root.pid);
+    if (!root || !root.id || !Number.isFinite(rootPid) || rootPid <= 0) continue;
+    const agents = procs
+      .filter((p) => p.pid !== rootPid && descendsFrom(p.pid, rootPid, byPid))
+      .filter((p) => classifyAgentCommand(p.command) && !agentPids.has(p.ppid))
+      .sort((a, b) =>
+        (ancestryDepth(a.pid, rootPid, byPid) - ancestryDepth(b.pid, rootPid, byPid))
+        || (a.pid - b.pid));
+    const agentKinds = new Set(agents.map((p) => classifyAgentCommand(p.command)));
+    const target = agentKinds.size === 1 ? agents[0] : null;
+    rows.push({
+      id: root.id,
+      rootPid,
+      pid: target ? target.pid : null,
+      agent: target ? classifyAgentCommand(target.command) : '',
+      command: target ? target.command : '',
+      etime: target ? target.etime : '',
+      conflict: agentKinds.size > 1,
+      candidates: agents.map((p) => ({
+        pid: p.pid,
+        ppid: p.ppid,
+        agent: classifyAgentCommand(p.command),
+        command: p.command,
+        etime: p.etime,
+      })),
+    });
+  }
+  return rows;
 }
 
 async function lsofCwds(pids) {
@@ -917,6 +1061,70 @@ function latestClaudeSession(cwd) {
       if (!best || mtimeMs > best.ts) best = { id, ts: mtimeMs };
     }
   } catch { /* no sessions for this project */ }
+  return best;
+}
+
+// Latest saved Grok Build session for a project dir.
+// Layout: ~/.grok/sessions/<url-encoded-cwd>/<session-id>/summary.json
+// (GROK_HOME overrides ~/.grok). Long paths may use a slug+hash group with a
+// `.cwd` file recording the original path — we resolve that as a fallback.
+function latestGrokSession(cwd) {
+  if (!cwd || typeof cwd !== 'string') return null;
+  const root = path.join(grokHomeDir(), 'sessions');
+  let best = null;
+
+  const considerGroup = (groupDir) => {
+    let names;
+    try { names = fs.readdirSync(groupDir); } catch { return; }
+    for (const name of names) {
+      if (!/^[0-9a-f-]{16,}$/i.test(name)) continue;
+      const sessionDir = path.join(groupDir, name);
+      const summaryPath = path.join(sessionDir, 'summary.json');
+      let ts = 0;
+      try {
+        const summary = readJson(summaryPath);
+        const stamp = summary
+          && (summary.last_active_at || summary.updated_at
+            || (summary.info && (summary.info.last_active_at || summary.info.updated_at)));
+        if (typeof stamp === 'string') {
+          const parsed = Date.parse(stamp);
+          if (Number.isFinite(parsed)) ts = parsed;
+        }
+        if (!ts) ts = fs.statSync(summaryPath).mtimeMs;
+      } catch {
+        try { ts = fs.statSync(sessionDir).mtimeMs; } catch { continue; }
+      }
+      if (!best || ts > best.ts) best = { id: name, ts };
+    }
+  };
+
+  considerGroup(path.join(root, encodeURIComponent(cwd)));
+  if (best) return best;
+
+  // Fallback: hashed long-path groups (and any encoding mismatch) via .cwd or
+  // a summary.json info.cwd match. Capped walk — DETECT only needs "latest".
+  try {
+    const groups = fs.readdirSync(root);
+    for (const group of groups) {
+      if (group === 'session_search.sqlite') continue;
+      const groupDir = path.join(root, group);
+      let matched = false;
+      try {
+        if (fs.readFileSync(path.join(groupDir, '.cwd'), 'utf8').trim() === cwd) matched = true;
+      } catch { /* no .cwd marker */ }
+      if (!matched) {
+        try {
+          for (const name of fs.readdirSync(groupDir)) {
+            if (!/^[0-9a-f-]{16,}$/i.test(name)) continue;
+            const summary = readJson(path.join(groupDir, name, 'summary.json'));
+            const summaryCwd = summary && summary.info && summary.info.cwd;
+            if (summaryCwd === cwd) { matched = true; break; }
+          }
+        } catch { /* unreadable group */ }
+      }
+      if (matched) considerGroup(groupDir);
+    }
+  } catch { /* no grok sessions root */ }
   return best;
 }
 
@@ -1018,15 +1226,28 @@ ipcMain.handle('detect-external', async () => {
     if (!row.cwd) continue;
     if (row.agent === 'claude') row.resume = latestClaudeSession(row.cwd);
     else if (row.agent === 'codex') row.resume = codexIndex.get(row.cwd) || null;
+    else if (row.agent === 'grok') row.resume = latestGrokSession(row.cwd);
   }
 
-  const agentRank = { claude: 0, codex: 1, '': 2 };
+  const agentRank = { claude: 0, codex: 1, grok: 2, '': 3 };
   rows.sort((a, b) =>
-    (agentRank[a.agent] - agentRank[b.agent])
+    ((agentRank[a.agent] ?? 9) - (agentRank[b.agent] ?? 9))
     || (parseInt(a.tty.slice(4), 10) - parseInt(b.tty.slice(4), 10)));
   // tabs empty with rows present ⇒ Chromux lacks macOS Automation permission
   // for Terminal/iTerm2 (or neither is scriptable) — titles are best-effort.
   return { rows, tabTitles: tabs.size > 0, scannedAt: new Date().toISOString() };
+});
+
+ipcMain.handle('detect-pty-agents', async () => {
+  const roots = [...ptys.entries()]
+    .map(([id, p]) => ({ id, pid: Number(p && p.pid) }))
+    .filter((row) => row.id && Number.isFinite(row.pid) && row.pid > 0);
+  if (roots.length === 0) return { rows: [], scannedAt: new Date().toISOString() };
+  const procs = await listTtyProcesses();
+  return {
+    rows: classifyPtyAgentDescendants(procs, roots),
+    scannedAt: new Date().toISOString(),
+  };
 });
 
 // ---------------------------------------------------------------------------
@@ -1072,6 +1293,9 @@ ipcMain.handle('get-env', () => ({
   // agents uninstrumented instead of pointing them at broken paths.
   hooksSettingsPath: hookInstall.claude ? HOOKS_CLAUDE : null,
   codexNotifyPath: hookInstall.codex ? CODEX_NOTIFY : null,
+  // Grok hooks install into ~/.grok/hooks (no launch flag). Expose path for
+  // diagnostics/tests; launch always uses bare `grok` / `grok --resume`.
+  grokHooksPath: hookInstall.grok ? HOOKS_GROK : null,
   version: currentVersion(),
 }));
 
@@ -1152,6 +1376,7 @@ app.whenReady().then(() => {
   installAppMenu();
   try { writeClaudeHooksSettings(); hookInstall.claude = true; } catch (err) { console.error('hooks settings write failed:', err.message); }
   try { writeCodexNotifyScript(); hookInstall.codex = true; } catch (err) { console.error('codex notify script write failed:', err.message); }
+  try { writeGrokHooks(); hookInstall.grok = true; } catch (err) { console.error('grok hooks write failed:', err.message); }
   createWindow();
   getUpdateStatus().then((status) => send('update-status', status)).catch(() => {});
   app.on('activate', () => {

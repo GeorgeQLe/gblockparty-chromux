@@ -1,5 +1,22 @@
 # Release Notes
 
+## GBlockParty Chromux v0.17.0
+
+Planned tag: `chromux-v0.17.0`
+
+- Make the paired browser approval-gated: new sessions start with the browser shut, and detected localhost / loopback / local `.html` previews always enter QUEUE instead of auto-opening an empty pane.
+- Open a preview only on explicit approval — queue OPEN, ⌘/Ctrl-click a terminal link, or Enter in the URL bar — and restore a shut browser when a URL is opened.
+- Polish Command+Shift+B and COLLAPSE/RESTORE control copy for open/shut semantics, and update README / troubleshooting for the terminal-first workflow.
+
+## GBlockParty Chromux v0.16.0
+
+Planned tag: `chromux-v0.16.0`
+
+- Add Grok Build (`grok`) as a first-class agent alongside Claude Code and Codex: new-session picker, DETECT resume/fresh, shell-tab adoption, and restore snapshots.
+- Install Chromux turn-signal hooks into `~/.grok/hooks/chromux-turn-signals.json` (plus `~/.chromux/grok-hook.sh`) so Grok sessions emit the same OSC attention signals as Claude; hooks no-op outside Chromux when `CHROMUX_SESSION_ID` is unset.
+- Resume Grok conversations from `~/.grok/sessions/<encoded-cwd>/` via `grok --resume <id>` for DETECT and workspace restore.
+- Extend agent-command quoting and shell-adoption smoke coverage for Grok launch/resume and process classification.
+
 ## GBlockParty Chromux v0.15.0
 
 Planned tag: `chromux-v0.15.0`
@@ -20,6 +37,14 @@ Planned tag: `chromux-v0.14.5`
 Planned tag: `chromux-v0.14.4`
 
 - Suppress bare Shift and ordinary shifted typing in the hotkey diagnostics strip while preserving Shift highlighting and catalog matching for Command+Shift+B.
+
+## GBlockParty Chromux v0.14.3
+
+Planned tag: `chromux-v0.14.3`
+
+- Adopt Claude and Codex sessions launched from a Chromux Shell tab by rewriting simple `claude ...` and `codex ...` submissions into Chromux-instrumented commands while preserving user arguments.
+- Leave complex shell syntax, wrappers, redirects, and existing Claude/Codex hook flags untouched, then fall back to read-only process scanning for Chromux-owned PTYs.
+- Save adopted shell-started agents as Claude/Codex sessions in restore snapshots so update safety and workspace restore use the corrected session identity.
 
 ## GBlockParty Chromux v0.14.2
 

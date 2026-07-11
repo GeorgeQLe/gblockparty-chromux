@@ -1,10 +1,10 @@
 # Chromux — v1 prototype
 
-A macOS desktop **agent cockpit**: parallel Claude Code / Codex terminal sessions, each paired
-1:1 with an embedded Chromium browser pane. Localhost dev-server previews and generated
-`file://` HTML open next to the session that produced them — no alt-tabbing — and one click
-packages browser evidence (console tail + picked element + screenshot + URL) into a YAML
-payload delivered to an agent via `claude -p`.
+A macOS desktop **agent cockpit**: parallel Claude Code / Codex / Grok Build terminal sessions,
+each paired 1:1 with an embedded Chromium browser pane. Localhost dev-server previews and
+generated `file://` HTML open next to the session that produced them — no alt-tabbing — and
+one click packages browser evidence (console tail + picked element + screenshot + URL) into a
+YAML payload delivered to an agent via `claude -p`.
 
 Scope follows `research/idea-brief.md`: this is the "smallest v1 you'd actually use every day"
 (interview round 2, Q5). Deferred: live-session stdin injection, full network telemetry,
@@ -39,24 +39,25 @@ the same as in Terminal even when launched from Finder.
 Then complete the loop:
 
 1. **Start a session** — `+ NEW`, pick your project directory, choose CLAUDE CODE / CODEX /
-   SHELL ONLY. Chromux spawns your login shell and launches the agent CLI *unchanged* — it
-   wraps the CLIs, never modifies them.
+   GROK BUILD / SHELL ONLY. Chromux spawns your login shell and launches the agent CLI
+   *unchanged* — it wraps the CLIs, never modifies them.
 
    **…or adopt what's already running** — hit **⛶ DETECT** (⌘D). Chromux scans your open
    terminal tabs (`ps` + `lsof`, tab titles via Terminal.app/iTerm2 AppleScript) and lists
-   every live `claude` / `codex` process with its project directory, plus plain-shell tabs.
-   Per row: **RESUME** re-opens that project's latest saved conversation in a new Chromux
-   session (`claude --resume <id>` / `codex resume <id>`), **FRESH** starts a new one in the
-   same directory, **OPEN SHELL** adopts a shell tab's cwd. **OPEN ALL AGENTS** does the lot,
-   resuming where a saved session exists. The original tabs are never touched — everything is
-   read-only; if the agent is still running in the terminal, the resumed copy diverges from
-   the last save point.
-2. **Let the preview find you** — run your dev server (or ask the agent to). When the terminal
+   every live `claude` / `codex` / `grok` process with its project directory, plus plain-shell
+   tabs. Per row: **RESUME** re-opens that project's latest saved conversation in a new
+   Chromux session (`claude --resume <id>` / `codex resume <id>` / `grok --resume <id>`),
+   **FRESH** starts a new one in the same directory, **OPEN SHELL** adopts a shell tab's cwd.
+   **OPEN ALL AGENTS** does the lot, resuming where a saved session exists. The original tabs
+   are never touched — everything is read-only; if the agent is still running in the terminal,
+   the resumed copy diverges from the last save point.
+2. **Approve the preview** — run your dev server (or ask the agent to). When the terminal
    prints `http://localhost:5173` (or any loopback URL, or an absolute `/path/to/page.html`),
-   the paired browser pane auto-opens it. An empty pane auto-fills; a busy pane never gets
-   hot-swapped — later URLs land in the badged **QUEUE**, and popups from the page do too.
-   Re-emitting the same URL auto-refreshes the pane (throttled). Use **COLLAPSE** or
-   `Command+Shift+B` to hide/show the paired browser for the active session.
+   Chromux queues it in the badged **QUEUE** — nothing auto-opens. Approve with queue
+   **OPEN**, **⌘-click** a terminal link, or type a URL in the browser bar and hit ⏎.
+   Opening a URL also restores a shut browser. New sessions start with the paired browser
+   shut; use **RESTORE** / **COLLAPSE** or `Command+Shift+B` to open/shut it. Re-emitting
+   the same already-open URL auto-refreshes the pane (throttled). Popups queue too.
 3. **Capture evidence** — hit **⌖ PICK ELEMENT**, hover to highlight, click the broken thing
    (Esc cancels). Or **⚡ CAPTURE** for a page-level capture. Review the YAML payload, add a
    note, pick a target (paired session by default, redirectable), then:
@@ -73,11 +74,12 @@ failure screen shows the exact retry command. Every attempt is logged to
 
 | Piece | File | Notes |
 | --- | --- | --- |
-| Main process | `main.js` | PTYs (`node-pty`), capture persistence, `claude -p` adapter, popup interception, external terminal/agent-session detection |
+| Main process | `main.js` | PTYs (`node-pty`), capture persistence, `claude -p` adapter, popup interception, external terminal/agent-session detection (Claude / Codex / Grok) |
 | Bridge | `preload.js` | narrow `window.chromux` API, no node in the page |
 | Guest bridge | `webview-preload.js` | element-picker results and focused-editable status |
 | UI | `renderer/` | sessions, xterm terminals, paired webviews, review queue, capture modal |
 | Payload contract | `docs/capture-payload.md` | schema v1, field bounds, retention |
+| Privacy and local data | `docs/privacy-and-local-data.md` | local storage map, outbound boundaries, deletion guidance |
 
 ## Troubleshooting
 
@@ -99,7 +101,8 @@ See [`docs/troubleshooting.md`](docs/troubleshooting.md) for the full support gu
   Detection itself (`ps`/`lsof`) works without it — you just lose the tab titles.
 - **DETECT's RESUME opens the wrong conversation** — resume targets the *latest saved*
   session for the tab's project directory (`~/.claude/projects/<dir>` /
-  `~/.codex/sessions`); two agents in the same directory can't be told apart.
+  `~/.codex/sessions` / `~/.grok/sessions/<encoded-cwd>`); two agents in the same directory
+  can't be told apart.
 
 ## Storage map
 
@@ -107,6 +110,13 @@ See [`docs/troubleshooting.md`](docs/troubleshooting.md) for the full support gu
 | --- | --- |
 | Capture payloads + screenshots | `~/.chromux/captures/<timestamp>/` |
 | Delivery log | `~/.chromux/delivery-log.jsonl` |
+| Restore snapshot | `~/.chromux/restore-sessions.json` |
+| Update cache/source/install log | `~/.chromux/update-cache.json`, `~/.chromux/update-source.json`, `~/.chromux/update-install.log` |
+| Hook settings and notify scripts | `~/.chromux/hooks-claude.json`, `~/.chromux/codex-notify.sh`, `~/.chromux/hooks-grok.json`, `~/.chromux/grok-hook.sh`, and `~/.grok/hooks/chromux-turn-signals.json` |
 | Browser pane profile | Electron partition `persist:chromux` |
 
-Nothing leaves the machine except what `claude -p` itself sends.
+Chromux has no account, cloud sync, Chromux-hosted capture upload, or product
+telemetry in the current prototype. Browser pages, update checks, agent CLIs,
+and `SEND - claude -p` can make outbound requests. See
+[`docs/privacy-and-local-data.md`](docs/privacy-and-local-data.md) for the full
+data-handling notice.

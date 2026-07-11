@@ -1231,6 +1231,7 @@ input[type="text"]:focus, textarea:focus, select:focus { border-color: var(--amb
 }
 .dr-badge.claude { color: var(--amber); border-color: rgba(255, 180, 84, 0.4); background: var(--amber-dim); }
 .dr-badge.codex { color: var(--cyan); border-color: rgba(95, 198, 255, 0.4); background: rgba(95, 198, 255, 0.1); }
+.dr-badge.grok { color: var(--violet, #b794f6); border-color: rgba(183, 148, 246, 0.45); background: rgba(183, 148, 246, 0.12); }
 .dr-main { flex: 1; min-width: 0; }
 .dr-title {
   color: var(--text); font-size: 12px;

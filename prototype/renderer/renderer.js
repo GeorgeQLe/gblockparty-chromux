@@ -273,6 +273,8 @@ function trackTypedPreviewSuppressions(session, data) {
       if (t.previewSuppress.length > PREVIEW_SUPPRESS_MAX) {
         t.previewSuppress.splice(0, t.previewSuppress.length - PREVIEW_SUPPRESS_MAX);
       }
+    } else if (ch === '\x15' || ch === '\x03') {
+      t.typedInputBuf = '';
     } else if (ch === '\b' || ch === '\x7f') {
       t.typedInputBuf = t.typedInputBuf.slice(0, -1);
     } else {
@@ -520,6 +522,13 @@ function apply(event) {
       // session cannot regress the update queue.
       state.activeId = event.sessionId;
       break;
+    case 'session-adopted':
+      if (session && ADOPTABLE_AGENTS.has(event.agent) && session.agent !== event.agent) {
+        session.agent = event.agent;
+        updateSessionAgentChrome(session);
+        invalidate('tabs', 'shortcutDebug');
+      }
+      break;
     case 'attention-dismissed':
       if (session) session.turn.acknowledged = true;
       break;
@@ -674,7 +683,9 @@ function newSessionShape({ id, name, cwd, agent }) {
       webview: null, webContentsId: null, currentUrl: null, lastReload: 0,
       queue: [], consoleBuf: [], consoleTotal: 0, picking: false,
       guestEditableFocused: false,
-      collapsed: false,
+      // Terminal-first: new sessions start with the paired browser shut.
+      // Detected previews queue until the user opens one (QUEUE OPEN, ⌘-click, URL bar).
+      collapsed: true,
       expandedGridTemplate: 'minmax(320px, 46%) 6px minmax(360px, 1fr)',
     },
     term: {
@@ -693,8 +704,9 @@ function newSessionShape({ id, name, cwd, agent }) {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// Review queue — never hot-swap the pane. Auto-fill only an empty pane;
-// refresh only when the pane's own URL is re-emitted; everything else queues.
+// Review queue — approval-gated. Detected previews always queue; never auto-
+// open the pane. Refresh only when the pane's own (already open) URL is
+// re-emitted. User opens via QUEUE OPEN, ⌘/Ctrl-click terminal link, or URL bar.
 // ───────────────────────────────────────────────────────────────────────────
 
 function routePreview(session, url, source, detail = {}) {
@@ -706,10 +718,6 @@ function routePreview(session, url, source, detail = {}) {
       try { b.webview.reload(); } catch { /* not ready */ }
       flashRefresh(session);
     }
-    return;
-  }
-  if (!b.currentUrl && !b.webview) {
-    openInPane(session, url); // empty pane: auto-fill is not attention-stealing
     return;
   }
   if (b.queue.some((q) => q.url === url)) return;
@@ -1062,7 +1070,7 @@ function computeShortcutCatalog() {
     } else if (shortcut.id === 'browser-toggle') {
       disabledReason = guardReason || (activeSession ? null : 'no active session');
       description = activeSession
-        ? (activeSession.browser.collapsed ? 'restore browser' : 'collapse browser')
+        ? (activeSession.browser.collapsed ? 'open browser' : 'shut browser')
         : 'no active session';
     } else if (shortcut.id === 'quit') {
       disabledReason = guardReason;
@@ -1185,6 +1193,8 @@ function renderShortcutDebug() {
 
 function openInPane(session, url) {
   const b = session.browser;
+  // Explicit open always restores a shut browser so the approved URL is visible.
+  if (b.collapsed) setBrowserCollapsed(session, false);
   b.currentUrl = url;
   b.lastReload = Date.now();
   session.els.urlBar.value = url;
@@ -1271,8 +1281,12 @@ function applyBrowserLayout(session) {
   } else {
     session.els.view.style.gridTemplateColumns = session.browser.expandedGridTemplate;
   }
+  // Labels read as open/shut for the paired browser while keeping familiar
+  // COLLAPSE/RESTORE button text used by docs and muscle memory.
   session.els.collapseBtn.textContent = collapsed ? 'RESTORE' : 'COLLAPSE';
-  session.els.collapseBtn.title = collapsed ? 'Restore paired browser' : 'Collapse paired browser';
+  session.els.collapseBtn.title = collapsed
+    ? 'Open paired browser (⌘⇧B)'
+    : 'Shut paired browser (⌘⇧B)';
   session.els.collapseBtn.setAttribute('aria-label', session.els.collapseBtn.title);
   refitTerminal(session);
 }
@@ -1658,7 +1672,10 @@ window.chromux.onDeliverClose(handleDeliverClose);
 // Session creation / lifecycle
 // ───────────────────────────────────────────────────────────────────────────
 
-const AGENT_LABELS = { claude: 'CLAUDE CODE', codex: 'CODEX', '': 'SHELL' };
+const AGENT_LABELS = { claude: 'CLAUDE CODE', codex: 'CODEX', grok: 'GROK BUILD', '': 'SHELL' };
+const ADOPTABLE_AGENTS = new Set(['claude', 'codex', 'grok']);
+const AGENT_ORDER = ['claude', 'codex', 'grok', ''];
+const SHELL_ADOPTION_SCAN_MS = 2500;
 
 // POSIX single-quoting: close the quote, emit an escaped ', reopen. Safe for
 // any byte the filesystem allows (spaces, quotes, backslashes).
@@ -1668,7 +1685,9 @@ function shellQuote(value) {
 
 // Launch command for an agent CLI. Claude sessions get `--settings` pointing
 // at the Chromux hooks file (merges with, never replaces, the user's own
-// settings) so deterministic turn signals flow back over the PTY.
+// settings) so deterministic turn signals flow back over the PTY. Codex gets
+// a notify config path. Grok Build installs hooks into ~/.grok/hooks at app
+// start (no launch flag), so the command is bare `grok` / `grok --resume`.
 function agentCommand(agent, resumeId = null) {
   if (agent === 'claude') {
     const settingsPath = state.env && state.env.hooksSettingsPath;
@@ -1687,7 +1706,131 @@ function agentCommand(agent, resumeId = null) {
       : 'codex';
     return resumeId ? `${base} resume ${shellQuote(resumeId)}` : base;
   }
+  if (agent === 'grok') {
+    return resumeId ? `grok --resume ${shellQuote(resumeId)}` : 'grok';
+  }
   return null;
+}
+
+function simpleShellTokens(line) {
+  const src = String(line || '').trim();
+  if (!src) return null;
+  const tokens = [];
+  let i = 0;
+  const meta = new Set(['|', '&', ';', '<', '>', '(', ')', '{', '}']);
+  while (i < src.length) {
+    while (/\s/.test(src[i] || '')) i += 1;
+    if (i >= src.length) break;
+    const start = i;
+    let text = '';
+    while (i < src.length && !/\s/.test(src[i])) {
+      const ch = src[i];
+      if (ch === "'") {
+        i += 1;
+        while (i < src.length && src[i] !== "'") {
+          text += src[i];
+          i += 1;
+        }
+        if (i >= src.length) return null;
+        i += 1;
+      } else if (ch === '"') {
+        i += 1;
+        while (i < src.length && src[i] !== '"') {
+          if (src[i] === '\\') {
+            if (i + 1 >= src.length) return null;
+            text += src[i + 1];
+            i += 2;
+          } else {
+            if (src[i] === '`' || (src[i] === '$' && src[i + 1] === '(')) return null;
+            text += src[i];
+            i += 1;
+          }
+        }
+        if (i >= src.length) return null;
+        i += 1;
+      } else if (ch === '\\') {
+        if (i + 1 >= src.length) return null;
+        text += src[i + 1];
+        i += 2;
+      } else {
+        if (ch === '`' || (ch === '$' && src[i + 1] === '(') || meta.has(ch)) return null;
+        text += ch;
+        i += 1;
+      }
+    }
+    tokens.push({ text, raw: src.slice(start, i), start, end: i });
+  }
+  return tokens.length ? { line: src, tokens } : null;
+}
+
+function claudeHasSettingsArg(tokens) {
+  return tokens.slice(1).some((token) => token.text === '--settings' || token.text.startsWith('--settings='));
+}
+
+function codexHasNotifyConfigArg(tokens) {
+  for (let i = 1; i < tokens.length; i += 1) {
+    const text = tokens[i].text;
+    if (text === '-c' || text === '--config') {
+      if (/\bnotify\b/.test(tokens[i + 1] ? tokens[i + 1].text : '')) return true;
+    } else if ((text.startsWith('-c') && text.length > 2) || text.startsWith('--config=')) {
+      if (/\bnotify\b/.test(text)) return true;
+    }
+  }
+  return false;
+}
+
+function rewriteShellLaunchLine(line) {
+  const parsed = simpleShellTokens(line);
+  if (!parsed) return null;
+  const commandToken = parsed.tokens[0];
+  const agent = commandToken.text;
+  if (!ADOPTABLE_AGENTS.has(agent)) return null;
+  if (commandToken.raw !== agent) return null;
+  if (agent === 'claude' && claudeHasSettingsArg(parsed.tokens)) return null;
+  if (agent === 'codex' && codexHasNotifyConfigArg(parsed.tokens)) return null;
+  const base = agentCommand(agent);
+  if (!base) return null;
+  const args = parsed.line.slice(commandToken.end).trim();
+  return {
+    agent,
+    original: parsed.line,
+    command: args ? `${base} ${args}` : base,
+  };
+}
+
+function lineBufferAfterInput(base, input) {
+  let buf = String(base || '');
+  for (const ch of String(input || '')) {
+    if (ch === '\x15' || ch === '\x03') buf = '';
+    else if (ch === '\b' || ch === '\x7f') buf = buf.slice(0, -1);
+    else if (ch === '\t' || ch >= ' ') buf += ch;
+  }
+  return buf.length > 4096 ? buf.slice(-4096) : buf;
+}
+
+function submittedShellLineForInput(session, data) {
+  if (!session || !data) return null;
+  const raw = String(data);
+  const endings = [];
+  for (let i = 0; i < raw.length; i += 1) {
+    if (raw[i] === '\r' || raw[i] === '\n') endings.push(i);
+  }
+  if (endings.length !== 1) return null;
+  const index = endings[0];
+  if (raw.slice(index + 1).length > 0) return null;
+  return lineBufferAfterInput(session.term.typedInputBuf, raw.slice(0, index));
+}
+
+function rewriteShellLaunchInput(session, data) {
+  if (!session || session.agent !== '') return null;
+  const submitted = submittedShellLineForInput(session, data);
+  if (submitted === null) return null;
+  const rewrite = rewriteShellLaunchLine(submitted);
+  if (!rewrite) return null;
+  return {
+    ...rewrite,
+    data: `\x15${rewrite.command}\r`,
+  };
 }
 
 function resumeIdForRow(row) {
@@ -1718,10 +1861,24 @@ function agentLabel(agent) {
   return AGENT_LABELS[agent || ''] || (agent || 'shell').toUpperCase();
 }
 
+function sessionAgentHeaderText(agent) {
+  return agent ? agent.toUpperCase() : 'SHELL';
+}
+
+function updateSessionAgentChrome(session) {
+  if (!session || !session.els) return;
+  if (session.els.termLabel) {
+    session.els.termLabel.innerHTML = `TERMINAL <span class="lit">· ${sessionAgentHeaderText(session.agent)}</span>`;
+  }
+}
+
+function otherAgents(agent) {
+  return AGENT_ORDER.filter((name) => name && name !== (agent || ''));
+}
+
 function otherAgent(agent) {
-  if (agent === 'claude') return 'codex';
-  if (agent === 'codex') return 'claude';
-  return 'claude';
+  // Prefer the first alternate agent for single-slot call sites.
+  return otherAgents(agent)[0] || 'claude';
 }
 
 function uniqueSessionName(base) {
@@ -1774,13 +1931,14 @@ function openSessionContextMenu(session, x, y) {
     menu.appendChild(item);
   };
 
-  const crossAgent = otherAgent(session.agent);
   addItem('Duplicate session', agentLabel(session.agent), () => {
     duplicateSession(session, session.agent, 'same').catch(() => {});
   });
-  addItem(`Open in ${agentLabel(crossAgent)}`, session.cwd, () => {
-    duplicateSession(session, crossAgent, 'other').catch(() => {});
-  });
+  for (const crossAgent of otherAgents(session.agent)) {
+    addItem(`Open in ${agentLabel(crossAgent)}`, session.cwd, () => {
+      duplicateSession(session, crossAgent, 'other').catch(() => {});
+    });
+  }
   addItem('Close session', session.name, () => closeSession(session.id), true);
 
   document.body.appendChild(menu);
@@ -1803,7 +1961,7 @@ function buildSessionView(session) {
   termHead.className = 'pane-head';
   const termLabel = document.createElement('span');
   termLabel.className = 'pane-label';
-  termLabel.innerHTML = `TERMINAL <span class="lit">· ${session.agent ? session.agent.toUpperCase() : 'SHELL'}</span>`;
+  termLabel.innerHTML = `TERMINAL <span class="lit">· ${sessionAgentHeaderText(session.agent)}</span>`;
   const termCwd = document.createElement('span');
   termCwd.className = 'term-head-cwd';
   termCwd.textContent = session.cwd;
@@ -1831,9 +1989,9 @@ function buildSessionView(session) {
   const reload = document.createElement('button'); reload.className = 'nav-btn'; reload.textContent = '⟳'; reload.title = 'Reload';
   const collapseBtn = document.createElement('button');
   collapseBtn.className = 'head-btn collapse-btn';
-  collapseBtn.textContent = 'COLLAPSE';
-  collapseBtn.title = 'Collapse paired browser';
-  collapseBtn.setAttribute('aria-label', 'Collapse paired browser');
+  collapseBtn.textContent = 'RESTORE';
+  collapseBtn.title = 'Open paired browser (⌘⇧B)';
+  collapseBtn.setAttribute('aria-label', 'Open paired browser (⌘⇧B)');
   const urlBar = document.createElement('input');
   urlBar.className = 'url-bar'; urlBar.type = 'text'; urlBar.spellcheck = false;
   urlBar.placeholder = 'awaiting preview — or type a URL and hit ⏎';
@@ -1878,9 +2036,9 @@ function buildSessionView(session) {
     <div class="wp-radar"></div>
     <div class="wp-title">AWAITING PREVIEW</div>
     <div class="wp-sub">Chromux watches this session's terminal for <em>localhost</em> dev-server URLs
-    and local <em>.html</em> paths.<br/>The first one auto-opens here; later ones queue — they never
-    steal the pane you're viewing.<br/>You can also <em>⌘-click</em> any URL or .html path in the
-    terminal to open it here.</div>`;
+    and local <em>.html</em> paths. Detected previews always land in the badged <em>QUEUE</em> —
+    nothing opens until you approve it.<br/>Open via queue <em>OPEN</em>, <em>⌘-click</em> a
+    terminal link, or type a URL here and hit ⏎. Opening a URL also restores a shut browser.</div>`;
   const refreshFlash = document.createElement('div');
   refreshFlash.className = 'refresh-flash';
   refreshFlash.textContent = 'AUTO-REFRESHED';
@@ -1929,7 +2087,7 @@ function buildSessionView(session) {
   });
 
   return {
-    view, termHost, urlBar, queueBtn, queueBadge, queuePanel, queueList,
+    view, termLabel, termHost, urlBar, queueBtn, queueBadge, queuePanel, queueList,
     consoleChip, captureChip, pickBtn, captureBtn, webHost, placeholder, refreshFlash,
     divider, webPane, browserToolbar, collapseBtn,
   };
@@ -2188,6 +2346,36 @@ function renderAttentionQueue() {
   }
 }
 
+function writePtyInput(session, data) {
+  if (!session || !data) return;
+  if (Array.isArray(session._ptyInputs)) session._ptyInputs.push(data);
+  window.chromux.ptyInput(session.id, data);
+}
+
+function adoptSessionAgent(session, agent, source = 'unknown', detail = {}) {
+  if (!session || !ADOPTABLE_AGENTS.has(agent)) return false;
+  if (session.agent && session.agent !== agent) return false;
+  if (session.agent === agent) return false;
+  apply({
+    type: 'session-adopted',
+    sessionId: session.id,
+    agent,
+    source,
+    command: detail.command || null,
+  });
+  return true;
+}
+
+function handleTerminalInput(session, data) {
+  if (!session) return null;
+  const rewrite = rewriteShellLaunchInput(session, data);
+  const outgoing = rewrite ? rewrite.data : data;
+  if (rewrite) adoptSessionAgent(session, rewrite.agent, 'rewrite', { command: rewrite.command });
+  apply({ type: 'user-input', sessionId: session.id, data: outgoing });
+  writePtyInput(session, outgoing);
+  return rewrite;
+}
+
 async function createSession({ name, cwd, agent, initialUrl = null, initialQueue = [], command = undefined, resumeLaunch = null }) {
   state.counter += 1;
   const id = 's' + state.counter;
@@ -2204,6 +2392,7 @@ async function createSession({ name, cwd, agent, initialUrl = null, initialQueue
   const viewEls = buildSessionView(session);
   const tabEls = buildSessionTab(session);
   session.els = { ...viewEls, ...tabEls };
+  applyBrowserLayout(session);
 
   const term = new Terminal({
     fontFamily: '"SF Mono", Menlo, monospace',
@@ -2228,10 +2417,7 @@ async function createSession({ name, cwd, agent, initialUrl = null, initialQueue
   session.term.fit();
   registerTerminalLinks(session);
 
-  term.onData((data) => {
-    apply({ type: 'user-input', sessionId: id, data });
-    window.chromux.ptyInput(id, data);
-  });
+  term.onData((data) => handleTerminalInput(session, data));
   new ResizeObserver(() => session.term.fit()).observe(viewEls.termHost);
 
   state.sessions.set(id, session);
@@ -2615,9 +2801,48 @@ function handlePtyData(id, data) {
     }
     feedDetector(s, res.clean);
   }
+  if (s.agent === '' && s.lifecycle.alive) scanPtyAgentDescendants(false).catch(() => {});
 }
 
 window.chromux.onPtyData(({ id, data }) => handlePtyData(id, data));
+
+let ptyAgentScanInFlight = false;
+let lastPtyAgentScanAt = 0;
+
+function adoptPtyAgentRows(rows = []) {
+  let adopted = 0;
+  const seen = new Set();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const id = row && row.id;
+    const agent = row && row.agent;
+    if (!id || seen.has(id) || !ADOPTABLE_AGENTS.has(agent)) continue;
+    seen.add(id);
+    const session = state.sessions.get(id);
+    if (!session || session.agent !== '' || !session.lifecycle.alive) continue;
+    if (adoptSessionAgent(session, agent, 'process-scan', { command: row.command || null })) adopted += 1;
+  }
+  if (adopted > 0) invalidate('tabs', 'attention', 'update', 'badges', 'shortcutDebug');
+  return adopted;
+}
+
+async function scanPtyAgentDescendants(force = false) {
+  if (!window.chromux || typeof window.chromux.detectPtyAgents !== 'function') return 0;
+  const hasShellSessions = orderedSessions().some((session) => session.agent === '' && session.lifecycle.alive);
+  if (!hasShellSessions) return 0;
+  const now = Date.now();
+  if (!force && now - lastPtyAgentScanAt < SHELL_ADOPTION_SCAN_MS) return 0;
+  if (ptyAgentScanInFlight) return 0;
+  ptyAgentScanInFlight = true;
+  lastPtyAgentScanAt = now;
+  try {
+    const result = await window.chromux.detectPtyAgents();
+    return adoptPtyAgentRows(result && result.rows);
+  } catch {
+    return 0;
+  } finally {
+    ptyAgentScanInFlight = false;
+  }
+}
 
 function isQuickCodexResumeExit(session, now = Date.now()) {
   const resume = session && session.lifecycle && session.lifecycle.resumeLaunch;
@@ -2668,7 +2893,7 @@ window.chromux.onWebviewPopup(({ webContentsId, url }) => {
 });
 
 // ───────────────────────────────────────────────────────────────────────────
-// Detect — adopt open terminal tabs and their claude/codex sessions into
+// Detect — adopt open terminal tabs and their claude/codex/grok sessions into
 // Chromux. Per row: RESUME (continue the CLI's latest saved conversation for
 // that project) or FRESH; agents can also be opened en masse.
 // ───────────────────────────────────────────────────────────────────────────
@@ -2997,7 +3222,7 @@ async function scanExternal() {
     state.detect = { rows };
     const agents = rows.filter((r) => r.agent).length;
     statusText.textContent =
-      `${rows.length} TERMINAL TAB${rows.length === 1 ? '' : 'S'} — ${agents} AGENT SESSION${agents === 1 ? '' : 'S'} (CLAUDE/CODEX), ${rows.length - agents} SHELL`
+      `${rows.length} TERMINAL TAB${rows.length === 1 ? '' : 'S'} — ${agents} AGENT SESSION${agents === 1 ? '' : 'S'} (CLAUDE/CODEX/GROK), ${rows.length - agents} SHELL`
       + (rows.length > 0 && !tabTitles ? ' — TAB TITLES UNAVAILABLE (GRANT AUTOMATION ACCESS TO TERMINAL)' : '');
   } catch (err) {
     state.detect = { rows: [] };
@@ -3050,8 +3275,7 @@ function sendResumeRetryCommand(warning = state.resumeRetryWarning) {
   const session = state.sessions.get(warning.sessionId);
   if (!session) return false;
   const data = `${warning.command}\r`;
-  if (Array.isArray(session._ptyInputs)) session._ptyInputs.push(data);
-  window.chromux.ptyInput(session.id, data);
+  writePtyInput(session, data);
   if (session.lifecycle && session.lifecycle.resumeLaunch) {
     const now = Date.now();
     session.lifecycle.resumeLaunch.launchedAt = now;
@@ -3532,6 +3756,7 @@ if (window.chromuxTest) {
     session.term.term = { write: (d) => written.push(d), focus() {}, dispose() {} };
     session.term.fit = () => {};
     session.els = { ...viewEls, ...tabEls };
+    applyBrowserLayout(session);
     state.sessions.set(session.id, session);
     apply({ type: 'session-created', sessionId: session.id, name, cwd, agent });
     renderQueue(session);
@@ -4095,6 +4320,7 @@ if (window.chromuxTest) {
       session.term.fit = () => { fitCount += 1; };
       session._fitCount = () => fitCount;
       session.els = { ...viewEls, ...tabEls };
+      applyBrowserLayout(session);
       state.sessions.set(session.id, session);
       apply({ type: 'session-created', sessionId: session.id, name, cwd, agent });
       session.browser.queue = queue.map((item) => normalizeQueueItem(item, 'RESTORE')).filter(Boolean);
@@ -4177,6 +4403,38 @@ if (window.chromuxTest) {
     build: (agent, resumeId = null) => agentCommand(agent, resumeId),
     env: () => ({ ...state.env }),
   };
+
+  window.chromuxTestShellAdoption = {
+    addShellSession(opts = {}) {
+      return addFakeSession({ name: 'shell-test', agent: '', cwd: '/tmp', ...opts });
+    },
+    type(id, data) {
+      const rewrite = handleTerminalInput(testSession(id), data);
+      flushRender();
+      return rewrite ? { ...rewrite } : null;
+    },
+    adoptRows(rows) {
+      const adopted = adoptPtyAgentRows(rows);
+      flushRender();
+      return adopted;
+    },
+    scan(force = true) {
+      return scanPtyAgentDescendants(force).then((count) => {
+        flushRender();
+        return count;
+      });
+    },
+    rewrite(line) {
+      const rewrite = rewriteShellLaunchLine(line);
+      return rewrite ? { ...rewrite } : null;
+    },
+    agent: (id) => testSession(id).agent,
+    header: (id) => testSession(id).els.termLabel.innerHTML,
+    ptyInputs: (id) => (testSession(id)._ptyInputs || []).join(''),
+    snapshot: () => snapshotOpenSessions(),
+    turnState: (id) => ({ ...testSession(id).turn }),
+    events: () => state.events.map((event) => ({ ...event })),
+  };
 }
 
 function fakeSessionEls() {
@@ -4191,10 +4449,12 @@ function fakeSessionEls() {
   const divider = document.createElement('div');
   const browserToolbar = document.createElement('div');
   const collapseBtn = document.createElement('button');
+  const termLabel = document.createElement('span');
   const placeholder = document.createElement('div');
   webHost.appendChild(placeholder);
   document.body.appendChild(queuePanel);
   return {
+    termLabel,
     queuePanel,
     queueList,
     queueBtn,
@@ -4240,6 +4500,10 @@ window.addEventListener('blur', () => {
   closeSessionContextMenu();
   invalidate('shortcutDebug');
 });
+
+setInterval(() => {
+  scanPtyAgentDescendants(false).catch(() => {});
+}, SHELL_ADOPTION_SCAN_MS);
 
 // boot
 (async () => {

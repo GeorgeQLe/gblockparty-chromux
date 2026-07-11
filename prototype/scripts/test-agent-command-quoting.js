@@ -1,10 +1,10 @@
 // Agent launch commands must survive shell metacharacters in HOME: the hooks
 // settings / codex notify paths are interpolated into shell strings by both
-// main (claudeCommand/codexCommand via resolve-restore-sessions) and the
-// renderer (agentCommand). Run the smoke app with a HOME containing a space,
-// a single quote, a double quote, and a backslash, collect the commands built
-// by both sides, and verify each one parses under zsh and delivers the exact
-// path back as a single argument.
+// main (claudeCommand/codexCommand/grokCommand via resolve-restore-sessions)
+// and the renderer (agentCommand). Run the smoke app with a HOME containing a
+// space, a single quote, a double quote, and a backslash, collect the commands
+// built by both sides, and verify each one parses under zsh and delivers the
+// exact path back as a single argument.
 'use strict';
 
 const fs = require('fs');
@@ -20,8 +20,10 @@ const e2eOutPath = path.join(tmpDir, 'e2e.out');
 
 const projClaude = path.join(homeDir, 'proj-claude');
 const projCodex = path.join(homeDir, 'proj-codex');
+const projGrok = path.join(homeDir, 'proj-grok');
 const claudeResumeId = '11111111-2222-3333-4444-555555555555';
 const codexResumeId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+const grokResumeId = '019f4ef1-dcd0-7440-beef-aec69c74a111';
 
 fs.mkdirSync(homeDir, { recursive: true });
 
@@ -43,6 +45,15 @@ fs.writeFileSync(
   }) + '\n',
 );
 
+// Grok sessions: ~/.grok/sessions/<encodeURIComponent(cwd)>/<id>/summary.json
+const grokSessionDir = path.join(homeDir, '.grok', 'sessions', encodeURIComponent(projGrok), grokResumeId);
+fs.mkdirSync(grokSessionDir, { recursive: true });
+fs.writeFileSync(path.join(grokSessionDir, 'summary.json'), JSON.stringify({
+  info: { id: grokResumeId, cwd: projGrok },
+  last_active_at: '2026-01-02T00:00:00Z',
+  updated_at: '2026-01-02T00:00:00Z',
+}) + '\n');
+
 fs.writeFileSync(e2ePath, `
 (async () => {
   const api = window.chromuxTestAgentCommand;
@@ -55,18 +66,25 @@ fs.writeFileSync(e2ePath, `
     sessions: [
       { name: 'claude-restore', cwd: ${JSON.stringify(projClaude)}, agent: 'claude' },
       { name: 'codex-restore', cwd: ${JSON.stringify(projCodex)}, agent: 'codex' },
+      { name: 'grok-restore', cwd: ${JSON.stringify(projGrok)}, agent: 'grok' },
     ],
   });
   const main = {};
   for (const s of resolved.sessions) main[s.agent] = s.command;
   return JSON.stringify({
     ok: true,
-    env: { hooksSettingsPath: env.hooksSettingsPath, codexNotifyPath: env.codexNotifyPath },
+    env: {
+      hooksSettingsPath: env.hooksSettingsPath,
+      codexNotifyPath: env.codexNotifyPath,
+      grokHooksPath: env.grokHooksPath,
+    },
     renderer: {
       claude: api.build('claude'),
       claudeResume: api.build('claude', 'resume-id-1234'),
       codex: api.build('codex'),
       codexResume: api.build('codex', 'resume-id-1234'),
+      grok: api.build('grok'),
+      grokResume: api.build('grok', 'resume-id-1234'),
     },
     main,
     unresolved: resolved.unresolved,
@@ -104,14 +122,21 @@ function expect(cond, msg) {
   }
 }
 
-// Run the command with claude/codex replaced by shims that echo their argv
+// Run the command with claude/codex/grok replaced by shims that echo their argv
 // NUL-separated — proves the command both parses and delivers exact args.
 function shellArgs(cmd) {
-  const shim = 'claude() { printf "%s\\0" "$@" }\ncodex() { printf "%s\\0" "$@" }\n';
+  const shim = [
+    'claude() { printf "%s\\0" "$@" }',
+    'codex() { printf "%s\\0" "$@" }',
+    'grok() { printf "%s\\0" "$@" }',
+    '',
+  ].join('\n');
   const run = spawnSync('/bin/zsh', ['-c', shim + cmd], { encoding: 'utf8' });
   if (run.status !== 0) return { error: (run.stderr || '').trim() || `exit ${run.status}` };
+  // zsh `printf '%s\0' "$@"` with no args still emits a trailing NUL (empty
+  // field). Drop empty trailing segments so bare `grok` yields [] not [''].
   const parts = run.stdout.split('\0');
-  parts.pop(); // trailing NUL
+  while (parts.length && parts[parts.length - 1] === '') parts.pop();
   return { args: parts };
 }
 
@@ -151,6 +176,9 @@ child.on('close', (code, signal) => {
 
   const hooksPath = path.join(homeDir, '.chromux', 'hooks-claude.json');
   const notifyPath = path.join(homeDir, '.chromux', 'codex-notify.sh');
+  const grokHooksPath = path.join(homeDir, '.chromux', 'hooks-grok.json');
+  const grokInstallPath = path.join(homeDir, '.grok', 'hooks', 'chromux-turn-signals.json');
+  const grokScriptPath = path.join(homeDir, '.chromux', 'grok-hook.sh');
   const tomlArg = notifyTomlArg(notifyPath);
   const tomlInner = (tomlArg.match(/^notify=\["(.*)"\]$/s) || [])[1];
   expect(
@@ -160,6 +188,9 @@ child.on('close', (code, signal) => {
 
   expect(report.env.hooksSettingsPath === hooksPath, `get-env hooksSettingsPath: ${report.env.hooksSettingsPath}`);
   expect(report.env.codexNotifyPath === notifyPath, `get-env codexNotifyPath: ${report.env.codexNotifyPath}`);
+  expect(report.env.grokHooksPath === grokHooksPath, `get-env grokHooksPath: ${report.env.grokHooksPath}`);
+  expect(fs.existsSync(grokInstallPath), `expected Grok hook install at ${grokInstallPath}`);
+  expect(fs.existsSync(grokScriptPath), `expected Grok hook script at ${grokScriptPath}`);
   expect(Array.isArray(report.unresolved) && report.unresolved.length === 0,
     `resolve-restore-sessions left sessions unresolved: ${JSON.stringify(report.unresolved)}`);
 
@@ -167,8 +198,11 @@ child.on('close', (code, signal) => {
   checkCommand('renderer claude --resume', report.renderer.claudeResume, ['--settings', hooksPath, '--resume', 'resume-id-1234']);
   checkCommand('renderer codex', report.renderer.codex, ['-c', tomlArg]);
   checkCommand('renderer codex resume', report.renderer.codexResume, ['-c', tomlArg, 'resume', 'resume-id-1234']);
+  checkCommand('renderer grok', report.renderer.grok, []);
+  checkCommand('renderer grok --resume', report.renderer.grokResume, ['--resume', 'resume-id-1234']);
   checkCommand('main claude resume', report.main.claude, ['--settings', hooksPath, '--resume', claudeResumeId]);
   checkCommand('main codex resume', report.main.codex, ['-c', tomlArg, 'resume', codexResumeId]);
+  checkCommand('main grok resume', report.main.grok, ['--resume', grokResumeId]);
 
   if (failures > 0) {
     console.error('AGENT_COMMAND_QUOTING_FAIL');

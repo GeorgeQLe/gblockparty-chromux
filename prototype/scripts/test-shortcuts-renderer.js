@@ -59,9 +59,13 @@ fs.writeFileSync(e2ePath, `
   expect(q.activeId() === thirdId, 'terminal-focused Command+3 should activate third session');
 
   q.focusTerminalTextarea();
+  expect(q.browserCollapsed(thirdId) === true, 'new sessions start with the paired browser shut');
   const terminalToggle = q.shortcutToggleBrowser();
   expect(terminalToggle && terminalToggle.sessionId === thirdId, 'terminal-focused Command+Shift+B should toggle browser');
-  expect(q.browserCollapsed(thirdId) === true, 'terminal-focused Command+Shift+B should collapse active browser');
+  expect(q.browserCollapsed(thirdId) === false, 'terminal-focused Command+Shift+B should open a shut browser');
+  const terminalToggleShut = q.shortcutToggleBrowser();
+  expect(terminalToggleShut && terminalToggleShut.sessionId === thirdId, 'second Command+Shift+B should target the same session');
+  expect(q.browserCollapsed(thirdId) === true, 'second Command+Shift+B should shut the open browser');
 
   q.focusTerminalTextarea();
   const focused = q.shortcutFocusNextQueueItem(1000);

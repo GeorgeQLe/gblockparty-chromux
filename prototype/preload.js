@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('chromux', {
 
   // external terminal/agent-session detection
   detectExternal: () => ipcRenderer.invoke('detect-external'),
+  detectPtyAgents: () => ipcRenderer.invoke('detect-pty-agents'),
 
   // utilities
   toYaml: (obj) => yaml.dump(obj, { lineWidth: 120, noRefs: true }),
@@ -63,5 +64,6 @@ if (process.env.CHROMUX_E2E) {
   contextBridge.exposeInMainWorld('chromuxTest', {
     sendHostInput: (input) => ipcRenderer.invoke('test-send-host-input', input),
     shortcutRouteLog: () => ipcRenderer.invoke('test-shortcut-route-log'),
+    classifyPtyAgentDescendants: (payload) => ipcRenderer.invoke('test-classify-pty-agent-descendants', payload || {}),
   });
 }
