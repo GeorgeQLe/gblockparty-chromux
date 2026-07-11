@@ -1,5 +1,14 @@
 # Session History
 
+## 2026-07-11 — Chromux v0.17.0 Grok agent + approval-gated browser
+
+- Added Grok Build (`grok`) as a first-class agent alongside Claude Code and Codex: session picker, DETECT resume/fresh, shell-tab adoption, restore snapshots, and turn-signal hooks under `~/.grok/hooks/`.
+- Made the paired browser approval-gated: new sessions start shut; detected localhost / loopback / local `.html` previews always QUEUE; open only on queue OPEN, ⌘/Ctrl-click, or URL bar Enter.
+- Wrote `prototype/docs/privacy-and-local-data.md` and updated README / landing / troubleshooting for the terminal-first multi-agent workflow.
+- Bumped prototype metadata to `0.17.0`; planned tag is `chromux-v0.17.0` (includes unreleased 0.16.0 Grok work).
+- Ship goal: commit/push and pin GitHub `/releases/latest` so in-app update checks surface the new version.
+
+
 ## 2026-07-09 — Chromux v0.14.0 dynamic session tab titles
 
 - Added chunk-boundary-safe observation of terminal OSC 0/1/2 title sequences while preserving passthrough of title bytes to xterm.

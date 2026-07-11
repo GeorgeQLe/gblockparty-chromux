@@ -7,9 +7,10 @@ and the capture pipeline runs end-to-end against the live webview.
 ```
 PASS session created + pty alive
 PASS pty produced terminal output
-PASS file:// preview auto-opened in empty pane — file:///tmp/chromux-e2e.html
+PASS file:// preview queued for approval — file:///tmp/chromux-e2e.html
+PASS queue OPEN loaded file:// preview into the paired pane
 PASS guest console captured — 3 msgs, 1 errors
-PASS second preview queued (no hot-swap) — ["http://localhost:5199/"]
+PASS second preview queued (no auto-open) — ["http://localhost:5199/"]
 PASS capture modal opened with YAML preview
 PASS screenshot captured — 28316 b64 chars
 PASS file-drop wrote payload — payload: ~/.chromux/captures/2026-07-06_05-32-59/payload.yaml

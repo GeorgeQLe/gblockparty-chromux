@@ -1,8 +1,8 @@
 # Explicit Preview Signal
 
 Chromux currently discovers previews from PTY output as a compatibility fallback:
-localhost URLs and existing local `.html` paths printed by a session can open the
-paired browser pane or enter the review queue.
+localhost URLs and existing local `.html` paths printed by a session enter the
+review queue for user approval (they never auto-open the paired browser pane).
 
 For agent-aware integrations, the preferred direction is an explicit OSC signal
 that rides the same terminal stream as the existing turn lifecycle events:

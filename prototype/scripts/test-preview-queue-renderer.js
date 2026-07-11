@@ -63,13 +63,23 @@ fs.writeFileSync(e2ePath, `
 
   const realId = await q.addSession({ name: 'real-preview-session', agent: 'codex' });
   q.feed(realId, 'Local: http://localhost:5173/\\r\\n');
-  expect(q.currentUrl(realId) === 'http://localhost:5173/', 'dev-server Local output should open empty pane');
+  expect(q.currentUrl(realId) === null, 'dev-server Local output must not auto-open the pane');
+  expect(JSON.stringify(q.queueUrls(realId)) === JSON.stringify(['http://localhost:5173/']),
+    'dev-server Local output should always queue: ' + JSON.stringify(q.queueUrls(realId)));
   q.feed(realId, 'ready on http://localhost:3000\\r\\n');
-  expect(JSON.stringify(q.queueUrls(realId)) === JSON.stringify(['http://localhost:3000']),
-    'dev-server ready output should queue when pane is occupied: ' + JSON.stringify(q.queueUrls(realId)));
+  expect(q.currentUrl(realId) === null, 'second preview must not auto-open either');
+  expect(JSON.stringify(q.queueUrls(realId)) === JSON.stringify([
+    'http://localhost:5173/',
+    'http://localhost:3000',
+  ]), 'every distinct detected preview should queue: ' + JSON.stringify(q.queueUrls(realId)));
   const realItem = q.queueItems(realId)[0];
   expect(realItem.reason === 'detected in agent output',
     'queued real preview should retain terminal reason: ' + JSON.stringify(realItem));
+  q.openQueued(realId, 'http://localhost:5173/');
+  expect(q.currentUrl(realId) === 'http://localhost:5173/',
+    'queue OPEN should load the approved URL into the pane');
+  expect(JSON.stringify(q.queueUrls(realId)) === JSON.stringify(['http://localhost:3000']),
+    'queue OPEN should dequeue only the opened URL');
 
   const id = await q.addSession({ name: 'typed-preview-session', agent: 'codex' });
   q.feed(id, 'http://localhost:49151/uat-ahttp://localhost:49151/uat-b\\r\\n');
@@ -85,18 +95,21 @@ fs.writeFileSync(e2ePath, `
   expect(q.currentUrl(id) === null, 'typed prompt echo should not route a preview');
   expect(q.queueCount(id) === 0, 'typed prompt echo should not queue a preview');
   q.feed(id, 'agent later printed http://localhost:49151/typed-url\\r\\n');
-  expect(q.currentUrl(id) === 'http://localhost:49151/typed-url',
-    'same URL should route when later printed by agent output');
+  expect(q.currentUrl(id) === null, 'agent-printed URL must still not auto-open');
+  expect(JSON.stringify(q.queueUrls(id)) === JSON.stringify(['http://localhost:49151/typed-url']),
+    'agent-printed URL should queue for approval: ' + JSON.stringify(q.queueUrls(id)));
 
   q.typeInput(id, 'open http://localhost:49151/chunked-');
   q.typeInput(id, 'typed\\r');
   q.feed(id, 'open http://localhost:49151/chunked-typed\\r\\n');
-  expect(q.currentUrl(id) === 'http://localhost:49151/typed-url',
-    'manually typed URL assembled across input chunks should not replace current pane');
-  expect(q.queueCount(id) === 0, 'chunked typed URL echo should not queue');
+  expect(q.currentUrl(id) === null, 'chunked typed URL echo must not open the pane');
+  expect(JSON.stringify(q.queueUrls(id)) === JSON.stringify(['http://localhost:49151/typed-url']),
+    'chunked typed URL echo should not queue: ' + JSON.stringify(q.queueUrls(id)));
   q.feed(id, 'agent later printed http://localhost:49151/chunked-typed\\r\\n');
-  expect(JSON.stringify(q.queueUrls(id)) === JSON.stringify(['http://localhost:49151/chunked-typed']),
-    'later agent output of chunked typed URL should still queue');
+  expect(JSON.stringify(q.queueUrls(id)) === JSON.stringify([
+    'http://localhost:49151/typed-url',
+    'http://localhost:49151/chunked-typed',
+  ]), 'later agent output of chunked typed URL should still queue');
 
   const fileId = await q.addSession({ name: 'file-preview-session', agent: 'codex' });
   q.typeInput(fileId, 'open ' + htmlPath + '\\r');
@@ -106,13 +119,21 @@ fs.writeFileSync(e2ePath, `
   expect(q.queueCount(fileId) === 0, 'typed local .html path echo should not queue');
   q.feed(fileId, 'agent later printed ' + htmlPath + '\\r\\n');
   await wait(80);
+  expect(q.currentUrl(fileId) === null, 'agent-printed local .html must not auto-open');
+  expect(JSON.stringify(q.queueUrls(fileId)) === JSON.stringify([htmlFileUrl]),
+    'agent-printed local .html should queue for approval: ' + JSON.stringify(q.queueUrls(fileId)));
+  q.openQueued(fileId, htmlFileUrl);
   expect(q.currentUrl(fileId) === htmlFileUrl,
-    'same local .html path should route when later printed by agent output: ' + q.currentUrl(fileId));
+    'queue OPEN should load the approved file URL: ' + q.currentUrl(fileId));
 
   const queueId = await q.addSession({ name: 'preview-session', agent: 'codex' });
   q.feed(queueId, 'Local: http://localhost:49151/current\\r\\n');
+  expect(q.currentUrl(queueId) === null, 'first detected preview must queue, not occupy the pane');
+  expect(JSON.stringify(q.queueUrls(queueId)) === JSON.stringify(['http://localhost:49151/current']),
+    'first detected preview should be queued: ' + JSON.stringify(q.queueUrls(queueId)));
+  q.openQueued(queueId, 'http://localhost:49151/current');
   expect(q.currentUrl(queueId) === 'http://localhost:49151/current',
-    'queue test session should start with an occupied pane');
+    'queue test session should occupy the pane only after OPEN');
 
   q.feed(queueId, 'now http://localhost:49151/uat-a\\r\\n');
   expect(JSON.stringify(q.queueUrls(queueId)) === JSON.stringify(['http://localhost:49151/uat-a']),

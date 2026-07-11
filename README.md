@@ -2,7 +2,7 @@
 
 GBlockParty Chromux is an OSS Electron/Chromium desktop front-end for local and GBlockParty-managed agent/browser workspaces.
 
-The current app lives in [`prototype/`](prototype/). It runs parallel Claude Code / Codex terminal sessions, pairs each session with an embedded Chromium browser pane, detects local previews, and packages browser evidence into payloads that can be sent back to an agent.
+The current app lives in [`prototype/`](prototype/). It runs parallel Claude Code / Codex / Grok Build terminal sessions, pairs each session with an embedded Chromium browser pane, detects local previews, and packages browser evidence into payloads that can be sent back to an agent.
 
 ## Quickstart
 

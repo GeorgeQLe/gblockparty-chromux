@@ -33,8 +33,16 @@ fs.writeFileSync(e2ePath, `
   });
 
   b.focus(firstId);
-  b.narrow(firstId, 245);
   let first = b.state(firstId);
+  expect(first.collapsed, 'new sessions should start with the paired browser shut');
+  expect(first.collapseText === 'RESTORE', 'shut browser rail should expose RESTORE (open)');
+  expect(first.collapseTitle === 'Open paired browser (⌘⇧B)', 'shut browser title should say open: ' + first.collapseTitle);
+  expect(first.grid.includes('40px'), 'new session should start on the narrow restore rail, got ' + first.grid);
+
+  b.restore(firstId);
+  b.narrow(firstId, 245);
+  first = b.state(firstId);
+  expect(!first.collapsed, 'restore should open the paired browser for narrow toolbar checks');
   expect(first.toolbarOverflow, 'narrow browser toolbar should horizontally overflow');
   expect(first.toolbarScrollbarWidth === 'none', 'browser toolbar scrollbar should be hidden, got ' + first.toolbarScrollbarWidth);
   b.scrollCaptureIntoView(firstId);
@@ -51,7 +59,7 @@ fs.writeFileSync(e2ePath, `
   expect(first.dividerDisabled, 'divider should be disabled while browser is collapsed');
   expect(first.grid.includes('40px'), 'collapsed grid should leave a narrow restore rail, got ' + first.grid);
   expect(first.collapseText === 'RESTORE', 'collapsed rail should expose restore button');
-  expect(first.collapseTitle === 'Restore paired browser', 'restore button should have restore title');
+  expect(first.collapseTitle === 'Open paired browser (⌘⇧B)', 'restore button should have open title');
   expect(first.currentUrl === 'http://localhost:5173/current', 'collapse must preserve current URL');
   expect(first.urlBar === 'http://localhost:5173/current', 'collapse must preserve URL bar');
   expect(first.queueCount === 1, 'collapse must preserve queue state');
@@ -59,7 +67,7 @@ fs.writeFileSync(e2ePath, `
 
   b.focus(secondId);
   let second = b.state(secondId);
-  expect(!second.collapsed, 'second session should remain restored');
+  expect(second.collapsed, 'second session should also start shut (per-session default)');
   b.focus(firstId);
   first = b.state(firstId);
   expect(first.collapsed, 'switching tabs should preserve first session collapse state');
@@ -72,7 +80,8 @@ fs.writeFileSync(e2ePath, `
   expect(!first.webHostHidden, 'restore should show browser content area');
   expect(!first.dividerDisabled, 'restore should re-enable divider');
   expect(first.grid.includes('245px'), 'restore should keep the previous split width, got ' + first.grid);
-  expect(first.collapseText === 'COLLAPSE', 'restored browser should expose collapse button');
+  expect(first.collapseText === 'COLLAPSE', 'open browser should expose COLLAPSE (shut) button');
+  expect(first.collapseTitle === 'Shut paired browser (⌘⇧B)', 'open browser title should say shut');
   expect(first.currentUrl === 'http://localhost:5173/current', 'restore must preserve current URL');
   expect(first.queueCount === 1, 'restore must preserve queue state');
 
@@ -81,16 +90,25 @@ fs.writeFileSync(e2ePath, `
   first = b.state(firstId);
   expect(shortcutCollapsed && shortcutCollapsed.sessionId === firstId, 'Command+Shift+B should target active session');
   expect(shortcutCollapsed.collapsed === true, 'Command+Shift+B should report collapsed state');
-  expect(first.collapsed, 'Command+Shift+B should collapse the active paired browser');
+  expect(first.collapsed, 'Command+Shift+B should shut the active paired browser');
 
   const shortcutRestored = b.shortcutToggle();
   await tick();
   first = b.state(firstId);
   expect(shortcutRestored && shortcutRestored.sessionId === firstId, 'second Command+Shift+B should target active session');
-  expect(shortcutRestored.collapsed === false, 'second Command+Shift+B should report restored state');
-  expect(!first.collapsed, 'second Command+Shift+B should restore the active paired browser');
-  expect(first.currentUrl === 'http://localhost:5173/current', 'shortcut restore must preserve current URL');
-  expect(first.queueCount === 1, 'shortcut restore must preserve queue state');
+  expect(shortcutRestored.collapsed === false, 'second Command+Shift+B should report open state');
+  expect(!first.collapsed, 'second Command+Shift+B should open the active paired browser');
+  expect(first.currentUrl === 'http://localhost:5173/current', 'shortcut open must preserve current URL');
+  expect(first.queueCount === 1, 'shortcut open must preserve queue state');
+
+  // Explicit open restores a shut browser without clearing URL/queue.
+  b.collapse(firstId);
+  b.open(firstId, 'http://localhost:5173/approved');
+  await tick();
+  first = b.state(firstId);
+  expect(!first.collapsed, 'opening a URL should restore a shut browser');
+  expect(first.currentUrl === 'http://localhost:5173/approved', 'open should navigate the paired pane');
+  expect(first.queueCount === 1, 'open must preserve queue state');
 
   return JSON.stringify({
     ok: true,

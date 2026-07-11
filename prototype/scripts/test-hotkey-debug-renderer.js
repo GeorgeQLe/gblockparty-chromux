@@ -47,10 +47,12 @@ fs.writeFileSync(e2ePath, `
   expect(byId('session-2').available, 'Command+2 should be available for the second session');
   expect(byId('queue-next').available, 'Command+J should be available when a queue item exists');
   expect(byId('browser-toggle').available, 'Command+Shift+B should be available with an active session');
-  expect(byId('browser-toggle').description === 'collapse browser', 'restored browser target should be collapse');
+  expect(byId('browser-toggle').description === 'open browser', 'shut browser target should be open');
 
+  h.setCollapsed(firstId, false);
+  expect(byId('browser-toggle').description === 'shut browser', 'open browser target should be shut');
   h.setCollapsed(firstId, true);
-  expect(byId('browser-toggle').description === 'restore browser', 'collapsed browser target should be restore');
+  expect(byId('browser-toggle').description === 'open browser', 'collapsed browser target should be open');
   h.setCollapsed(firstId, false);
 
   h.openModal();

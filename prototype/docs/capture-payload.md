@@ -56,6 +56,9 @@ Chromux never deletes captures. Each capture directory is self-contained
 `~/.chromux/captures/`. Delivery attempts (adapter, target, exit status, payload path) append
 to `~/.chromux/delivery-log.jsonl`.
 
+For the full local-data inventory, outbound delivery boundaries, and cleanup guidance, see
+[privacy-and-local-data.md](privacy-and-local-data.md).
+
 ## Versioning
 
 `schema_version` is bumped on any breaking change to field names, nesting, or semantics.

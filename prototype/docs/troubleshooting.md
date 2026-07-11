@@ -37,11 +37,11 @@ If a file preview did not open:
 
 ## Review queue
 
-Chromux does not hot-swap a busy browser pane. The first detected preview fills an empty pane; later URLs and popup windows go to QUEUE.
+Chromux never auto-opens a detected preview. Every localhost / loopback / local `.html` hit and every popup goes to QUEUE until you approve it. Opening a queued (or typed / ⌘-clicked) URL loads the paired pane and restores the browser if it was shut.
 
 Use QUEUE to open the next preview intentionally. Command-J reveals and focuses the next queued OPEN button without opening it. If a page seems stale, check whether the updated URL is waiting in QUEUE.
 
-Use the browser pane's COLLAPSE control or Command-Shift-B when you need the active terminal to take the full workspace width; the same shortcut restores the paired browser without clearing its URL, queue, or capture state.
+New sessions start with the paired browser shut so the terminal owns the workspace. Use the browser rail's RESTORE control (or Command-Shift-B) to open it, and COLLAPSE / Command-Shift-B again to shut it. Toggle does not clear URL, queue, or capture state.
 
 ## Screenshots
 
@@ -121,3 +121,4 @@ claude -p "$(cat /Users/me/.chromux/captures/<timestamp>/payload.yaml)"
 ```
 
 See [capture-payload.md](capture-payload.md) for the YAML schema and field limits.
+See [privacy-and-local-data.md](privacy-and-local-data.md) for the complete local-data map, outbound boundaries, and cleanup guidance.
