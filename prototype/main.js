@@ -29,6 +29,7 @@ const UPDATE_CACHE = path.join(CHROMUX_HOME, 'update-cache.json');
 const UPDATE_SOURCE = path.join(CHROMUX_HOME, 'update-source.json');
 const UPDATE_INSTALL_LOG = path.join(CHROMUX_HOME, 'update-install.log');
 const RESTORE_SESSIONS = path.join(CHROMUX_HOME, 'restore-sessions.json');
+const FAVORITES_FILE = path.join(CHROMUX_HOME, 'favorites.json');
 const HOOKS_CLAUDE = path.join(CHROMUX_HOME, 'hooks-claude.json');
 const CODEX_NOTIFY = path.join(CHROMUX_HOME, 'codex-notify.sh');
 const GROK_HOOK_SCRIPT = path.join(CHROMUX_HOME, 'grok-hook.sh');
@@ -43,6 +44,11 @@ const QUEUE_REASON_BY_SOURCE = {
   POPUP: 'opened by page popup',
   RESTORE: 'restored from previous session',
 };
+const FAVORITES_MAX = 200;
+const FAVORITES_INPUT_MAX = 400;
+const FAVORITES_FILE_BYTES_MAX = 1024 * 1024;
+const FAVORITE_URL_MAX = 4096;
+const FAVORITE_TITLE_MAX = 200;
 
 let win = null;
 const ptys = new Map(); // sessionId -> IPty
@@ -75,6 +81,65 @@ if (!hasSingleInstanceLock) {
 
 function ensureDirs() {
   fs.mkdirSync(CAPTURES_DIR, { recursive: true });
+}
+
+function normalizeFavoriteRecord(record) {
+  if (!record || typeof record !== 'object' || Array.isArray(record)) return null;
+  const rawUrl = typeof record.url === 'string' ? record.url.trim() : '';
+  if (!rawUrl || rawUrl.length > FAVORITE_URL_MAX) return null;
+  let parsed;
+  try { parsed = new URL(rawUrl); } catch { return null; }
+  if (!['http:', 'https:', 'file:'].includes(parsed.protocol)) return null;
+  if (parsed.username || parsed.password) return null;
+  parsed.hash = '';
+  const url = parsed.href;
+  const title = typeof record.title === 'string'
+    ? record.title.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, FAVORITE_TITLE_MAX)
+    : '';
+  const created = new Date(record.createdAt);
+  if (!Number.isFinite(created.getTime())) return null;
+  const createdAt = created.toISOString();
+  return { url, title: title || url, createdAt };
+}
+
+function validateFavorites(records) {
+  if (!Array.isArray(records)) return [];
+  const seen = new Set();
+  const valid = [];
+  for (const candidate of records.slice(0, FAVORITES_INPUT_MAX)) {
+    const record = normalizeFavoriteRecord(candidate);
+    if (!record || seen.has(record.url)) continue;
+    seen.add(record.url);
+    valid.push(record);
+    if (valid.length >= FAVORITES_MAX) break;
+  }
+  return valid;
+}
+
+function readFavorites() {
+  try {
+    if (fs.statSync(FAVORITES_FILE).size > FAVORITES_FILE_BYTES_MAX) return [];
+    return validateFavorites(JSON.parse(fs.readFileSync(FAVORITES_FILE, 'utf8')));
+  } catch {
+    return [];
+  }
+}
+
+function replaceFavorites(records) {
+  if (!Array.isArray(records) || records.length > FAVORITES_INPUT_MAX) {
+    throw new Error(`favorites must be an array of at most ${FAVORITES_INPUT_MAX} records`);
+  }
+  const valid = validateFavorites(records);
+  ensureDirs();
+  const tmp = path.join(CHROMUX_HOME, `.favorites-${process.pid}-${crypto.randomBytes(6).toString('hex')}.tmp`);
+  try {
+    fs.writeFileSync(tmp, JSON.stringify(valid, null, 2) + '\n', { mode: 0o600 });
+    fs.renameSync(tmp, FAVORITES_FILE);
+    try { fs.chmodSync(FAVORITES_FILE, 0o600); } catch { /* best effort */ }
+  } finally {
+    try { fs.unlinkSync(tmp); } catch { /* renamed or absent */ }
+  }
+  return valid;
 }
 
 function send(channel, payload) {
@@ -1367,6 +1432,9 @@ ipcMain.handle('get-env', () => ({
   grokHooksPath: hookInstall.grok ? HOOKS_GROK : null,
   version: currentVersion(),
 }));
+
+ipcMain.handle('favorites-read', () => readFavorites());
+ipcMain.handle('favorites-replace', (_e, records) => replaceFavorites(records));
 
 ipcMain.handle('check-updates', (_e, opts = {}) => getUpdateStatus(opts));
 

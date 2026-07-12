@@ -13,6 +13,8 @@ const state = {
   env: null,
   captures: new Map(), // captureId -> CaptureRecord
   deliveryIndex: new Map(), // deliveryId -> captureId
+  favorites: [], // global v1 { url, title, createdAt }
+  favoritesReady: null,
   events: [], // ring buffer of applied events (diagnostics), max EVENT_RING_MAX
   ui: {
     captureModal: null, // { captureId, pngBase64, payloadBase } while composing/delivering
@@ -56,6 +58,96 @@ const BOUNDS = {
   shortcutDebugStaleMs: 1500,
   resumeStartupExitMs: 15000,
 };
+
+function normalizeFavoriteUrl(rawUrl) {
+  try {
+    const parsed = new URL(String(rawUrl || '').trim());
+    if (!['http:', 'https:', 'file:'].includes(parsed.protocol)) return null;
+    if (parsed.username || parsed.password) return null;
+    parsed.hash = '';
+    return parsed.href;
+  } catch { return null; }
+}
+
+function favoriteForUrl(url) {
+  const normalized = normalizeFavoriteUrl(url);
+  return normalized ? state.favorites.find((item) => item.url === normalized) || null : null;
+}
+
+function favoriteTitle(session, url) {
+  let title = '';
+  try {
+    title = session && session.browser && session.browser.webview
+      ? String(session.browser.webview.getTitle ? session.browser.webview.getTitle() : '').trim()
+      : '';
+  } catch { title = ''; }
+  return (title || String(url)).slice(0, 200);
+}
+
+async function setFavorite(url, title, shouldFavorite) {
+  const normalized = normalizeFavoriteUrl(url);
+  if (!normalized) return false;
+  const existing = favoriteForUrl(normalized);
+  let next = state.favorites.slice();
+  if (shouldFavorite && !existing) {
+    next.push({ url: normalized, title: String(title || normalized).trim().slice(0, 200) || normalized, createdAt: new Date().toISOString() });
+  } else if (!shouldFavorite && existing) {
+    next = next.filter((item) => item.url !== normalized);
+  } else {
+    return Boolean(existing);
+  }
+  state.favorites = await window.chromux.favoritesReplace(next);
+  renderAllFavorites();
+  return Boolean(favoriteForUrl(normalized));
+}
+
+function toggleFavorite(session, url, title) {
+  return setFavorite(url, title || favoriteTitle(session, url), !favoriteForUrl(url));
+}
+
+function renderAllFavorites() {
+  for (const session of state.sessions.values()) {
+    if (!session.els) continue;
+    renderFavoriteToolbar(session);
+    renderFavoritesPicker(session);
+    if (session.els.queueList) renderQueue(session);
+  }
+}
+
+function renderFavoriteToolbar(session) {
+  const button = session.els && session.els.favoriteBtn;
+  if (!button) return;
+  const url = session.browser.currentUrl || session.els.urlBar.value;
+  const active = Boolean(favoriteForUrl(url));
+  button.classList.toggle('armed', active);
+  button.textContent = active ? '★' : '☆';
+  button.title = active ? 'Remove current page from favorites' : 'Add current page to favorites';
+  button.disabled = !normalizeFavoriteUrl(url);
+}
+
+function renderFavoritesPicker(session) {
+  const host = session.els && session.els.favoritesList;
+  if (!host) return;
+  host.innerHTML = '';
+  if (!state.favorites.length) {
+    const empty = document.createElement('div');
+    empty.className = 'queue-empty';
+    empty.textContent = 'No favorites yet. Pin the current page or a queued preview.';
+    host.appendChild(empty);
+  }
+  for (const favorite of state.favorites) {
+    const row = document.createElement('div'); row.className = 'favorite-item';
+    const main = document.createElement('button'); main.className = 'favorite-open';
+    const title = document.createElement('span'); title.className = 'favorite-title'; title.textContent = favorite.title;
+    const url = document.createElement('span'); url.className = 'qi-url'; url.textContent = favorite.url;
+    main.append(title, url);
+    main.onclick = () => { openInPane(state.sessions.get(state.activeId) || session, favorite.url); };
+    const remove = document.createElement('button'); remove.className = 'qi-btn'; remove.textContent = 'UNPIN';
+    remove.onclick = () => setFavorite(favorite.url, favorite.title, false);
+    row.append(main, remove); host.appendChild(row);
+  }
+  if (session.els.favoritesBadge) session.els.favoritesBadge.textContent = String(state.favorites.length);
+}
 
 // ───────────────────────────────────────────────────────────────────────────
 // Terminal theme (matches the flight-deck palette)
@@ -787,6 +879,11 @@ function renderQueue(session) {
       openInPane(session, item.url);
       renderQueue(session);
     };
+    const pin = document.createElement('button');
+    pin.className = 'qi-btn pin';
+    pin.textContent = favoriteForUrl(item.url) ? 'UNPIN' : 'PIN';
+    pin.dataset.queuePinUrl = item.url;
+    pin.onclick = () => toggleFavorite(session, item.url, item.url);
     const dismiss = document.createElement('button');
     dismiss.className = 'qi-btn';
     dismiss.textContent = 'DISMISS';
@@ -794,7 +891,7 @@ function renderQueue(session) {
       apply({ type: 'preview-dismissed', sessionId: session.id, url: item.url });
       renderQueue(session);
     };
-    row.append(src, main, open, dismiss);
+    row.append(src, main, pin, open, dismiss);
     host.appendChild(row);
   }
   session.els.queueBadge.textContent = String(queue.length);
@@ -1210,6 +1307,7 @@ function openInPane(session, url) {
   b.currentUrl = url;
   b.lastReload = Date.now();
   session.els.urlBar.value = url;
+  renderFavoriteToolbar(session);
   invalidate('captureChips');
   if (!b.webview) {
     const wv = document.createElement('webview');
@@ -1234,12 +1332,14 @@ function openInPane(session, url) {
       b.guestEditableFocused = false;
       b.currentUrl = e.url;
       session.els.urlBar.value = e.url;
+      renderFavoriteToolbar(session);
       invalidate('captureChips', 'shortcutDebug');
     });
     wv.addEventListener('did-navigate-in-page', (e) => {
       if (e.isMainFrame) {
         b.currentUrl = e.url;
         session.els.urlBar.value = e.url;
+        renderFavoriteToolbar(session);
         invalidate('captureChips');
       }
     });
@@ -1309,6 +1409,7 @@ function setBrowserCollapsed(session, collapsed) {
   if (next) session.browser.expandedGridTemplate = session.els.view.style.gridTemplateColumns || session.browser.expandedGridTemplate;
   session.browser.collapsed = next;
   if (next) session.els.queuePanel.classList.add('hidden');
+  if (next && session.els.favoritesPanel) session.els.favoritesPanel.classList.add('hidden');
   applyBrowserLayout(session);
   invalidate('shortcutDebug');
 }
@@ -2007,6 +2108,15 @@ function buildSessionView(session) {
   const urlBar = document.createElement('input');
   urlBar.className = 'url-bar'; urlBar.type = 'text'; urlBar.spellcheck = false;
   urlBar.placeholder = 'awaiting preview — or type a URL and hit ⏎';
+  const favoriteBtn = document.createElement('button');
+  favoriteBtn.className = 'nav-btn favorite-btn'; favoriteBtn.textContent = '☆';
+  favoriteBtn.title = 'Add current page to favorites'; favoriteBtn.disabled = true;
+
+  const favoritesBtn = document.createElement('button');
+  favoritesBtn.className = 'head-btn';
+  const favoritesBadge = document.createElement('span'); favoritesBadge.className = 'q-badge';
+  favoritesBadge.textContent = String(state.favorites.length);
+  favoritesBtn.append(document.createTextNode('FAVORITES '), favoritesBadge);
 
   const queueBtn = document.createElement('button');
   queueBtn.className = 'head-btn';
@@ -2029,7 +2139,7 @@ function buildSessionView(session) {
   captureBtn.className = 'head-btn'; captureBtn.textContent = '⚡ CAPTURE'; captureBtn.disabled = true;
   captureBtn.title = 'Capture page (console + screenshot + URL) without picking an element';
 
-  browserToolbar.append(back, reload, urlBar, consoleChip, captureChip, queueBtn, pickBtn, captureBtn, collapseBtn);
+  browserToolbar.append(back, reload, urlBar, favoriteBtn, consoleChip, captureChip, queueBtn, favoritesBtn, pickBtn, captureBtn, collapseBtn);
   webHead.append(webLabel, browserToolbar);
 
   const queuePanel = document.createElement('div');
@@ -2039,6 +2149,13 @@ function buildSessionView(session) {
   queueHead.innerHTML = '<span class="microlabel">REVIEW QUEUE — NEW PREVIEWS WAIT HERE</span>';
   const queueList = document.createElement('div');
   queuePanel.append(queueHead, queueList);
+
+  const favoritesPanel = document.createElement('div');
+  favoritesPanel.className = 'favorites-panel hidden';
+  const favoritesHead = document.createElement('div'); favoritesHead.className = 'queue-head';
+  favoritesHead.innerHTML = '<span class="microlabel">GLOBAL FAVORITES</span>';
+  const favoritesList = document.createElement('div');
+  favoritesPanel.append(favoritesHead, favoritesList);
 
   const webHost = document.createElement('div');
   webHost.className = 'web-host';
@@ -2056,7 +2173,7 @@ function buildSessionView(session) {
   refreshFlash.textContent = 'AUTO-REFRESHED';
   webHost.append(placeholder, refreshFlash);
 
-  webPane.append(webHead, queuePanel, webHost);
+  webPane.append(webHead, queuePanel, favoritesPanel, webHost);
   view.append(termPane, divider, webPane);
   $('#views').appendChild(view);
 
@@ -2071,7 +2188,15 @@ function buildSessionView(session) {
       openInPane(session, u);
     }
   });
-  queueBtn.onclick = () => queuePanel.classList.toggle('hidden');
+  queueBtn.onclick = () => {
+    favoritesPanel.classList.add('hidden');
+    queuePanel.classList.toggle('hidden');
+  };
+  favoritesBtn.onclick = () => {
+    queuePanel.classList.add('hidden');
+    favoritesPanel.classList.toggle('hidden');
+  };
+  favoriteBtn.onclick = () => toggleFavorite(session, session.browser.currentUrl || urlBar.value);
   collapseBtn.onclick = () => setBrowserCollapsed(session, !session.browser.collapsed);
   pickBtn.onclick = () => (session.browser.picking ? null : startPick(session));
   captureBtn.onclick = () => openCaptureModal(session, { selector: null, outerHTML: null, pageTitle: null, pageUrl: session.browser.currentUrl });
@@ -2099,7 +2224,7 @@ function buildSessionView(session) {
   });
 
   return {
-    view, termLabel, termHost, urlBar, queueBtn, queueBadge, queuePanel, queueList,
+    view, termLabel, termHost, urlBar, favoriteBtn, favoritesBtn, favoritesBadge, favoritesPanel, favoritesList, queueBtn, queueBadge, queuePanel, queueList,
     consoleChip, captureChip, pickBtn, captureBtn, webHost, placeholder, refreshFlash,
     divider, webPane, browserToolbar, collapseBtn,
   };
@@ -4362,6 +4487,8 @@ if (window.chromuxTest) {
         session.browser.currentUrl = url;
         session.els.urlBar.value = url;
       }
+      renderFavoriteToolbar(session);
+      renderFavoritesPicker(session);
       renderQueue(session);
       activateSession(session.id);
       flushRender();
@@ -4431,6 +4558,47 @@ if (window.chromuxTest) {
       };
     },
     flushRender,
+  };
+
+  window.chromuxTestFavorites = {
+    ready: () => state.favoritesReady || Promise.resolve(),
+    urls: () => state.favorites.map((item) => item.url),
+    addSession(opts = {}) {
+      return window.chromuxTestBrowser.addSession(opts);
+    },
+    focus(id) { window.chromuxTestBrowser.focus(id); },
+    collapse(id) { window.chromuxTestBrowser.collapse(id); },
+    state(id) { return window.chromuxTestBrowser.state(id); },
+    toolbar(id) {
+      const button = testSession(id).els.favoriteBtn;
+      return { active: button.classList.contains('armed'), disabled: button.disabled, text: button.textContent };
+    },
+    async toolbarToggle(id) {
+      testSession(id).els.favoriteBtn.click();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      flushRender();
+    },
+    async queueToggle(id, url) {
+      const button = [...testSession(id).els.queueList.querySelectorAll('.qi-btn.pin')]
+        .find((candidate) => candidate.dataset.queuePinUrl === url);
+      if (!button) throw new Error(`No queued PIN for ${url}`);
+      button.click();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      flushRender();
+    },
+    pickerUrls(id) {
+      return [...testSession(id).els.favoritesList.querySelectorAll('.qi-url')].map((el) => el.textContent);
+    },
+    openFavorite(url) {
+      const session = testSession(state.activeId);
+      const rows = [...session.els.favoritesList.querySelectorAll('.favorite-item')];
+      const row = rows.find((candidate) => candidate.querySelector('.qi-url')?.textContent === url);
+      if (!row) throw new Error(`No favorite for ${url}`);
+      row.querySelector('.favorite-open').click();
+      flushRender();
+    },
+    readPersisted: () => window.chromux.favoritesRead(),
+    replaceRaw: (records) => window.chromux.favoritesReplace(records),
   };
 
   window.chromuxTestAgentCommand = {
@@ -4541,6 +4709,11 @@ setInterval(() => {
 
 // boot
 (async () => {
+  state.favoritesReady = window.chromux.favoritesRead().then((favorites) => {
+    state.favorites = Array.isArray(favorites) ? favorites : [];
+    renderAllFavorites();
+  }).catch(() => { state.favorites = []; });
+  await state.favoritesReady;
   state.env = await window.chromux.getEnv();
   state.restoreSessions = state.env.restoreSessions || null;
   window.chromux.onUpdateStatus((status) => renderUpdateStatus(status));

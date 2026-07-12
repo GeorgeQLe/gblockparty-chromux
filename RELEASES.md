@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.21.0
+
+Tag: `chromux-v0.21.0`
+
+- Add global favorites for paired-browser documents and URLs, with toolbar and review-queue pin controls plus a shared picker that opens into the active session.
+- Persist a bounded, validated list atomically in `~/.chromux/favorites.json`, normalize fragments for deduplication, and recover safely from missing or malformed data.
+- Restore a shut paired browser when a favorite is opened, and document local storage, privacy, cleanup, and troubleshooting behavior.
+
 ## GBlockParty Chromux v0.20.1
 
 Tag: `chromux-v0.20.1`

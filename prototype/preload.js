@@ -23,6 +23,8 @@ contextBridge.exposeInMainWorld('chromux', {
   onDeliverClose: (cb) => ipcRenderer.on('deliver-close', (_e, m) => cb(m)),
   logFiledrop: (opts) => ipcRenderer.send('log-filedrop', opts),
   readDeliveryLog: () => ipcRenderer.invoke('read-delivery-log'),
+  favoritesRead: () => ipcRenderer.invoke('favorites-read'),
+  favoritesReplace: (records) => ipcRenderer.invoke('favorites-replace', records),
 
   // popups intercepted in main → review queue
   onWebviewPopup: (cb) => ipcRenderer.on('webview-popup', (_e, m) => cb(m)),

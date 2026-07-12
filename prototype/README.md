@@ -137,3 +137,15 @@ telemetry in the current prototype. Browser pages, update checks, agent CLIs,
 and `SEND - claude -p` can make outbound requests. See
 [`docs/privacy-and-local-data.md`](docs/privacy-and-local-data.md) for the full
 data-handling notice.
+
+### Global favorites
+
+Use the star beside the paired browser URL to favorite the current document or
+URL, or use `PIN` on a queued preview. `FAVORITES` shows the same global list in
+every session; selecting an entry opens it in the active session's paired
+browser and restores that browser if it is shut.
+
+Favorites are stored locally in `~/.chromux/favorites.json`. Chromux keeps at
+most 200 validated `http:`, `https:`, or `file:` entries, removes URL fragments
+for deduplication, and never syncs the list. Delete that file while Chromux is
+closed to clear all favorites.

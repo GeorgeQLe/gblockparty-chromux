@@ -43,6 +43,18 @@ Use QUEUE to open the next preview intentionally. Command-J reveals and focuses 
 
 New sessions start with the paired browser shut so the terminal owns the workspace. Use the browser rail's RESTORE control (or Command-Shift-B) to open it, and COLLAPSE / Command-Shift-B again to shut it. Toggle does not clear URL, queue, or capture state.
 
+## Favorites
+
+Use the star beside the URL bar to pin the current page, or `PIN` on a review
+queue row. Favorites are global in v1: every session shows the same list, and
+choosing one opens it in whichever session is active. Opening a favorite also
+restores that session's paired browser if it was shut.
+
+Chromux stores at most 200 favorites in `~/.chromux/favorites.json`. It accepts
+only `http:`, `https:`, and `file:` URLs, removes fragments such as `#section`
+before deduplication, and safely treats a missing or malformed file as an empty
+list. To reset the list, quit Chromux and delete `~/.chromux/favorites.json`.
+
 ## Screenshots
 
 Capture tries to save the visible viewport as `screenshot.png` next to the YAML payload. Screenshot failure does not cancel the capture. The payload is still written and `screenshot.mode` becomes `unavailable`.
@@ -98,6 +110,7 @@ Chromux stores local artifacts under your home directory:
 | --- | --- |
 | Capture payloads and screenshots | `~/.chromux/captures/<timestamp>/` |
 | Delivery log | `~/.chromux/delivery-log.jsonl` |
+| Global favorites | `~/.chromux/favorites.json` |
 | Hook settings and notify scripts | `~/.chromux/` |
 | Browser profile | Electron partition `persist:chromux` |
 

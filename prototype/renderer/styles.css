@@ -574,6 +574,9 @@ body.dragging webview { pointer-events: none; }
   display: flex; align-items: center; justify-content: center;
 }
 .nav-btn:hover { color: var(--text); border-color: var(--line-hi); }
+.nav-btn:disabled { opacity: 0.35; cursor: default; }
+.favorite-btn { font-size: 16px; color: var(--amber); }
+.favorite-btn.armed { color: #14100a; background: var(--amber); border-color: var(--amber); }
 
 .url-bar {
   flex: 1 0 190px; min-width: 190px;
@@ -620,6 +623,7 @@ body.dragging webview { pointer-events: none; }
 }
 .web-pane.collapsed .pane-label,
 .web-pane.collapsed .queue-panel,
+.web-pane.collapsed .favorites-panel,
 .web-pane.collapsed .web-host {
   display: none;
 }
@@ -667,6 +671,19 @@ body.dragging webview { pointer-events: none; }
   background: var(--bg2);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
 }
+.favorites-panel {
+  position: absolute; top: 35px; right: 8px; z-index: 41;
+  width: min(520px, 86%); max-height: min(420px, 70%); overflow-y: auto;
+  border: 1px solid var(--line-hi); background: var(--bg2);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+}
+.favorite-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.favorite-item:last-child { border-bottom: none; }
+.favorite-open {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; text-align: left;
+  border: 0; background: transparent; cursor: pointer; font-family: var(--font-mono);
+}
+.favorite-title { color: var(--text); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .queue-head {
   padding: 8px 10px; border-bottom: 1px solid var(--line);
   display: flex; justify-content: space-between; align-items: center;
