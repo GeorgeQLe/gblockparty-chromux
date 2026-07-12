@@ -1,5 +1,12 @@
 # Release Notes
 
+## GBlockParty Chromux v0.22.1
+
+Tag: `chromux-v0.22.1`
+
+- Fix production design-gallery navigation by linking every card to its Vercel clean URL instead of an `.html` path.
+- Add a website route regression test that verifies every gallery card maps to a generated HTML file and rejects `.html` links.
+
 ## GBlockParty Chromux v0.22.0
 
 Tag: `chromux-v0.22.0`

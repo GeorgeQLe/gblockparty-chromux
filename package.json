@@ -1,10 +1,11 @@
 {
   "name": "chromux-website",
-  "version": "0.21.0",
+  "version": "0.22.1",
   "private": true,
   "description": "Static product site and design gallery for GBlockParty Chromux.",
   "license": "MIT",
   "scripts": {
-    "build": "./scripts/build-website.sh"
+    "build": "./scripts/build-website.sh",
+    "test": "node scripts/test-website-routes.js"
   }
 }
