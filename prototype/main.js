@@ -7,6 +7,7 @@ const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron')
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const crypto = require('crypto');
 const { spawn, execFile } = require('child_process');
 const pty = require('node-pty');
 const yaml = require('js-yaml');
@@ -32,6 +33,7 @@ const HOOKS_CLAUDE = path.join(CHROMUX_HOME, 'hooks-claude.json');
 const CODEX_NOTIFY = path.join(CHROMUX_HOME, 'codex-notify.sh');
 const GROK_HOOK_SCRIPT = path.join(CHROMUX_HOME, 'grok-hook.sh');
 const HOOKS_GROK = path.join(CHROMUX_HOME, 'hooks-grok.json');
+const SIGNAL_CLASSIFIER = path.join(CHROMUX_HOME, 'signal-classifier.js');
 const GROK_HOOKS_INSTALL_NAME = 'chromux-turn-signals.json';
 const PACKAGE_PATH = path.join(__dirname, 'package.json');
 const KNOWN_AGENTS = ['claude', 'codex', 'grok', ''];
@@ -288,6 +290,62 @@ function readJson(p) {
   try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return null; }
 }
 
+function writeSignalClassifier() {
+  ensureDirs();
+  const source = String.raw`'use strict';
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+const agent = process.argv[2] || '';
+const nativeEvent = process.argv[3] || '';
+let raw = process.argv[4] || '';
+if (!raw) { try { raw = fs.readFileSync(0, 'utf8'); } catch {} }
+let payload = {};
+try { payload = raw ? JSON.parse(raw) : {}; } catch { process.exit(0); }
+if (agent === 'codex' && payload.type !== 'agent-turn-complete') process.exit(0);
+const sessionId = process.env.CHROMUX_SESSION_ID || '';
+const token = process.env.CHROMUX_SIGNAL_TOKEN || '';
+if (!sessionId || !token || !['claude','codex','grok'].includes(agent)) process.exit(0);
+const text = [payload.message, payload.title, payload.notification_type, payload.type,
+  payload.reason, payload.error, payload.last_assistant_message].filter((v) => typeof v === 'string').join(' ').slice(0, 4096);
+const lower = text.toLowerCase();
+let event = null; let reason = null; let stopped = false;
+if (nativeEvent === 'UserPromptSubmit') event = 'turn-started';
+else if (nativeEvent === 'Stop' || nativeEvent === 'agent-turn-complete') { event = 'turn-completed'; stopped = true; }
+else if (nativeEvent === 'SubagentStop') process.exit(0);
+else if (nativeEvent === 'Notification') {
+  if (/permission|approval|allow|confirm/.test(lower)) { event = 'permission-required'; reason = 'permission'; }
+  else if (/authenticat|log[ -]?in|sign[ -]?in|credential|api key|oauth/.test(lower)) { event = 'authentication-required'; reason = 'authentication'; }
+  else if (/rate limit|usage limit|quota|too many requests|limit reset/.test(lower)) { event = 'rate-limited'; reason = 'rate-limit'; stopped = /stopp|abort|cannot continue|try again later/.test(lower); }
+  else if (/tool.*fail|command.*fail|execution.*fail|error running/.test(lower)) { event = 'tool-failed'; reason = 'tool-failure'; stopped = /stopp|abort|cannot continue/.test(lower); }
+  else if (/input|answer|question|choose|select|provide|waiting/.test(lower)) { event = 'input-required'; reason = 'input'; }
+  else event = 'unknown-notification';
+} else process.exit(0);
+const stateDir = process.env.CHROMUX_STATE_DIR || path.dirname(__filename);
+const statePath = path.join(stateDir, 'signal-' + crypto.createHash('sha256').update(sessionId + token).digest('hex').slice(0, 24) + '.json');
+let state = { sequence: -1, turnId: null };
+try { state = Object.assign(state, JSON.parse(fs.readFileSync(statePath, 'utf8'))); } catch {}
+state.sequence += 1;
+if (event === 'turn-started' || !state.turnId) state.turnId = String(payload.turn_id || payload.turnId || crypto.randomUUID());
+const envelope = { v: 2, sessionId, token, agent, event, reason,
+  message: text.slice(0, 1024) || null, turnId: state.turnId, eventId: crypto.randomUUID(),
+  sequence: state.sequence, timestamp: Date.now(), source: agent + ':' + nativeEvent,
+  confidence: event === 'unknown-notification' ? 'low' : 'high', stopped };
+try { fs.writeFileSync(statePath, JSON.stringify(state), { mode: 0o600 }); } catch {}
+const encoded = Buffer.from(JSON.stringify(envelope)).toString('base64url');
+try { fs.writeFileSync('/dev/tty', '\x1b]777;chromux;v2;' + encoded + '\x07'); } catch {}
+`;
+  fs.writeFileSync(SIGNAL_CLASSIFIER, source, { mode: 0o700 });
+  fs.chmodSync(SIGNAL_CLASSIFIER, 0o700);
+  return SIGNAL_CLASSIFIER;
+}
+
+function classifierCommand(agent, event, payloadArg = '') {
+  const node = shellQuote(process.execPath);
+  const args = `${shellQuote(SIGNAL_CLASSIFIER)} ${agent} ${event}${payloadArg ? ` ${payloadArg}` : ''}`;
+  return `ELECTRON_RUN_AS_NODE=1 ${node} ${args}`;
+}
+
 // ---------------------------------------------------------------------------
 // Deterministic turn signals — Claude Code hooks. Chromux launches claude with
 // `--settings ~/.chromux/hooks-claude.json` (merges with, never replaces, user
@@ -303,7 +361,8 @@ function chromuxHookCommand(event) {
   // The doubled backslashes make printf emit the six-character texts
   // "backslash-u001b" / "backslash-u0007", so stdout stays valid JSON;
   // Claude Code's JSON parser decodes them into the real ESC/BEL bytes.
-  return `printf '{"terminalSequence":"\\\\u001b]777;chromux;v1;${event};%s\\\\u0007"}' "$CHROMUX_SESSION_ID"`;
+  if (hookInstall.helper) return classifierCommand('claude', event);
+  return `printf '{"terminalSequence":"\\\\u001b]777;chromux;v1;${event === 'UserPromptSubmit' ? 'turn-start' : event === 'Stop' ? 'turn-end' : 'input-needed'};%s\\\\u0007"}' "$CHROMUX_SESSION_ID"`;
 }
 
 function writeClaudeHooksSettings() {
@@ -313,9 +372,9 @@ function writeClaudeHooksSettings() {
     hooks: {
       // No SubagentStop on purpose: a subagent finishing must not read as
       // session-level turn completion.
-      UserPromptSubmit: hook('turn-start'),
-      Notification: hook('input-needed'),
-      Stop: hook('turn-end'),
+      UserPromptSubmit: hook('UserPromptSubmit'),
+      Notification: hook('Notification'),
+      Stop: hook('Stop'),
     },
   };
   fs.writeFileSync(HOOKS_CLAUDE, JSON.stringify(settings, null, 2) + '\n');
@@ -325,7 +384,7 @@ function writeClaudeHooksSettings() {
 // Set in app.whenReady: true only after the corresponding hook file was
 // written successfully. When false, agents launch uninstrumented instead of
 // pointing --settings/notify at a path that was never written.
-const hookInstall = { claude: false, codex: false, grok: false };
+const hookInstall = { helper: false, claude: false, codex: false, grok: false };
 
 // POSIX single-quoting: close the quote, emit an escaped ', reopen. Safe for
 // any byte the filesystem allows (spaces, quotes, backslashes).
@@ -353,11 +412,15 @@ function writeCodexNotifyScript() {
     '# comes from CHROMUX_SESSION_ID in the PTY env; the renderer drops any',
     '# signal whose id does not match the PTY it arrived on.',
     '[ -n "$CHROMUX_SESSION_ID" ] || exit 0',
-    'case "$1" in',
-    '  *\'"type":"agent-turn-complete"\'*) ;;',
-    '  *) exit 0 ;; # only turn completion may signal turn-end',
-    'esac',
-    'printf \'\\033]777;chromux;v1;turn-end;%s\\007\' "$CHROMUX_SESSION_ID" > /dev/tty 2>/dev/null || true',
+    ...(hookInstall.helper ? [] : [
+      'case "$1" in',
+      '  *\'"type":"agent-turn-complete"\'*) ;;',
+      '  *) exit 0 ;; # only turn completion may signal turn-end',
+      'esac',
+    ]),
+    hookInstall.helper
+      ? `${classifierCommand('codex', 'agent-turn-complete', '"$1"')} >/dev/null 2>&1 || true`
+      : 'printf \'\\033]777;chromux;v1;turn-end;%s\\007\' "$CHROMUX_SESSION_ID" > /dev/tty 2>/dev/null || true',
     '',
   ].join('\n');
   fs.writeFileSync(CODEX_NOTIFY, script, { mode: 0o755 });
@@ -399,10 +462,14 @@ function writeGrokHooks() {
     '[ -n "$CHROMUX_SESSION_ID" ] || exit 0',
     'event="$1"',
     'case "$event" in',
-    '  turn-start|input-needed|turn-end) ;;',
+    hookInstall.helper
+      ? '  UserPromptSubmit|Notification|Stop) ;;'
+      : '  turn-start|input-needed|turn-end) ;;',
     '  *) exit 0 ;;',
     'esac',
-    'printf \'\\033]777;chromux;v1;%s;%s\\007\' "$event" "$CHROMUX_SESSION_ID" > /dev/tty 2>/dev/null || true',
+    hookInstall.helper
+      ? `ELECTRON_RUN_AS_NODE=1 ${shellQuote(process.execPath)} ${shellQuote(SIGNAL_CLASSIFIER)} grok "$event" >/dev/null 2>&1 || true`
+      : 'printf \'\\033]777;chromux;v1;%s;%s\\007\' "$event" "$CHROMUX_SESSION_ID" > /dev/tty 2>/dev/null || true',
     '',
   ].join('\n');
   fs.writeFileSync(GROK_HOOK_SCRIPT, script, { mode: 0o755 });
@@ -416,9 +483,9 @@ function writeGrokHooks() {
     hooks: {
       // No SubagentStop: a subagent finishing must not read as session-level
       // turn completion (same policy as Claude Code hooks).
-      UserPromptSubmit: hook('turn-start'),
-      Notification: hook('input-needed'),
-      Stop: hook('turn-end'),
+      UserPromptSubmit: hook(hookInstall.helper ? 'UserPromptSubmit' : 'turn-start'),
+      Notification: hook(hookInstall.helper ? 'Notification' : 'input-needed'),
+      Stop: hook(hookInstall.helper ? 'Stop' : 'turn-end'),
     },
   };
   const json = JSON.stringify(settings, null, 2) + '\n';
@@ -718,12 +785,14 @@ app.on('web-contents-created', (_event, contents) => {
 
 ipcMain.handle('pty-create', (_e, { id, cwd, command, cols, rows }) => {
   const shellPath = process.env.SHELL || '/bin/zsh';
+  const signalToken = crypto.randomBytes(32).toString('base64url');
   const p = pty.spawn(shellPath, ['-l'], {
     name: 'xterm-256color',
     cols: cols || 80,
     rows: rows || 24,
     cwd: cwd && fs.existsSync(cwd) ? cwd : os.homedir(),
-    env: { ...process.env, TERM: 'xterm-256color', CHROMUX: '1', CHROMUX_SESSION_ID: id },
+    env: { ...process.env, TERM: 'xterm-256color', CHROMUX: '1', CHROMUX_SESSION_ID: id,
+      CHROMUX_SIGNAL_TOKEN: signalToken, CHROMUX_STATE_DIR: CHROMUX_HOME },
   });
   ptys.set(id, p);
   p.onData((data) => send('pty-data', { id, data }));
@@ -738,7 +807,7 @@ ipcMain.handle('pty-create', (_e, { id, cwd, command, cols, rows }) => {
       if (ptys.has(id)) p.write(command + '\r');
     }, 700);
   }
-  return { ok: true };
+  return { ok: true, signalToken };
 });
 
 ipcMain.on('pty-input', (_e, { id, data }) => {
@@ -1374,6 +1443,7 @@ ipcMain.handle('install-update', async (_e, opts = {}) => {
 app.whenReady().then(() => {
   ensureDirs();
   installAppMenu();
+  try { writeSignalClassifier(); hookInstall.helper = true; } catch (err) { console.error('signal classifier write failed; using legacy hooks:', err.message); }
   try { writeClaudeHooksSettings(); hookInstall.claude = true; } catch (err) { console.error('hooks settings write failed:', err.message); }
   try { writeCodexNotifyScript(); hookInstall.codex = true; } catch (err) { console.error('codex notify script write failed:', err.message); }
   try { writeGrokHooks(); hookInstall.grok = true; } catch (err) { console.error('grok hooks write failed:', err.message); }

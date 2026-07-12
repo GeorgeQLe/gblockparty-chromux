@@ -113,6 +113,23 @@ See [`docs/troubleshooting.md`](docs/troubleshooting.md) for the full support gu
 | Restore snapshot | `~/.chromux/restore-sessions.json` |
 | Update cache/source/install log | `~/.chromux/update-cache.json`, `~/.chromux/update-source.json`, `~/.chromux/update-install.log` |
 | Hook settings and notify scripts | `~/.chromux/hooks-claude.json`, `~/.chromux/codex-notify.sh`, `~/.chromux/hooks-grok.json`, `~/.chromux/grok-hook.sh`, and `~/.grok/hooks/chromux-turn-signals.json` |
+
+## Agent attention protocol
+
+Chromux creates a random 256-bit signal token for every PTY and exposes it only
+to that session's processes. Generated hooks use Electron's embedded Node
+runtime to classify native callback JSON, bound message text, and write an
+authenticated base64url-JSON v2 OSC envelope to `/dev/tty`. Chromux rejects
+wrong session, token, or agent claims; malformed or oversized envelopes;
+duplicates; stale sequences and turns; and invalid transitions. Legacy v1 OSC
+remains accepted at lower confidence, and Codex prompt output is only a final
+fallback after a recently inferred working turn.
+
+Claude Code and Grok Build provide native start, actionable-notification, and
+completion callbacks. Codex provides native completion while start is inferred
+from submitted Enter; its actionable notification capabilities are unavailable.
+Unknown native notifications are retained in local diagnostics and never create
+an attention row. Chromux does not post macOS Notification Center alerts.
 | Browser pane profile | Electron partition `persist:chromux` |
 
 Chromux has no account, cloud sync, Chromux-hosted capture upload, or product

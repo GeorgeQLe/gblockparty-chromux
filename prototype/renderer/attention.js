@@ -8,10 +8,21 @@
     'turn-start': 'working',
     'input-needed': 'needsInput',
     'turn-end': 'completed',
+    'turn-started': 'working',
+    'turn-completed': 'completed',
+    'input-required': 'needsInput',
+    'permission-required': 'permission',
+    'authentication-required': 'authentication',
+    'rate-limited': 'rateLimited',
+    'tool-failed': 'toolFailed',
   };
 
   const PRIORITIES = {
+    permission: 5,
+    authentication: 6,
     input: 10,
+    rateLimited: 12,
+    toolFailed: 14,
     delivery: 20,
     updateReady: 30,
     updateFailed: 30,
@@ -21,12 +32,42 @@
     updateWaiting: 60,
   };
 
-  function applyTurnSignal(turn, signal, detail, now) {
+  const V2_EVENTS = new Set(['turn-started', 'turn-completed', 'input-required',
+    'permission-required', 'authentication-required', 'rate-limited', 'tool-failed']);
+
+  function applyTurnSignal(turn, signal, detail, now, envelope = null) {
     const next = TURN_SIGNAL_STATES[signal];
     if (!turn || !next) return false;
+    if (envelope) {
+      if (!V2_EVENTS.has(signal)) return false;
+      if (turn.inputAt && envelope.timestamp <= turn.inputAt) return false;
+      if (turn.eventIds && turn.eventIds.includes(envelope.eventId)) return false;
+      if (Number.isFinite(turn.sequence) && envelope.sequence <= turn.sequence) return false;
+      if (turn.turnId && envelope.turnId && envelope.turnId !== turn.turnId
+        && signal !== 'turn-started') return false;
+      if (turn.authoritative && signal === 'turn-started' && envelope.turnId === turn.turnId) return false;
+      turn.authoritative = true;
+      turn.hasV2 = true;
+      turn.protocol = 'v2';
+      turn.reason = envelope.reason || null;
+      turn.source = envelope.source;
+      turn.confidence = envelope.confidence;
+      turn.turnId = envelope.turnId || null;
+      turn.eventId = envelope.eventId;
+      turn.eventIds = [...(turn.eventIds || []).slice(-63), envelope.eventId];
+      turn.sequence = envelope.sequence;
+      turn.stopped = envelope.stopped;
+      turn.authoritativeAt = envelope.timestamp;
+    } else if (turn.hasV2) {
+      return false;
+    } else {
+      turn.protocol = 'v1';
+      turn.source = 'legacy';
+      turn.confidence = 'low';
+    }
     turn.state = next;
     turn.instrumented = true;
-    turn.detail = detail || null;
+    turn.detail = (envelope && envelope.message) || detail || null;
     turn.since = now;
     turn.acknowledged = false;
     return true;
@@ -35,11 +76,14 @@
   function applyUserInputTurnTransition(session, input, now) {
     const turn = session && session.turn;
     if (!turn) return false;
-    if (turn.state === 'needsInput' || turn.state === 'completed') {
+    if (['needsInput', 'permission', 'authentication', 'rateLimited', 'toolFailed', 'completed'].includes(turn.state)) {
       turn.state = 'working';
       turn.detail = null;
       turn.since = now;
       turn.acknowledged = false;
+      turn.authoritative = false;
+      turn.inputAt = now;
+      turn.turnId = null;
       return true;
     }
     if (session.agent === 'codex' && turn.state === 'unknown' && /\r/.test(input || '')) {
@@ -53,7 +97,7 @@
 
   function applyCodexOutputCompletionFallback(session, output, now) {
     const turn = session && session.turn;
-    if (!turn || session.agent !== 'codex' || turn.state !== 'working') return false;
+    if (!turn || turn.hasV2 || session.agent !== 'codex' || turn.state !== 'working') return false;
     const text = String(output || '');
     const reachedIdle = /(?:^|\n)\s*(?:›|❯|>)\s*$/.test(text)
       || /(?:rate limit|usage limit|limit resets|try again later|wait until)/i.test(text);
@@ -71,6 +115,13 @@
     }
     const turnState = session.turn ? session.turn.state : 'unknown';
     if (turnState === 'needsInput') return { safe: true, reason: 'waiting for input' };
+    if (turnState === 'permission') return { safe: true, reason: 'waiting for permission' };
+    if (turnState === 'authentication') return { safe: true, reason: 'waiting for authentication' };
+    if (turnState === 'rateLimited' || turnState === 'toolFailed') {
+      return turn.stopped
+        ? { safe: true, reason: turnState === 'rateLimited' ? 'rate limited and stopped' : 'tool failed and stopped' }
+        : { safe: false, reason: 'nonterminal agent failure' };
+    }
     if (turnState === 'completed') return { safe: true, reason: 'completed' };
     return {
       safe: false,
@@ -136,17 +187,17 @@
     }
 
     const turn = session.turn || {};
-    if (!turn.acknowledged && turn.state === 'needsInput') {
-      items.push(scopedItem({
-        type: 'input',
-        kind: 'INPUT NEEDED',
-        session,
-        detail: turn.detail || 'Agent is waiting on your input',
-        cls: 'input',
-        primaryAction: 'FOCUS',
-        createdAt: turn.since,
-        acknowledged: turn.acknowledged,
-      }));
+    const actionable = {
+      permission: ['permission', 'PERMISSION', 'Permission required'],
+      authentication: ['authentication', 'AUTH REQUIRED', 'Authentication required'],
+      needsInput: ['input', 'INPUT NEEDED', 'Agent is waiting on your input'],
+      rateLimited: ['rateLimited', 'RATE LIMITED', 'Agent rate limited'],
+      toolFailed: ['toolFailed', 'TOOL FAILED', 'Agent tool failed'],
+    };
+    if (!turn.acknowledged && actionable[turn.state]) {
+      const [type, kind, fallback] = actionable[turn.state];
+      items.push(scopedItem({ type, kind, session, detail: turn.detail || fallback,
+        cls: type, primaryAction: 'FOCUS', createdAt: turn.since, acknowledged: false }));
     }
     if (!turn.acknowledged && turn.state === 'completed') {
       items.push(scopedItem({

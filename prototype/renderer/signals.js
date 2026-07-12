@@ -1,4 +1,4 @@
-// Chromux — deterministic agent-attention signals (wire protocol v1).
+// Chromux — deterministic agent-attention signals (wire protocols v1 + v2).
 // Extracts Chromux OSC sequences from PTY output:
 //   ESC ] 777 ; chromux ; v1 ; <event> ; <session-id> [ ; <detail-b64url> ] BEL
 // (ST — ESC \ — is accepted as an alternate terminator.)
@@ -12,7 +12,8 @@
 
 (function attachChromuxSignals(global) {
   const MARKER = '\x1b]777;chromux;';
-  const MAX_SEQ_BYTES = 512;
+  const MAX_V1_SEQ_BYTES = 512;
+  const MAX_V2_SEQ_BYTES = 8192;
   const OSC = '\x1b]';
   const TITLE_CODES = new Set(['0', '1', '2']);
   const MAX_TITLE_SEQ_BYTES = 2048;
@@ -35,13 +36,28 @@
   }
 
   function parseBody(body) {
+    if (body.startsWith('v2;')) {
+      const encoded = body.slice(3);
+      if (!encoded || encoded.includes(';')) return { malformed: true, body };
+      const decoded = decodeDetail(encoded);
+      if (!decoded) return { malformed: true, body };
+      try {
+        const envelope = JSON.parse(decoded);
+        if (!envelope || envelope.v !== 2 || typeof envelope.sessionId !== 'string') {
+          return { malformed: true, body };
+        }
+        return { version: 'v2', envelope, sessionId: envelope.sessionId, event: envelope.event };
+      } catch {
+        return { malformed: true, body };
+      }
+    }
     const parts = body.split(';');
     if (parts.length < 3 || parts.length > 4) return { malformed: true, body };
     const [version, event, sessionId, detail] = parts;
     if (version !== 'v1' || !EVENTS.has(event) || !ID_RE.test(sessionId || '')) {
       return { malformed: true, body };
     }
-    return { event, sessionId, detail: detail ? decodeDetail(detail) : null };
+    return { version: 'v1', event, sessionId, detail: detail ? decodeDetail(detail) : null };
   }
 
   // Index where the longest suffix of `data` (at/after `from`) that is a
@@ -134,14 +150,16 @@
       }
       clean += data.slice(i, at);
       const term = findTerminator(data, at + MARKER.length);
+      const maxBytes = data.startsWith('v2;', at + MARKER.length)
+        ? MAX_V2_SEQ_BYTES : MAX_V1_SEQ_BYTES;
       if (!term) {
-        if (data.length - at > MAX_SEQ_BYTES) {
+        if (data.length - at > maxBytes) {
           clean += data.slice(at);
           return { buf: '', clean, signals };
         }
         return { buf: data.slice(at), clean, signals };
       }
-      if (term.end - at > MAX_SEQ_BYTES) {
+      if (term.end - at > maxBytes) {
         clean += data.slice(at, term.next);
       } else {
         signals.push(parseBody(data.slice(at + MARKER.length, term.end)));

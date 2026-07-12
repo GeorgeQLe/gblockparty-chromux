@@ -1,5 +1,14 @@
 # Release Notes
 
+## GBlockParty Chromux v0.20.0
+
+Tag: `chromux-v0.20.0`
+
+- Authenticate agent attention events with a per-PTY 256-bit token and correlated v2 OSC envelopes while retaining lower-confidence v1 compatibility.
+- Classify native Claude Code, Codex, and Grok Build callbacks into permission, authentication, input, rate-limit, tool-failure, turn-start, and completion states; unknown notifications remain diagnostic-only.
+- Add monotonic event validation, authoritative-over-heuristic precedence, distinct attention priorities, stopped-aware update safety, and per-agent capability diagnostics.
+- Generate dependency-free hook adapters for Electron's embedded Node runtime, with safe v1 or uninstrumented fallback when installation fails.
+
 ## GBlockParty Chromux v0.19.0
 
 Planned tag: `chromux-v0.19.0`

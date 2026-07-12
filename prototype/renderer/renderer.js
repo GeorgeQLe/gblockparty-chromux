@@ -499,7 +499,9 @@ function apply(event) {
   switch (event.type) {
     case 'turn-signal':
       if (session) {
-        window.chromuxAttention.applyTurnSignal(session.turn, event.signal, event.detail, Date.now());
+        window.chromuxAttention.applyTurnSignal(
+          session.turn, event.signal, event.detail, Date.now(), event.envelope || null,
+        );
       }
       break;
     case 'user-input':
@@ -669,8 +671,15 @@ function flushRender() {
 // ───────────────────────────────────────────────────────────────────────────
 
 function newSessionShape({ id, name, cwd, agent }) {
+  const capabilities = {
+    claude: { turnStarted: 'native', inputRequired: 'native', permissionRequired: 'native', authenticationRequired: 'native', rateLimited: 'native', toolFailed: 'native', turnCompleted: 'native' },
+    codex: { turnStarted: 'inferred', inputRequired: 'unavailable', permissionRequired: 'unavailable', authenticationRequired: 'unavailable', rateLimited: 'unavailable', toolFailed: 'unavailable', turnCompleted: 'native' },
+    grok: { turnStarted: 'native', inputRequired: 'native', permissionRequired: 'native', authenticationRequired: 'native', rateLimited: 'native', toolFailed: 'native', turnCompleted: 'native' },
+    '': { turnStarted: 'unavailable', inputRequired: 'unavailable', permissionRequired: 'unavailable', authenticationRequired: 'unavailable', rateLimited: 'unavailable', toolFailed: 'unavailable', turnCompleted: 'unavailable' },
+  }[agent];
   return {
     id, name, cwd, agent,
+    capabilities,
     lifecycle: { alive: true, exitCode: null, exitedAt: null, resumeLaunch: null },
     turn: {
       state: 'unknown', // 'unknown' | 'working' | 'needsInput' | 'completed'
@@ -678,6 +687,9 @@ function newSessionShape({ id, name, cwd, agent }) {
       detail: null,
       since: 0,
       acknowledged: false, // explicit DISMISS — hides the item, keeps the state
+      token: null, protocol: null, authoritative: false, hasV2: false, inputAt: 0, reason: null,
+      source: null, confidence: null, turnId: null, eventId: null,
+      eventIds: [], sequence: -1, stopped: false, authoritativeAt: 0,
     },
     browser: {
       webview: null, webContentsId: null, currentUrl: null, lastReload: 0,
@@ -2422,11 +2434,12 @@ async function createSession({ name, cwd, agent, initialUrl = null, initialQueue
 
   state.sessions.set(id, session);
   apply({ type: 'session-created', sessionId: id, name, cwd, agent });
-  await window.chromux.ptyCreate({
+  const ptyInfo = await window.chromux.ptyCreate({
     id, cwd,
     command: command !== undefined ? command : agentCommand(agent),
     cols: term.cols, rows: term.rows,
   });
+  if (ptyInfo && ptyInfo.signalToken) session.turn.token = ptyInfo.signalToken;
 
   session.browser.queue = Array.isArray(initialQueue)
     ? initialQueue.map((item) => normalizeQueueItem(item, 'RESTORE')).filter(Boolean)
@@ -2783,15 +2796,33 @@ function handlePtyData(id, data) {
   const res = window.chromuxSignals.extractChromuxSignals(s.term.signalBuf, data);
   s.term.signalBuf = res.buf;
   for (const sig of res.signals) {
-    if (sig.malformed || sig.sessionId !== id) {
+    const env = sig.envelope;
+    const validV2 = !env || (
+      env.sessionId === id
+      && env.token === s.turn.token
+      && env.agent === s.agent
+      && typeof env.event === 'string' && env.event.length <= 64
+      && (env.reason === null || env.reason === undefined || (typeof env.reason === 'string' && env.reason.length <= 80))
+      && (env.message === null || env.message === undefined || (typeof env.message === 'string' && env.message.length <= 1024))
+      && typeof env.turnId === 'string' && env.turnId.length > 0 && env.turnId.length <= 128
+      && typeof env.eventId === 'string' && env.eventId.length > 0 && env.eventId.length <= 128
+      && Number.isSafeInteger(env.sequence) && env.sequence >= 0
+      && Number.isFinite(env.timestamp) && env.timestamp > 0
+      && typeof env.source === 'string' && env.source.length <= 64
+      && ['high', 'medium', 'low'].includes(env.confidence)
+      && typeof env.stopped === 'boolean'
+    );
+    if (sig.malformed || sig.sessionId !== id || !validV2) {
       apply({
         type: 'signal-rejected',
         sessionId: id,
         signal: sig.malformed ? null : sig.event,
         claimedSessionId: sig.sessionId || null,
       });
+    } else if (env && env.event === 'unknown-notification') {
+      apply({ type: 'signal-unknown', sessionId: id, source: env.source, eventId: env.eventId });
     } else {
-      apply({ type: 'turn-signal', sessionId: id, signal: sig.event, detail: sig.detail });
+      apply({ type: 'turn-signal', sessionId: id, signal: sig.event, detail: sig.detail, envelope: env });
     }
   }
   if (res.clean) {
@@ -3882,6 +3913,8 @@ if (window.chromuxTest) {
       flushRender();
     },
     turnState: (id) => ({ ...testSession(id).turn }),
+    capabilities: (id) => ({ ...testSession(id).capabilities }),
+    setSignalToken(id, token) { testSession(id).turn.token = token; },
     markUserInput(id) {
       apply({ type: 'user-input', sessionId: id, data: 'x\r' });
       flushRender();
@@ -3891,6 +3924,7 @@ if (window.chromuxTest) {
 
   window.chromuxTestSignals = {
     addFakeSession,
+    setSignalToken(id, token) { testSession(id).turn.token = token; },
     feedPtyChunk(id, chunk) {
       handlePtyData(id, chunk);
       flushRender();

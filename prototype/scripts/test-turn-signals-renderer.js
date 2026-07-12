@@ -23,6 +23,8 @@ fs.writeFileSync(e2ePath, `
   const expect = (cond, msg) => { if (!cond) throw new Error(msg); };
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const osc = (event, id) => '\\x1b]777;chromux;v1;' + event + ';' + id + '\\x07';
+  const oscV2 = (envelope) => '\\x1b]777;chromux;v2;' + btoa(unescape(encodeURIComponent(JSON.stringify(envelope))))
+    .replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '') + '\\x07';
   const titleOsc = (title) => '\\x1b]0;' + title + '\\x07';
   const itemsFor = (kind, name) => sig.attentionItems()
     .filter((i) => i.kind === kind && (!name || i.name === name));
@@ -32,6 +34,19 @@ fs.writeFileSync(e2ePath, `
   // Focus holder: keeps the sessions under test in the background, since the
   // focused session is display-excluded from the attention queue.
   const holder = sig.addFakeSession({ name: 'holder', agent: '' });
+
+  const secure = sig.addFakeSession({ name: 'secure', agent: 'claude' });
+  sig.setSignalToken(secure, 'secret');
+  const base = { v: 2, sessionId: secure, token: 'secret', agent: 'claude',
+    reason: 'permission', message: 'Allow command?', turnId: 'turn-1', eventId: 'event-1',
+    sequence: 1, timestamp: Date.now(), source: 'claude:Notification', confidence: 'high', stopped: false };
+  sig.feedPtyChunk(secure, oscV2({ ...base, event: 'permission-required' }));
+  expect(sig.turnState(secure).state === 'permission', 'v2 permission should create distinct state');
+  expect(itemsFor('PERMISSION', 'secure').length === 1, 'v2 permission should create attention');
+  sig.feedPtyChunk(secure, oscV2({ ...base, token: 'wrong', eventId: 'event-2', sequence: 2, event: 'turn-completed' }));
+  expect(sig.turnState(secure).state === 'permission', 'wrong token must not mutate state');
+  sig.feedPtyChunk(secure, oscV2({ ...base, event: 'permission-required' }));
+  expect(sig.turnState(secure).sequence === 1, 'duplicate event must not advance state');
 
   // 1 — regex heuristics are dead: plain "complete" prose does nothing…
   const a = sig.addFakeSession({ name: 'claude-a', agent: 'claude' });
@@ -135,7 +150,7 @@ fs.writeFileSync(e2ePath, `
   sig.feedPtyChunk(b, osc('turn-end', 'someone-else'));
   expect(JSON.stringify(sig.turnState(b)) === beforeB, 'foreign-id signal must not mutate state');
   const rejected = sig.events().filter((e) => e.type === 'signal-rejected');
-  expect(rejected.length === 2, 'malformed and foreign-id signals recorded as signal-rejected');
+  expect(rejected.length >= 3, 'wrong-token, malformed, and foreign-id signals recorded as signal-rejected');
   expect(rejected.some((e) => e.claimedSessionId === null), 'malformed signal recorded without claimed session');
   expect(rejected.some((e) => e.claimedSessionId === 'someone-else'),
     'foreign-id signal recorded with claimed session');

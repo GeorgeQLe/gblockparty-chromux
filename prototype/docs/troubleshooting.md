@@ -122,3 +122,15 @@ claude -p "$(cat /Users/me/.chromux/captures/<timestamp>/payload.yaml)"
 
 See [capture-payload.md](capture-payload.md) for the YAML schema and field limits.
 See [privacy-and-local-data.md](privacy-and-local-data.md) for the complete local-data map, outbound boundaries, and cleanup guidance.
+
+## Agent attention is missing or marked legacy
+
+Chromux regenerates its classifier and installed hook files at startup. New v2
+events are authenticated to one PTY; copied terminal output, callbacks from a
+different session, and stale or duplicate callbacks are intentionally rejected.
+If classifier installation fails, Claude, Codex, and Grok use the existing v1
+adapter where it can be written, otherwise that agent launches uninstrumented—a
+command is never launched with a missing helper path. Existing user settings and
+configs are not replaced: Claude receives an additional `--settings` file,
+Codex receives a launch-scoped `notify` value, and Grok uses its global hook
+discovery file, which no-ops outside Chromux.

@@ -1,4 +1,4 @@
-// Plain-node unit test for renderer/signals.js — the Chromux OSC v1 parser.
+// Plain-node unit test for renderer/signals.js — Chromux OSC v1/v2 parser.
 'use strict';
 
 const { extractChromuxSignals, extractTerminalTitles, MARKER } = require('../renderer/signals.js');
@@ -41,6 +41,24 @@ const osc = (body, terminator = '\x07') => `${MARKER}${body}${terminator}`;
 const titleOsc = (code, title, terminator = '\x07') => `\x1b]${code};${title}${terminator}`;
 const b64url = (s) => Buffer.from(s, 'utf8').toString('base64')
   .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+// ── authenticated v2 JSON coexists with v1 and preserves Unicode ─────────
+{
+  const envelope = { v: 2, sessionId: 's-v2', token: 'token', agent: 'claude',
+    event: 'permission-required', reason: 'permission', message: '允许运行? 🔐',
+    turnId: 't1', eventId: 'e1', sequence: 1, timestamp: 123,
+    source: 'claude:Notification', confidence: 'high', stopped: false };
+  const whole = osc('v2;' + b64url(JSON.stringify(envelope)));
+  for (let cut = 0; cut <= whole.length; cut += 1) {
+    const r = feed([whole.slice(0, cut), whole.slice(cut)]);
+    expect(r.signals.length === 1 && r.signals[0].envelope.message === envelope.message,
+      `v2 split ${cut}: envelope and Unicode survive`);
+  }
+  const mixed = feed([whole + osc('v1;turn-end;s-v2')]);
+  expect(mixed.signals.map((s) => s.version).join(',') === 'v2,v1', 'v1/v2 coexist');
+  expect(feed([osc('v2;%%%')]).signals[0].malformed, 'malformed v2 base64 rejected');
+  expect(feed([osc('v2;' + b64url('{'))]).signals[0].malformed, 'malformed v2 JSON rejected');
+}
 
 // ── whole-chunk parse, BEL terminator ──────────────────────────────────────
 {
