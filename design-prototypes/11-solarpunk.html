@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Chromux — Solarpunk</title>
+<style>
+/* ————— Solarpunk: light through a canopy ————— */
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,420;0,9..144,560;0,9..144,700;1,9..144,480&display=swap');
+
+:root{
+  /* soil + paper */
+  --cream:        #f5efdd;
+  --cream-hi:     #faf6e9;
+  --cream-lo:     #efe6cd;
+  --paper:        #fdfbf1;
+  /* botany */
+  --forest:       #1d3a26;
+  --forest-2:     #274a31;
+  --moss:         #48684c;
+  --fern:         #6f9060;
+  --leaf:         #2f7d4c;
+  --leaf-bright:  #3fa062;
+  --sprout:       #8fbc7a;
+  /* sunlight */
+  --sun:          #e9b64b;
+  --sun-deep:     #d99a2e;
+  --marigold:     #c97a1e;
+  --marigold-hot: #b95f10;
+  /* water / info */
+  --pond:         #2e8578;
+  /* dried leaf / danger */
+  --russet:       #a8512c;
+  /* lines */
+  --vein:         #cbbf9d;
+  --vein-soft:    #ddd3b4;
+  --ink-dim:      #5d6f56;
+
+  --grad-sun: linear-gradient(128deg,#f3d987 0%, #cfd57e 34%, #8fbc7a 68%, #57a06a 100%);
+  --grad-sun-soft: linear-gradient(128deg, rgba(243,217,135,.55), rgba(143,188,122,.42) 62%, rgba(87,160,106,.38));
+  --grad-canopy: radial-gradient(120% 90% at 12% -8%, rgba(243,217,135,.5) 0%, rgba(243,217,135,0) 42%),
+                 radial-gradient(90% 70% at 88% 108%, rgba(143,188,122,.34) 0%, rgba(143,188,122,0) 48%);
+
+  --serif: "Fraunces","Iowan Old Style",Charter,Georgia,serif;
+  --ui: "Avenir Next",Avenir,Optima,"Gill Sans","Helvetica Neue",sans-serif;
+  --mono: "SF Mono",Menlo,Monaco,"Courier New",monospace;
+
+  /* organic radii — one corner swept, like a leaf */
+  --r-leaf: 18px 7px 18px 7px;
+  --r-leaf-lg: 26px 10px 26px 10px;
+  --r-frond: 4px 16px 16px 16px;
+  --r-seed: 999px;
+}
+
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  min-width:1280px;
+  overflow:hidden;
+  font-family:var(--ui);
+  color:var(--forest);
+  background:
+    var(--grad-canopy),
+    repeating-linear-gradient(-32deg, rgba(72,104,76,.028) 0 1px, transparent 1px 9px),
+    var(--cream);
+  display:grid;
+  grid-template-rows:46px 1fr 27px;
+  height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;color:inherit;background:none;border:none;cursor:pointer}
+svg{display:block}
+
+.microlabel{
+  font-size:9.5px;letter-spacing:.16em;font-weight:600;
+  color:var(--moss);text-transform:uppercase;
+}
+
+/* ════ titlebar ════ */
+#titlebar{
+  display:flex;align-items:center;gap:18px;
+  padding:0 14px 0 84px; /* traffic-light gutter */
+  background:
+    linear-gradient(180deg, rgba(243,217,135,.28), rgba(243,217,135,0) 70%),
+    var(--cream-hi);
+  border-bottom:1px solid var(--vein);
+  position:relative;
+  -webkit-app-region:drag;
+}
+#titlebar::after{ /* sunlit hairline under the bar */
+  content:"";position:absolute;left:0;right:0;bottom:-2px;height:2px;
+  background:linear-gradient(90deg, transparent 2%, rgba(233,182,75,.55) 18%, rgba(87,160,106,.5) 52%, transparent 96%);
+  pointer-events:none;
+}
+.brand{display:flex;align-items:baseline;gap:9px}
+.brand-mark{align-self:center}
+.brand-name{
+  font-family:var(--serif);font-weight:700;font-size:16px;letter-spacing:.08em;
+  color:var(--forest);
+}
+.brand-name .x{color:var(--leaf)}
+.brand-sub{
+  font-size:9px;letter-spacing:.22em;font-weight:600;color:var(--fern);
+  border-left:1px solid var(--vein);padding-left:9px;
+}
+.titlebar-gauges{margin-left:auto;display:flex;align-items:center;gap:14px;-webkit-app-region:no-drag}
+.gauge{display:flex;align-items:center;gap:6px;font-size:10px;letter-spacing:.12em;font-weight:600;color:var(--moss)}
+.gauge b{color:var(--forest);font-size:11.5px;font-family:var(--serif)}
+.gdot{width:8px;height:8px;border-radius:0 70% 0 70%;display:inline-block;transform:rotate(45deg)} /* tiny leaf */
+.g-green{background:var(--leaf-bright);box-shadow:0 0 6px rgba(63,160,98,.55)}
+.g-amber{background:var(--sun-deep);box-shadow:0 0 6px rgba(217,154,46,.6)}
+.g-cyan{background:var(--pond);box-shadow:0 0 6px rgba(46,133,120,.5)}
+.top-btn{
+  font-size:9.5px;letter-spacing:.14em;font-weight:700;color:var(--moss);
+  padding:6px 12px;border:1px solid var(--vein);border-radius:var(--r-leaf);
+  background:var(--paper);
+  transition:border-color .18s, box-shadow .18s, color .18s;
+}
+.top-btn:hover{border-color:var(--fern);color:var(--forest);box-shadow:0 2px 8px rgba(72,104,76,.16)}
+.top-btn.update-ready{
+  color:#3d2b06;border-color:rgba(185,95,16,.45);
+  background:var(--grad-sun);
+  box-shadow:0 0 0 3px rgba(233,182,75,.22), 0 2px 10px rgba(217,154,46,.35);
+  animation:sunpulse 2.8s ease-in-out infinite;
+}
+@keyframes sunpulse{
+  0%,100%{box-shadow:0 0 0 3px rgba(233,182,75,.18), 0 2px 10px rgba(217,154,46,.3)}
+  50%{box-shadow:0 0 0 5px rgba(233,182,75,.34), 0 3px 14px rgba(217,154,46,.5)}
+}
+
+/* ════ frame ════ */
+#app{display:grid;grid-template-columns:232px 1fr;min-height:0}
+
+/* ════ left rail ════ */
+#rail{
+  display:flex;flex-direction:column;min-height:0;
+  background:linear-gradient(178deg, var(--cream-hi), var(--cream) 55%);
+  border-right:1px solid var(--vein);
+  position:relative;
+}
+.rail-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 12px 9px;
+  border-bottom:1px dashed var(--vein-soft);
+}
+.btn{
+  font-size:9px;letter-spacing:.13em;font-weight:700;color:var(--moss);
+  padding:5px 9px;border:1px solid var(--vein);border-radius:var(--r-leaf);
+  background:var(--paper);
+  transition:border-color .18s, color .18s, box-shadow .18s;
+}
+.btn:hover{border-color:var(--fern);color:var(--forest);box-shadow:0 2px 7px rgba(72,104,76,.15)}
+#attention-list{flex:1;overflow-y:auto;padding:10px 10px 4px;display:flex;flex-direction:column;gap:9px}
+.qcard{
+  position:relative;
+  background:var(--paper);
+  border:1px solid var(--vein);
+  border-radius:var(--r-leaf-lg);
+  padding:9px 11px 10px 13px;
+  box-shadow:0 1px 3px rgba(29,58,38,.06);
+  transition:transform .18s, box-shadow .18s;
+}
+.qcard:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(29,58,38,.12)}
+.qcard::before{ /* stem accent along the left edge */
+  content:"";position:absolute;left:-1px;top:14px;bottom:14px;width:3px;
+  border-radius:3px;background:var(--qc, var(--fern));
+}
+.qcard .sprig-tr{position:absolute;top:4px;right:5px;opacity:.5;pointer-events:none}
+.q-kind{font-size:8.5px;letter-spacing:.18em;font-weight:800;color:var(--qc,var(--fern))}
+.q-kind .qglyph{font-size:9px;margin-right:3px}
+.q-sess{font-family:var(--serif);font-weight:600;font-size:13px;color:var(--forest);margin:3px 0 2px}
+.q-note{font-size:10.5px;line-height:1.45;color:var(--ink-dim)}
+.q-note code{font-family:var(--mono);font-size:9.5px;background:var(--cream-lo);padding:1px 4px;border-radius:4px;color:var(--forest-2)}
+.qcard.q-approval{--qc:var(--marigold);
+  background:linear-gradient(150deg, rgba(243,217,135,.32), rgba(253,251,241,1) 55%);
+  border-color:rgba(201,122,30,.4);
+  box-shadow:0 0 0 3px rgba(233,182,75,.14), 0 2px 8px rgba(201,122,30,.14);
+}
+.qcard.q-preview{--qc:var(--pond)}
+.qcard.q-exited{--qc:var(--russet);opacity:.82}
+.rail-foot{
+  padding:10px 12px 12px;border-top:1px dashed var(--vein-soft);
+  position:relative;
+}
+.pathlink{
+  font-family:var(--mono);font-size:10px;color:var(--leaf);
+  border-bottom:1px dotted var(--fern);padding-bottom:1px;margin-top:4px;
+}
+.pathlink:hover{color:var(--leaf-bright)}
+.rail-foot .sprig-corner{position:absolute;right:8px;bottom:6px;opacity:.55;pointer-events:none}
+/* ════ workspace + session tabs ════ */
+#workspace{display:flex;flex-direction:column;min-width:0;min-height:0}
+#session-tabs{
+  display:flex;align-items:flex-end;gap:7px;
+  padding:9px 12px 0;
+  background:linear-gradient(180deg, rgba(243,217,135,.14), transparent 80%);
+}
+.session-tab{
+  display:flex;align-items:center;gap:7px;
+  font-size:10.5px;letter-spacing:.06em;font-weight:600;color:var(--moss);
+  padding:7px 13px 8px;
+  border:1px solid var(--vein);border-bottom:none;
+  border-radius:16px 16px 0 0;
+  background:var(--cream-lo);
+  position:relative;top:1px;
+  transition:background .18s,color .18s;
+}
+.session-tab:hover{background:var(--cream-hi);color:var(--forest)}
+.session-tab.active{
+  background:var(--paper);color:var(--forest);
+  border-color:var(--vein);
+  border-radius:20px 16px 0 0;
+  box-shadow:0 -3px 10px rgba(29,58,38,.07);
+}
+.session-tab.active::after{ /* sunlight underline */
+  content:"";position:absolute;left:10px;right:10px;top:-1px;height:3px;
+  border-radius:3px;background:var(--grad-sun);
+  box-shadow:0 1px 6px rgba(233,182,75,.5);
+}
+.tab-dot{display:inline-block;width:7px;height:7px;border-radius:0 70% 0 70%;transform:rotate(45deg);flex:none}
+.tab-dot.live{background:var(--leaf-bright);box-shadow:0 0 5px rgba(63,160,98,.6)}
+.tab-dot.dead{background:var(--russet);box-shadow:none}
+.tab-badge{
+  min-width:16px;height:16px;padding:0 4px;
+  display:inline-flex;align-items:center;justify-content:center;
+  font-size:9px;font-weight:800;color:#3d2b06;
+  background:var(--grad-sun);border-radius:var(--r-seed);
+  box-shadow:0 1px 4px rgba(217,154,46,.4);
+}
+.add-tab{
+  padding:6px 12px 7px;font-size:14px;font-weight:500;color:var(--fern);
+  border-radius:16px 16px 0 0;background:transparent;border:1px dashed var(--vein);border-bottom:none;
+}
+.add-tab:hover{color:var(--leaf);border-color:var(--fern)}
+
+/* ════ stage ════ */
+#stage{
+  flex:1;min-height:0;display:flex;
+  margin:0 12px 10px;
+  background:var(--paper);
+  border:1px solid var(--vein);
+  border-radius:6px 22px 22px 22px; /* swept — active tab grows out of the top-left */
+  box-shadow:0 6px 22px rgba(29,58,38,.08);
+  overflow:hidden;
+  position:relative;
+}
+
+/* — terminal pane — */
+#pane-terminal{
+  flex:0 0 46%;min-width:0;display:flex;flex-direction:column;
+  background:linear-gradient(178deg, #fbf7ea, #f7f1de);
+}
+.pane-head{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 14px;
+  border-bottom:1px solid var(--vein-soft);
+  position:relative;
+}
+.pane-head .sprig-tr{position:absolute;top:3px;right:8px;opacity:.5;pointer-events:none}
+.pane-title{font-size:9.5px;letter-spacing:.16em;font-weight:700;color:var(--moss)}
+.pane-title em{font-style:normal;color:var(--leaf)}
+.pane-cwd{margin-left:auto;font-family:var(--mono);font-size:9.5px;color:var(--ink-dim);padding-right:26px}
+.term-body{
+  flex:1;overflow-y:auto;
+  padding:14px 18px 18px;
+  font-family:var(--mono);font-size:11.5px;line-height:1.72;
+  color:var(--forest-2);
+}
+.term-body .tl{white-space:pre-wrap}
+.t-wel{display:flex;justify-content:space-between;color:var(--moss)}
+.t-wel .star{color:var(--sun-deep);font-weight:700}
+.t-wel .wpath{color:var(--ink-dim);font-size:10px}
+.t-user{color:var(--forest);font-weight:700;margin:8px 0 2px}
+.t-user .caret{color:var(--marigold)}
+.t-step .bud{color:var(--leaf-bright)}
+.t-step{color:var(--forest-2)}
+.t-step .fname{color:var(--pond)}
+.t-diff-del{color:var(--russet);background:rgba(168,81,44,.08);border-radius:4px;padding:0 5px;margin-left:12px;display:inline-block}
+.t-diff-add{color:var(--leaf);background:rgba(63,160,98,.12);border-radius:4px;padding:0 5px;margin-left:12px;display:inline-block}
+.t-ok{color:var(--leaf);font-weight:700;margin-top:6px}
+.t-ok .tick{
+  background:var(--grad-sun);-webkit-background-clip:text;background-clip:text;color:transparent;
+  font-weight:800;
+}
+.t-wait{color:var(--moss);margin-top:10px}
+.t-wait .cursor{
+  display:inline-block;width:7px;height:13px;vertical-align:-2px;margin-right:6px;
+  background:var(--leaf-bright);border-radius:1px 4px 1px 4px;
+  animation:sway 1.15s steps(2,start) infinite;
+}
+@keyframes sway{50%{opacity:0}}
+
+/* — divider — */
+#divider{
+  flex:0 0 7px;cursor:col-resize;position:relative;
+  background:linear-gradient(180deg, var(--cream-lo), var(--cream));
+  border-left:1px solid var(--vein-soft);border-right:1px solid var(--vein-soft);
+}
+#divider::before{ /* climbing vine grip */
+  content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:3px;height:64px;border-radius:3px;
+  background:repeating-linear-gradient(180deg, var(--fern) 0 5px, transparent 5px 11px);
+  opacity:.75;
+}
+#divider:hover::before{background:repeating-linear-gradient(180deg, var(--leaf) 0 5px, transparent 5px 11px)}
+/* — browser pane — */
+#pane-browser{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--paper)}
+.btoolbar{
+  display:flex;align-items:center;gap:8px;
+  padding:7px 12px;
+  border-bottom:1px solid var(--vein-soft);
+  background:linear-gradient(180deg, rgba(243,217,135,.12), transparent);
+}
+.nav-btn{
+  width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;
+  font-size:12px;color:var(--moss);
+  border:1px solid var(--vein);border-radius:var(--r-frond);
+  background:var(--cream-hi);
+  transition:color .18s,border-color .18s;
+}
+.nav-btn:hover{color:var(--forest);border-color:var(--fern)}
+.urlbar{
+  flex:1;min-width:0;display:flex;align-items:center;gap:7px;
+  font-family:var(--mono);font-size:10.5px;color:var(--forest-2);
+  padding:5px 12px;
+  background:var(--cream-hi);
+  border:1px solid var(--vein);border-radius:var(--r-seed);
+}
+.urlbar .lock{color:var(--leaf-bright);font-size:9px}
+.urlbar .scheme{color:var(--ink-dim)}
+.urlbar .u{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.chip{
+  font-size:9px;letter-spacing:.1em;font-weight:700;color:var(--moss);
+  padding:4px 9px;border:1px solid var(--vein);border-radius:var(--r-seed);
+  background:var(--cream-hi);white-space:nowrap;
+}
+.chip.ok{color:var(--leaf);border-color:rgba(63,160,98,.4)}
+.tb-btn{
+  font-size:9px;letter-spacing:.12em;font-weight:800;white-space:nowrap;
+  padding:6px 11px;border-radius:var(--r-leaf);
+  border:1px solid var(--vein);color:var(--moss);background:var(--paper);
+  transition:box-shadow .18s,border-color .18s,color .18s;
+}
+.tb-btn:hover{border-color:var(--fern);color:var(--forest);box-shadow:0 2px 8px rgba(72,104,76,.16)}
+.tb-btn.primary{
+  color:#123420;border-color:rgba(47,125,76,.5);
+  background:var(--grad-sun);
+  box-shadow:0 0 0 3px rgba(143,188,122,.22), 0 2px 9px rgba(87,160,106,.32);
+}
+.tb-btn.primary:hover{box-shadow:0 0 0 4px rgba(143,188,122,.32), 0 3px 12px rgba(87,160,106,.44);color:#0c2917}
+.tb-btn .bdg{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:15px;height:15px;padding:0 4px;margin-left:5px;
+  font-size:8.5px;font-weight:800;color:var(--paper);
+  background:var(--marigold);border-radius:var(--r-seed);
+}
+
+/* — mock web page (light checkout, harmonizing) — */
+.webview{
+  flex:1;min-height:0;overflow:auto;position:relative;
+  background:
+    radial-gradient(80% 60% at 80% -10%, rgba(233,182,75,.10), transparent 60%),
+    #fbfaf6;
+  padding:26px 30px;
+}
+.shopfr{max-width:430px;margin:0 auto;font-family:var(--ui)}
+.shop-brand{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+.shop-logo{
+  width:26px;height:26px;border-radius:8px 3px 8px 3px;
+  background:linear-gradient(135deg,#3fa062,#2e8578);
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;font-family:var(--serif);font-weight:700;font-size:13px;
+}
+.shop-name{font-weight:700;font-size:14px;color:#22302a;letter-spacing:.01em}
+.shop-step{margin-left:auto;font-size:10px;color:#8b9489}
+.shop-h1{font-family:var(--serif);font-size:21px;font-weight:600;color:#22302a;margin-bottom:14px}
+.order-card{
+  background:#fff;border:1px solid #e5e2d6;border-radius:14px;
+  box-shadow:0 3px 14px rgba(34,48,42,.07);
+  padding:16px 18px;margin-bottom:14px;
+}
+.oc-label{font-size:9.5px;letter-spacing:.14em;font-weight:700;color:#9aa195;text-transform:uppercase;margin-bottom:10px}
+.oc-row{display:flex;justify-content:space-between;font-size:12.5px;color:#3c473f;padding:5px 0}
+.oc-row .oc-qty{color:#9aa195;font-size:11px;margin-left:6px}
+.oc-row.oc-sub{border-top:1px dashed #e5e2d6;margin-top:6px;padding-top:9px;color:#6b7568}
+.oc-row.oc-total{font-weight:700;font-size:14px;color:#22302a}
+.cta-row{width:100%;max-width:480px}
+.pay-btn{
+  width:100%;padding:12px 0;
+  font-size:13.5px;font-weight:700;letter-spacing:.02em;color:#fff;
+  background:linear-gradient(135deg,#2f9158,#237a54);
+  border-radius:11px;
+  box-shadow:0 4px 14px rgba(47,145,88,.35);
+  transition:transform .15s, box-shadow .15s;
+}
+.pay-btn:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(47,145,88,.45)}
+.pay-note{text-align:center;font-size:10px;color:#9aa195;margin-top:9px}
+.refreshed{
+  position:absolute;top:12px;right:14px;
+  font-size:8.5px;letter-spacing:.16em;font-weight:800;color:#1d5a35;
+  padding:4px 10px;border-radius:var(--r-seed);
+  background:var(--grad-sun);
+  box-shadow:0 2px 9px rgba(143,188,122,.5);
+  animation:bloom .5s ease-out backwards, fadechip 4s ease-in 2.4s forwards;
+}
+@keyframes bloom{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes fadechip{to{opacity:.45}}
+
+/* ════ status bar ════ */
+#statusbar{
+  display:flex;align-items:center;gap:14px;
+  padding:0 12px;
+  font-size:9.5px;letter-spacing:.1em;
+  background:var(--cream-hi);
+  border-top:1px solid var(--vein);
+}
+.sb-left,.sb-right{display:flex;align-items:center;gap:8px}
+.sb-right{margin-left:auto}
+.sb-val{font-family:var(--mono);font-size:9.5px;letter-spacing:0;color:var(--forest-2)}
+.sb-sep{width:14px;height:1px;background:var(--vein);transform:rotate(-18deg)} /* fallen twig */
+.sb-btn{
+  font-size:8.5px;letter-spacing:.14em;font-weight:800;color:var(--moss);
+  padding:3px 9px;border:1px solid var(--vein);border-radius:var(--r-seed);
+  background:var(--paper);
+}
+.sb-btn:hover{color:var(--forest);border-color:var(--fern)}
+.sb-ver{font-family:var(--mono);font-size:9px;letter-spacing:0;color:var(--ink-dim)}
+
+/* ════ corner tag ════ */
+#corner-tag{
+  position:fixed;right:14px;bottom:36px;z-index:60;
+  font-size:8.5px;letter-spacing:.2em;font-weight:800;color:#1d5a35;
+  padding:5px 12px 5px 10px;
+  background:var(--grad-sun);
+  border-radius:14px 4px 14px 4px;
+  box-shadow:0 3px 12px rgba(87,160,106,.4);
+  pointer-events:none;
+}
+/* ════ capture modal ════ */
+.overlay{
+  position:fixed;inset:0;z-index:80;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(29,58,38,.34);
+  backdrop-filter:blur(3px) saturate(1.05);
+  opacity:0;pointer-events:none;
+  transition:opacity .22s ease;
+}
+.overlay.open{opacity:1;pointer-events:auto}
+.modal{
+  width:min(880px, 88vw);max-height:86vh;
+  display:flex;flex-direction:column;
+  background:var(--paper);
+  border:1px solid var(--vein);
+  border-radius:30px 12px 30px 12px;
+  box-shadow:0 24px 70px rgba(23,48,31,.35), 0 0 0 6px rgba(243,217,135,.14);
+  overflow:hidden;position:relative;
+  transform:translateY(10px) scale(.985);
+  transition:transform .24s cubic-bezier(.2,.9,.3,1.2);
+}
+.overlay.open .modal{transform:none}
+.modal::before{ /* sunbeam across the top */
+  content:"";position:absolute;top:0;left:0;right:0;height:3px;
+  background:var(--grad-sun);
+}
+.modal-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px 11px;border-bottom:1px dashed var(--vein-soft);
+  position:relative;
+}
+.modal-head .sprig-tr{position:absolute;top:8px;right:52px;opacity:.55;pointer-events:none}
+.modal-title{font-family:var(--serif);font-size:15px;font-weight:600;color:var(--forest)}
+.modal-title .microlabel{display:block;margin-bottom:1px;color:var(--fern)}
+.modal-x{
+  width:26px;height:26px;border-radius:var(--r-frond);
+  border:1px solid var(--vein);color:var(--moss);font-size:11px;
+  display:flex;align-items:center;justify-content:center;background:var(--cream-hi);
+}
+.modal-x:hover{color:var(--russet);border-color:var(--russet)}
+.cap-grid{
+  display:grid;grid-template-columns:1.05fr .95fr;gap:18px;
+  padding:16px 18px;overflow:auto;min-height:0;
+}
+.cap-col{display:flex;flex-direction:column;gap:12px;min-width:0}
+.cap-summary{
+  border:1px solid var(--vein-soft);border-radius:var(--r-leaf-lg);
+  background:linear-gradient(160deg, rgba(243,217,135,.14), var(--cream-hi) 60%);
+  padding:10px 13px;display:flex;flex-direction:column;gap:6px;
+}
+.cs-row{display:flex;gap:10px;align-items:baseline;font-size:11px}
+.cs-row .microlabel{flex:0 0 74px}
+.cs-row .v{font-family:var(--mono);font-size:10.5px;color:var(--forest-2)}
+.cs-row .v em{font-style:normal;color:var(--leaf)}
+.field{display:flex;flex-direction:column;gap:5px}
+.field textarea, .field select{
+  font-family:var(--ui);font-size:11.5px;color:var(--forest);
+  background:var(--cream-hi);
+  border:1px solid var(--vein);border-radius:var(--r-frond);
+  padding:8px 10px;resize:vertical;outline:none;
+}
+.field textarea{font-family:var(--mono);font-size:10.5px;line-height:1.6;min-height:58px}
+.field textarea:focus, .field select:focus{
+  border-color:var(--leaf-bright);
+  box-shadow:0 0 0 3px rgba(143,188,122,.25);
+}
+.field textarea::placeholder{color:#9aa38b}
+.cap-shot{
+  height:96px;border:1.5px dashed var(--vein);border-radius:var(--r-leaf);
+  display:flex;align-items:center;justify-content:center;gap:9px;
+  color:var(--ink-dim);font-size:10px;letter-spacing:.08em;
+  background:
+    repeating-linear-gradient(-32deg, rgba(72,104,76,.03) 0 1px, transparent 1px 8px),
+    var(--cream-hi);
+}
+.yaml-wrap{display:flex;flex-direction:column;gap:6px;min-height:0}
+.yaml-view{
+  flex:1;overflow:auto;
+  font-family:var(--mono);font-size:10.5px;line-height:1.8;
+  color:#d9e8c8;
+  background:
+    radial-gradient(90% 60% at 100% 0%, rgba(233,182,75,.14), transparent 55%),
+    linear-gradient(165deg, #22452c, #1a3722 70%);
+  border-radius:var(--r-leaf-lg);
+  border:1px solid #2f5a3a;
+  padding:14px 16px;
+  box-shadow:inset 0 1px 8px rgba(0,0,0,.22);
+}
+.yaml-view .yk{color:#a8d18c}
+.yaml-view .yv{color:#f0e5bd}
+.yaml-view .yc{color:#7b9a72}
+.modal-foot{
+  display:flex;align-items:center;justify-content:flex-end;gap:9px;
+  padding:12px 18px 15px;border-top:1px dashed var(--vein-soft);
+  background:linear-gradient(0deg, rgba(243,217,135,.1), transparent);
+}
+.mbtn{
+  font-size:9.5px;letter-spacing:.13em;font-weight:800;color:var(--moss);
+  padding:8px 15px;border:1px solid var(--vein);border-radius:var(--r-leaf);
+  background:var(--paper);transition:border-color .18s,color .18s,box-shadow .18s;
+}
+.mbtn:hover{border-color:var(--fern);color:var(--forest);box-shadow:0 2px 8px rgba(72,104,76,.15)}
+.mbtn.primary{
+  color:#123420;border-color:rgba(47,125,76,.55);
+  background:var(--grad-sun);
+  box-shadow:0 0 0 3px rgba(143,188,122,.24), 0 3px 12px rgba(87,160,106,.36);
+}
+.mbtn.primary:hover{color:#0c2917;box-shadow:0 0 0 4px rgba(143,188,122,.34), 0 4px 15px rgba(87,160,106,.48)}
+
+/* sprig svg helper */
+.sprig{color:var(--fern)}
+
+/* scrollbars, cream + moss */
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--vein);border-radius:8px;border:2px solid var(--paper)}
+::-webkit-scrollbar-thumb:hover{background:var(--fern)}
+
+/* tighten the browser toolbar on narrower desktop windows */
+@media (max-width:1366px){
+  .btoolbar{gap:5px;padding:7px 9px}
+  .nav-btn{width:21px;height:21px;font-size:11px}
+  .urlbar{font-size:10px;padding:4px 10px;gap:5px}
+  .urlbar .scheme{display:none}
+  .tb-btn{padding:5px 8px;letter-spacing:.07em}
+  .chip{padding:3px 7px;letter-spacing:.05em}
+  #pane-terminal{flex-basis:44%}
+}
+
+/* wide desktop: reclaim toolbar room so the full URL (scheme included) fits */
+@media (min-width:1367px){
+  .btoolbar{gap:5px}
+  .urlbar{font-size:9.5px;padding:5px 10px;gap:5px}
+  .tb-btn{padding:5px 8px;letter-spacing:.07em}
+  .chip{padding:3px 7px;letter-spacing:.05em}
+}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{
+    animation:none !important;
+    transition:none !important;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- shared hand-drawn sprig symbol -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <g id="sprig" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round">
+      <path d="M2 26 Q16 22 28 14 Q38 8 50 3"/>
+      <path d="M14 23 Q13 15 20 11 Q22 18 14 23 Z" fill="rgba(143,188,122,.28)"/>
+      <path d="M27 15.5 Q31 8 39 7 Q36 15 27 15.5 Z" fill="rgba(233,182,75,.22)"/>
+      <path d="M40 8.5 Q39 3 45 1"/>
+    </g>
+  </defs>
+</svg>
+
+<!-- ══ titlebar ══ -->
+<header id="titlebar">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 64 64" width="22" height="22">
+        <path d="M22 18 C34 21 41 26 44 32 C41 38 34 43 22 46" fill="none" stroke="#48684c" stroke-opacity=".55" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M31 21.5 Q34 15 40 15 Q37 22 31 21.5 Z" fill="none" stroke="#6f9060" stroke-width="1.1"/>
+        <path d="M31 42.5 Q34 49 40 49 Q37 42 31 42.5 Z" fill="none" stroke="#6f9060" stroke-width="1.1"/>
+        <circle cx="22" cy="18" r="6.6" fill="#e08a3c"/>
+        <circle cx="44" cy="32" r="6.6" fill="#9c7bd4"/>
+        <circle cx="22" cy="46" r="6.6" fill="#3fa062"/>
+        <circle cx="20" cy="16" r="2" fill="rgba(255,255,255,.5)"/>
+        <circle cx="42" cy="30" r="2" fill="rgba(255,255,255,.45)"/>
+        <circle cx="20" cy="44" r="2" fill="rgba(255,255,255,.45)"/>
+      </svg>
+    </span>
+    <span class="brand-name">CHROMU<span class="x">X</span></span>
+    <span class="brand-sub">AGENT&nbsp;COCKPIT</span>
+  </div>
+  <div class="titlebar-gauges">
+    <span class="gauge"><i class="gdot g-green"></i><b>3</b>&nbsp;SESSIONS</span>
+    <span class="gauge"><i class="gdot g-amber"></i><b>2</b>&nbsp;QUEUED</span>
+    <span class="gauge"><i class="gdot g-cyan"></i><b>14</b>&nbsp;SENT</span>
+    <button class="top-btn update-ready">☀ UPDATE READY</button>
+    <button class="top-btn">SETTINGS</button>
+  </div>
+</header>
+
+<!-- ══ main frame ══ -->
+<div id="app">
+  <aside id="rail">
+    <div class="rail-head">
+      <span class="microlabel">Attention Queue</span>
+      <button class="btn">⛶ DETECT</button>
+    </div>
+    <div id="attention-list">
+      <div class="qcard q-approval">
+        <svg class="sprig-tr" width="40" height="22" viewBox="0 0 52 28"><use href="#sprig"/></svg>
+        <div class="q-kind"><span class="qglyph">✳</span>APPROVAL</div>
+        <div class="q-sess">checkout-flow</div>
+        <div class="q-note">claude wants to run <code>npm run db:migrate</code></div>
+      </div>
+      <div class="qcard q-preview">
+        <div class="q-kind"><span class="qglyph">❋</span>PREVIEW</div>
+        <div class="q-sess">landing-page</div>
+        <div class="q-note">localhost:5173 changed — review ready</div>
+      </div>
+      <div class="qcard q-exited">
+        <div class="q-kind"><span class="qglyph">✽</span>EXITED</div>
+        <div class="q-sess">api-server</div>
+        <div class="q-note">codex exited (code 0) · 12m ago</div>
+      </div>
+    </div>
+    <div class="rail-foot">
+      <div class="microlabel">Local Storage</div>
+      <button class="pathlink">~/.chromux/captures</button>
+      <svg class="sprig-corner sprig" width="46" height="25" viewBox="0 0 52 28" style="transform:scaleX(-1)"><use href="#sprig"/></svg>
+    </div>
+  </aside>
+
+  <div id="workspace">
+    <nav id="session-tabs" aria-label="Session tabs">
+      <button class="session-tab active"><i class="tab-dot live"></i>checkout-flow · claude<span class="tab-badge">2</span></button>
+      <button class="session-tab"><i class="tab-dot live"></i>landing-page · grok</button>
+      <button class="session-tab"><i class="tab-dot dead"></i>api-server · codex</button>
+      <button class="session-tab add-tab" title="New session">+</button>
+    </nav>
+
+    <main id="stage">
+      <!-- terminal pane -->
+      <section id="pane-terminal">
+        <div class="pane-head">
+          <span class="pane-title">TERMINAL — <em>claude</em></span>
+          <span class="pane-cwd">~/projects/shop/checkout-flow</span>
+          <svg class="sprig-tr sprig" width="42" height="23" viewBox="0 0 52 28"><use href="#sprig"/></svg>
+        </div>
+        <div class="term-body">
+          <div class="tl t-wel"><span><span class="star">✻</span> Welcome to Claude Code!</span><span class="wpath">/projects/shop/checkout-flow</span></div>
+          <div class="tl t-user"><span class="caret">&gt;</span> fix the CTA overflow on the checkout page</div>
+          <div class="tl t-step"><span class="bud">●</span> I'll look at the checkout component styles.</div>
+          <div class="tl t-step"><span class="bud">●</span> Read <span class="fname">src/components/CheckoutCTA.tsx</span> (84 lines)</div>
+          <div class="tl t-step"><span class="bud">●</span> Edit <span class="fname">src/styles/checkout.css</span></div>
+          <div class="tl"><span class="t-diff-del">- .cta-row { width: 120%; }</span></div>
+          <div class="tl"><span class="t-diff-add">+ .cta-row { width: 100%; max-width: 480px; }</span></div>
+          <div class="tl t-ok"><span class="tick">✔</span> Change applied — dev server reloaded</div>
+          <div class="tl t-step"><span class="bud">●</span> The button no longer overflows. Preview updated on the right.</div>
+          <div class="tl t-wait"><span class="cursor"></span>awaiting your next instruction…</div>
+        </div>
+      </section>
+
+      <div id="divider" title="Drag to resize"></div>
+
+      <!-- browser pane -->
+      <section id="pane-browser">
+        <div class="btoolbar">
+          <button class="nav-btn" title="Back">←</button>
+          <button class="nav-btn" title="Forward">→</button>
+          <button class="nav-btn" title="Reload">⟳</button>
+          <div class="urlbar"><span class="lock">◉</span><span class="u"><span class="scheme">http://</span>localhost:5173/checkout</span></div>
+          <button class="tb-btn primary" id="btn-capture">⛶ CAPTURE</button>
+          <button class="tb-btn">QUEUE<span class="bdg">2</span></button>
+          <span class="chip ok">console: 0</span>
+          <button class="tb-btn">⌄ COLLAPSE</button>
+        </div>
+        <div class="webview">
+          <span class="refreshed">✦ REFRESHED</span>
+          <div class="shopfr">
+            <div class="shop-brand">
+              <span class="shop-logo">S</span>
+              <span class="shop-name">Shopfront</span>
+              <span class="shop-step">Cart → <b>Checkout</b> → Done</span>
+            </div>
+            <div class="shop-h1">Checkout</div>
+            <div class="order-card">
+              <div class="oc-label">Order summary</div>
+              <div class="oc-row"><span>Ceramic pour-over kit<span class="oc-qty">×1</span></span><span>$36.00</span></div>
+              <div class="oc-row"><span>Filter papers, 100pk<span class="oc-qty">×1</span></span><span>$8.00</span></div>
+              <div class="oc-row oc-sub"><span>Shipping</span><span>$4.00</span></div>
+              <div class="oc-row oc-total"><span>Total</span><span>$48.00</span></div>
+            </div>
+            <div class="cta-row">
+              <button class="pay-btn">Pay $48.00</button>
+              <div class="pay-note">Secured by ShopPay · 256-bit TLS</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<!-- ══ status bar ══ -->
+<footer id="statusbar">
+  <div class="sb-left">
+    <span class="microlabel">Adapter</span><span class="sb-val">claude -p · one-off</span>
+    <span class="sb-sep"></span>
+    <span class="microlabel">Pairing</span><span class="sb-val">1:1 session ↔ pane</span>
+  </div>
+  <div class="sb-right">
+    <button class="sb-btn">DELIVERY LOG</button>
+    <span class="sb-ver">chromux 0.17.0 — solarpunk concept</span>
+  </div>
+</footer>
+
+<div id="corner-tag">☀ SOLARPUNK · № 11</div>
+
+<!-- ══ capture modal ══ -->
+<div id="modal-capture" class="overlay" role="dialog" aria-modal="true" aria-labelledby="cap-title">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title" id="cap-title">
+        <span class="microlabel">Capture → Agent</span>
+        Send this page to claude
+      </div>
+      <svg class="sprig-tr sprig" width="46" height="25" viewBox="0 0 52 28"><use href="#sprig"/></svg>
+      <button class="modal-x" id="cap-close" title="Close (Esc)">✕</button>
+    </div>
+    <div class="cap-grid">
+      <div class="cap-col">
+        <div class="cap-summary">
+          <div class="cs-row"><span class="microlabel">Session</span><span class="v">checkout-flow · <em>claude</em></span></div>
+          <div class="cs-row"><span class="microlabel">URL</span><span class="v">localhost:5173/checkout</span></div>
+          <div class="cs-row"><span class="microlabel">Selection</span><span class="v">"CTA button region 412×88"</span></div>
+        </div>
+        <label class="field">
+          <span class="microlabel">Note to agent — what's wrong / what to do</span>
+          <textarea rows="3" spellcheck="false" placeholder="e.g. the CTA button overflows its container — fix the CSS"></textarea>
+        </label>
+        <label class="field">
+          <span class="microlabel">Target</span>
+          <select><option>checkout-flow · claude -p</option></select>
+        </label>
+        <div class="field">
+          <span class="microlabel">Screenshot</span>
+          <div class="cap-shot">
+            <svg class="sprig" width="40" height="22" viewBox="0 0 52 28"><use href="#sprig"/></svg>
+            412×88 · CTA region clipped
+          </div>
+        </div>
+      </div>
+      <div class="cap-col yaml-wrap">
+        <span class="microlabel">Payload Preview — YAML v1</span>
+        <pre class="yaml-view"><span class="yk">chromux_capture:</span> <span class="yv">v1</span>
+<span class="yk">session:</span> <span class="yv">checkout-flow</span>
+<span class="yk">agent:</span> <span class="yv">claude</span>
+<span class="yk">url:</span> <span class="yv">http://localhost:5173/checkout</span>
+<span class="yk">note:</span> <span class="yv">CTA overflows container</span>
+<span class="yk">screenshot:</span> <span class="yv">~/.chromux/captures/2026-07-11-0142.png</span>
+<span class="yk">console_errors:</span> <span class="yc">[]</span></pre>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="mbtn" id="cap-cancel">CANCEL</button>
+      <button class="mbtn">FILE-DROP ONLY</button>
+      <button class="mbtn primary">☀ SEND — claude -p</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var overlay = document.getElementById('modal-capture');
+  var open  = function(){ overlay.classList.add('open'); };
+  var close = function(){ overlay.classList.remove('open'); };
+  document.getElementById('btn-capture').addEventListener('click', open);
+  document.getElementById('cap-close').addEventListener('click', close);
+  document.getElementById('cap-cancel').addEventListener('click', close);
+  overlay.addEventListener('click', function(e){ if (e.target === overlay) close(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') close(); });
+  if (/[?&]modal=1/.test(location.search)) open();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Chromux — Retro-OS</title>
+<style>
+/* ================================================================
+   CHROMUX — RETRO-OS  ·  System 7 / NeXTSTEP concept
+   Beveled platinum gray, pinstripe titlebars, pixel-crisp 1px edges.
+   ================================================================ */
+
+:root{
+  --desk-a:#8f9392;         /* desktop dither dark  */
+  --desk-b:#a8acab;         /* desktop dither light */
+  --chrome:#cccccc;         /* platinum base        */
+  --chrome-lite:#dcdcdc;
+  --chrome-dark:#b2b2b2;
+  --hi:#ffffff;             /* bevel highlight      */
+  --hi-2:#e9e9e9;
+  --lo:#7d7d7d;             /* bevel shadow         */
+  --lo-2:#a6a6a6;
+  --line:#1c1c1c;           /* hard outline         */
+  --ink:#141414;
+  --ink-dim:#4c4c4c;
+  --well:#ffffff;           /* inset paper          */
+  --stripe:#9c9c9c;
+
+  --green:#1f7a34;
+  --green-led:#37b24d;
+  --amber:#a05a00;
+  --amber-led:#e8940a;
+  --cyan:#0b6a7d;
+  --cyan-led:#18a5c0;
+  --red:#9b1c1c;
+  --red-led:#d6393b;
+  --sel:#30309a;            /* classic selection navy */
+
+  --font-ui:"Charcoal","Chicago","Geneva","Verdana",sans-serif;
+  --font-body:"Geneva","Verdana","Helvetica Neue",sans-serif;
+  --font-mono:"Monaco","Andale Mono","Menlo",monospace;
+
+  /* bevels */
+  --bevel-out: inset 1px 1px 0 var(--hi), inset 2px 2px 0 var(--hi-2),
+               inset -1px -1px 0 var(--lo), inset -2px -2px 0 var(--lo-2);
+  --bevel-out-thin: inset 1px 1px 0 var(--hi), inset -1px -1px 0 var(--lo);
+  --bevel-in: inset 1px 1px 0 var(--lo), inset 2px 2px 0 var(--lo-2),
+              inset -1px -1px 0 var(--hi-2);
+  --bevel-in-thin: inset 1px 1px 0 var(--lo), inset -1px -1px 0 var(--hi);
+}
+
+*{ margin:0; padding:0; box-sizing:border-box; border-radius:0 !important; }
+
+html,body{ height:100%; }
+
+body{
+  min-width:1280px;
+  height:100vh;
+  overflow:hidden;
+  font-family:var(--font-body);
+  font-size:12px;
+  color:var(--ink);
+  /* 50% dithered desktop, System 7 style */
+  background-color:var(--desk-a);
+  background-image:conic-gradient(var(--desk-a) 25%, var(--desk-b) 0 50%, var(--desk-a) 0 75%, var(--desk-b) 0);
+  background-size:4px 4px;
+  padding:10px 12px 12px 10px;
+  -webkit-font-smoothing:antialiased;
+}
+
+button{
+  font:inherit; color:inherit; background:none; border:none; cursor:pointer;
+}
+button:focus-visible{ outline:1px dotted var(--ink); outline-offset:-4px; }
+
+/* pixel-flavored label type */
+.microlabel, .t-title, .btn, .tab-label, .gauge, .sb-btn, .pane-title{
+  font-family:var(--font-ui);
+  letter-spacing:.04em;
+}
+
+/* ── generic widgets ─────────────────────────────────────────── */
+.btn{
+  display:inline-flex; align-items:center; gap:5px;
+  padding:4px 11px 5px;
+  font-size:10.5px; font-weight:700; letter-spacing:.06em;
+  color:var(--ink);
+  background:var(--chrome);
+  border:1px solid var(--line);
+  box-shadow:var(--bevel-out);
+  white-space:nowrap;
+  user-select:none;
+}
+.btn:hover{ background:var(--chrome-lite); }
+.btn:active{
+  background:var(--chrome-dark);
+  box-shadow:var(--bevel-in);
+  transform:translate(1px,1px);
+}
+/* classic "default button" — heavy double outline */
+.btn-default{
+  position:relative;
+  background:#e3e3e3;
+  outline:1px solid var(--line);
+  outline-offset:2px;
+  margin:3px;
+}
+.btn-urgent{
+  background:#f4e2b8;
+  box-shadow:var(--bevel-out), inset 0 0 0 40px rgba(232,148,10,.12);
+}
+.btn-urgent:hover{ background:#f8ecd0; }
+
+.well{
+  background:var(--well);
+  border:1px solid var(--line);
+  box-shadow:var(--bevel-in);
+}
+
+.led{
+  display:inline-block; width:7px; height:7px;
+  border:1px solid var(--line);
+  box-shadow:inset -1px -1px 0 rgba(0,0,0,.35), inset 1px 1px 0 rgba(255,255,255,.55);
+  flex:none;
+}
+.led-green{ background:var(--green-led); }
+.led-amber{ background:var(--amber-led); }
+.led-cyan{ background:var(--cyan-led); }
+.led-red{ background:var(--red-led); }
+
+/* pinstripe band — System 7 titlebars */
+.pinstripe{
+  background-color:var(--chrome-lite);
+  background-image:repeating-linear-gradient(
+    to bottom, transparent 0 2px, var(--stripe) 2px 3px);
+  background-clip:content-box;
+}
+
+/* ── application window shell ────────────────────────────────── */
+#appwindow{
+  height:100%;
+  display:flex; flex-direction:column;
+  background:var(--chrome);
+  border:1px solid var(--line);
+  box-shadow:
+    inset 1px 1px 0 var(--hi), inset -1px -1px 0 var(--lo),
+    2px 2px 0 rgba(0,0,0,.85);           /* hard 2px window shadow */
+}
+
+/* ── titlebar ────────────────────────────────────────────────── */
+#titlebar{
+  flex:none;
+  height:44px;
+  display:flex; align-items:stretch;
+  border-bottom:1px solid var(--line);
+  background:var(--chrome);
+  box-shadow:inset 1px 1px 0 var(--hi), inset -1px 0 0 var(--lo);
+}
+.tb-stripes{
+  flex:none; width:84px;                  /* traffic-light reserve */
+  margin:5px 0 5px 7px;
+  padding:4px 0;
+  border-right:1px solid var(--lo-2);
+}
+.tb-closebox{
+  position:absolute;
+  width:13px; height:13px;
+  background:var(--chrome);
+  border:1px solid var(--line);
+  box-shadow:var(--bevel-out-thin);
+  margin:5px 0 0 5px;
+}
+.brand{
+  display:flex; align-items:center; gap:9px;
+  padding:0 14px 0 12px;
+}
+.brand-mark{
+  width:26px; height:26px; flex:none;
+  display:grid; place-items:center;
+  background:var(--hi-2);
+  border:1px solid var(--line);
+  box-shadow:var(--bevel-out-thin);
+}
+.brand-name{
+  font-family:var(--font-ui);
+  font-size:16px; font-weight:700; letter-spacing:.08em;
+  text-shadow:1px 1px 0 var(--hi);
+}
+.brand-sub{
+  font-family:var(--font-ui);
+  font-size:9px; font-weight:700; letter-spacing:.14em;
+  color:var(--ink-dim);
+  border:1px solid var(--lo-2);
+  background:var(--chrome-lite);
+  box-shadow:inset 1px 1px 0 var(--hi);
+  padding:2px 6px 3px;
+}
+.tb-mid{
+  flex:1;
+  margin:5px 10px;
+  padding:4px 0;
+  position:relative;
+}
+.titlebar-gauges{
+  display:flex; align-items:center; gap:10px;
+  padding:0 12px 0 4px;
+}
+.gauge{
+  display:inline-flex; align-items:center; gap:6px;
+  font-size:10px; font-weight:700; letter-spacing:.05em;
+  color:var(--ink);
+  background:var(--chrome-lite);
+  border:1px solid var(--lo);
+  box-shadow:inset 1px 1px 0 var(--hi), inset -1px -1px 0 var(--lo-2);
+  padding:3px 8px 4px;
+  white-space:nowrap;
+}
+.gauge b{ font-weight:700; }
+/* ── main frame ──────────────────────────────────────────────── */
+#app{
+  flex:1; min-height:0;
+  display:flex;
+  padding:8px;
+  gap:8px;
+  background:var(--chrome);
+}
+
+/* ── left rail: a window-within-window ───────────────────────── */
+#rail{
+  flex:none; width:230px;
+  display:flex; flex-direction:column;
+  background:var(--chrome);
+  border:1px solid var(--line);
+  box-shadow:var(--bevel-out-thin), 2px 2px 0 rgba(0,0,0,.55);
+}
+.mini-titlebar{
+  flex:none;
+  display:flex; align-items:center; justify-content:space-between;
+  gap:8px;
+  height:24px;
+  padding:0 6px;
+  border-bottom:1px solid var(--line);
+  background:var(--chrome);
+}
+.mini-titlebar .stripe-fill{
+  flex:1; align-self:stretch;
+  margin:5px 0;
+  background-image:repeating-linear-gradient(
+    to bottom, transparent 0 2px, var(--stripe) 2px 3px);
+}
+.pane-title{
+  flex:none;
+  font-size:10px; font-weight:700; letter-spacing:.08em;
+  padding:0 6px;
+  background:var(--chrome);
+  white-space:nowrap;
+}
+.mini-titlebar .btn{ padding:2px 7px 3px; font-size:9.5px; }
+
+.rail-body{
+  flex:1; min-height:0;
+  overflow:hidden;
+  padding:8px;
+  display:flex; flex-direction:column; gap:8px;
+}
+.qcard{
+  border:1px solid var(--line);
+  background:var(--hi-2);
+  box-shadow:var(--bevel-out-thin);
+  padding:7px 8px 8px;
+  cursor:pointer;
+}
+.qcard:hover{ background:#f2f2f2; }
+.qcard:active{ box-shadow:var(--bevel-in-thin); background:var(--chrome-lite); }
+.qcard-head{
+  display:flex; align-items:center; gap:6px;
+  margin-bottom:4px;
+}
+.qcard-type{
+  font-family:var(--font-ui);
+  font-size:9px; font-weight:700; letter-spacing:.1em;
+  padding:1px 5px 2px;
+  border:1px solid var(--line);
+  color:#fff;
+}
+.q-urgent .qcard-type{ background:var(--amber); }
+.q-info   .qcard-type{ background:var(--cyan); }
+.q-dead   .qcard-type{ background:var(--lo); color:#f2f2f2; }
+.qcard-name{
+  font-family:var(--font-mono);
+  font-size:10.5px; font-weight:700;
+}
+.qcard-desc{
+  font-size:10.5px; line-height:1.45;
+  color:var(--ink-dim);
+}
+.qcard-desc code{
+  font-family:var(--font-mono); font-size:10px;
+  background:var(--well);
+  border:1px solid var(--lo-2);
+  padding:0 3px;
+}
+.q-urgent{ box-shadow:var(--bevel-out-thin), inset 0 0 0 40em rgba(232,148,10,.08); }
+.q-urgent .qcard-alert{
+  margin-left:auto;
+  width:13px; height:13px; flex:none;
+  display:grid; place-items:center;
+  font-family:var(--font-ui); font-size:9px; font-weight:700;
+  color:#fff; background:var(--amber);
+  border:1px solid var(--line);
+}
+.rail-foot{
+  flex:none;
+  border-top:1px solid var(--lo-2);
+  box-shadow:inset 0 1px 0 var(--hi);
+  padding:7px 9px 9px;
+}
+.microlabel{
+  display:block;
+  font-size:9px; font-weight:700; letter-spacing:.12em;
+  color:var(--ink-dim);
+}
+.pathlink{
+  font-family:var(--font-mono);
+  font-size:10.5px;
+  color:var(--sel);
+  text-decoration:underline;
+  margin-top:4px;
+  padding:0;
+}
+.pathlink:hover{ color:#0000c0; }
+
+/* ── workspace / session tabs ────────────────────────────────── */
+#workspace{
+  flex:1; min-width:0;
+  display:flex; flex-direction:column;
+}
+#session-tabs{
+  flex:none;
+  display:flex; align-items:flex-end; gap:3px;
+  padding:0 4px;
+  height:30px;
+}
+.session-tab{
+  display:inline-flex; align-items:center; gap:7px;
+  height:24px;
+  padding:0 11px 1px;
+  font-family:var(--font-ui);
+  font-size:10.5px; font-weight:700; letter-spacing:.03em;
+  background:var(--chrome-dark);
+  border:1px solid var(--line);
+  border-bottom:none;
+  box-shadow:inset 1px 1px 0 var(--hi-2), inset -1px 0 0 var(--lo);
+  color:var(--ink-dim);
+  white-space:nowrap;
+}
+.session-tab:hover{ background:var(--chrome); }
+.session-tab.active{
+  height:29px;
+  background:var(--chrome-lite);
+  color:var(--ink);
+  box-shadow:inset 1px 1px 0 var(--hi), inset -1px 0 0 var(--lo),
+             0 1px 0 var(--chrome-lite);      /* fuse with stage frame */
+  position:relative; z-index:2;
+}
+.tab-badge{
+  font-family:var(--font-ui);
+  font-size:9px; font-weight:700;
+  min-width:14px; height:14px;
+  display:inline-grid; place-items:center;
+  padding:0 3px;
+  color:#fff; background:var(--amber);
+  border:1px solid var(--line);
+}
+.add-tab{
+  width:26px; justify-content:center;
+  font-size:13px; padding:0;
+}
+
+/* ── stage ───────────────────────────────────────────────────── */
+#stage{
+  flex:1; min-height:0;
+  display:flex;
+  background:var(--chrome-lite);
+  border:1px solid var(--line);
+  box-shadow:var(--bevel-out-thin), 2px 2px 0 rgba(0,0,0,.55);
+  padding:7px;
+  gap:0;
+  position:relative; z-index:1;
+}
+.pane{
+  min-width:0; min-height:0;
+  display:flex; flex-direction:column;
+  background:var(--chrome);
+  border:1px solid var(--line);
+  box-shadow:var(--bevel-out-thin);
+}
+#pane-terminal{ flex:0 0 42%; }
+#pane-browser{ flex:1; min-width:0; }
+
+.pane-head-meta{
+  font-family:var(--font-mono);
+  font-size:9.5px; color:var(--ink-dim);
+  padding:0 6px;
+  background:var(--chrome);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+
+/* divider */
+#divider{
+  flex:none; width:6px;
+  margin:14px 1px;
+  background:var(--chrome);
+  border:1px solid var(--line);
+  box-shadow:var(--bevel-out-thin);
+  cursor:col-resize;
+  position:relative;
+}
+#divider::after{
+  content:"";
+  position:absolute; inset:6px 1px;
+  background-image:repeating-linear-gradient(
+    to bottom, var(--lo) 0 1px, transparent 1px 4px);
+}
+
+/* ── terminal ────────────────────────────────────────────────── */
+.term-frame{
+  flex:1; min-height:0;
+  margin:6px;
+  display:flex;
+  background:var(--well);
+  border:1px solid var(--line);
+  box-shadow:var(--bevel-in);
+}
+.term-body{
+  flex:1; min-width:0;
+  overflow:hidden;
+  padding:10px 12px;
+  font-family:var(--font-mono);
+  font-size:11px; line-height:1.72;
+  color:var(--ink);
+  background:var(--well);
+}
+.term-body .t-row{ white-space:pre-wrap; }
+.t-hello{ display:flex; justify-content:space-between; gap:12px; }
+.t-hello .t-path{ color:var(--ink-dim); }
+.t-star{ color:var(--amber); font-weight:700; }
+.t-prompt{ color:var(--sel); font-weight:700; }
+.t-dot{ color:var(--green); }
+.t-dim{ color:var(--ink-dim); }
+.t-del{ color:var(--red); background:#fbeaea; display:inline-block; }
+.t-add{ color:var(--green); background:#e8f5ea; display:inline-block; }
+.t-ok{ color:var(--green); font-weight:700; }
+.t-cursor-row{ color:var(--ink-dim); }
+.t-block{
+  display:inline-block;
+  width:7px; height:13px;
+  background:var(--ink);
+  vertical-align:-2px;
+  margin-right:2px;
+  animation:blink 1.1s steps(1) infinite;
+}
+@keyframes blink{ 50%{ opacity:0; } }
+
+/* chunky decorative scrollbar */
+.retro-scrollbar{
+  flex:none; width:16px;
+  display:flex; flex-direction:column;
+  border-left:1px solid var(--line);
+  background:var(--chrome-lite);
+}
+.rs-arrow{
+  flex:none; height:16px;
+  display:grid; place-items:center;
+  font-size:8px; line-height:1;
+  color:var(--ink);
+  background:var(--chrome);
+  border:1px solid var(--line); border-left:none;
+  box-shadow:var(--bevel-out-thin);
+}
+.rs-track{
+  flex:1;
+  position:relative;
+  background-image:conic-gradient(#c2c2c2 25%, #d8d8d8 0 50%, #c2c2c2 0 75%, #d8d8d8 0);
+  background-size:4px 4px;
+}
+.rs-thumb{
+  position:absolute; left:1px; right:1px; top:34%; height:26%;
+  background:var(--chrome);
+  border:1px solid var(--line);
+  box-shadow:var(--bevel-out-thin);
+}
+.rs-thumb::after{
+  content:"";
+  position:absolute; inset:4px 3px;
+  background-image:repeating-linear-gradient(
+    to bottom, var(--lo) 0 1px, transparent 1px 3px);
+}
+/* ── browser pane ────────────────────────────────────────────── */
+.browser-toolbar{
+  flex:none;
+  display:flex; align-items:center; gap:5px;
+  padding:6px 6px 5px;
+  border-bottom:1px solid var(--lo-2);
+  box-shadow:inset 0 1px 0 var(--hi);
+  overflow:hidden;
+}
+.nav-btn{
+  width:24px; height:22px;
+  display:inline-grid; place-items:center;
+  padding:0;
+  font-size:10px; font-weight:700;
+  background:var(--chrome);
+  border:1px solid var(--line);
+  box-shadow:var(--bevel-out-thin);
+}
+.nav-btn:hover{ background:var(--chrome-lite); }
+.nav-btn:active{ box-shadow:var(--bevel-in-thin); background:var(--chrome-dark); }
+.nav-btn[disabled]{ color:var(--lo-2); cursor:default; }
+.url-bar{
+  flex:1 1 auto; min-width:0;
+  height:22px;
+  display:flex; align-items:center;
+  padding:0 6px;
+  font-family:var(--font-mono);
+  font-size:10.5px;
+  color:var(--ink);
+  background:var(--well);
+  border:1px solid var(--line);
+  box-shadow:var(--bevel-in-thin);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.url-bar .scheme{ color:var(--ink-dim); }
+/* toolbar chrome must not steal room from the URL box */
+.browser-toolbar .nav-btn,
+.browser-toolbar .btn,
+.browser-toolbar .chip-console{ flex:0 0 auto; }
+/* compact button metrics so the URL is meaningfully visible at 1280 */
+.browser-toolbar .btn{ padding:4px 6px 5px; gap:4px; letter-spacing:.03em; }
+.browser-toolbar .btn-default{ margin:2px; }
+.browser-toolbar .chip-console{ padding:3px 6px 4px; }
+.browser-toolbar .nav-btn{ width:22px; }
+.chip-console{
+  font-family:var(--font-mono);
+  font-size:9.5px;
+  padding:3px 7px 4px;
+  color:var(--green);
+  background:var(--hi-2);
+  border:1px solid var(--lo);
+  box-shadow:inset 1px 1px 0 var(--hi);
+  white-space:nowrap;
+}
+.btn .b-badge{
+  font-size:9px; font-weight:700;
+  min-width:13px; height:13px;
+  display:inline-grid; place-items:center;
+  padding:0 3px;
+  color:#fff; background:var(--amber);
+  border:1px solid var(--line);
+}
+
+/* the rendered page well — deliberately modern inside retro chrome */
+.page-well{
+  flex:1; min-height:0;
+  margin:6px;
+  border:1px solid var(--line);
+  box-shadow:var(--bevel-in);
+  background:#f4f5f9;
+  position:relative;
+  overflow:hidden;
+}
+.mockpage{
+  position:absolute; inset:2px;
+  overflow:hidden;
+  font-family:"Helvetica Neue","Avenir Next",Helvetica,Arial,sans-serif;
+  background:linear-gradient(180deg,#fafbff 0%,#eef1f8 100%);
+  color:#1b2030;
+  -webkit-font-smoothing:antialiased;
+}
+.mockpage *, .mockpage{ border-radius:revert !important; }  /* modern island: radius allowed */
+.mp-header{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 26px;
+  background:#fff;
+  border-bottom:1px solid #e4e7f0;
+}
+.mp-logo{ font-weight:700; font-size:14px; letter-spacing:-.01em; }
+.mp-logo em{ font-style:normal; color:#5b5bd6; }
+.mp-steps{ font-size:11px; color:#8a90a6; }
+.mp-steps b{ color:#1b2030; }
+.mp-body{
+  display:flex; justify-content:center; gap:22px;
+  padding:26px 26px 0;
+}
+.mp-card{
+  width:min(360px,46%);
+  background:#fff;
+  border:1px solid #e4e7f0;
+  border-radius:12px !important;
+  box-shadow:0 6px 18px rgba(27,32,48,.07);
+  padding:20px 18px;
+}
+.mp-card h3{
+  font-size:12px; font-weight:600; letter-spacing:.08em;
+  color:#8a90a6; text-transform:uppercase;
+  margin-bottom:14px;
+}
+.mp-row{
+  display:flex; justify-content:space-between; gap:10px;
+  font-size:12.5px; letter-spacing:-.005em;
+  padding:7px 0;
+  color:#3c4256;
+}
+.mp-row > span:first-child{
+  min-width:0; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis;
+}
+.mp-row > span:last-child{ flex:0 0 auto; white-space:nowrap; }
+.mp-row + .mp-row{ border-top:1px dashed #e8eaf2; }
+.mp-row.total{
+  border-top:1px solid #d9dcec;
+  margin-top:6px; padding-top:12px;
+  font-weight:700; font-size:15px; color:#1b2030;
+}
+.mp-pay{
+  width:min(360px,46%);
+  display:flex; flex-direction:column; gap:12px;
+}
+.mp-field{
+  background:#fff;
+  border:1px solid #e4e7f0;
+  border-radius:10px !important;
+  padding:11px 14px;
+  font-size:12px; color:#8a90a6;
+}
+.mp-cta{
+  margin-top:4px;
+  padding:14px 18px;
+  font-size:15px; font-weight:600;
+  color:#fff; text-align:center;
+  background:linear-gradient(180deg,#6c6cf0 0%,#5150d4 100%);
+  border-radius:12px !important;
+  box-shadow:0 8px 20px rgba(81,80,212,.35);
+  cursor:pointer;
+}
+.mp-cta:hover{ filter:brightness(1.06); }
+.mp-secure{
+  text-align:center; font-size:10.5px; color:#8a90a6;
+}
+.refreshed-chip{
+  position:absolute; top:10px; right:12px;
+  font-family:var(--font-mono);
+  font-size:9px; font-weight:700; letter-spacing:.1em;
+  color:#fff; background:var(--green);
+  border:1px solid var(--line);
+  padding:3px 7px 4px;
+  animation:flashfade 3.2s steps(2) infinite;
+}
+@keyframes flashfade{ 0%,60%{opacity:1;} 70%,80%{opacity:.35;} 90%,100%{opacity:1;} }
+
+/* ── status bar ──────────────────────────────────────────────── */
+#statusbar{
+  flex:none;
+  height:26px;
+  display:flex; align-items:center; justify-content:space-between;
+  gap:12px;
+  padding:0 10px;
+  border-top:1px solid var(--line);
+  background:var(--chrome);
+  box-shadow:inset 0 1px 0 var(--hi);
+  font-size:10px;
+}
+.sb-left{ display:flex; align-items:center; gap:7px; min-width:0; }
+.sb-left .microlabel{ display:inline; }
+.sb-val{
+  font-family:var(--font-mono); font-size:10px;
+  color:var(--ink);
+}
+.sb-sep{
+  width:1px; height:12px;
+  background:var(--lo);
+  box-shadow:1px 0 0 var(--hi);
+  margin:0 4px;
+}
+.sb-right{ display:flex; align-items:center; gap:10px; }
+.sb-btn{
+  font-size:9px; font-weight:700; letter-spacing:.08em;
+  padding:2px 8px 3px;
+  background:var(--chrome);
+  border:1px solid var(--line);
+  box-shadow:var(--bevel-out-thin);
+}
+.sb-btn:active{ box-shadow:var(--bevel-in-thin); }
+.sb-ver{
+  font-family:var(--font-mono); font-size:9.5px;
+  color:var(--ink-dim);
+}
+
+/* ── corner tag ──────────────────────────────────────────────── */
+#corner-tag{
+  position:fixed; right:0; bottom:0;
+  z-index:60;
+  font-family:var(--font-ui);
+  font-size:9px; font-weight:700; letter-spacing:.12em;
+  color:#fff; background:var(--line);
+  border:1px solid #000;
+  box-shadow:inset 1px 1px 0 #555;
+  padding:3px 9px 4px;
+}
+
+/* ── capture modal: classic alert dialog ─────────────────────── */
+.overlay{
+  position:fixed; inset:0;
+  z-index:50;
+  display:grid; place-items:center;
+  /* 50% dither scrim, no soft blur */
+  background-image:conic-gradient(rgba(20,20,20,.55) 25%, transparent 0 50%, rgba(20,20,20,.55) 0 75%, transparent 0);
+  background-size:4px 4px;
+}
+.overlay.hidden{ display:none; }
+.modal{
+  width:min(880px, calc(100vw - 80px));
+  background:var(--chrome);
+  border:1px solid var(--line);
+  box-shadow:var(--bevel-out), 3px 3px 0 rgba(0,0,0,.85);
+  display:flex; flex-direction:column;
+}
+.modal-head{
+  flex:none; height:26px;
+  display:flex; align-items:center; gap:8px;
+  padding:0 6px;
+  border-bottom:1px solid var(--line);
+}
+.modal-head .stripe-fill{
+  flex:1; align-self:stretch; margin:6px 0;
+  background-image:repeating-linear-gradient(
+    to bottom, transparent 0 2px, var(--stripe) 2px 3px);
+}
+.modal-title{
+  font-family:var(--font-ui);
+  font-size:10.5px; font-weight:700; letter-spacing:.08em;
+  padding:0 7px;
+  background:var(--chrome);
+}
+.modal-x{
+  flex:none;
+  width:15px; height:15px;
+  display:grid; place-items:center;
+  padding:0;
+  font-size:9px; font-weight:700; line-height:1;
+  background:var(--chrome);
+  border:1px solid var(--line);
+  box-shadow:var(--bevel-out-thin);
+}
+.modal-x:active{ box-shadow:var(--bevel-in-thin); }
+.cap-grid{
+  display:grid; grid-template-columns:1fr 1fr;
+  gap:12px;
+  padding:12px;
+}
+.cap-col{ display:flex; flex-direction:column; gap:10px; min-width:0; }
+.cap-summary{
+  border:1px solid var(--line);
+  background:var(--hi-2);
+  box-shadow:var(--bevel-out-thin);
+}
+.cap-srow{
+  display:grid; grid-template-columns:86px 1fr;
+  gap:8px; align-items:baseline;
+  padding:6px 9px;
+}
+.cap-srow + .cap-srow{ border-top:1px solid var(--chrome-dark); }
+.cap-srow .microlabel{ letter-spacing:.1em; }
+.cap-sval{
+  font-family:var(--font-mono); font-size:10.5px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.field{ display:flex; flex-direction:column; gap:4px; }
+textarea, select{
+  font-family:var(--font-mono); font-size:11px;
+  color:var(--ink);
+  background:var(--well);
+  border:1px solid var(--line);
+  box-shadow:var(--bevel-in-thin);
+  padding:6px 8px;
+  resize:none;
+  appearance:none; -webkit-appearance:none;
+}
+textarea::placeholder{ color:#8a8a8a; }
+.select-wrap{ position:relative; }
+.select-wrap select{ width:100%; padding-right:26px; }
+.select-wrap::after{
+  content:"▾";
+  position:absolute; top:2px; right:2px; bottom:2px;
+  width:18px;
+  display:grid; place-items:center;
+  font-size:9px;
+  background:var(--chrome);
+  border:1px solid var(--line);
+  box-shadow:var(--bevel-out-thin);
+  pointer-events:none;
+}
+.cap-shot{
+  height:96px;
+  display:grid; place-items:center;
+  background:var(--well);
+  border:1px solid var(--line);
+  box-shadow:var(--bevel-in-thin);
+  background-image:conic-gradient(#ececec 25%, #fff 0 50%, #ececec 0 75%, #fff 0);
+  background-size:8px 8px;
+}
+.cap-shot-tag{
+  font-family:var(--font-mono); font-size:10px;
+  color:var(--ink-dim);
+  background:var(--chrome-lite);
+  border:1px solid var(--lo);
+  box-shadow:inset 1px 1px 0 var(--hi);
+  padding:3px 8px 4px;
+}
+.yaml-view{
+  flex:1; min-height:0;
+  margin:0;
+  padding:10px 12px;
+  font-family:var(--font-mono);
+  font-size:10.5px; line-height:1.7;
+  color:var(--ink);
+  background:var(--well);
+  border:1px solid var(--line);
+  box-shadow:var(--bevel-in);
+  overflow:auto;
+  white-space:pre;
+}
+.yaml-view .yk{ color:var(--sel); }
+.yaml-view .yc{ color:var(--ink-dim); }
+.modal-foot{
+  flex:none;
+  display:flex; align-items:center; justify-content:flex-end; gap:10px;
+  padding:10px 12px 12px;
+  border-top:1px solid var(--lo-2);
+  box-shadow:inset 0 1px 0 var(--hi);
+}
+
+/* ── narrow desktop: reclaim URL room by dropping the scheme ──── */
+@media (max-width:1366px){
+  .url-bar .scheme{ display:none; }
+}
+
+/* ── reduced motion ──────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{
+    animation:none !important;
+    transition:none !important;
+  }
+}
+</style>
+</head>
+<body>
+<div id="appwindow">
+
+  <!-- ══ titlebar ══ -->
+  <header id="titlebar">
+    <div class="tb-closebox" aria-hidden="true"></div>
+    <div class="tb-stripes pinstripe" aria-hidden="true"></div>
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <!-- three-node chevron mark, pixel-square retro redraw -->
+        <svg viewBox="0 0 16 16" width="16" height="16" shape-rendering="crispEdges">
+          <path d="M6 4 H8 V5 H10 V6 H12 V7 H13 V9 H12 V10 H10 V11 H8 V12 H6 Z" fill="none"/>
+          <path d="M7 5 h2 v1 h1 v1 h1 v2 h-1 v1 h-1 v1 h-2 z" fill="#b6b6b6"/>
+          <rect x="2" y="1" width="5" height="5" fill="#d96a1e" stroke="#1c1c1c" stroke-width="1"/>
+          <rect x="9" y="6" width="5" height="5" fill="#7a4fd0" stroke="#1c1c1c" stroke-width="1"/>
+          <rect x="2" y="10" width="5" height="5" fill="#1f8a44" stroke="#1c1c1c" stroke-width="1"/>
+        </svg>
+      </span>
+      <span class="brand-name">CHROMUX</span>
+      <span class="brand-sub">AGENT&nbsp;COCKPIT</span>
+    </div>
+    <div class="tb-mid pinstripe" aria-hidden="true"></div>
+    <div class="titlebar-gauges">
+      <span class="gauge"><i class="led led-green"></i><b>3</b>&nbsp;SESSIONS</span>
+      <span class="gauge"><i class="led led-amber"></i><b>2</b>&nbsp;QUEUED</span>
+      <span class="gauge"><i class="led led-cyan"></i><b>14</b>&nbsp;SENT</span>
+      <button class="btn btn-urgent" id="btn-update-ready">UPDATE READY</button>
+      <button class="btn" id="btn-settings">SETTINGS</button>
+    </div>
+  </header>
+
+  <!-- ══ main frame ══ -->
+  <div id="app">
+
+    <!-- left rail -->
+    <aside id="rail">
+      <div class="mini-titlebar">
+        <span class="pane-title">ATTENTION QUEUE</span>
+        <div class="stripe-fill" aria-hidden="true"></div>
+        <button class="btn" id="btn-detect">⛶ DETECT</button>
+      </div>
+      <div class="rail-body">
+        <div class="qcard q-urgent">
+          <div class="qcard-head">
+            <span class="qcard-type">APPROVAL</span>
+            <span class="qcard-name">checkout-flow</span>
+            <span class="qcard-alert">!</span>
+          </div>
+          <div class="qcard-desc">claude wants to run <code>npm run db:migrate</code></div>
+        </div>
+        <div class="qcard q-info">
+          <div class="qcard-head">
+            <span class="qcard-type">PREVIEW</span>
+            <span class="qcard-name">landing-page</span>
+          </div>
+          <div class="qcard-desc">localhost:5173 changed — review ready</div>
+        </div>
+        <div class="qcard q-dead">
+          <div class="qcard-head">
+            <span class="qcard-type">EXITED</span>
+            <span class="qcard-name">api-server</span>
+          </div>
+          <div class="qcard-desc">codex exited (code 0) · 12m ago</div>
+        </div>
+      </div>
+      <div class="rail-foot">
+        <span class="microlabel">LOCAL STORAGE</span>
+        <button class="pathlink">~/.chromux/captures</button>
+      </div>
+    </aside>
+
+    <!-- workspace -->
+    <div id="workspace">
+      <nav id="session-tabs" aria-label="Session tabs">
+        <button class="session-tab active">
+          <i class="led led-green"></i>
+          <span class="tab-label">checkout-flow · claude</span>
+          <span class="tab-badge">2</span>
+        </button>
+        <button class="session-tab">
+          <i class="led led-green"></i>
+          <span class="tab-label">landing-page · grok</span>
+        </button>
+        <button class="session-tab">
+          <i class="led led-red"></i>
+          <span class="tab-label">api-server · codex</span>
+        </button>
+        <button class="session-tab add-tab" title="New session">+</button>
+      </nav>
+
+      <!-- stage: split view -->
+      <main id="stage">
+
+        <!-- terminal pane -->
+        <section class="pane" id="pane-terminal">
+          <div class="mini-titlebar">
+            <span class="pane-title">TERMINAL — claude</span>
+            <div class="stripe-fill" aria-hidden="true"></div>
+            <span class="pane-head-meta">~/projects/shop/checkout-flow</span>
+          </div>
+          <div class="term-frame">
+            <div class="term-body">
+              <div class="t-row t-hello"><span><span class="t-star">✻</span> Welcome to Claude Code!</span><span class="t-path">/projects/shop/checkout-flow</span></div>
+              <div class="t-row"><span class="t-prompt">&gt;</span> fix the CTA overflow on the checkout page</div>
+              <div class="t-row"><span class="t-dot">●</span> I'll look at the checkout component styles.</div>
+              <div class="t-row"><span class="t-dot">●</span> Read <b>src/components/CheckoutCTA.tsx</b> <span class="t-dim">(84 lines)</span></div>
+              <div class="t-row"><span class="t-dot">●</span> Edit <b>src/styles/checkout.css</b></div>
+              <div class="t-row">  <span class="t-del">- .cta-row { width: 120%; }</span></div>
+              <div class="t-row">  <span class="t-add">+ .cta-row { width: 100%; max-width: 480px; }</span></div>
+              <div class="t-row"><span class="t-ok">✔</span> Change applied — dev server reloaded</div>
+              <div class="t-row"><span class="t-dot">●</span> The button no longer overflows. Preview updated on the right.</div>
+              <div class="t-row t-cursor-row"><span class="t-block" aria-hidden="true"></span>awaiting your next instruction…</div>
+            </div>
+            <div class="retro-scrollbar" aria-hidden="true">
+              <div class="rs-arrow">▲</div>
+              <div class="rs-track"><div class="rs-thumb"></div></div>
+              <div class="rs-arrow">▼</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- divider -->
+        <div id="divider" title="Drag to resize" aria-hidden="true"></div>
+
+        <!-- browser pane -->
+        <section class="pane" id="pane-browser">
+          <div class="mini-titlebar">
+            <span class="pane-title">PAIRED BROWSER</span>
+            <div class="stripe-fill" aria-hidden="true"></div>
+            <span class="pane-head-meta">session ↔ pane</span>
+          </div>
+          <div class="browser-toolbar">
+            <button class="nav-btn" title="Back">◀</button>
+            <button class="nav-btn" title="Forward" disabled>▶</button>
+            <button class="nav-btn" title="Reload">⟳</button>
+            <div class="url-bar"><span class="scheme">http://</span>localhost:5173/checkout</div>
+            <button class="btn btn-default" id="btn-capture">⛶ CAPTURE</button>
+            <button class="btn">QUEUE <span class="b-badge">2</span></button>
+            <span class="chip-console">console: 0</span>
+            <button class="btn">⌄ COLLAPSE</button>
+          </div>
+          <div class="page-well">
+            <div class="mockpage">
+              <div class="mp-header">
+                <span class="mp-logo">shop<em>.dev</em></span>
+                <span class="mp-steps">Cart → Shipping → <b>Payment</b></span>
+              </div>
+              <div class="mp-body">
+                <div class="mp-card">
+                  <h3>Order summary</h3>
+                  <div class="mp-row"><span>Aeron desk socks × 2</span><span>$18.00</span></div>
+                  <div class="mp-row"><span>Terminal mug — beige</span><span>$22.00</span></div>
+                  <div class="mp-row"><span>Shipping (2-day)</span><span>$8.00</span></div>
+                  <div class="mp-row total"><span>Total</span><span>$48.00</span></div>
+                </div>
+                <div class="mp-pay">
+                  <div class="mp-field">Card number &nbsp;•••• •••• •••• 4242</div>
+                  <div class="mp-field">Exp 08 / 29 &nbsp;·&nbsp; CVC •••</div>
+                  <div class="mp-cta">Pay $48.00</div>
+                  <div class="mp-secure">🔒 Payments secured by shop.dev</div>
+                </div>
+              </div>
+              <div class="refreshed-chip">REFRESHED</div>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- ══ status bar ══ -->
+  <footer id="statusbar">
+    <div class="sb-left">
+      <span class="microlabel">ADAPTER</span><span class="sb-val">claude -p · one-off</span>
+      <span class="sb-sep"></span>
+      <span class="microlabel">PAIRING</span><span class="sb-val">1:1 session ↔ pane</span>
+    </div>
+    <div class="sb-right">
+      <button class="sb-btn">DELIVERY LOG</button>
+      <span class="sb-ver">chromux 0.17.0 — retro-os concept</span>
+    </div>
+  </footer>
+
+</div><!-- /appwindow -->
+
+<div id="corner-tag">09 · RETRO-OS</div>
+
+<!-- ══ capture modal — classic alert dialog ══ -->
+<div id="modal-capture" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="cap-title">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-title" id="cap-title">CAPTURE → AGENT</span>
+      <div class="stripe-fill" aria-hidden="true"></div>
+      <button class="modal-x" id="modal-close" title="Close">✕</button>
+    </div>
+    <div class="cap-grid">
+      <div class="cap-col">
+        <div class="cap-summary">
+          <div class="cap-srow">
+            <span class="microlabel">SESSION</span>
+            <span class="cap-sval">checkout-flow · claude</span>
+          </div>
+          <div class="cap-srow">
+            <span class="microlabel">URL</span>
+            <span class="cap-sval">localhost:5173/checkout</span>
+          </div>
+          <div class="cap-srow">
+            <span class="microlabel">SELECTION</span>
+            <span class="cap-sval">"CTA button region 412×88"</span>
+          </div>
+        </div>
+        <label class="field">
+          <span class="microlabel">NOTE TO AGENT — WHAT'S WRONG / WHAT TO DO</span>
+          <textarea rows="3" spellcheck="false"
+            placeholder="e.g. the CTA button overflows its container — fix the CSS"></textarea>
+        </label>
+        <label class="field">
+          <span class="microlabel">TARGET</span>
+          <span class="select-wrap">
+            <select><option>checkout-flow · claude -p</option></select>
+          </span>
+        </label>
+        <div class="field">
+          <span class="microlabel">SCREENSHOT</span>
+          <div class="cap-shot">
+            <span class="cap-shot-tag">2026-07-11-0142.png · 412×88</span>
+          </div>
+        </div>
+      </div>
+      <div class="cap-col">
+        <span class="microlabel">PAYLOAD PREVIEW — YAML v1</span>
+        <pre class="yaml-view"><span class="yk">chromux_capture:</span> v1
+<span class="yk">session:</span> checkout-flow
+<span class="yk">agent:</span> claude
+<span class="yk">url:</span> http://localhost:5173/checkout
+<span class="yk">note:</span> CTA overflows container
+<span class="yk">screenshot:</span> ~/.chromux/captures/2026-07-11-0142.png
+<span class="yk">console_errors:</span> <span class="yc">[]</span></pre>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="btn-cancel">CANCEL</button>
+      <button class="btn">FILE-DROP ONLY</button>
+      <button class="btn btn-default">SEND — claude -p</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var overlay = document.getElementById('modal-capture');
+
+  function openModal(){ overlay.classList.remove('hidden'); }
+  function closeModal(){ overlay.classList.add('hidden'); }
+
+  document.getElementById('btn-capture').addEventListener('click', openModal);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  document.getElementById('btn-cancel').addEventListener('click', closeModal);
+
+  overlay.addEventListener('click', function(e){
+    if (e.target === overlay) closeModal();
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') closeModal();
+  });
+
+  /* headless screenshot hook: ?modal=1 opens the dialog */
+  if (/[?&]modal=1/.test(location.search)) openModal();
+})();
+</script>
+</body>
+</html>

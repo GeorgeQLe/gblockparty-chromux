@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Chromux — Observatory</title>
+<style>
+/* ————————————————————————————————————————————————
+   CHROMUX · 07 OBSERVATORY LUXE
+   ink-navy ground · champagne gold · star-chart hairlines
+   ———————————————————————————————————————————————— */
+@import url('https://fonts.googleapis.com/css2?family=Marcellus&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&display=swap');
+
+:root{
+  --ink-0:#04091a;            /* deepest ground            */
+  --ink-1:#071022;            /* app chrome                */
+  --ink-2:#0b162e;            /* panels                    */
+  --ink-3:#101d3a;            /* raised panels             */
+  --ink-4:#16254a;            /* hover fields              */
+  --gold:#d2b477;             /* champagne                 */
+  --gold-hi:#f1ddab;          /* polished highlight        */
+  --gold-dim:rgba(210,180,119,.55);
+  --hair:rgba(210,180,119,.20);      /* fine hairline      */
+  --hair-strong:rgba(210,180,119,.42);
+  --text:#d8deec;
+  --dim:#8b94ac;
+  --faint:#5b6580;
+  --green:#82d8a6;
+  --amber:#e3a75d;
+  --cyan:#8fcbe0;
+  --red:#d98484;
+  --node-o:#e09a5e; --node-v:#b493ea; --node-g:#66cd94;
+  --serif:"Marcellus","Didot","Optima","Baskerville","Palatino",serif;
+  --uiface:"Optima","Avenir Next","Palatino","Baskerville",serif;
+  --mono:"SF Mono","Menlo","Monaco","Courier New",monospace;
+}
+
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  min-width:1280px;height:100vh;overflow:hidden;
+  background:
+    radial-gradient(1200px 700px at 68% -10%, #0d1a38 0%, transparent 60%),
+    radial-gradient(900px 600px at -8% 108%, #0a1430 0%, transparent 55%),
+    var(--ink-0);
+  color:var(--text);
+  font-family:var(--uiface);
+  font-size:13px;
+  display:flex;flex-direction:column;
+  position:relative;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* star field — three drifting layers of pinprick stars */
+body::before{
+  content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:
+    radial-gradient(1px 1px at 12% 22%, rgba(238,228,200,.55) 45%, transparent 55%),
+    radial-gradient(1px 1px at 44% 8%,  rgba(238,228,200,.35) 45%, transparent 55%),
+    radial-gradient(1.5px 1.5px at 78% 30%, rgba(210,180,119,.5) 45%, transparent 55%),
+    radial-gradient(1px 1px at 63% 64%, rgba(238,228,200,.30) 45%, transparent 55%),
+    radial-gradient(1px 1px at 90% 82%, rgba(238,228,200,.40) 45%, transparent 55%),
+    radial-gradient(1.5px 1.5px at 28% 78%, rgba(210,180,119,.34) 45%, transparent 55%),
+    radial-gradient(1px 1px at 6% 56%,  rgba(238,228,200,.28) 45%, transparent 55%),
+    radial-gradient(1px 1px at 52% 42%, rgba(238,228,200,.22) 45%, transparent 55%);
+  background-size:620px 620px, 480px 480px, 720px 720px, 540px 540px,
+                  660px 660px, 420px 420px, 380px 380px, 500px 500px;
+  opacity:.8;
+}
+
+button{font-family:inherit;color:inherit;background:none;border:none;cursor:pointer;}
+.microlabel{
+  font-family:var(--uiface);font-size:9.5px;letter-spacing:.24em;
+  color:var(--dim);text-transform:uppercase;
+}
+
+/* shared button treatments — engraved hairline vs. gilded primary */
+.btn{
+  font-family:var(--uiface);font-size:10px;letter-spacing:.2em;
+  color:var(--gold);padding:6px 13px;border:1px solid var(--hair-strong);
+  border-radius:2px;background:transparent;
+  transition:background .25s,color .25s,border-color .25s,box-shadow .25s;
+  white-space:nowrap;
+}
+.btn:hover{background:rgba(210,180,119,.10);border-color:var(--gold-dim);color:var(--gold-hi);}
+.btn-gold{
+  background:linear-gradient(180deg,var(--gold-hi) 0%,var(--gold) 55%,#b3945c 100%);
+  color:#12100a;border-color:transparent;font-weight:600;
+  box-shadow:0 0 0 1px rgba(210,180,119,.35), 0 2px 10px rgba(210,180,119,.18);
+}
+.btn-gold:hover{filter:brightness(1.06);background:linear-gradient(180deg,var(--gold-hi),var(--gold));color:#12100a;}
+
+/* ═══ TITLEBAR — the bezel ═══ */
+#titlebar{
+  position:relative;z-index:5;
+  height:52px;flex:0 0 52px;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 18px 0 84px;   /* macOS traffic-light reserve */
+  background:linear-gradient(180deg,#0a1329 0%,var(--ink-1) 100%);
+  -webkit-app-region:drag;
+}
+#titlebar button{-webkit-app-region:no-drag;}
+/* gold shimmer hairline under the bezel */
+#titlebar::after{
+  content:"";position:absolute;left:0;right:0;bottom:0;height:1px;
+  background:linear-gradient(90deg,transparent 0%,var(--gold-dim) 18%,rgba(241,221,171,.85) 50%,var(--gold-dim) 82%,transparent 100%);
+  background-size:200% 100%;
+  animation:shimmer 9s linear infinite;
+}
+@keyframes shimmer{0%{background-position:200% 0;}100%{background-position:-200% 0;}}
+
+.brand{display:flex;align-items:center;gap:12px;}
+.brand-mark{display:flex;align-items:center;}
+.brand-name{
+  font-family:var(--serif);font-size:17px;letter-spacing:.42em;
+  color:var(--gold-hi);text-indent:.1em;
+  text-shadow:0 0 18px rgba(210,180,119,.35);
+}
+.brand-sub{
+  font-family:var(--uiface);font-size:8.5px;letter-spacing:.34em;
+  color:var(--faint);border-left:1px solid var(--hair);
+  padding-left:12px;margin-left:2px;
+}
+
+/* gauges — three tiny watch dials */
+.titlebar-right{display:flex;align-items:center;gap:18px;}
+.gauges{display:flex;align-items:center;gap:16px;padding-right:16px;border-right:1px solid var(--hair);}
+.gauge{display:flex;align-items:center;gap:7px;}
+.dial{position:relative;width:28px;height:28px;flex:0 0 28px;}
+.dial svg{display:block;transform:rotate(-90deg);}
+.dial .dial-num{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-family:var(--serif);font-size:11px;color:var(--text);
+}
+.gauge-label{font-size:9px;letter-spacing:.22em;color:var(--dim);}
+.gauge-label b{display:block;font-weight:400;color:var(--faint);font-size:8px;letter-spacing:.24em;}
+.g-green .dial-num{color:var(--green);} .g-amber .dial-num{color:var(--amber);} .g-cyan .dial-num{color:var(--cyan);}
+
+.top-btn{
+  font-size:9.5px;letter-spacing:.22em;padding:6px 12px;
+  border:1px solid var(--hair-strong);border-radius:2px;color:var(--gold);
+  transition:background .25s,color .25s;
+}
+.top-btn:hover{background:rgba(210,180,119,.10);color:var(--gold-hi);}
+.update-ready{
+  background:linear-gradient(180deg,var(--gold-hi),var(--gold) 60%,#b3945c);
+  color:#141109;border-color:transparent;font-weight:600;
+  box-shadow:0 0 14px rgba(210,180,119,.30);
+  animation:beacon 3.2s ease-in-out infinite;
+}
+@keyframes beacon{0%,100%{box-shadow:0 0 8px rgba(210,180,119,.22);}50%{box-shadow:0 0 20px rgba(210,180,119,.5);}}
+/* ═══ APP FRAME ═══ */
+#app{flex:1;display:flex;min-height:0;position:relative;z-index:1;}
+
+/* ═══ LEFT RAIL — attention queue ═══ */
+#rail{
+  width:230px;flex:0 0 230px;display:flex;flex-direction:column;
+  background:linear-gradient(180deg,rgba(11,22,46,.7),rgba(7,16,34,.9));
+  border-right:1px solid var(--hair);
+}
+.rail-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 14px 10px;
+}
+.rail-head .microlabel{color:var(--gold);letter-spacing:.28em;font-size:9px;}
+.btn-detect{font-size:9px;letter-spacing:.16em;color:var(--dim);
+  border:1px solid var(--hair);border-radius:2px;padding:4px 8px;
+  transition:color .25s,border-color .25s;}
+.btn-detect:hover{color:var(--gold-hi);border-color:var(--gold-dim);}
+
+#attention-list{flex:1;overflow:hidden;padding:2px 12px 0;display:flex;flex-direction:column;gap:10px;}
+.qcard{
+  position:relative;border:1px solid var(--hair);border-radius:3px;
+  padding:10px 12px 11px 16px;background:linear-gradient(160deg,rgba(16,29,58,.55),rgba(11,22,46,.35));
+  transition:border-color .25s,background .25s;cursor:default;
+}
+.qcard:hover{border-color:var(--hair-strong);background:rgba(16,29,58,.75);}
+.qcard::before{ /* star bullet */
+  content:"✦";position:absolute;left:-6px;top:9px;font-size:9px;
+  background:var(--ink-1);padding:1px 2px;line-height:1;
+}
+.qcard.q-urgent::before{color:var(--amber);}
+.qcard.q-info::before{color:var(--cyan);}
+.qcard.q-dead::before{color:var(--red);opacity:.75;}
+.qcard.q-urgent{border-left:2px solid var(--amber);}
+.qcard.q-info{border-left:2px solid var(--cyan);}
+.qcard.q-dead{border-left:2px solid rgba(217,132,132,.5);opacity:.82;}
+.q-kind{font-size:8.5px;letter-spacing:.3em;margin-bottom:5px;}
+.q-urgent .q-kind{color:var(--amber);} .q-info .q-kind{color:var(--cyan);} .q-dead .q-kind{color:var(--red);}
+.q-session{font-family:var(--serif);font-size:13px;letter-spacing:.06em;color:var(--text);margin-bottom:4px;}
+.q-msg{font-size:11px;line-height:1.5;color:var(--dim);}
+.q-msg code{font-family:var(--mono);font-size:10px;color:var(--gold);background:rgba(210,180,119,.08);
+  padding:0 4px;border-radius:2px;}
+
+.rail-foot{
+  padding:12px 14px 14px;border-top:1px solid var(--hair);
+}
+.rail-foot .microlabel{font-size:8.5px;margin-bottom:5px;}
+.pathlink{
+  font-family:var(--mono);font-size:10.5px;color:var(--gold);
+  letter-spacing:.02em;padding:0;border-bottom:1px solid transparent;
+  transition:color .25s,border-color .25s;
+}
+.pathlink:hover{color:var(--gold-hi);border-bottom-color:var(--gold-dim);}
+
+/* ═══ WORKSPACE ═══ */
+#workspace{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;}
+
+/* session tab strip — engraved plaques */
+#session-tabs{
+  display:flex;align-items:stretch;gap:1px;
+  height:38px;flex:0 0 38px;
+  padding:0 10px;background:rgba(7,16,34,.85);
+  border-bottom:1px solid var(--hair);
+}
+.session-tab{
+  position:relative;display:flex;align-items:center;gap:8px;
+  padding:0 16px;font-family:var(--uiface);font-size:10.5px;letter-spacing:.14em;
+  color:var(--dim);border-right:1px solid rgba(210,180,119,.10);
+  transition:color .25s,background .25s;
+}
+.session-tab:first-child{border-left:1px solid rgba(210,180,119,.10);}
+.session-tab:hover{color:var(--text);background:rgba(16,29,58,.5);}
+.session-tab.active{
+  color:var(--gold-hi);background:linear-gradient(180deg,rgba(210,180,119,.10),transparent 70%);
+}
+.session-tab.active::before{ /* gilded meridian on the active tab */
+  content:"";position:absolute;top:-1px;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--gold) 30%,var(--gold-hi) 50%,var(--gold) 70%,transparent);
+}
+.tab-dot{width:6px;height:6px;border-radius:50%;flex:0 0 6px;}
+.dot-live{background:var(--green);box-shadow:0 0 6px rgba(130,216,166,.8);}
+.dot-dead{background:var(--red);box-shadow:0 0 5px rgba(217,132,132,.55);}
+.tab-badge{
+  min-width:16px;height:16px;border-radius:50%;
+  display:inline-flex;align-items:center;justify-content:center;
+  font-family:var(--serif);font-size:9.5px;color:#141109;
+  background:linear-gradient(180deg,var(--gold-hi),var(--gold));
+  box-shadow:0 0 8px rgba(210,180,119,.35);
+}
+.add-tab{
+  width:34px;justify-content:center;padding:0;
+  font-family:var(--serif);font-size:16px;color:var(--faint);
+}
+.add-tab:hover{color:var(--gold-hi);}
+
+/* ═══ STAGE — split view ═══ */
+#stage{flex:1;display:flex;min-height:0;position:relative;padding:14px;gap:0;overflow:hidden;}
+/* faint celestial-coordinate arcs behind the panes */
+#stage::before,#stage::after{
+  content:"";position:absolute;border:1px solid rgba(210,180,119,.10);
+  border-radius:50%;pointer-events:none;z-index:0;
+}
+#stage::before{width:1400px;height:1400px;top:-1050px;right:-420px;}
+#stage::after{width:900px;height:900px;bottom:-700px;left:-260px;border-color:rgba(210,180,119,.08);}
+
+.pane{
+  position:relative;z-index:1;display:flex;flex-direction:column;min-width:0;min-height:0;
+  border:1px solid var(--hair);border-radius:4px;
+  background:linear-gradient(180deg,rgba(11,22,46,.85),rgba(7,16,34,.92));
+  box-shadow:0 8px 30px rgba(2,5,14,.5);
+}
+#terminal-pane{flex:0 0 44%;}
+#browser-pane{flex:1;}
+
+.pane-header{
+  display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+  padding:11px 16px 9px;border-bottom:1px solid var(--hair);
+  background:linear-gradient(180deg,rgba(16,29,58,.5),transparent);
+}
+.pane-title{
+  font-family:var(--serif);font-size:11.5px;letter-spacing:.3em;color:var(--gold);
+}
+.pane-title em{font-style:normal;color:var(--gold-hi);}
+.pane-cwd{font-family:var(--mono);font-size:10px;color:var(--faint);letter-spacing:.02em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+/* terminal transcript */
+#terminal-body{
+  flex:1;overflow:hidden;padding:16px 18px;
+  font-family:var(--mono);font-size:12px;line-height:1.85;
+  color:var(--text);
+}
+.t-line{white-space:pre-wrap;}
+.t-glyph{display:inline-block;width:1.4em;}
+.t-welcome{color:var(--gold-hi);}
+.t-welcome .t-path{color:var(--faint);float:right;font-size:10.5px;}
+.t-user{color:var(--gold);}
+.t-user .t-glyph{color:var(--gold);}
+.t-agent{color:var(--text);}
+.t-agent .t-glyph{color:var(--gold-dim);}
+.t-tool{color:var(--dim);}
+.t-tool .t-glyph{color:var(--gold-dim);}
+.t-tool code{color:var(--cyan);font-size:11.5px;}
+.t-diff-del{color:var(--red);padding-left:1.4em;}
+.t-diff-add{color:var(--green);padding-left:1.4em;}
+.t-ok{color:var(--green);}
+.t-ok .t-glyph{color:var(--green);}
+.t-await{color:var(--faint);font-style:italic;}
+.t-cursor{
+  display:inline-block;width:7px;height:14px;margin-right:6px;vertical-align:-2px;
+  background:var(--gold);animation:pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.25;}}
+
+/* divider — a slim gilded meridian */
+#divider{
+  flex:0 0 6px;position:relative;z-index:1;cursor:col-resize;margin:0 4px;
+  display:flex;align-items:center;justify-content:center;
+}
+#divider::before{
+  content:"";width:1px;height:82%;
+  background:linear-gradient(180deg,transparent,var(--hair-strong) 20%,var(--hair-strong) 80%,transparent);
+}
+#divider::after{
+  content:"✦";position:absolute;font-size:8px;color:var(--gold-dim);
+  background:var(--ink-0);padding:4px 0;
+}
+#divider:hover::before{background:linear-gradient(180deg,transparent,var(--gold-dim) 20%,var(--gold-dim) 80%,transparent);}
+/* ═══ BROWSER PANE ═══ */
+.browser-toolbar{
+  display:flex;align-items:center;gap:5px;
+  padding:8px 9px;border-bottom:1px solid var(--hair);
+  background:linear-gradient(180deg,rgba(16,29,58,.5),transparent);
+}
+.nav-btn{
+  width:23px;height:23px;border:1px solid var(--hair);border-radius:50%;
+  color:var(--dim);font-size:11px;display:flex;align-items:center;justify-content:center;
+  transition:color .25s,border-color .25s;flex:0 0 23px;
+}
+.nav-btn:hover{color:var(--gold-hi);border-color:var(--gold-dim);}
+.url-bar{
+  flex:1 1 auto;min-width:118px;display:flex;align-items:center;gap:7px;
+  height:26px;padding:0 11px;
+  border:1px solid var(--hair);border-radius:13px;
+  background:rgba(4,9,26,.6);
+  font-family:var(--mono);font-size:10.5px;color:var(--text);
+  white-space:nowrap;overflow:hidden;
+}
+.url-text{overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.url-scheme{color:var(--faint);}
+.url-lock{color:var(--gold-dim);font-size:9px;flex:0 0 auto;}
+.tool-chip{
+  font-family:var(--mono);font-size:9px;color:var(--faint);flex:0 0 auto;
+  border:1px solid var(--hair);border-radius:12px;padding:4px 7px;white-space:nowrap;
+}
+.chip-badge{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:14px;height:14px;border-radius:50%;margin-left:5px;
+  font-family:var(--serif);font-size:9px;color:#141109;
+  background:linear-gradient(180deg,var(--gold-hi),var(--gold));
+}
+.btn-capture{font-size:9px;letter-spacing:.12em;padding:6px 11px;border-radius:13px;flex:0 0 auto;}
+.btn-queue,.btn-collapse{
+  font-size:9px;letter-spacing:.05em;color:var(--dim);flex:0 0 auto;
+  border:1px solid var(--hair);border-radius:13px;padding:5px 8px;
+  transition:color .25s,border-color .25s;white-space:nowrap;
+}
+.btn-queue:hover,.btn-collapse:hover{color:var(--gold-hi);border-color:var(--gold-dim);}
+
+/* the framed web page — light checkout in deliberate contrast */
+.webview{
+  flex:1;min-height:0;position:relative;margin:12px;border-radius:3px;
+  background:#f2efe8;color:#2c2a26;overflow:hidden;
+  box-shadow:inset 0 0 0 1px rgba(210,180,119,.30), 0 6px 24px rgba(2,5,14,.55);
+  display:flex;align-items:center;justify-content:center;
+  font-family:"Avenir Next","Helvetica Neue",Arial,sans-serif;
+}
+.web-page{width:min(430px,88%);}
+.web-shop{font-size:10px;letter-spacing:.28em;color:#8a8578;text-transform:uppercase;margin-bottom:6px;}
+.web-h1{font-size:22px;font-weight:600;color:#22201c;margin-bottom:16px;letter-spacing:-.01em;}
+.order-card{
+  background:#fff;border:1px solid #e2ddd2;border-radius:10px;
+  padding:18px 20px;box-shadow:0 2px 10px rgba(60,50,30,.07);
+}
+.order-row{display:flex;justify-content:space-between;font-size:13px;color:#4a463e;padding:7px 0;}
+.order-row + .order-row{border-top:1px solid #efece4;}
+.order-row .oi-name b{display:block;font-weight:600;color:#22201c;}
+.order-row .oi-name span{font-size:11px;color:#8a8578;}
+.order-total{display:flex;justify-content:space-between;align-items:baseline;
+  margin-top:10px;padding-top:12px;border-top:2px solid #22201c;}
+.order-total .ot-label{font-size:11px;letter-spacing:.14em;color:#8a8578;text-transform:uppercase;}
+.order-total .ot-amt{font-size:20px;font-weight:700;color:#22201c;}
+.pay-cta{
+  display:block;width:100%;max-width:480px;margin-top:16px;
+  background:#152341;color:#f5efdf;border:none;border-radius:8px;
+  padding:13px 0;font-size:14px;font-weight:600;letter-spacing:.03em;
+  font-family:inherit;box-shadow:0 3px 12px rgba(21,35,65,.35);
+  transition:transform .2s,box-shadow .2s;
+}
+.pay-cta:hover{transform:translateY(-1px);box-shadow:0 5px 16px rgba(21,35,65,.42);}
+.web-secure{margin-top:10px;font-size:10.5px;color:#a49e8e;text-align:center;}
+.refresh-chip{
+  position:absolute;top:10px;right:10px;
+  font-size:9px;letter-spacing:.2em;color:#0f5c37;
+  background:#dff2e4;border:1px solid #b5dfc2;border-radius:10px;
+  padding:3px 9px;animation:fadeflash 4s ease-in-out infinite;
+}
+@keyframes fadeflash{0%,100%{opacity:.55;}50%{opacity:1;}}
+
+/* ═══ STATUS BAR ═══ */
+#statusbar{
+  position:relative;z-index:5;
+  height:28px;flex:0 0 28px;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 14px;background:var(--ink-1);
+  border-top:1px solid var(--hair);
+  font-size:9.5px;letter-spacing:.14em;
+}
+.sb-left,.sb-right{display:flex;align-items:center;gap:9px;}
+.sb-val{color:var(--text);font-family:var(--mono);font-size:10px;letter-spacing:.02em;}
+.sb-sep{width:1px;height:12px;background:var(--hair);margin:0 5px;}
+.sb-btn{
+  font-size:9px;letter-spacing:.2em;color:var(--gold);
+  border:1px solid var(--hair);border-radius:2px;padding:3px 9px;
+  transition:color .25s,border-color .25s;
+}
+.sb-btn:hover{color:var(--gold-hi);border-color:var(--gold-dim);}
+.sb-ver{color:var(--faint);font-size:9px;}
+
+/* fixed corner tag */
+#variation-tag{
+  position:fixed;right:14px;bottom:36px;z-index:40;
+  font-family:var(--serif);font-size:9px;letter-spacing:.3em;
+  color:var(--gold);border:1px solid var(--hair-strong);border-radius:2px;
+  padding:5px 10px 4px;background:rgba(4,9,26,.85);
+  pointer-events:none;
+}
+
+/* ═══ CAPTURE MODAL ═══ */
+#modal-capture{
+  position:fixed;inset:0;z-index:60;display:none;
+  align-items:center;justify-content:center;
+  background:rgba(2,5,14,.72);
+}
+#modal-capture.open{display:flex;}
+.modal{
+  width:min(920px,92vw);max-height:88vh;display:flex;flex-direction:column;
+  background:linear-gradient(180deg,#0d1832,#081020);
+  border:1px solid var(--hair-strong);border-radius:5px;
+  box-shadow:0 0 0 1px rgba(4,9,26,.9), 0 30px 80px rgba(0,0,0,.65), 0 0 40px rgba(210,180,119,.07);
+  animation:modal-in .3s ease-out;
+}
+@keyframes modal-in{from{opacity:0;transform:translateY(10px) scale(.985);}to{opacity:1;transform:none;}}
+.modal-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:13px 18px;border-bottom:1px solid var(--hair);
+}
+.modal-head .modal-title{
+  font-family:var(--serif);font-size:12px;letter-spacing:.3em;color:var(--gold-hi);
+}
+.modal-x{
+  width:24px;height:24px;border:1px solid var(--hair);border-radius:50%;
+  color:var(--dim);font-size:11px;display:flex;align-items:center;justify-content:center;
+  transition:color .25s,border-color .25s;
+}
+.modal-x:hover{color:var(--gold-hi);border-color:var(--gold-dim);}
+.cap-grid{
+  flex:1;display:grid;grid-template-columns:1fr 1fr;gap:20px;
+  padding:18px;overflow:auto;min-height:0;
+}
+.cap-col{display:flex;flex-direction:column;gap:13px;min-width:0;}
+.cap-summary{border:1px solid var(--hair);border-radius:3px;padding:4px 14px;}
+.cap-row{display:flex;justify-content:space-between;align-items:baseline;gap:14px;padding:8px 0;}
+.cap-row + .cap-row{border-top:1px solid rgba(210,180,119,.10);}
+.cap-row .microlabel{flex:0 0 auto;}
+.cap-row .cap-val{font-family:var(--mono);font-size:11px;color:var(--text);text-align:right;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.field{display:flex;flex-direction:column;gap:6px;}
+.field textarea,.field select{
+  font-family:var(--mono);font-size:11px;color:var(--text);
+  background:rgba(4,9,26,.6);border:1px solid var(--hair);border-radius:3px;
+  padding:9px 11px;resize:none;outline:none;appearance:none;
+}
+.field textarea:focus,.field select:focus{border-color:var(--gold-dim);}
+.field textarea::placeholder{color:var(--faint);}
+.select-wrap{position:relative;}
+.select-wrap::after{content:"⌄";position:absolute;right:11px;top:50%;transform:translateY(-56%);
+  color:var(--gold-dim);pointer-events:none;font-size:12px;}
+.select-wrap select{width:100%;}
+.cap-shot{
+  height:96px;border:1px dashed var(--hair-strong);border-radius:3px;
+  display:flex;align-items:center;justify-content:center;gap:9px;
+  color:var(--faint);font-size:10px;letter-spacing:.18em;
+  background:
+    radial-gradient(1px 1px at 20% 35%, rgba(238,228,200,.4) 45%, transparent 55%),
+    radial-gradient(1px 1px at 72% 60%, rgba(210,180,119,.35) 45%, transparent 55%),
+    radial-gradient(1px 1px at 48% 22%, rgba(238,228,200,.25) 45%, transparent 55%),
+    rgba(4,9,26,.5);
+}
+.cap-shot .shot-star{color:var(--gold-dim);font-size:13px;}
+.yaml-view{
+  flex:1;font-family:var(--mono);font-size:11px;line-height:1.8;
+  color:var(--text);background:rgba(4,9,26,.6);
+  border:1px solid var(--hair);border-radius:3px;padding:13px 15px;
+  overflow:auto;white-space:pre;
+}
+.y-key{color:var(--gold);} .y-str{color:var(--cyan);} .y-punc{color:var(--faint);}
+.modal-foot{
+  display:flex;align-items:center;justify-content:flex-end;gap:10px;
+  padding:13px 18px;border-top:1px solid var(--hair);
+}
+
+/* ═══ REDUCED MOTION ═══ */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{
+    animation:none !important;
+    transition:none !important;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- ══ titlebar ══ -->
+<header id="titlebar">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 64 64" width="26" height="26">
+        <!-- constellation hairlines joining the three brand stars -->
+        <path d="M22 16 L46 32 L22 48" fill="none" stroke="#d2b477" stroke-opacity="0.45" stroke-width="0.8"/>
+        <!-- faint coordinate arc -->
+        <circle cx="32" cy="32" r="27" fill="none" stroke="#d2b477" stroke-opacity="0.22" stroke-width="0.6" stroke-dasharray="2 5"/>
+        <!-- minor stars -->
+        <circle cx="38" cy="12" r="0.9" fill="#eee4c8" opacity="0.7"/>
+        <circle cx="50" cy="48" r="0.8" fill="#eee4c8" opacity="0.55"/>
+        <circle cx="12" cy="32" r="0.8" fill="#d2b477" opacity="0.6"/>
+        <!-- three brand nodes as haloed stars -->
+        <circle cx="22" cy="16" r="6" fill="#e09a5e" opacity="0.16"/>
+        <circle cx="22" cy="16" r="3" fill="#e09a5e"/>
+        <circle cx="46" cy="32" r="6" fill="#b493ea" opacity="0.16"/>
+        <circle cx="46" cy="32" r="3" fill="#b493ea"/>
+        <circle cx="22" cy="48" r="6" fill="#66cd94" opacity="0.16"/>
+        <circle cx="22" cy="48" r="3" fill="#66cd94"/>
+      </svg>
+    </span>
+    <span class="brand-name">CHROMUX</span>
+    <span class="brand-sub">AGENT&nbsp;COCKPIT</span>
+  </div>
+  <div class="titlebar-right">
+    <div class="gauges">
+      <span class="gauge g-green">
+        <span class="dial">
+          <svg viewBox="0 0 28 28" width="28" height="28">
+            <circle cx="14" cy="14" r="11" fill="none" stroke="rgba(210,180,119,0.16)" stroke-width="1.5"/>
+            <circle cx="14" cy="14" r="11" fill="none" stroke="#82d8a6" stroke-width="1.5"
+                    stroke-linecap="round" stroke-dasharray="41.5 69.1"/>
+          </svg>
+          <span class="dial-num">3</span>
+        </span>
+        <span class="gauge-label">SESSIONS</span>
+      </span>
+      <span class="gauge g-amber">
+        <span class="dial">
+          <svg viewBox="0 0 28 28" width="28" height="28">
+            <circle cx="14" cy="14" r="11" fill="none" stroke="rgba(210,180,119,0.16)" stroke-width="1.5"/>
+            <circle cx="14" cy="14" r="11" fill="none" stroke="#e3a75d" stroke-width="1.5"
+                    stroke-linecap="round" stroke-dasharray="27.6 69.1"/>
+          </svg>
+          <span class="dial-num">2</span>
+        </span>
+        <span class="gauge-label">QUEUED</span>
+      </span>
+      <span class="gauge g-cyan">
+        <span class="dial">
+          <svg viewBox="0 0 28 28" width="28" height="28">
+            <circle cx="14" cy="14" r="11" fill="none" stroke="rgba(210,180,119,0.16)" stroke-width="1.5"/>
+            <circle cx="14" cy="14" r="11" fill="none" stroke="#8fcbe0" stroke-width="1.5"
+                    stroke-linecap="round" stroke-dasharray="58.7 69.1"/>
+          </svg>
+          <span class="dial-num">14</span>
+        </span>
+        <span class="gauge-label">SENT</span>
+      </span>
+    </div>
+    <button class="top-btn update-ready">UPDATE READY</button>
+    <button class="top-btn">SETTINGS</button>
+  </div>
+</header>
+
+<!-- ══ main frame ══ -->
+<div id="app">
+  <aside id="rail">
+    <div class="rail-head">
+      <span class="microlabel">ATTENTION QUEUE</span>
+      <button class="btn-detect">⛶ DETECT</button>
+    </div>
+    <div id="attention-list">
+      <div class="qcard q-urgent">
+        <div class="q-kind">APPROVAL</div>
+        <div class="q-session">checkout-flow</div>
+        <div class="q-msg">claude wants to run <code>npm run db:migrate</code></div>
+      </div>
+      <div class="qcard q-info">
+        <div class="q-kind">PREVIEW</div>
+        <div class="q-session">landing-page</div>
+        <div class="q-msg">localhost:5173 changed — review ready</div>
+      </div>
+      <div class="qcard q-dead">
+        <div class="q-kind">EXITED</div>
+        <div class="q-session">api-server</div>
+        <div class="q-msg">codex exited (code 0) · 12m ago</div>
+      </div>
+    </div>
+    <div class="rail-foot">
+      <div class="microlabel">LOCAL STORAGE</div>
+      <button class="pathlink">~/.chromux/captures</button>
+    </div>
+  </aside>
+
+  <div id="workspace">
+    <nav id="session-tabs" aria-label="Session tabs">
+      <button class="session-tab active">
+        <span class="tab-dot dot-live"></span>
+        checkout-flow · claude
+        <span class="tab-badge">2</span>
+      </button>
+      <button class="session-tab">
+        <span class="tab-dot dot-live"></span>
+        landing-page · grok
+      </button>
+      <button class="session-tab">
+        <span class="tab-dot dot-dead"></span>
+        api-server · codex
+      </button>
+      <button class="session-tab add-tab" aria-label="New session">+</button>
+    </nav>
+
+    <main id="stage">
+      <!-- terminal pane -->
+      <section class="pane" id="terminal-pane">
+        <div class="pane-header">
+          <span class="pane-title">TERMINAL — <em>claude</em></span>
+          <span class="pane-cwd">~/projects/shop/checkout-flow</span>
+        </div>
+        <div id="terminal-body">
+          <div class="t-line t-welcome"><span class="t-glyph">✻</span>Welcome to Claude Code!<span class="t-path">/projects/shop/checkout-flow</span></div>
+          <div class="t-line t-user"><span class="t-glyph">›</span>fix the CTA overflow on the checkout page</div>
+          <div class="t-line t-agent"><span class="t-glyph">●</span>I'll look at the checkout component styles.</div>
+          <div class="t-line t-tool"><span class="t-glyph">●</span>Read <code>src/components/CheckoutCTA.tsx</code> (84 lines)</div>
+          <div class="t-line t-tool"><span class="t-glyph">●</span>Edit <code>src/styles/checkout.css</code></div>
+          <div class="t-line t-diff-del">- .cta-row { width: 120%; }</div>
+          <div class="t-line t-diff-add">+ .cta-row { width: 100%; max-width: 480px; }</div>
+          <div class="t-line t-ok"><span class="t-glyph">✔</span>Change applied — dev server reloaded</div>
+          <div class="t-line t-agent"><span class="t-glyph">●</span>The button no longer overflows. Preview updated on the right.</div>
+          <div class="t-line t-await"><span class="t-cursor"></span>awaiting your next instruction…</div>
+        </div>
+      </section>
+
+      <div id="divider" role="separator" aria-orientation="vertical"></div>
+
+      <!-- browser pane -->
+      <section class="pane" id="browser-pane">
+        <div class="browser-toolbar">
+          <button class="nav-btn" aria-label="Back">‹</button>
+          <button class="nav-btn" aria-label="Forward">›</button>
+          <button class="nav-btn" aria-label="Reload">⟳</button>
+          <div class="url-bar">
+            <span class="url-lock">✦</span>
+            <span class="url-text"><span class="url-scheme">http://</span>localhost:5173/checkout</span>
+          </div>
+          <button id="btn-capture" class="btn btn-gold btn-capture">⛶ CAPTURE</button>
+          <button class="btn-queue">QUEUE<span class="chip-badge">2</span></button>
+          <span class="tool-chip">console: 0</span>
+          <button class="btn-collapse">⌄ COLLAPSE</button>
+        </div>
+        <div class="webview">
+          <span class="refresh-chip">REFRESHED</span>
+          <div class="web-page">
+            <div class="web-shop">Shop / Checkout</div>
+            <div class="web-h1">Order summary</div>
+            <div class="order-card">
+              <div class="order-row">
+                <span class="oi-name"><b>Aurora desk lamp</b><span>Qty 1 · brass</span></span>
+                <span>$36.00</span>
+              </div>
+              <div class="order-row">
+                <span class="oi-name"><b>Cable weave — 2m</b><span>Qty 2 · slate</span></span>
+                <span>$8.00</span>
+              </div>
+              <div class="order-row">
+                <span class="oi-name"><b>Shipping</b><span>Standard, 3–5 days</span></span>
+                <span>$4.00</span>
+              </div>
+              <div class="order-total">
+                <span class="ot-label">Total due</span>
+                <span class="ot-amt">$48.00</span>
+              </div>
+              <button class="pay-cta">Pay $48.00</button>
+              <div class="web-secure">🔒 Payments secured by ShopPay</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<!-- ══ status bar ══ -->
+<footer id="statusbar">
+  <div class="sb-left">
+    <span class="microlabel">ADAPTER</span><span class="sb-val">claude -p · one-off</span>
+    <span class="sb-sep"></span>
+    <span class="microlabel">PAIRING</span><span class="sb-val">1:1 session ↔ pane</span>
+  </div>
+  <div class="sb-right">
+    <button class="sb-btn">DELIVERY LOG</button>
+    <span class="sb-ver">chromux 0.17.0 — observatory concept</span>
+  </div>
+</footer>
+
+<div id="variation-tag">07 · OBSERVATORY</div>
+
+<!-- ══ capture modal ══ -->
+<div id="modal-capture" role="dialog" aria-modal="true" aria-label="Capture to agent">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-title">CAPTURE → AGENT</span>
+      <button class="modal-x" id="modal-close" aria-label="Close">✕</button>
+    </div>
+    <div class="cap-grid">
+      <div class="cap-col">
+        <div class="cap-summary">
+          <div class="cap-row"><span class="microlabel">SESSION</span><span class="cap-val">checkout-flow · claude</span></div>
+          <div class="cap-row"><span class="microlabel">URL</span><span class="cap-val">localhost:5173/checkout</span></div>
+          <div class="cap-row"><span class="microlabel">SELECTION</span><span class="cap-val">CTA button region 412×88</span></div>
+        </div>
+        <label class="field">
+          <span class="microlabel">NOTE TO AGENT — WHAT'S WRONG / WHAT TO DO</span>
+          <textarea rows="3" spellcheck="false"
+            placeholder="e.g. the CTA button overflows its container — fix the CSS"></textarea>
+        </label>
+        <div class="field">
+          <span class="microlabel">TARGET</span>
+          <span class="select-wrap">
+            <select><option>checkout-flow · claude -p</option></select>
+          </span>
+        </div>
+        <div class="field">
+          <span class="microlabel">SCREENSHOT</span>
+          <div class="cap-shot"><span class="shot-star">✦</span> CTA REGION · 412 × 88 · PNG</div>
+        </div>
+      </div>
+      <div class="cap-col">
+        <span class="microlabel">PAYLOAD PREVIEW — YAML v1</span>
+        <pre class="yaml-view"><span class="y-key">chromux_capture</span><span class="y-punc">:</span> <span class="y-str">v1</span>
+<span class="y-key">session</span><span class="y-punc">:</span> <span class="y-str">checkout-flow</span>
+<span class="y-key">agent</span><span class="y-punc">:</span> <span class="y-str">claude</span>
+<span class="y-key">url</span><span class="y-punc">:</span> <span class="y-str">http://localhost:5173/checkout</span>
+<span class="y-key">note</span><span class="y-punc">:</span> <span class="y-str">CTA overflows container</span>
+<span class="y-key">screenshot</span><span class="y-punc">:</span> <span class="y-str">~/.chromux/captures/2026-07-11-0142.png</span>
+<span class="y-key">console_errors</span><span class="y-punc">:</span> <span class="y-punc">[]</span></pre>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="modal-cancel">CANCEL</button>
+      <button class="btn">FILE-DROP ONLY</button>
+      <button class="btn btn-gold">SEND — claude -p</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var modal = document.getElementById('modal-capture');
+  function open(){ modal.classList.add('open'); }
+  function close(){ modal.classList.remove('open'); }
+
+  document.getElementById('btn-capture').addEventListener('click', open);
+  document.getElementById('modal-close').addEventListener('click', close);
+  document.getElementById('modal-cancel').addEventListener('click', close);
+  modal.addEventListener('click', function(e){ if(e.target === modal) close(); });
+  document.addEventListener('keydown', function(e){ if(e.key === 'Escape') close(); });
+
+  /* headless verification hook: ?modal=1 auto-opens the capture modal */
+  if(/[?&]modal=1/.test(location.search)) open();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Chromux — Brutalist Mono</title>
+<style>
+/* ============================================================
+   CHROMUX — VARIATION 10 — BRUTALIST MONO
+   pure #000 on #fff · exposed grid · oversized condensed type
+   zero radius · zero shadow · zero gradient · zero color
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;600;800&display=swap');
+
+:root {
+  --ink: #000;
+  --paper: #fff;
+  --line: 2px solid #000;
+  --hairline: 1px solid #000;
+  --mono: "Menlo", "SF Mono", "Monaco", "Courier New", monospace;
+  --disp: "Anton", "Helvetica Neue Condensed", "Arial Narrow", "Impact", "Haettenschweiler", sans-serif;
+  --grot: "Archivo", "Helvetica Neue", "Helvetica", "Arial", sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; border-radius: 0 !important; }
+::selection { background: #000; color: #fff; }
+
+html, body { height: 100%; }
+body {
+  min-width: 1280px;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.4;
+  display: grid;
+  grid-template-rows: 52px 1fr 28px;
+  cursor: default;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: var(--paper);
+  border: var(--line);
+  cursor: pointer;
+  text-transform: uppercase;
+}
+button:hover { background: var(--ink); color: var(--paper); }
+button:active { outline: 4px solid #000; outline-offset: -6px; }
+
+.microlabel {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+/* ── TITLEBAR ─────────────────────────────────────────────── */
+#titlebar {
+  display: flex;
+  align-items: stretch;
+  border-bottom: var(--line);
+  padding-left: 84px; /* traffic-light zone */
+  position: relative;
+  background: var(--paper);
+  -webkit-app-region: drag;
+}
+#titlebar::before { /* traffic-light ghost sockets */
+  content: "";
+  position: absolute;
+  left: 16px; top: 50%;
+  width: 52px; height: 12px;
+  transform: translateY(-50%);
+  background:
+    radial-gradient(circle at 6px 6px,  #000 0 5px, transparent 5.5px),
+    radial-gradient(circle at 26px 6px, #000 0 5px, transparent 5.5px),
+    radial-gradient(circle at 46px 6px, #000 0 5px, transparent 5.5px);
+  background-repeat: no-repeat;
+  opacity: 1;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 20px 0 8px;
+  border-right: var(--line);
+  border-left: var(--line);
+}
+.brand-mark svg { display: block; }
+.brand-name {
+  font-family: var(--disp);
+  font-size: 34px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  transform: translateY(1px);
+}
+.brand-sub {
+  font-size: 9px;
+  letter-spacing: 0.32em;
+  font-weight: 700;
+  border: var(--hairline);
+  padding: 3px 6px 2px;
+  align-self: center;
+}
+.titlebar-gauges {
+  margin-left: auto;
+  display: flex;
+  align-items: stretch;
+}
+.gauge {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 16px;
+  border-left: var(--line);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+.gauge b { font-size: 16px; font-weight: 700; }
+.gdot { width: 10px; height: 10px; display: inline-block; border: 2px solid #000; }
+.g-live   { background: #000; }                        /* sessions: solid   */
+.g-queued { background: repeating-linear-gradient(45deg, #000 0 2px, #fff 2px 4px); } /* queued: hatched */
+.g-sent   { background: #fff; }                        /* sent: hollow      */
+.top-btn {
+  border: 0;
+  border-left: var(--line);
+  padding: 0 18px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  -webkit-app-region: no-drag;
+}
+.top-btn.update-ready {
+  background: #000;
+  color: #fff;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  animation: harshblink 1.2s steps(2, jump-none) infinite;
+}
+.top-btn.update-ready:hover { background: #fff; color: #000; }
+@keyframes harshblink {
+  0%, 49% { background: #000; color: #fff; }
+  50%, 100% { background: #fff; color: #000; }
+}
+/* ── APP FRAME ────────────────────────────────────────────── */
+#app {
+  display: grid;
+  grid-template-columns: 230px 1fr;
+  min-height: 0;
+}
+
+/* ── LEFT RAIL ────────────────────────────────────────────── */
+#rail {
+  border-right: var(--line);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--paper);
+}
+.rail-head {
+  border-bottom: var(--line);
+  padding: 14px 12px 10px;
+}
+.rail-title {
+  font-family: var(--disp);
+  font-size: 52px;
+  line-height: 0.86;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  word-break: break-word;
+}
+.rail-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+.btn-detect {
+  padding: 5px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+#attention-list {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.qcard {
+  border-bottom: var(--line);
+  padding: 10px 12px 12px;
+  position: relative;
+}
+.qcard-kind {
+  font-family: var(--disp);
+  font-size: 20px;
+  line-height: 1;
+  letter-spacing: 0.03em;
+  margin-bottom: 6px;
+}
+.qcard-session {
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  margin-bottom: 4px;
+}
+.qcard-msg { font-size: 10px; line-height: 1.5; }
+.qcard-msg code { font-family: var(--mono); border: var(--hairline); padding: 0 3px; }
+.qcard.q-urgent { background: #000; color: #fff; }
+.qcard.q-urgent .qcard-msg code { border-color: #fff; }
+.qcard.q-urgent .qcard-kind { text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 3px; }
+.qcard.q-info .qcard-kind { border-bottom: 3px solid #000; display: inline-block; padding-bottom: 2px; }
+.qcard.q-dead .qcard-kind { text-decoration: line-through; text-decoration-thickness: 3px; }
+.qcard:hover:not(.q-urgent) { background: #000; color: #fff; }
+.qcard:hover:not(.q-urgent) .qcard-msg code { border-color: #fff; }
+.qcard.q-urgent:hover { background: #fff; color: #000; }
+.qcard.q-urgent:hover .qcard-msg code { border-color: #000; }
+.qcard-index {
+  position: absolute;
+  top: 10px; right: 10px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+.rail-foot {
+  border-top: var(--line);
+  padding: 10px 12px;
+}
+.pathlink {
+  border: 0;
+  padding: 2px 0;
+  font-size: 11px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-align: left;
+  display: block;
+  margin-top: 4px;
+}
+
+/* ── WORKSPACE / SESSION TABS ─────────────────────────────── */
+#workspace {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+#session-tabs {
+  display: flex;
+  align-items: stretch;
+  border-bottom: var(--line);
+  height: 42px;
+  flex: none;
+}
+.session-tab {
+  border: 0;
+  border-right: var(--line);
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.session-tab.active {
+  background: #000;
+  color: #fff;
+}
+.session-tab.active:hover { background: #fff; color: #000; }
+.tabdot { width: 9px; height: 9px; display: inline-block; border: 2px solid currentColor; flex: none; }
+.tabdot.live { background: currentColor; }
+.tabdot.dead { background: transparent; position: relative; }
+.tabdot.dead::after {
+  content: "";
+  position: absolute; inset: -2px;
+  background: linear-gradient(to top right, transparent calc(50% - 1px), currentColor calc(50% - 1px) calc(50% + 1px), transparent calc(50% + 1px));
+}
+.tab-badge {
+  background: currentColor;
+  min-width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  padding: 0 3px;
+}
+.session-tab .tab-badge { color: #fff; background: #000; border: 1px solid #000; }
+.session-tab.active .tab-badge { color: #000; background: #fff; border: 1px solid #fff; }
+.session-tab.active:hover .tab-badge { color: #fff; background: #000; border-color: #000; }
+.add-tab {
+  font-family: var(--grot);
+  font-size: 20px;
+  font-weight: 800;
+  padding: 0 18px;
+}
+.tabs-spacer {
+  flex: 1;
+  background: repeating-linear-gradient(-45deg, #fff 0 9px, #000 9px 11px);
+  border-left: 0;
+}
+/* ── STAGE — SPLIT VIEW ───────────────────────────────────── */
+#stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
+.pane-head {
+  height: 34px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px;
+  border-bottom: var(--line);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.pane-head .cwd {
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* terminal pane — full inversion block */
+#terminal-pane {
+  flex: 0 1 46%;
+  min-width: 380px;
+  display: flex;
+  flex-direction: column;
+}
+#terminal-pane .pane-head { background: #000; color: #fff; border-bottom: 2px solid #000; }
+.term-body {
+  flex: 1;
+  min-height: 0;
+  background: #000;
+  color: #fff;
+  padding: 16px 16px 12px;
+  font-size: 12px;
+  line-height: 1.75;
+  overflow: hidden;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.term-body .t-glyph { font-weight: 700; }
+.term-body .t-user  { background: #fff; color: #000; padding: 1px 4px; font-weight: 700; }
+.term-body .t-dim   { opacity: 1; }
+.term-body .t-del   { text-decoration: line-through; }
+.term-body .t-add   { text-decoration: underline; text-underline-offset: 3px; font-weight: 700; }
+.term-body .t-ok    { border: 1px solid #fff; padding: 0 5px; font-weight: 700; }
+.term-body .t-path  { float: right; font-size: 10px; }
+.caret {
+  display: inline-block;
+  width: 9px; height: 15px;
+  background: #fff;
+  vertical-align: text-bottom;
+  animation: caretblink 1s steps(2, jump-none) infinite;
+}
+@keyframes caretblink { 0%,49% { opacity: 1; } 50%,100% { opacity: 0; } }
+
+/* divider */
+#divider {
+  flex: 0 0 8px;
+  background: #000;
+  position: relative;
+  cursor: col-resize;
+}
+#divider::after {
+  content: "";
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 2px; height: 56px;
+  transform: translate(-50%, -50%);
+  background: repeating-linear-gradient(to bottom, #fff 0 4px, transparent 4px 8px);
+}
+
+/* browser pane */
+#browser-pane {
+  flex: 1;
+  min-width: 630px;
+  display: flex;
+  flex-direction: column;
+}
+#browser-toolbar {
+  height: 40px;
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  border-bottom: var(--line);
+}
+.nav-btn {
+  border: 0;
+  border-right: var(--line);
+  width: 30px;
+  font-size: 12px;
+  font-weight: 700;
+  flex: none;
+}
+.url-bar {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  font-size: 11px;
+  letter-spacing: 0;
+  border-right: var(--line);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.url-bar b { font-weight: 700; }
+.tool-btn {
+  border: 0;
+  border-right: var(--line);
+  padding: 0 10px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  white-space: nowrap;
+}
+.tool-btn.primary { background: #000; color: #fff; }
+.tool-btn.primary:hover { background: #fff; color: #000; }
+.tool-btn .tab-badge { background: #000; color: #fff; border: 1px solid #000; }
+.tool-btn:hover .tab-badge { background: #fff; color: #000; border-color: #fff; }
+.console-chip {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  border-right: var(--line);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.tool-btn.last { border-right: 0; }
+
+/* fake rendered checkout page (grayscale light commerce) */
+#browser-view {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+  background: #fff;
+  /* the one place a gray is unavoidable: page canvas vs card */
+  background: repeating-linear-gradient(0deg, #f2f2f2 0 1px, #fafafa 1px 24px);
+}
+.webpage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 42px;
+  font-family: var(--grot);
+  color: #1a1a1a;
+}
+.shop-card {
+  width: 380px;
+  background: #fff;
+  border: 1px solid #d9d9d9;
+  padding: 26px 28px 28px;
+}
+.shop-eyebrow { font-size: 10px; letter-spacing: 0.22em; color: #8a8a8a; text-transform: uppercase; margin-bottom: 6px; }
+.shop-title { font-size: 21px; font-weight: 800; margin-bottom: 18px; letter-spacing: -0.01em; }
+.shop-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 9px 0;
+  border-bottom: 1px solid #ececec;
+  color: #3c3c3c;
+}
+.shop-row.total { border-bottom: 0; font-weight: 800; color: #111; font-size: 15px; padding-top: 14px; }
+.shop-cta {
+  width: 100%;
+  max-width: 480px;
+  margin-top: 18px;
+  padding: 13px 0;
+  background: #111;
+  color: #fff;
+  border: 1px solid #111;
+  font-family: var(--grot);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  cursor: pointer;
+}
+.shop-cta:hover { background: #fff; color: #111; }
+.shop-secure { text-align: center; font-size: 10px; color: #9a9a9a; margin-top: 12px; letter-spacing: 0.06em; }
+.refresh-chip {
+  position: absolute;
+  top: 12px; right: 12px;
+  background: #000;
+  color: #fff;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  padding: 5px 9px 4px;
+  animation: harshblink 1.6s steps(2, jump-none) infinite;
+}
+/* ── STATUS BAR ───────────────────────────────────────────── */
+#statusbar {
+  display: flex;
+  align-items: stretch;
+  border-top: var(--line);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  overflow: hidden;
+}
+.sb-left, .sb-right { display: flex; align-items: center; }
+.sb-left { padding-left: 12px; gap: 8px; }
+.sb-left .microlabel { font-size: 8px; }
+.sb-val { font-weight: 700; }
+.sb-sep { width: 2px; height: 100%; background: #000; margin: 0 8px; align-self: stretch; }
+.sb-right { margin-left: auto; }
+.sb-btn {
+  border: 0;
+  border-left: var(--line);
+  padding: 0 14px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  align-self: stretch;
+}
+.sb-ver {
+  border-left: var(--line);
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  font-weight: 700;
+}
+
+/* ── CORNER TAG ───────────────────────────────────────────── */
+#corner-tag {
+  position: fixed;
+  right: 0;
+  bottom: 28px;
+  background: #000;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  padding: 6px 10px 5px 12px;
+  z-index: 60;
+  pointer-events: none;
+}
+
+/* ── CAPTURE MODAL ────────────────────────────────────────── */
+#overlay-capture {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.62);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+#overlay-capture.open { display: flex; }
+.modal {
+  width: 880px;
+  max-width: calc(100vw - 80px);
+  max-height: calc(100vh - 80px);
+  background: #fff;
+  border: 3px solid #000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.modal-head {
+  display: flex;
+  align-items: stretch;
+  border-bottom: var(--line);
+  flex: none;
+}
+.modal-title {
+  font-family: var(--disp);
+  font-size: 30px;
+  line-height: 1;
+  padding: 8px 14px 6px;
+  letter-spacing: 0.02em;
+}
+.modal-head .microlabel { align-self: center; margin-left: 4px; }
+.modal-x {
+  margin-left: auto;
+  border: 0;
+  border-left: var(--line);
+  width: 46px;
+  font-size: 16px;
+  font-weight: 700;
+}
+.modal-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 0;
+  overflow: hidden;
+}
+.modal-col { padding: 14px; min-width: 0; overflow: hidden; }
+.modal-col.left { border-right: var(--line); }
+.sum-row {
+  display: grid;
+  grid-template-columns: 86px 1fr;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: var(--hairline);
+  font-size: 11px;
+  align-items: baseline;
+}
+.sum-row .microlabel { font-size: 8px; }
+.sum-row b { font-weight: 700; }
+.field-label { margin: 14px 0 6px; display: block; }
+.note-area {
+  width: 100%;
+  height: 74px;
+  border: var(--line);
+  background: #fff;
+  color: #000;
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 8px;
+  resize: none;
+}
+.note-area::placeholder { color: #000; opacity: 1; font-style: italic; }
+.note-area:focus { outline: 3px solid #000; outline-offset: 0; }
+.target-select {
+  width: 100%;
+  border: var(--line);
+  background: #fff;
+  color: #000;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 8px;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: linear-gradient(45deg, transparent 49%, #000 50%), linear-gradient(-45deg, transparent 49%, #000 50%);
+  background-position: calc(100% - 18px) 55%, calc(100% - 12px) 55%;
+  background-size: 6px 6px;
+  background-repeat: no-repeat;
+}
+.shot-box {
+  margin-top: 14px;
+  height: 108px;
+  border: var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 6px;
+  background: repeating-linear-gradient(-45deg, #fff 0 12px, #000 12px 13px);
+}
+.shot-box span {
+  background: #fff;
+  border: var(--line);
+  padding: 4px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+.yaml-block {
+  border: var(--line);
+  background: #000;
+  color: #fff;
+  padding: 12px 14px;
+  font-size: 11px;
+  line-height: 1.8;
+  white-space: pre;
+  overflow: auto;
+  height: calc(100% - 24px);
+}
+.yaml-block .y-key { font-weight: 700; }
+.modal-foot {
+  border-top: var(--line);
+  display: flex;
+  align-items: stretch;
+  height: 44px;
+  flex: none;
+}
+.modal-foot .foot-note {
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  border-right: var(--line);
+}
+.btn-cancel {
+  border: 0;
+  border-right: var(--line);
+  padding: 0 22px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+.btn-send {
+  margin-left: auto;
+  border: 0;
+  border-left: var(--line);
+  background: #000;
+  color: #fff;
+  padding: 0 26px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+.btn-send:hover { background: #fff; color: #000; }
+
+/* ── REDUCED MOTION ───────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- ══ TITLEBAR ══ -->
+<header id="titlebar">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 64 64" width="30" height="30">
+        <path d="M22 16 L46 32 L22 48" fill="none" stroke="#000" stroke-width="3" />
+        <rect x="14" y="8"  width="16" height="16" fill="#000" />
+        <rect x="38" y="24" width="16" height="16" fill="#fff" stroke="#000" stroke-width="3" />
+        <rect x="14" y="40" width="16" height="16" fill="#fff" stroke="#000" stroke-width="3" />
+        <line x1="14" y1="40" x2="30" y2="56" stroke="#000" stroke-width="3" />
+        <line x1="30" y1="40" x2="14" y2="56" stroke="#000" stroke-width="3" />
+      </svg>
+    </span>
+    <span class="brand-name">CHROMUX</span>
+    <span class="brand-sub">AGENT&nbsp;COCKPIT</span>
+  </div>
+  <div class="titlebar-gauges">
+    <span class="gauge"><i class="gdot g-live"></i><b>3</b>&nbsp;SESSIONS</span>
+    <span class="gauge"><i class="gdot g-queued"></i><b>2</b>&nbsp;QUEUED</span>
+    <span class="gauge"><i class="gdot g-sent"></i><b>14</b>&nbsp;SENT</span>
+    <button class="top-btn update-ready">UPDATE READY</button>
+    <button class="top-btn">SETTINGS</button>
+  </div>
+</header>
+
+<!-- ══ APP FRAME ══ -->
+<div id="app">
+
+  <!-- left rail -->
+  <aside id="rail">
+    <div class="rail-head">
+      <div class="rail-title">Attention<br>Queue</div>
+      <div class="rail-head-row">
+        <span class="microlabel">3 ITEMS</span>
+        <button class="btn-detect">⛶ DETECT</button>
+      </div>
+    </div>
+    <div id="attention-list">
+      <div class="qcard q-urgent">
+        <span class="qcard-index">01</span>
+        <div class="qcard-kind">Approval</div>
+        <div class="qcard-session">checkout-flow</div>
+        <div class="qcard-msg">claude wants to run <code>npm run db:migrate</code></div>
+      </div>
+      <div class="qcard q-info">
+        <span class="qcard-index">02</span>
+        <div class="qcard-kind">Preview</div>
+        <div class="qcard-session">landing-page</div>
+        <div class="qcard-msg">localhost:5173 changed — review ready</div>
+      </div>
+      <div class="qcard q-dead">
+        <span class="qcard-index">03</span>
+        <div class="qcard-kind">Exited</div>
+        <div class="qcard-session">api-server</div>
+        <div class="qcard-msg">codex exited (code 0) · 12m ago</div>
+      </div>
+    </div>
+    <div class="rail-foot">
+      <span class="microlabel">LOCAL STORAGE</span>
+      <button class="pathlink">~/.chromux/captures</button>
+    </div>
+  </aside>
+
+  <!-- workspace -->
+  <div id="workspace">
+
+    <!-- session tab strip -->
+    <nav id="session-tabs" aria-label="Session tabs">
+      <button class="session-tab active">
+        <i class="tabdot live"></i> checkout-flow · claude <span class="tab-badge">2</span>
+      </button>
+      <button class="session-tab">
+        <i class="tabdot live"></i> landing-page · grok
+      </button>
+      <button class="session-tab">
+        <i class="tabdot dead"></i> api-server · codex
+      </button>
+      <button class="session-tab add-tab" aria-label="New session">+</button>
+      <div class="tabs-spacer" aria-hidden="true"></div>
+    </nav>
+
+    <!-- stage -->
+    <main id="stage">
+
+      <!-- terminal pane -->
+      <section id="terminal-pane">
+        <div class="pane-head">
+          <span>TERMINAL — CLAUDE</span>
+          <span class="cwd">~/projects/shop/checkout-flow</span>
+        </div>
+        <div class="term-body"><span class="t-glyph">✻</span> Welcome to Claude Code!<span class="t-path">/projects/shop/checkout-flow</span>
+
+<span class="t-user">&gt; fix the CTA overflow on the checkout page</span>
+
+<span class="t-glyph">●</span> I'll look at the checkout component styles.
+<span class="t-glyph">●</span> Read src/components/CheckoutCTA.tsx (84 lines)
+<span class="t-glyph">●</span> Edit src/styles/checkout.css
+  <span class="t-del">- .cta-row { width: 120%; }</span>
+  <span class="t-add">+ .cta-row { width: 100%; max-width: 480px; }</span>
+<span class="t-ok">✔ Change applied — dev server reloaded</span>
+<span class="t-glyph">●</span> The button no longer overflows. Preview updated on the right.
+
+<span class="caret"></span> awaiting your next instruction…</div>
+      </section>
+
+      <!-- divider -->
+      <div id="divider" role="separator" aria-orientation="vertical"></div>
+
+      <!-- browser pane -->
+      <section id="browser-pane">
+        <div id="browser-toolbar">
+          <button class="nav-btn" aria-label="Back">←</button>
+          <button class="nav-btn" aria-label="Forward">→</button>
+          <button class="nav-btn" aria-label="Reload">↻</button>
+          <div class="url-bar">http://<b>localhost:5173</b>/checkout</div>
+          <button class="tool-btn primary" id="btn-capture">⛶ CAPTURE</button>
+          <button class="tool-btn">QUEUE <span class="tab-badge">2</span></button>
+          <div class="console-chip">CONSOLE: 0</div>
+          <button class="tool-btn last">⌄ COLLAPSE</button>
+        </div>
+        <div id="browser-view">
+          <div class="webpage">
+            <div class="shop-card">
+              <div class="shop-eyebrow">Order Summary</div>
+              <div class="shop-title">Your cart — 2 items</div>
+              <div class="shop-row"><span>Mono Tee — Black / M</span><span>$24.00</span></div>
+              <div class="shop-row"><span>Grid Socks — 3 pack</span><span>$18.00</span></div>
+              <div class="shop-row"><span>Shipping</span><span>$6.00</span></div>
+              <div class="shop-row total"><span>Total</span><span>$48.00</span></div>
+              <button class="shop-cta">Pay $48.00</button>
+              <div class="shop-secure">SECURE CHECKOUT — TEST MODE</div>
+            </div>
+          </div>
+          <div class="refresh-chip">REFRESHED</div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- ══ STATUS BAR ══ -->
+<footer id="statusbar">
+  <div class="sb-left">
+    <span class="microlabel">ADAPTER</span><span class="sb-val">claude -p · one-off</span>
+    <span class="sb-sep"></span>
+    <span class="microlabel">PAIRING</span><span class="sb-val">1:1 session ↔ pane</span>
+  </div>
+  <div class="sb-right">
+    <button class="sb-btn">DELIVERY LOG</button>
+    <span class="sb-ver">chromux 0.17.0 — brutalist mono concept</span>
+  </div>
+</footer>
+
+<!-- corner tag -->
+<div id="corner-tag">VAR 10 — BRUTALIST MONO</div>
+
+<!-- ══ CAPTURE MODAL ══ -->
+<div id="overlay-capture" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Capture">
+    <div class="modal-head">
+      <span class="modal-title">Capture</span>
+      <span class="microlabel">→ CLAUDE -P</span>
+      <button class="modal-x" id="btn-modal-close" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-col left">
+        <div class="sum-row"><span class="microlabel">SESSION</span><b>checkout-flow · claude</b></div>
+        <div class="sum-row"><span class="microlabel">URL</span><b>localhost:5173/checkout</b></div>
+        <div class="sum-row"><span class="microlabel">SELECTION</span><b>"CTA button region 412×88"</b></div>
+        <label class="microlabel field-label" for="capture-note">NOTE</label>
+        <textarea class="note-area" id="capture-note" placeholder="e.g. the CTA button overflows its container — fix the CSS"></textarea>
+        <label class="microlabel field-label" for="capture-target">TARGET</label>
+        <select class="target-select" id="capture-target">
+          <option>checkout-flow · claude -p</option>
+        </select>
+        <div class="shot-box"><span>SCREENSHOT — 412×88 REGION</span></div>
+      </div>
+      <div class="modal-col right">
+        <span class="microlabel">PAYLOAD PREVIEW — YAML V1</span>
+        <div class="yaml-block" style="margin-top:6px;"><span class="y-key">chromux_capture:</span> v1
+<span class="y-key">session:</span> checkout-flow
+<span class="y-key">agent:</span> claude
+<span class="y-key">url:</span> http://localhost:5173/checkout
+<span class="y-key">note:</span> CTA overflows container
+<span class="y-key">screenshot:</span> ~/.chromux/captures/2026-07-11-0142.png
+<span class="y-key">console_errors:</span> []</div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel" id="btn-modal-cancel">CANCEL</button>
+      <span class="foot-note">FILE-DROP ONLY</span>
+      <button class="btn-send">SEND — CLAUDE -P</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var overlay = document.getElementById('overlay-capture');
+  var openBtn = document.getElementById('btn-capture');
+
+  function openModal() {
+    overlay.classList.add('open');
+    overlay.setAttribute('aria-hidden', 'false');
+  }
+  function closeModal() {
+    overlay.classList.remove('open');
+    overlay.setAttribute('aria-hidden', 'true');
+  }
+
+  openBtn.addEventListener('click', openModal);
+  document.getElementById('btn-modal-close').addEventListener('click', closeModal);
+  document.getElementById('btn-modal-cancel').addEventListener('click', closeModal);
+  overlay.addEventListener('click', function (e) {
+    if (e.target === overlay) closeModal();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeModal();
+  });
+
+  // headless screenshot hook: ?modal=1 auto-opens the capture modal
+  if (/[?&]modal=1(&|$)/.test(location.search)) openModal();
+})();
+</script>
+</body>
+</html>

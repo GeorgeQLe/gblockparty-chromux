@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Chromux — Atelier</title>
+<style>
+/* ============================================================
+   CHROMUX · ATELIER — warm studio craft, calm light workspace
+   ceramic, linen and wood — not metal and glass
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Nunito:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
+
+:root{
+  /* pigments */
+  --linen:        #f4eee1;   /* canvas */
+  --linen-deep:   #ece4d1;   /* recessed trays */
+  --paper:        #fbf7ec;   /* cards */
+  --paper-warm:   #f8f2e3;
+  --clay:         #e9dfcb;   /* panel tint */
+  --clay-line:    #ddd1b8;   /* hairlines */
+  --ink:          #3a332b;   /* text — never pure black */
+  --ink-soft:     #6d6353;
+  --ink-faint:    #a2967f;
+  --terracotta:   #c26d4f;   /* primary action */
+  --terracotta-deep:#a9532f;
+  --terracotta-soft:#f0d9cd;
+  --sage:         #7d9678;   /* live / healthy */
+  --sage-deep:    #59775a;
+  --sage-soft:    #e2e9da;
+  --marigold:     #cf9a3b;   /* attention */
+  --marigold-deep:#a87a24;
+  --marigold-soft:#f3e5c4;
+  --brick:        #ad5c4c;   /* errors / exited */
+  --brick-soft:   #ecd6cd;
+  --teal:         #6d93a0;   /* info / sent */
+  --teal-soft:    #dbe6e5;
+  --espresso:     #2e2822;   /* terminal chalkboard */
+  --espresso-head:#3a332b;
+  --espresso-line:#4a4136;
+  --cream-mono:   #efe5cf;   /* terminal text */
+  --cream-dim:    #a89b82;
+
+  --font-display:'Fraunces','Iowan Old Style','Hoefler Text',Georgia,serif;
+  --font-ui:'Nunito','Avenir Next Rounded','Avenir Next','Avenir','Optima',sans-serif;
+  --font-mono:'SF Mono',Menlo,Monaco,'Courier New',monospace;
+
+  --shadow-card: 0 1px 2px rgba(96,74,44,.06), 0 6px 18px rgba(96,74,44,.09);
+  --shadow-lift: 0 2px 4px rgba(96,74,44,.08), 0 14px 34px rgba(96,74,44,.14);
+  --shadow-deep: 0 3px 8px rgba(60,44,24,.16), 0 22px 54px rgba(60,44,24,.22);
+  --r-lg:16px; --r-md:12px; --r-sm:8px;
+}
+
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  min-width:1280px; height:100vh; overflow:hidden;
+  display:flex; flex-direction:column;
+  background:var(--linen); color:var(--ink);
+  font-family:var(--font-ui); font-size:13px; line-height:1.45;
+  -webkit-font-smoothing:antialiased; position:relative;
+}
+/* linen weave — fine cross-hatch + a breath of fibre noise */
+body::before{
+  content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background:
+    repeating-linear-gradient(0deg,  rgba(120,96,60,.035) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(120,96,60,.028) 0 1px, transparent 1px 3px);
+}
+body::after{
+  content:''; position:fixed; inset:0; z-index:0; pointer-events:none; opacity:.05;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+button{font-family:inherit; color:inherit; background:none; border:none; cursor:pointer;}
+.hidden{display:none !important;}
+
+/* ── settle-in on load ─────────────────────────────────── */
+@keyframes settle{from{opacity:0; transform:translateY(9px);} to{opacity:1; transform:none;}}
+.settle{animation:settle .55s cubic-bezier(.22,.9,.32,1) both; animation-delay:var(--d,0s);}
+
+/* ============================================================
+   1 · TITLEBAR — the shelf above the desk
+   ============================================================ */
+#titlebar{
+  position:relative; z-index:5; flex:none; height:46px;
+  display:flex; align-items:center; gap:18px;
+  padding:0 14px 0 84px;               /* traffic-light gutter */
+  background:linear-gradient(to bottom, #f8f3e7, #f2ebdb);
+  border-bottom:1px solid var(--clay-line);
+  -webkit-app-region:drag;
+}
+#titlebar button{-webkit-app-region:no-drag;}
+.brand{display:flex; align-items:baseline; gap:9px;}
+.brand-mark{align-self:center; display:grid; place-items:center; transform:rotate(-4deg);}
+.brand-name{
+  font-family:var(--font-display); font-weight:600; font-size:16.5px;
+  letter-spacing:.01em; color:var(--ink);
+}
+.brand-sub{font-size:11px; color:var(--ink-faint); font-style:italic; font-family:var(--font-display);}
+.titlebar-spacer{flex:1;}
+
+/* gauges as little glazed beans */
+.gauges{display:flex; gap:8px; align-items:center;}
+.gauge{
+  display:flex; align-items:center; gap:6px; padding:4px 12px 5px;
+  background:var(--paper); border:1px solid var(--clay-line);
+  border-radius:11px 15px 12px 16px / 15px 11px 16px 12px;   /* bean */
+  box-shadow:0 1px 2px rgba(96,74,44,.07);
+  font-size:12px; color:var(--ink-soft);
+}
+.gauge b{font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums;}
+.gdot{width:7px; height:7px; border-radius:50%; flex:none;}
+.g-sage{background:var(--sage); box-shadow:0 0 0 3px var(--sage-soft);}
+.g-marigold{background:var(--marigold); box-shadow:0 0 0 3px var(--marigold-soft);}
+.g-teal{background:var(--teal); box-shadow:0 0 0 3px var(--teal-soft);}
+
+.top-btn{
+  padding:5px 14px 6px; border-radius:999px; font-size:12px; font-weight:700;
+  border:1px solid var(--clay-line); background:var(--paper); color:var(--ink-soft);
+  transition:transform .18s ease, box-shadow .18s ease, background .18s ease;
+}
+.top-btn:hover{transform:translateY(-1px); box-shadow:var(--shadow-card); background:var(--paper-warm); color:var(--ink);}
+.top-btn.update{
+  background:var(--terracotta); border-color:var(--terracotta-deep); color:#fdf6ec;
+  box-shadow:0 2px 6px rgba(169,83,47,.28);
+}
+.top-btn.update:hover{background:var(--terracotta-deep); box-shadow:0 4px 12px rgba(169,83,47,.34);}
+
+/* ============================================================
+   2 · APP FRAME
+   ============================================================ */
+#app{position:relative; z-index:1; flex:1; display:flex; min-height:0;}
+
+/* ============================================================
+   3 · LEFT RAIL — the pinboard
+   ============================================================ */
+#rail{
+  flex:none; width:232px; display:flex; flex-direction:column; min-height:0;
+  padding:14px 12px 10px;
+  background:linear-gradient(to right, #efe8d7, #f1ead9);
+  border-right:1px solid var(--clay-line);
+}
+.rail-head{display:flex; align-items:center; justify-content:space-between; margin:0 2px 12px;}
+.rail-title{
+  font-family:var(--font-display); font-size:13.5px; font-weight:600; color:var(--ink);
+}
+.rail-title .mark{color:var(--terracotta); font-weight:400;}
+.btn-detect{
+  font-size:11.5px; font-weight:700; color:var(--ink-soft);
+  padding:3px 10px 4px; border-radius:999px;
+  border:1px dashed var(--ink-faint); background:transparent;
+  transition:all .18s ease;
+}
+.btn-detect:hover{border-style:solid; border-color:var(--terracotta); color:var(--terracotta-deep); background:var(--paper);}
+
+#attention-list{flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column; gap:10px;}
+
+/* paper notes with a folded corner tinted per kind */
+.note{
+  --fold:var(--clay); --dot:var(--ink-faint);
+  position:relative; overflow:hidden;
+  background:var(--paper); border:1px solid rgba(160,140,100,.24);
+  border-radius:10px 13px 11px 12px;
+  padding:9px 11px 10px 12px;
+  box-shadow:var(--shadow-card);
+  cursor:pointer;
+  transition:transform .2s ease, box-shadow .2s ease;
+}
+.note:hover{transform:translateY(-2px) rotate(-.35deg); box-shadow:var(--shadow-lift);}
+.note::before{  /* dog-ear fold */
+  content:''; position:absolute; top:-1px; right:-1px; width:17px; height:17px;
+  background:linear-gradient(225deg, #efe8d7 0 50%, var(--fold) 50% 100%);
+  border-bottom-left-radius:7px;
+  box-shadow:-1.5px 1.5px 2.5px rgba(96,74,44,.18);
+}
+.note-kind{
+  display:flex; align-items:center; gap:6px;
+  font-size:10.5px; font-weight:800; letter-spacing:.04em;
+  margin-bottom:3px;
+}
+.note-kind i{width:8px; height:8px; border-radius:50%; background:var(--dot); flex:none;
+  box-shadow:inset 0 -1px 1px rgba(60,40,20,.25);}
+.note.k-approval{--fold:#e5c19c; --dot:var(--marigold);}
+.note.k-approval .note-kind{color:var(--marigold-deep);}
+.note.k-approval{border-left:3px solid var(--marigold);}
+.note.k-preview{--fold:#c4d4d3; --dot:var(--teal);}
+.note.k-preview .note-kind{color:#527886;}
+.note.k-preview{border-left:3px solid var(--teal);}
+.note.k-exited{--fold:#dcc0b4; --dot:var(--brick);}
+.note.k-exited .note-kind{color:var(--brick);}
+.note.k-exited{border-left:3px solid var(--brick); opacity:.85;}
+.note-session{font-family:var(--font-display); font-size:12.5px; font-weight:600; color:var(--ink); margin-bottom:2px;}
+.note-body{font-size:11.5px; color:var(--ink-soft); line-height:1.4;}
+.note-body code{font-family:var(--font-mono); font-size:10.5px; background:var(--linen-deep);
+  padding:1px 4px; border-radius:4px; color:var(--terracotta-deep);}
+
+.rail-foot{flex:none; margin-top:12px; padding:9px 3px 2px; border-top:1px dashed var(--clay-line);}
+.rail-foot-label{font-size:10.5px; color:var(--ink-faint); font-weight:700; letter-spacing:.03em;}
+.pathlink{
+  display:block; margin-top:2px; font-family:var(--font-mono); font-size:11px;
+  color:var(--terracotta-deep); text-align:left; padding:0;
+  text-decoration:underline dotted rgba(194,109,79,.5); text-underline-offset:3px;
+}
+.pathlink:hover{color:var(--terracotta); text-decoration-style:solid;}
+
+/* ============================================================
+   4 · WORKSPACE + SESSION TAB TRAY
+   ============================================================ */
+#workspace{flex:1; display:flex; flex-direction:column; min-width:0; min-height:0;}
+#session-tabs{
+  flex:none; display:flex; align-items:center; gap:8px;
+  margin:12px 16px 0; padding:6px;
+  background:var(--linen-deep); border:1px solid var(--clay-line);
+  border-radius:999px;
+  box-shadow:inset 0 1.5px 4px rgba(96,74,44,.09);
+}
+.session-tab{
+  position:relative; display:flex; align-items:center; gap:7px;
+  padding:6px 15px 7px; border-radius:999px;
+  font-size:12.5px; font-weight:600; color:var(--ink-soft);
+  border:1px solid transparent;
+  transition:all .18s ease;
+}
+.session-tab:hover{background:rgba(251,247,236,.65); color:var(--ink);}
+.session-tab.active{
+  background:var(--paper); color:var(--ink); border-color:var(--clay-line);
+  box-shadow:0 2px 6px rgba(96,74,44,.13);
+}
+.session-tab .agent{color:var(--ink-faint); font-weight:500; font-style:italic;}
+.session-tab.active .agent{color:var(--terracotta-deep);}
+/* hand-drawn squiggle under the active tab label */
+.session-tab.active .tab-label{
+  padding-bottom:5px;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='5' viewBox='0 0 28 5'%3E%3Cpath d='M1 3 Q4.5 0.6 8 3 T15 3 T22 3 T28 3' fill='none' stroke='%23c26d4f' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") repeat-x left bottom;
+}
+.tdot{width:7px; height:7px; border-radius:50%; flex:none;}
+.tdot.live{background:var(--sage); box-shadow:0 0 0 2.5px var(--sage-soft);}
+.tdot.dead{background:var(--brick); box-shadow:0 0 0 2.5px var(--brick-soft);}
+.tab-badge{
+  min-width:17px; height:17px; padding:0 5px; border-radius:999px;
+  display:grid; place-items:center;
+  background:var(--marigold); color:#453309;
+  font-size:10.5px; font-weight:800;
+  box-shadow:0 1px 2px rgba(96,74,44,.25);
+  animation:wiggle 7s ease-in-out infinite;
+  transform-origin:50% 40%;
+}
+@keyframes wiggle{
+  0%,88%,100%{transform:rotate(0);}
+  90%{transform:rotate(-9deg);} 92.5%{transform:rotate(8deg);}
+  95%{transform:rotate(-5deg);} 97.5%{transform:rotate(3deg);}
+}
+.add-tab{
+  width:28px; height:28px; padding:0; border-radius:50%;
+  display:grid; place-items:center; font-size:16px; font-weight:600;
+  color:var(--ink-faint); border:1px dashed var(--ink-faint);
+  transition:all .18s ease;
+}
+.add-tab:hover{color:var(--terracotta-deep); border-color:var(--terracotta); border-style:solid; background:var(--paper); transform:rotate(90deg);}
+
+/* ============================================================
+   5 · STAGE — split view on the desk
+   ============================================================ */
+#stage{flex:1; display:flex; min-height:0; padding:12px 16px 10px; gap:0;}
+
+/* ── terminal pane — the chalkboard ── */
+#terminal-pane{
+  flex:0 0 45%; min-width:0; display:flex; flex-direction:column;
+  background:var(--espresso); border-radius:var(--r-lg);
+  border:1px solid #241f19;
+  box-shadow:var(--shadow-lift), inset 0 1px 0 rgba(239,229,207,.06);
+  overflow:hidden;
+}
+.term-head{
+  flex:none; display:flex; align-items:baseline; gap:10px;
+  padding:9px 16px 8px;
+  background:var(--espresso-head); border-bottom:1px solid var(--espresso-line);
+}
+.term-title{font-family:var(--font-display); font-size:12.5px; font-weight:600; color:var(--cream-mono);}
+.term-title em{font-style:italic; color:var(--terracotta); font-weight:500;}
+.term-cwd{margin-left:auto; font-family:var(--font-mono); font-size:10.5px; color:var(--cream-dim);}
+.term-body{
+  flex:1; min-height:0; overflow:hidden;
+  padding:14px 18px; font-family:var(--font-mono); font-size:12px; line-height:1.75;
+  color:var(--cream-mono);
+}
+.t-line{white-space:pre-wrap;}
+.t-welcome .spark{color:var(--marigold);}
+.t-welcome .path{float:right; color:var(--cream-dim); font-size:10.5px;}
+.t-user{color:#f3ead8; font-weight:600;}
+.t-user .caret{color:var(--terracotta);}
+.t-agent .bullet{color:var(--terracotta);}
+.t-agent{color:#ded2b8;}
+.t-agent .file{color:var(--cream-mono);}
+.t-agent .meta{color:var(--cream-dim);}
+.t-del{color:#d99a87; background:rgba(173,92,76,.16); border-radius:3px;}
+.t-add{color:#b5cf9e; background:rgba(125,150,120,.18); border-radius:3px;}
+.t-ok{color:#a4c294;}
+.t-ok .check{color:var(--sage);}
+.t-await{color:var(--cream-dim); font-style:italic;}
+.cursor{
+  display:inline-block; width:8px; height:15px; margin-right:7px;
+  vertical-align:text-bottom; border-radius:2px;
+  background:var(--terracotta);
+  animation:breathe 1.6s ease-in-out infinite;
+}
+@keyframes breathe{0%,100%{opacity:1;} 50%{opacity:.25;}}
+
+/* ── divider — a wooden batten ── */
+#divider{
+  flex:none; width:6px; margin:0 5px; cursor:col-resize; border-radius:3px;
+  background:linear-gradient(to bottom, transparent 12%, var(--clay-line) 12% 88%, transparent 88%);
+  position:relative; transition:background .18s ease;
+}
+#divider::after{
+  content:''; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+  width:2px; height:26px; border-radius:2px;
+  background:repeating-linear-gradient(to bottom, var(--ink-faint) 0 2px, transparent 2px 6px);
+}
+#divider:hover{background:linear-gradient(to bottom, transparent 8%, var(--terracotta-soft) 8% 92%, transparent 92%);}
+
+/* ── browser pane — a paper card with a tab label ── */
+#browser-pane{
+  flex:1; min-width:0; display:flex; flex-direction:column; position:relative;
+  margin-top:9px;
+  background:var(--paper); border:1px solid var(--clay-line);
+  border-radius:var(--r-lg); box-shadow:var(--shadow-lift);
+}
+.paper-tab{
+  position:absolute; top:-9px; left:22px; z-index:2;
+  padding:2px 12px 3px; font-size:10px; font-weight:800; letter-spacing:.05em;
+  color:var(--ink-soft); background:var(--clay);
+  border:1px solid var(--clay-line); border-radius:6px 6px 0 0;
+  transform:rotate(-1.2deg); box-shadow:0 -1px 2px rgba(96,74,44,.06);
+}
+.browser-toolbar{
+  flex:none; display:flex; align-items:center; gap:5px;
+  padding:9px 10px; border-bottom:1px solid var(--clay-line);
+  background:var(--paper-warm); border-radius:var(--r-lg) var(--r-lg) 0 0;
+}
+.nav-btn{
+  width:24px; height:24px; border-radius:50%; display:grid; place-items:center;
+  font-size:11px; color:var(--ink-soft); border:1px solid var(--clay-line); background:var(--paper);
+  transition:all .16s ease;
+}
+.nav-btn:hover{color:var(--ink); box-shadow:var(--shadow-card); transform:translateY(-1px);}
+.nav-btn:disabled{opacity:.4; cursor:default;}
+.url-bar{
+  flex:1; min-width:176px; display:flex; align-items:center; gap:5px;
+  padding:5px 10px 6px; border-radius:999px;
+  background:var(--linen-deep); border:1px solid var(--clay-line);
+  box-shadow:inset 0 1px 3px rgba(96,74,44,.08);
+  font-family:var(--font-mono); font-size:10.5px; color:var(--ink-soft);
+  overflow:hidden; white-space:nowrap;
+}
+.url-bar .lock{color:var(--sage-deep); font-size:10px;}
+.url-bar .addr{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis;}
+.url-bar .scheme{color:var(--ink-faint); display:none;}
+@media (min-width:1560px){ .url-bar .scheme{display:inline;} }
+.url-bar .host{color:var(--ink); font-weight:600;}
+.chip{
+  flex:none; padding:4px 9px 5px; border-radius:999px; font-size:11px; font-weight:700;
+  border:1px solid var(--clay-line); background:var(--paper); color:var(--ink-soft);
+  display:flex; align-items:center; gap:6px;
+  transition:all .16s ease;
+}
+.chip:hover{box-shadow:var(--shadow-card); transform:translateY(-1px); color:var(--ink);}
+.chip.primary{
+  background:var(--terracotta); border-color:var(--terracotta-deep); color:#fdf6ec;
+  box-shadow:0 2px 6px rgba(169,83,47,.26);
+}
+.chip.primary:hover{background:var(--terracotta-deep); box-shadow:0 4px 12px rgba(169,83,47,.34); color:#fff8ee;}
+.chip .badge{
+  min-width:16px; height:16px; padding:0 4px; border-radius:999px; display:grid; place-items:center;
+  background:var(--marigold); color:#453309; font-size:10px; font-weight:800;
+}
+.chip.console-ok{color:var(--sage-deep); border-color:#cdd8c4; background:var(--sage-soft); cursor:default;}
+@media (max-width:1380px){
+  .chip .opt{display:none;}
+  .chip{padding:4px 8px 5px; font-size:10.5px;}
+  .url-bar{font-size:10px;}
+}
+</style>
+<style>
+/* ── the rendered web page — a bright sheet inside the card ── */
+.webview{
+  flex:1; min-height:0; position:relative; overflow:hidden;
+  background:#fdfdfa; border-radius:0 0 var(--r-lg) var(--r-lg);
+  font-family:'Avenir Next','Helvetica Neue',Helvetica,Arial,sans-serif;
+}
+.site{height:100%; display:flex; flex-direction:column; color:#26282e;}
+.site-nav{
+  flex:none; display:flex; align-items:center; gap:22px;
+  padding:13px 30px; border-bottom:1px solid #ebebee; background:#fff;
+}
+.site-logo{font-weight:800; font-size:14.5px; letter-spacing:-.01em; color:#1f2129;}
+.site-logo span{color:#5661f0;}
+.site-steps{display:flex; gap:16px; font-size:12px; color:#9a9ca6; margin-left:auto;}
+.site-steps .on{color:#5661f0; font-weight:700;}
+.site-main{flex:1; display:flex; align-items:flex-start; justify-content:center; gap:26px; padding:34px 30px;}
+.order-card{
+  width:330px; background:#fff; border:1px solid #e8e8ec; border-radius:10px;
+  box-shadow:0 4px 16px rgba(30,32,44,.06); padding:22px 24px;
+}
+.order-card h3{font-size:15px; font-weight:700; margin-bottom:14px; color:#1f2129;}
+.order-row{display:flex; justify-content:space-between; font-size:13px; color:#4c4f58; padding:7px 0;}
+.order-row .qty{color:#9a9ca6; font-size:11.5px; margin-left:5px;}
+.order-row.total{border-top:1px solid #ececf0; margin-top:8px; padding-top:12px;
+  font-weight:800; font-size:14.5px; color:#1f2129;}
+.pay-panel{width:280px; display:flex; flex-direction:column; gap:12px;}
+.pay-field{display:flex; flex-direction:column; gap:4px;}
+.pay-field label{font-size:11px; font-weight:700; color:#71747e; letter-spacing:.02em;}
+.pay-field .fake-input{
+  height:34px; border:1px solid #dcdde3; border-radius:7px; background:#fbfbfd;
+  display:flex; align-items:center; padding:0 11px; font-size:12.5px; color:#585b64;
+}
+.pay-cta{
+  margin-top:6px; height:44px; border-radius:9px; border:none;
+  background:#5661f0; color:#fff; font-size:14.5px; font-weight:700;
+  font-family:inherit; box-shadow:0 4px 14px rgba(86,97,240,.32);
+  transition:transform .15s ease, box-shadow .15s ease;
+}
+.pay-cta:hover{transform:translateY(-1px); box-shadow:0 7px 20px rgba(86,97,240,.4);}
+.pay-note{font-size:10.5px; color:#a4a6af; text-align:center;}
+/* auto-reload sticker */
+.refreshed{
+  position:absolute; right:18px; top:58px; z-index:3;
+  padding:4px 12px 5px; border-radius:999px; transform:rotate(2.5deg);
+  background:var(--sage); color:#f2f6ec; font-family:var(--font-ui);
+  font-size:10.5px; font-weight:800; letter-spacing:.05em;
+  box-shadow:0 3px 8px rgba(89,119,90,.35);
+  animation:stickerIn .45s cubic-bezier(.3,1.4,.5,1) .25s both;
+}
+.refreshed::before{content:'✓ '; font-weight:400;}
+@keyframes stickerIn{from{opacity:0; transform:rotate(8deg) scale(.6);} to{opacity:1; transform:rotate(2.5deg) scale(1);}}
+
+/* ============================================================
+   6 · STATUS BAR — the quiet footer
+   ============================================================ */
+#statusbar{
+  position:relative; z-index:5; flex:none; height:27px;
+  display:flex; align-items:center; gap:16px; padding:0 14px;
+  background:var(--linen-deep); border-top:1px solid var(--clay-line);
+  font-size:11px; color:var(--ink-soft);
+}
+.sb-key{color:var(--ink-faint); font-weight:700;}
+.sb-val{color:var(--ink-soft);}
+.sb-val em{font-style:normal; font-family:var(--font-mono); font-size:10.5px; color:var(--terracotta-deep);}
+.sb-sep{width:3px; height:3px; border-radius:50%; background:var(--ink-faint); opacity:.6;}
+.sb-spacer{flex:1;}
+.sb-btn{
+  font-size:11px; font-weight:700; color:var(--ink-soft); padding:2px 10px 3px;
+  border-radius:999px; border:1px solid transparent; transition:all .16s ease;
+}
+.sb-btn:hover{border-color:var(--clay-line); background:var(--paper); color:var(--ink);}
+.sb-ver{color:var(--ink-faint); font-style:italic; font-family:var(--font-display); font-size:11px;}
+
+/* corner variation tag */
+.corner-tag{
+  position:fixed; right:14px; bottom:34px; z-index:60;
+  padding:3px 13px 5px; transform:rotate(-2deg);
+  background:var(--espresso); color:var(--cream-mono);
+  font-family:var(--font-display); font-style:italic; font-size:11.5px;
+  border-radius:8px 11px 9px 12px; box-shadow:var(--shadow-card);
+  pointer-events:none; opacity:.92;
+}
+.corner-tag b{color:var(--terracotta); font-style:normal;}
+
+/* ============================================================
+   7 · CAPTURE MODAL — a worksheet laid over the desk
+   ============================================================ */
+.overlay{
+  position:fixed; inset:0; z-index:50; display:grid; place-items:center;
+  background:rgba(58,51,43,.36);
+  -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px);
+}
+.modal{
+  width:880px; max-width:calc(100vw - 80px); max-height:calc(100vh - 90px);
+  display:flex; flex-direction:column;
+  background:var(--paper); border:1px solid var(--clay-line);
+  border-radius:var(--r-lg); box-shadow:var(--shadow-deep);
+  animation:settle .4s cubic-bezier(.22,.9,.32,1) both;
+}
+.modal-head{
+  flex:none; display:flex; align-items:center; justify-content:space-between;
+  padding:14px 20px 12px; border-bottom:1px dashed var(--clay-line);
+}
+.modal-title{font-family:var(--font-display); font-size:15.5px; font-weight:600;}
+.modal-title .mark{color:var(--terracotta);}
+.modal-x{
+  width:26px; height:26px; border-radius:50%; display:grid; place-items:center;
+  font-size:12px; color:var(--ink-faint); border:1px solid transparent; transition:all .16s ease;
+}
+.modal-x:hover{color:var(--brick); border-color:var(--clay-line); background:var(--paper-warm);}
+.cap-grid{
+  flex:1; min-height:0; display:grid; grid-template-columns:1fr 1fr; gap:22px;
+  padding:18px 20px 20px; overflow:auto;
+}
+.cap-col{display:flex; flex-direction:column; gap:13px; min-width:0;}
+.cap-summary{
+  display:grid; grid-template-columns:max-content 1fr; gap:6px 14px;
+  padding:12px 14px; background:var(--paper-warm);
+  border:1px solid var(--clay-line); border-radius:var(--r-md);
+  font-size:12px;
+}
+.cap-summary dt{color:var(--ink-faint); font-weight:700; font-size:11px; padding-top:1px;}
+.cap-summary dd{color:var(--ink); font-family:var(--font-mono); font-size:11.5px;}
+.field-label{font-size:11px; font-weight:800; color:var(--ink-soft); letter-spacing:.02em; margin-bottom:5px; display:block;}
+textarea,select{
+  width:100%; font-family:var(--font-ui); font-size:12.5px; color:var(--ink);
+  background:var(--linen); border:1px solid var(--clay-line); border-radius:var(--r-sm);
+  padding:9px 11px; resize:none; outline:none;
+  box-shadow:inset 0 1px 3px rgba(96,74,44,.07);
+}
+textarea:focus,select:focus{border-color:var(--terracotta); box-shadow:0 0 0 3px var(--terracotta-soft);}
+textarea::placeholder{color:var(--ink-faint); font-style:italic;}
+select{appearance:none; -webkit-appearance:none; cursor:pointer;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236d6353' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 12px center;}
+.cap-shot{
+  height:104px; border-radius:var(--r-sm);
+  border:1.5px dashed var(--ink-faint); background:var(--linen);
+  display:grid; place-items:center; color:var(--ink-faint);
+  font-size:11.5px; font-style:italic;
+}
+.cap-shot .shot-frame{
+  width:200px; height:74px; border-radius:6px; background:#fdfdfa;
+  border:1px solid var(--clay-line); box-shadow:var(--shadow-card);
+  display:grid; place-items:center; color:#8d90a0; font-size:10.5px; font-style:normal;
+}
+.yaml-view{
+  flex:1; min-height:230px; overflow:auto;
+  background:var(--espresso); color:var(--cream-mono);
+  border-radius:var(--r-md); border:1px solid #241f19;
+  padding:14px 16px; font-family:var(--font-mono); font-size:11.5px; line-height:1.8;
+  box-shadow:inset 0 2px 8px rgba(0,0,0,.25);
+}
+.yaml-view .yk{color:var(--terracotta);}
+.yaml-view .yv{color:var(--cream-mono);}
+.yaml-view .ys{color:#b5cf9e;}
+.yaml-view .yc{color:var(--cream-dim);}
+.modal-foot{
+  flex:none; display:flex; align-items:center; gap:10px;
+  padding:13px 20px 15px; border-top:1px dashed var(--clay-line);
+}
+.foot-spacer{flex:1;}
+.btn{
+  padding:7px 17px 8px; border-radius:999px; font-size:12.5px; font-weight:700;
+  border:1px solid var(--clay-line); background:var(--paper); color:var(--ink-soft);
+  transition:all .18s ease;
+}
+.btn:hover{color:var(--ink); box-shadow:var(--shadow-card); transform:translateY(-1px);}
+.btn.primary{
+  background:var(--terracotta); border-color:var(--terracotta-deep); color:#fdf6ec;
+  box-shadow:0 2px 8px rgba(169,83,47,.3);
+}
+.btn.primary:hover{background:var(--terracotta-deep); color:#fff8ee; box-shadow:0 5px 14px rgba(169,83,47,.38);}
+
+/* ── calm for those who ask for it ── */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation:none !important; transition:none !important;}
+}
+</style>
+</head>
+<body>
+
+<!-- ══ titlebar ══ -->
+<header id="titlebar" class="settle" style="--d:0s">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 64 64" width="19" height="19">
+        <path d="M22 18 Q34 22 44 32 Q34 42 22 46" fill="none" stroke="#a2967f" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3.5 4.5"/>
+        <circle cx="22" cy="18" r="7.4" fill="#c26d4f"/>
+        <circle cx="44" cy="32" r="7.4" fill="#9b7fb8"/>
+        <circle cx="22" cy="46" r="7.4" fill="#7d9678"/>
+        <circle cx="19.6" cy="15.8" r="2.1" fill="#f0d9cd" opacity=".85"/>
+        <circle cx="41.6" cy="29.8" r="2.1" fill="#e6dcee" opacity=".85"/>
+        <circle cx="19.6" cy="43.8" r="2.1" fill="#e2e9da" opacity=".85"/>
+      </svg>
+    </span>
+    <span class="brand-name">Chromux</span>
+    <span class="brand-sub">agent cockpit</span>
+  </div>
+  <div class="titlebar-spacer"></div>
+  <div class="gauges" aria-label="Workspace gauges">
+    <span class="gauge"><i class="gdot g-sage"></i><b>3</b>&nbsp;sessions</span>
+    <span class="gauge"><i class="gdot g-marigold"></i><b>2</b>&nbsp;queued</span>
+    <span class="gauge"><i class="gdot g-teal"></i><b>14</b>&nbsp;sent</span>
+  </div>
+  <button class="top-btn update" title="A new version is ready to install">✻ update ready</button>
+  <button class="top-btn" title="Settings">settings</button>
+</header>
+
+<!-- ══ main frame ══ -->
+<div id="app">
+
+  <!-- ── left rail · attention queue ── -->
+  <aside id="rail" class="settle" style="--d:.06s">
+    <div class="rail-head">
+      <span class="rail-title"><span class="mark">✻</span> attention queue</span>
+      <button class="btn-detect" title="Detect open terminal tabs and agent sessions (⌘D)">⛶ detect</button>
+    </div>
+    <div id="attention-list">
+      <div class="note k-approval settle" style="--d:.16s">
+        <div class="note-kind"><i></i>approval</div>
+        <div class="note-session">checkout-flow</div>
+        <div class="note-body">claude wants to run <code>npm run db:migrate</code></div>
+      </div>
+      <div class="note k-preview settle" style="--d:.24s">
+        <div class="note-kind"><i></i>preview</div>
+        <div class="note-session">landing-page</div>
+        <div class="note-body">localhost:5173 changed — review ready</div>
+      </div>
+      <div class="note k-exited settle" style="--d:.32s">
+        <div class="note-kind"><i></i>exited</div>
+        <div class="note-session">api-server</div>
+        <div class="note-body">codex exited (code 0) · 12m ago</div>
+      </div>
+    </div>
+    <div class="rail-foot">
+      <div class="rail-foot-label">local storage</div>
+      <button class="pathlink" title="Reveal in Finder">~/.chromux/captures</button>
+    </div>
+  </aside>
+
+  <!-- ── workspace ── -->
+  <div id="workspace">
+
+    <nav id="session-tabs" class="settle" style="--d:.1s" aria-label="Session tabs">
+      <button class="session-tab active">
+        <i class="tdot live"></i>
+        <span class="tab-label">checkout-flow <span class="agent">· claude</span></span>
+        <span class="tab-badge">2</span>
+      </button>
+      <button class="session-tab">
+        <i class="tdot live"></i>
+        <span class="tab-label">landing-page <span class="agent">· grok</span></span>
+      </button>
+      <button class="session-tab">
+        <i class="tdot dead"></i>
+        <span class="tab-label">api-server <span class="agent">· codex</span></span>
+      </button>
+      <button class="add-tab" title="New session (⌘T)" aria-label="New session">+</button>
+    </nav>
+
+    <main id="stage">
+
+      <!-- terminal pane — the chalkboard -->
+      <section id="terminal-pane" class="settle" style="--d:.18s">
+        <div class="term-head">
+          <span class="term-title">terminal — <em>claude</em></span>
+          <span class="term-cwd">~/projects/shop/checkout-flow</span>
+        </div>
+        <div class="term-body">
+<div class="t-line t-welcome"><span class="spark">✻</span> Welcome to Claude Code!<span class="path">/projects/shop/checkout-flow</span></div>
+<div class="t-line">&nbsp;</div>
+<div class="t-line t-user"><span class="caret">&gt;</span> fix the CTA overflow on the checkout page</div>
+<div class="t-line">&nbsp;</div>
+<div class="t-line t-agent"><span class="bullet">●</span> I'll look at the checkout component styles.</div>
+<div class="t-line t-agent"><span class="bullet">●</span> Read <span class="file">src/components/CheckoutCTA.tsx</span> <span class="meta">(84 lines)</span></div>
+<div class="t-line t-agent"><span class="bullet">●</span> Edit <span class="file">src/styles/checkout.css</span></div>
+<div class="t-line">  <span class="t-del">- .cta-row { width: 120%; }</span></div>
+<div class="t-line">  <span class="t-add">+ .cta-row { width: 100%; max-width: 480px; }</span></div>
+<div class="t-line t-ok"><span class="check">✔</span> Change applied — dev server reloaded</div>
+<div class="t-line t-agent"><span class="bullet">●</span> The button no longer overflows. Preview updated on the right.</div>
+<div class="t-line">&nbsp;</div>
+<div class="t-line t-await"><span class="cursor"></span>awaiting your next instruction…</div>
+        </div>
+      </section>
+
+      <div id="divider" title="Drag to resize" aria-hidden="true"></div>
+
+      <!-- browser pane — paper card with a tab label -->
+      <section id="browser-pane" class="settle" style="--d:.26s">
+        <span class="paper-tab">localhost preview</span>
+        <div class="browser-toolbar">
+          <button class="nav-btn" title="Back">←</button>
+          <button class="nav-btn" title="Forward" disabled>→</button>
+          <button class="nav-btn" title="Reload">↻</button>
+          <div class="url-bar"><span class="lock">●</span><span class="addr"><span class="scheme">http://</span><span class="host">localhost:5173</span>/checkout</span></div>
+          <button id="btn-capture" class="chip primary">⛶ capture</button>
+          <button class="chip">queue <span class="badge">2</span></button>
+          <span class="chip console-ok">console: 0</span>
+          <button class="chip" title="Collapse pane">⌄<span class="opt">&nbsp;collapse</span></button>
+        </div>
+        <div class="webview">
+          <span class="refreshed">refreshed</span>
+          <div class="site">
+            <div class="site-nav">
+              <span class="site-logo">shop<span>mark</span></span>
+              <div class="site-steps"><span>Cart</span><span class="on">Checkout</span><span>Done</span></div>
+            </div>
+            <div class="site-main">
+              <div class="order-card">
+                <h3>Order summary</h3>
+                <div class="order-row"><span>Ceramic pour-over set<span class="qty">×1</span></span><span>$32.00</span></div>
+                <div class="order-row"><span>Linen tea towel<span class="qty">×2</span></span><span>$10.00</span></div>
+                <div class="order-row"><span>Shipping</span><span>$6.00</span></div>
+                <div class="order-row total"><span>Total</span><span>$48.00</span></div>
+              </div>
+              <div class="pay-panel">
+                <div class="pay-field"><label>EMAIL</label><div class="fake-input">mara@studio.example</div></div>
+                <div class="pay-field"><label>CARD</label><div class="fake-input">•••• •••• •••• 4242</div></div>
+                <button class="pay-cta">Pay $48.00</button>
+                <div class="pay-note">Payments are encrypted and secure.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- ══ status bar ══ -->
+<footer id="statusbar" class="settle" style="--d:.34s">
+  <span><span class="sb-key">adapter</span> <span class="sb-val"><em>claude -p</em> · one-off</span></span>
+  <span class="sb-sep"></span>
+  <span><span class="sb-key">pairing</span> <span class="sb-val">1:1 session ↔ pane</span></span>
+  <span class="sb-spacer"></span>
+  <button class="sb-btn">delivery log</button>
+  <span class="sb-ver">chromux 0.17.0 — atelier concept</span>
+</footer>
+
+<div class="corner-tag"><b>05</b> · atelier</div>
+
+<!-- ══ capture modal ══ -->
+<div id="modal-capture" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Capture to agent">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-title"><span class="mark">✻</span> capture → agent</span>
+      <button class="modal-x" data-close>✕</button>
+    </div>
+    <div class="cap-grid">
+      <div class="cap-col">
+        <dl class="cap-summary">
+          <dt>session</dt><dd>checkout-flow · claude</dd>
+          <dt>url</dt><dd>localhost:5173/checkout</dd>
+          <dt>selection</dt><dd>"CTA button region 412×88"</dd>
+        </dl>
+        <label>
+          <span class="field-label">note to agent — what's wrong / what to do</span>
+          <textarea rows="3" spellcheck="false" placeholder="e.g. the CTA button overflows its container — fix the CSS"></textarea>
+        </label>
+        <label>
+          <span class="field-label">target</span>
+          <select><option>checkout-flow · claude -p</option><option>landing-page · grok</option></select>
+        </label>
+        <div>
+          <span class="field-label">screenshot</span>
+          <div class="cap-shot"><div class="shot-frame">CTA button region · 412×88</div></div>
+        </div>
+      </div>
+      <div class="cap-col">
+        <span class="field-label">payload preview — YAML v1</span>
+        <pre class="yaml-view"><span class="yk">chromux_capture</span><span class="yv">: v1</span>
+<span class="yk">session</span><span class="yv">: checkout-flow</span>
+<span class="yk">agent</span><span class="yv">: claude</span>
+<span class="yk">url</span><span class="yv">: http://localhost:5173/checkout</span>
+<span class="yk">note</span><span class="ys">: CTA overflows container</span>
+<span class="yk">screenshot</span><span class="yv">: ~/.chromux/captures/2026-07-11-0142.png</span>
+<span class="yk">console_errors</span><span class="yc">: []</span></pre>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" data-close>cancel</button>
+      <span class="foot-spacer"></span>
+      <button class="btn" title="Write payload to ~/.chromux/captures only">file-drop only</button>
+      <button class="btn primary">send — claude -p</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var modal = document.getElementById('modal-capture');
+  document.getElementById('btn-capture').addEventListener('click', function(){
+    modal.classList.remove('hidden');
+  });
+  modal.querySelectorAll('[data-close]').forEach(function(btn){
+    btn.addEventListener('click', function(){ modal.classList.add('hidden'); });
+  });
+  modal.addEventListener('click', function(e){
+    if (e.target === modal) modal.classList.add('hidden');
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') modal.classList.add('hidden');
+  });
+})();
+</script>
+</body>
+</html>

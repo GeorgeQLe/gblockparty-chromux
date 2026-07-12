@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.18.0
+
+Planned tag: `chromux-v0.18.0`
+
+- Publish the Chromux website as a deterministic static Vercel build with the product landing page at `/` and the complete 15-direction design refresh gallery at `/designs/`.
+- Add production security headers and clean URLs while keeping Electron application and repository-internal files outside the deployed artifact.
+- Link the public design gallery from the landing-page navigation and product footer.
+
 ## GBlockParty Chromux v0.17.0
 
 Planned tag: `chromux-v0.17.0`

@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Chromux — Foreman</title>
+<style>
+/* ============================================================
+   CHROMUX CONCEPT 04 — "FOREMAN"
+   Industrial control-panel utilitarian. Matte, physical, gripped.
+   Mid-tone: concrete/gunmetal plates over a dark chassis.
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700;800&family=Saira+Stencil+One&display=swap');
+
+:root{
+  --chassis:#2b2b28;
+  --chassis-deep:#232320;
+  --panel:#c9c9c4;
+  --panel-hi:#d6d6d0;
+  --panel-lo:#b3b3ac;
+  --panel-mid:#a8a8a2;
+  --ink:#1c1c1a;
+  --ink-soft:#3a3a34;
+  --shadow:#151513;
+  --orange:#ff5f00;
+  --orange-hi:#ff7c26;
+  --orange-lo:#d94f00;
+  --yellow:#f2c400;
+  --green:#3ba14e;
+  --green-lit:#62d878;
+  --red:#d13c2c;
+  --red-lit:#ff6a52;
+  --cyan:#2e93b8;
+  --cyan-lit:#57c4e8;
+  --cream:#e9e2d2;
+  --well:#1c1c1a;
+  --stencil:'Saira Condensed','Avenir Next Condensed','Futura','Arial Narrow',sans-serif;
+  --mono:ui-monospace,'Menlo','SF Mono','Monaco',monospace;
+  --plain:'Avenir Next','Helvetica Neue',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  min-width:1280px;height:100vh;overflow:hidden;
+  background:
+    radial-gradient(140% 90% at 50% 0%, rgba(255,255,255,.04), transparent 60%),
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(0,0,0,.05) 3px 4px),
+    var(--chassis);
+  color:var(--ink);
+  font-family:var(--stencil);
+  display:flex;flex-direction:column;
+  -webkit-font-smoothing:antialiased;
+  user-select:none;
+}
+
+/* ---------- shared hardware ---------- */
+.screw{position:absolute;width:9px;height:9px;border-radius:50%;z-index:3;
+  background:radial-gradient(circle at 35% 30%, #e2dfd6, #98958c 55%, #5c5a52);
+  border:1px solid #34332e;
+  box-shadow:0 1px 0 rgba(255,255,255,.35), inset 0 -1px 1px rgba(0,0,0,.4);}
+.screw::after{content:"";position:absolute;left:1px;right:1px;top:3px;height:1px;background:#3a3833;transform:rotate(-28deg)}
+.screw.tl{top:5px;left:5px}      .screw.tl::after{transform:rotate(24deg)}
+.screw.tr{top:5px;right:5px}     .screw.tr::after{transform:rotate(-62deg)}
+.screw.bl{bottom:5px;left:5px}   .screw.bl::after{transform:rotate(80deg)}
+.screw.br{bottom:5px;right:5px}  .screw.br::after{transform:rotate(-15deg)}
+
+/* raised plate */
+.plate{
+  background:linear-gradient(180deg, var(--panel-hi), var(--panel) 45%, var(--panel-lo));
+  border:2px solid var(--ink);
+  box-shadow:4px 4px 0 var(--shadow), inset 0 1px 0 rgba(255,255,255,.55);
+  position:relative;
+}
+
+/* engraved nameplate — dark plate, light stamped text */
+.nameplate{
+  display:inline-flex;align-items:center;gap:6px;
+  background:linear-gradient(180deg,#44443d,#33332d);
+  color:#d9d6c8;
+  border:1px solid #121210;border-radius:3px;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.09), 0 1px 0 rgba(255,255,255,.3);
+  padding:3px 10px 4px;
+  font-family:var(--stencil);font-weight:700;font-size:11px;
+  letter-spacing:.22em;text-transform:uppercase;
+  text-shadow:0 -1px 0 rgba(0,0,0,.9);
+  white-space:nowrap;
+}
+
+/* chunky physical key */
+.key{
+  font-family:var(--stencil);font-weight:700;font-size:11px;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--ink);
+  background:linear-gradient(180deg,#d8d8d2,#bdbdb6);
+  border:2px solid var(--ink);border-radius:2px;
+  padding:6px 12px;cursor:pointer;
+  box-shadow:0 3px 0 var(--shadow), inset 0 1px 0 rgba(255,255,255,.6);
+  position:relative;white-space:nowrap;
+}
+.key:hover{background:linear-gradient(180deg,#e2e2dc,#c6c6bf)}
+.key:active{transform:translateY(3px);box-shadow:0 0 0 var(--shadow), inset 0 1px 0 rgba(255,255,255,.4)}
+.key-orange{
+  background:linear-gradient(180deg,var(--orange-hi),var(--orange-lo));
+  color:#160c05;border-color:#1c0e04;
+  box-shadow:0 3px 0 #521e02, inset 0 1px 0 rgba(255,255,255,.45);
+}
+.key-orange:hover{background:linear-gradient(180deg,#ff8b3f,var(--orange))}
+.key-orange:active{box-shadow:0 0 0 #521e02, inset 0 1px 0 rgba(255,255,255,.3)}
+
+/* indicator lamp — inset with inner bevel */
+.lamp{
+  display:inline-block;width:12px;height:12px;border-radius:50%;
+  border:2px solid #22221e;flex:none;
+  box-shadow:inset 0 -2px 3px rgba(0,0,0,.5), inset 0 1px 1px rgba(255,255,255,.55), 0 1px 0 rgba(255,255,255,.35);
+  background:radial-gradient(circle at 38% 30%, #7a7a72, #4a4a44 70%);
+}
+.lamp-green{background:radial-gradient(circle at 38% 30%, #a8f0b4, var(--green-lit) 35%, var(--green) 75%)}
+.lamp-amber{background:radial-gradient(circle at 38% 30%, #ffe9a8, #ffcf3e 35%, #e0a400 75%)}
+.lamp-cyan{background:radial-gradient(circle at 38% 30%, #bfeeff, var(--cyan-lit) 35%, var(--cyan) 75%)}
+.lamp-red{background:radial-gradient(circle at 38% 30%, #ffb3a3, var(--red-lit) 35%, var(--red) 75%)}
+.lamp-off{background:radial-gradient(circle at 38% 30%, #6c6c64, #43433e 70%)}
+.lamp-blink{animation:lampblink 1.6s steps(1,end) infinite}
+@keyframes lampblink{0%,55%{filter:none}56%,100%{filter:brightness(.45) saturate(.6)}}
+
+/* hazard striping — RESERVED: update-ready key + approval card only */
+.hazard{
+  background:repeating-linear-gradient(45deg,#171712 0 9px,var(--yellow) 9px 18px);
+}
+
+/* ---------- titlebar ---------- */
+#titlebar{
+  height:48px;flex:none;display:flex;align-items:center;
+  padding:0 14px 0 84px;gap:18px;
+  background:linear-gradient(180deg,#c2c2bb,#adada6 60%,#9d9d96);
+  border-bottom:2px solid var(--ink);
+  box-shadow:0 2px 0 rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.5);
+  position:relative;z-index:20;
+}
+.brand{display:flex;align-items:center;gap:9px}
+.brand-mark{width:24px;height:24px;display:grid;place-items:center;
+  background:#33332d;border:2px solid var(--ink);border-radius:3px;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.1), 0 1px 0 rgba(255,255,255,.35);}
+.brand-name{font-family:'Saira Stencil One',var(--stencil);font-weight:400;font-size:17px;
+  letter-spacing:.18em;color:var(--ink);text-shadow:0 1px 0 rgba(255,255,255,.5)}
+.brand-sub{font-size:9px;font-weight:700;letter-spacing:.3em;color:#54544d;
+  border-left:2px solid #7e7e77;padding-left:9px;text-shadow:0 1px 0 rgba(255,255,255,.4)}
+.titlebar-gauges{margin-left:auto;display:flex;align-items:center;gap:10px}
+.gauge{
+  display:inline-flex;align-items:center;gap:7px;
+  background:linear-gradient(180deg,#3f3f39,#31312c);
+  border:1px solid #14140f;border-radius:3px;padding:4px 10px 5px;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.08), 0 1px 0 rgba(255,255,255,.3);
+  font-size:10px;font-weight:700;letter-spacing:.18em;color:#cfccbd;
+  text-shadow:0 -1px 0 rgba(0,0,0,.8);
+}
+.gauge b{color:#fff;font-size:12px;font-weight:800;margin-right:1px}
+.gauge .lamp{width:10px;height:10px;border-width:2px}
+#btn-update-ready{
+  border:2px solid #0f0f0b;border-radius:2px;padding:3px;cursor:pointer;
+  box-shadow:0 3px 0 var(--shadow), inset 0 0 0 1px rgba(0,0,0,.4);
+}
+#btn-update-ready:active{transform:translateY(3px);box-shadow:0 0 0 var(--shadow)}
+#btn-update-ready .haz-tag{
+  display:block;background:var(--yellow);color:#131309;
+  border:1px solid #131309;padding:3px 9px 4px;
+  font-family:var(--stencil);font-weight:800;font-size:10px;letter-spacing:.16em;
+}
+</style>
+</head>
+<body>
+<style>
+/* ---------- frame ---------- */
+#app{flex:1;display:flex;min-height:0;padding:12px 12px 10px;gap:12px}
+
+/* ---------- left rail ---------- */
+#rail{
+  width:232px;flex:none;display:flex;flex-direction:column;min-height:0;
+  padding:12px 10px 10px;gap:10px;
+}
+.rail-head{display:flex;flex-direction:column;gap:9px;padding:2px 2px 0}
+.rail-head-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+#btn-detect{width:100%;padding:7px 10px;text-align:center}
+#attention-list{flex:1;min-height:0;display:flex;flex-direction:column;gap:11px;overflow:hidden;padding:2px}
+/* vent grille filler in leftover rail space */
+#attention-list::after{
+  content:"";margin-top:auto;height:56px;flex:none;border-radius:2px;
+  background:repeating-linear-gradient(0deg, transparent 0 6px, rgba(28,28,26,.22) 6px 8px);
+  border:1px solid rgba(28,28,26,.28);
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.18), 0 1px 0 rgba(255,255,255,.4);
+}
+.qcard{
+  background:linear-gradient(180deg,#d2d2cc,#bebeb7);
+  border:2px solid var(--ink);border-radius:2px;
+  box-shadow:3px 3px 0 var(--shadow), inset 0 1px 0 rgba(255,255,255,.55);
+  position:relative;cursor:pointer;overflow:hidden;
+}
+.qcard:hover{background:linear-gradient(180deg,#dcdcd6,#c6c6bf)}
+.qcard:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--shadow)}
+.qcard-strip{height:8px;border-bottom:2px solid var(--ink)}
+.qcard-strip.info{background:repeating-linear-gradient(90deg,var(--cyan) 0 14px,#20718f 14px 16px)}
+.qcard-strip.dead{background:repeating-linear-gradient(90deg,#8b8b84 0 14px,#6f6f68 14px 16px)}
+.qcard-body{padding:8px 10px 9px}
+.qcard-top{display:flex;align-items:center;gap:7px;margin-bottom:5px}
+.qcard-kind{font-size:9px;font-weight:800;letter-spacing:.22em;padding:2px 6px 3px;border:1px solid var(--ink);border-radius:2px;background:#e6e6df}
+.qcard-kind.urgent{background:var(--yellow);}
+.qcard-kind.info{background:#cfe9f2}
+.qcard-kind.dead{background:#c4c4bd;color:#4d4d47}
+.qcard-sess{font-family:var(--mono);font-size:10.5px;font-weight:700;color:#33332d;letter-spacing:0;text-transform:none}
+.qcard-msg{font-family:var(--mono);font-size:10.5px;line-height:1.45;color:#3c3c36;letter-spacing:0}
+.qcard-msg code{background:#e9e9e2;border:1px solid #9a9a92;border-radius:2px;padding:0 3px;font-family:var(--mono);font-size:10px}
+.rail-foot{
+  border-top:2px solid #8e8e86;padding:9px 4px 2px;
+  display:flex;flex-direction:column;gap:5px;
+  box-shadow:0 -1px 0 rgba(255,255,255,.5) inset;
+}
+.microlabel{font-size:9px;font-weight:800;letter-spacing:.26em;color:#5c5c54;text-shadow:0 1px 0 rgba(255,255,255,.4)}
+.pathlink{
+  background:none;border:none;cursor:pointer;text-align:left;padding:0;
+  font-family:var(--mono);font-size:11px;color:#7a3a12;text-decoration:underline;
+  text-underline-offset:2px;
+}
+.pathlink:hover{color:var(--orange-lo)}
+
+/* ---------- workspace ---------- */
+#workspace{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0;gap:0}
+
+/* session tabs — physical selector keys */
+#session-tabs{
+  flex:none;display:flex;align-items:flex-end;gap:8px;
+  padding:4px 4px 12px;
+}
+.session-tab{
+  display:inline-flex;align-items:center;gap:8px;
+  font-family:var(--stencil);font-weight:700;font-size:11px;letter-spacing:.1em;
+  text-transform:uppercase;color:#2e2e29;
+  background:linear-gradient(180deg,#c6c6bf,#a9a9a2);
+  border:2px solid var(--ink);border-radius:3px 3px 2px 2px;
+  padding:8px 13px 9px;cursor:pointer;position:relative;
+  box-shadow:0 4px 0 var(--shadow), inset 0 1px 0 rgba(255,255,255,.55);
+}
+.session-tab:hover{background:linear-gradient(180deg,#d2d2cb,#b3b3ac)}
+.session-tab .lamp{width:10px;height:10px}
+.session-tab.active{
+  transform:translateY(4px);
+  box-shadow:0 0 0 var(--shadow), inset 0 2px 4px rgba(0,0,0,.28);
+  background:linear-gradient(180deg,#b7b7b0,#c9c9c2);
+  border-bottom-color:#3c3c36;
+}
+.session-tab.active::before{
+  content:"";position:absolute;left:6px;right:6px;top:2px;height:3px;border-radius:2px;
+  background:var(--orange);box-shadow:0 0 0 1px rgba(0,0,0,.55) inset;
+}
+.tab-badge{
+  min-width:17px;height:17px;display:inline-grid;place-items:center;
+  background:var(--orange);color:#160c05;border:1px solid #1c0e04;border-radius:2px;
+  font-size:10px;font-weight:800;padding:0 3px;
+}
+.tab-agent{font-family:var(--mono);font-size:10px;letter-spacing:0;text-transform:none;color:#55554e}
+.add-tab{padding:8px 12px 9px;font-size:14px;font-weight:800;line-height:1}
+
+/* ---------- stage ---------- */
+#stage{flex:1;min-height:0;display:flex;padding:12px;gap:0}
+.pane{display:flex;flex-direction:column;min-width:0;min-height:0}
+.pane-terminal{width:43%;flex:none}
+.pane-browser{flex:1}
+.pane-head{
+  flex:none;display:flex;align-items:center;gap:10px;
+  padding:8px 12px;border-bottom:2px solid var(--ink);
+  background:linear-gradient(180deg,#bcbcb5,#a7a7a0);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5);
+  position:relative;min-height:40px;
+}
+.pane-cwd{font-family:var(--mono);font-size:10.5px;color:#4a4a44;letter-spacing:0;margin-left:auto}
+
+/* terminal — recessed dark well */
+.well{
+  flex:1;min-height:0;margin:10px;position:relative;
+  background:var(--well);
+  border:2px solid #0f0f0c;border-radius:2px;
+  box-shadow:inset 0 3px 8px rgba(0,0,0,.75), inset 0 0 0 1px #060605, 0 1px 0 rgba(255,255,255,.4);
+  overflow:hidden;
+}
+.term-scroll{position:absolute;inset:0;padding:14px 16px;overflow:hidden;
+  font-family:var(--mono);font-size:12px;line-height:1.72;color:var(--cream);letter-spacing:0}
+.t-dim{color:#8d877a}
+.t-orange{color:#ff7a2e}
+.t-user{color:#fff;font-weight:700}
+.t-user .t-caret{color:#ff7a2e}
+.t-bullet{color:#e6e0d2}
+.t-bullet .t-dot{color:#ff7a2e}
+.t-del{color:#ff7d68}
+.t-add{color:#7fe092}
+.t-ok{color:#7fe092;font-weight:700}
+.t-await{color:#c9c2b1}
+.block-cursor{
+  display:inline-block;width:8px;height:14px;vertical-align:-2px;margin-right:6px;
+  background:var(--orange);animation:blockblink 1.05s steps(1,end) infinite;
+}
+@keyframes blockblink{0%,49%{opacity:1}50%,100%{opacity:0}}
+
+/* divider — knurled grip strip */
+#divider{
+  width:14px;flex:none;margin:22px 2px;cursor:col-resize;border-radius:3px;
+  border:2px solid var(--ink);
+  background:
+    repeating-linear-gradient(90deg, #b9b9b2 0 2px, #83837c 2px 4px),
+    #a3a39c;
+  box-shadow:3px 3px 0 var(--shadow), inset 0 1px 0 rgba(255,255,255,.4);
+}
+#divider:hover{filter:brightness(1.08)}
+</style>
+<style>
+/* ---------- browser pane ---------- */
+.btoolbar{
+  flex:none;display:flex;align-items:center;gap:6px;
+  padding:8px 10px;border-bottom:2px solid var(--ink);
+  background:linear-gradient(180deg,#b6b6af,#a2a29b);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.45);
+  flex-wrap:nowrap;overflow:hidden;
+}
+.btoolbar .key{padding:5px 8px;font-size:10px;letter-spacing:.06em;flex:none}
+.nav-key{padding:5px 7px !important;font-size:10px;line-height:1.2}
+.urlbar{
+  flex:1;min-width:110px;display:flex;align-items:center;gap:7px;
+  background:#26261f;border:2px solid #101010;border-radius:2px;
+  box-shadow:inset 0 2px 4px rgba(0,0,0,.65), 0 1px 0 rgba(255,255,255,.35);
+  padding:4px 9px;overflow:hidden;white-space:nowrap;
+  font-family:var(--mono);font-size:11px;color:#f0e9d6;letter-spacing:0;
+}
+.urlbar .lamp{width:8px;height:8px;border-width:1px}
+.chip{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:0;
+  background:#e3e3dc;border:1px solid var(--ink);border-radius:2px;
+  padding:3px 6px;color:#3a3a34;white-space:nowrap;flex:none;
+}
+.key .kbadge{
+  display:inline-grid;place-items:center;min-width:15px;height:15px;margin-left:6px;
+  background:var(--orange);color:#160c05;border:1px solid #1c0e04;border-radius:2px;
+  font-size:9px;font-weight:800;vertical-align:-2px;
+}
+.caption-plate{
+  flex:none;margin:8px 10px 0;padding:3px 10px 4px;
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  background:linear-gradient(180deg,#40403a,#31312c);
+  border:1px solid #121210;border-radius:3px;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.08), 0 1px 0 rgba(255,255,255,.3);
+  font-size:9px;font-weight:700;letter-spacing:.24em;color:#c9c6b7;
+  text-shadow:0 -1px 0 rgba(0,0,0,.85);
+}
+.caption-plate b{color:#ffb37e;font-weight:800}
+.browser-well{margin-top:8px}
+
+/* fake rendered checkout page */
+.webpage{
+  position:absolute;inset:0;overflow:hidden;
+  background:#f2f0ea;color:#232323;
+  font-family:var(--plain);letter-spacing:0;user-select:text;
+}
+.wp-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 26px;border-bottom:1px solid #e0ddd4;background:#fbfaf7;
+}
+.wp-logo{font-weight:700;font-size:15px;color:#1f1f1f}
+.wp-logo span{color:#9a958a;font-weight:500}
+.wp-steps{font-size:11.5px;color:#8d887c}
+.wp-steps b{color:#232323}
+.wp-body{display:flex;justify-content:center;gap:22px;padding:30px 26px}
+.wp-card{
+  width:330px;background:#fff;border:1px solid #e3e0d7;border-radius:10px;
+  box-shadow:0 8px 22px rgba(40,36,28,.08);padding:20px 22px;
+}
+.wp-card h3{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#8d887c;margin-bottom:14px;font-weight:600}
+.wp-row{display:flex;justify-content:space-between;font-size:13.5px;padding:7px 0;color:#33322e}
+.wp-row .muted{color:#8d887c}
+.wp-row.total{border-top:1px solid #eceade;margin-top:8px;padding-top:12px;font-weight:700;font-size:15px}
+.wp-cta{
+  display:block;width:100%;margin-top:18px;padding:13px 0;
+  background:#1f6f4f;color:#fff;border:none;border-radius:8px;
+  font-family:var(--plain);font-size:14.5px;font-weight:600;cursor:pointer;
+  box-shadow:0 3px 10px rgba(31,111,79,.35);
+}
+.wp-cta:hover{background:#1a6146}
+.wp-fine{margin-top:12px;font-size:10.5px;color:#a49f92;text-align:center}
+.refreshed-chip{
+  position:absolute;top:58px;right:16px;
+  font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.08em;
+  background:#dff3e2;color:#1d7a35;border:1px solid #86caa0;border-radius:3px;
+  padding:3px 8px;
+}
+
+/* ---------- status bar ---------- */
+#statusbar{
+  flex:none;height:30px;display:flex;align-items:center;gap:14px;
+  padding:0 12px;
+  background:linear-gradient(180deg,#31312c,#232320);
+  border-top:2px solid #0f0f0c;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.09);
+  font-size:9.5px;font-weight:700;letter-spacing:.2em;color:#8f8c80;
+  text-shadow:0 -1px 0 rgba(0,0,0,.9);
+}
+#statusbar .sb-val{color:#d3d0c2;font-family:var(--mono);font-size:10.5px;font-weight:400;letter-spacing:.02em;text-transform:none}
+.sb-sep{width:2px;height:12px;background:#141411;box-shadow:1px 0 0 rgba(255,255,255,.12)}
+.sb-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.sb-btn{
+  font-family:var(--stencil);font-weight:700;font-size:9.5px;letter-spacing:.18em;
+  background:#3d3d37;color:#cfccbd;border:1px solid #121210;border-radius:2px;
+  padding:3px 9px 4px;cursor:pointer;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12), 0 2px 0 #0c0c0a;
+}
+.sb-btn:hover{background:#48483f}
+.sb-btn:active{transform:translateY(2px);box-shadow:inset 0 1px 0 rgba(255,255,255,.1), 0 0 0 #0c0c0a}
+.sb-serial{
+  font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:#a8a496;
+  background:#1a1a17;border:1px solid #0d0d0b;border-radius:2px;padding:2px 9px 3px;
+  box-shadow:inset 0 1px 3px rgba(0,0,0,.7), 0 1px 0 rgba(255,255,255,.1);
+}
+
+/* corner variation tag */
+#corner-tag{
+  position:fixed;right:14px;bottom:40px;z-index:60;
+  background:linear-gradient(180deg,#44443d,#33332d);
+  border:1px solid #121210;border-radius:3px;padding:3px 10px 4px;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.08), 2px 2px 0 rgba(0,0,0,.5);
+  font-size:9px;font-weight:800;letter-spacing:.26em;color:#e0ddce;
+  text-shadow:0 -1px 0 rgba(0,0,0,.9);pointer-events:none;
+}
+#corner-tag b{color:#ff9a52}
+
+/* ---------- capture modal ---------- */
+.overlay{
+  position:fixed;inset:0;z-index:100;display:grid;place-items:center;
+  background:rgba(20,20,17,.62);
+}
+.overlay.hidden{display:none}
+.modal{
+  width:880px;max-width:calc(100vw - 80px);max-height:calc(100vh - 80px);
+  display:flex;flex-direction:column;
+  background:linear-gradient(180deg,var(--panel-hi),var(--panel) 45%,var(--panel-lo));
+  border:2px solid var(--ink);
+  box-shadow:8px 8px 0 rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.55);
+  position:relative;
+}
+.modal-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 16px;border-bottom:2px solid var(--ink);
+  background:linear-gradient(180deg,#bcbcb5,#a7a7a0);
+}
+.modal-x{
+  width:26px;height:26px;display:grid;place-items:center;cursor:pointer;
+  background:linear-gradient(180deg,#d8d8d2,#bdbdb6);
+  border:2px solid var(--ink);border-radius:2px;
+  font-family:var(--stencil);font-weight:800;font-size:12px;color:var(--ink);
+  box-shadow:0 2px 0 var(--shadow);
+}
+.modal-x:active{transform:translateY(2px);box-shadow:0 0 0 var(--shadow)}
+.cap-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:16px;
+  padding:16px;overflow:auto;min-height:0;
+}
+.cap-col{display:flex;flex-direction:column;gap:12px;min-width:0}
+.cap-summary{
+  border:2px solid var(--ink);background:#d8d8d1;border-radius:2px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.6);
+}
+.cap-sumrow{
+  display:flex;gap:10px;align-items:baseline;padding:7px 11px;
+  border-bottom:1px solid #a5a59d;
+}
+.cap-sumrow:last-child{border-bottom:none}
+.cap-sumrow .microlabel{width:76px;flex:none}
+.cap-sumrow .v{font-family:var(--mono);font-size:11px;color:#33332d;letter-spacing:0}
+.field{display:flex;flex-direction:column;gap:6px}
+textarea, select{
+  font-family:var(--mono);font-size:11.5px;color:#2d2d27;letter-spacing:0;
+  background:#e7e7e0;border:2px solid var(--ink);border-radius:2px;
+  box-shadow:inset 0 2px 4px rgba(0,0,0,.22);
+  padding:8px 10px;resize:none;outline:none;width:100%;
+}
+textarea::placeholder{color:#8b8b82}
+select{appearance:none;-webkit-appearance:none;cursor:pointer;
+  background-image:linear-gradient(45deg, transparent 50%, #2d2d27 50%),linear-gradient(135deg, #2d2d27 50%, transparent 50%);
+  background-position:calc(100% - 16px) 55%, calc(100% - 11px) 55%;
+  background-size:5px 5px;background-repeat:no-repeat;}
+.cap-shot{
+  height:96px;display:grid;place-items:center;
+  background:#26261f;border:2px solid #101010;border-radius:2px;
+  box-shadow:inset 0 3px 6px rgba(0,0,0,.7);
+  font-family:var(--mono);font-size:10.5px;color:#7e7a6c;letter-spacing:.05em;
+}
+.yaml-well{
+  flex:1;min-height:240px;position:relative;
+  background:var(--well);border:2px solid #0f0f0c;border-radius:2px;
+  box-shadow:inset 0 3px 8px rgba(0,0,0,.75), 0 1px 0 rgba(255,255,255,.45);
+  overflow:auto;
+}
+.yaml-well pre{
+  padding:13px 15px;font-family:var(--mono);font-size:11.5px;line-height:1.7;
+  color:#d9d2bf;letter-spacing:0;
+}
+.yaml-well .yk{color:#ff8c42}
+.yaml-well .yc{color:#777162}
+.modal-foot{
+  display:flex;align-items:center;gap:10px;justify-content:flex-end;
+  padding:13px 16px;border-top:2px solid var(--ink);
+  background:linear-gradient(180deg,#b3b3ac,#a1a19a);
+}
+
+/* motion guard */
+@media (prefers-reduced-motion: reduce){
+  .lamp-blink,.block-cursor{animation:none !important}
+}
+</style>
+
+<!-- ══ titlebar ══ -->
+<header id="titlebar">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 64 64" width="16" height="16">
+        <path d="M22 18 L44 32 L22 46" fill="none" stroke="#8b887a" stroke-width="4" stroke-linecap="square" stroke-linejoin="miter"/>
+        <circle cx="22" cy="18" r="8" fill="#ff5f00" stroke="#0f0f0c" stroke-width="2.5"/>
+        <circle cx="44" cy="32" r="8" fill="#9a7bd8" stroke="#0f0f0c" stroke-width="2.5"/>
+        <circle cx="22" cy="46" r="8" fill="#3ba14e" stroke="#0f0f0c" stroke-width="2.5"/>
+      </svg>
+    </span>
+    <span class="brand-name">CHROMUX</span>
+    <span class="brand-sub">AGENT&nbsp;COCKPIT</span>
+  </div>
+  <div class="titlebar-gauges">
+    <span class="gauge"><i class="lamp lamp-green"></i><b>3</b>&nbsp;SESSIONS</span>
+    <span class="gauge"><i class="lamp lamp-amber lamp-blink"></i><b>2</b>&nbsp;QUEUED</span>
+    <span class="gauge"><i class="lamp lamp-cyan"></i><b>14</b>&nbsp;SENT</span>
+    <button id="btn-update-ready" class="hazard" title="Update ready — install"><span class="haz-tag">UPDATE READY</span></button>
+    <button class="key" style="padding:5px 11px">SETTINGS</button>
+  </div>
+</header>
+
+<!-- ══ main frame ══ -->
+<div id="app">
+
+  <!-- left rail -->
+  <aside id="rail" class="plate">
+    <i class="screw tl"></i><i class="screw tr"></i><i class="screw bl"></i><i class="screw br"></i>
+    <div class="rail-head">
+      <span class="nameplate">Attention Queue</span>
+      <button id="btn-detect" class="key">&#x26F6; Detect</button>
+    </div>
+    <div id="attention-list">
+      <div class="qcard">
+        <div class="qcard-strip hazard"></div>
+        <div class="qcard-body">
+          <div class="qcard-top">
+            <span class="qcard-kind urgent">APPROVAL</span>
+            <span class="qcard-sess">checkout-flow</span>
+          </div>
+          <div class="qcard-msg">claude wants to run <code>npm run db:migrate</code></div>
+        </div>
+      </div>
+      <div class="qcard">
+        <div class="qcard-strip info"></div>
+        <div class="qcard-body">
+          <div class="qcard-top">
+            <span class="qcard-kind info">PREVIEW</span>
+            <span class="qcard-sess">landing-page</span>
+          </div>
+          <div class="qcard-msg">localhost:5173 changed — review ready</div>
+        </div>
+      </div>
+      <div class="qcard">
+        <div class="qcard-strip dead"></div>
+        <div class="qcard-body">
+          <div class="qcard-top">
+            <span class="qcard-kind dead">EXITED</span>
+            <span class="qcard-sess">api-server</span>
+          </div>
+          <div class="qcard-msg">codex exited (code 0) · 12m ago</div>
+        </div>
+      </div>
+    </div>
+    <div class="rail-foot">
+      <div class="microlabel">LOCAL STORAGE</div>
+      <button class="pathlink" title="Reveal in Finder">~/.chromux/captures</button>
+    </div>
+  </aside>
+
+  <!-- workspace -->
+  <div id="workspace">
+    <nav id="session-tabs" aria-label="Session tabs">
+      <button class="session-tab active">
+        <i class="lamp lamp-green"></i>
+        checkout-flow&nbsp;<span class="tab-agent">· claude</span>
+        <span class="tab-badge">2</span>
+      </button>
+      <button class="session-tab">
+        <i class="lamp lamp-green"></i>
+        landing-page&nbsp;<span class="tab-agent">· grok</span>
+      </button>
+      <button class="session-tab">
+        <i class="lamp lamp-red"></i>
+        api-server&nbsp;<span class="tab-agent">· codex</span>
+      </button>
+      <button class="session-tab add-tab" title="New session">+</button>
+    </nav>
+
+    <main id="stage" class="plate">
+      <i class="screw tl"></i><i class="screw tr"></i><i class="screw bl"></i><i class="screw br"></i>
+
+      <!-- terminal pane -->
+      <section class="pane pane-terminal">
+        <div class="pane-head">
+          <span class="nameplate">Terminal — claude</span>
+          <span class="pane-cwd">~/projects/shop/checkout-flow</span>
+        </div>
+        <div class="well">
+          <div class="term-scroll">
+<div><span class="t-orange">&#10035;</span> <span class="t-dim">Welcome to Claude Code!</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="t-dim">/projects/shop/checkout-flow</span></div>
+<div>&nbsp;</div>
+<div class="t-user"><span class="t-caret">&gt;</span> fix the CTA overflow on the checkout page</div>
+<div>&nbsp;</div>
+<div class="t-bullet"><span class="t-dot">&#9679;</span> I'll look at the checkout component styles.</div>
+<div class="t-bullet"><span class="t-dot">&#9679;</span> Read <span style="color:#fff">src/components/CheckoutCTA.tsx</span> <span class="t-dim">(84 lines)</span></div>
+<div class="t-bullet"><span class="t-dot">&#9679;</span> Edit <span style="color:#fff">src/styles/checkout.css</span></div>
+<div class="t-del">&nbsp;&nbsp;- .cta-row { width: 120%; }</div>
+<div class="t-add">&nbsp;&nbsp;+ .cta-row { width: 100%; max-width: 480px; }</div>
+<div>&nbsp;</div>
+<div class="t-ok">&#10004; Change applied — dev server reloaded</div>
+<div class="t-bullet"><span class="t-dot">&#9679;</span> The button no longer overflows. Preview updated on the right.</div>
+<div>&nbsp;</div>
+<div class="t-await"><span class="block-cursor"></span>awaiting your next instruction&hellip;</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- knurled divider -->
+      <div id="divider" title="Drag to resize"></div>
+
+      <!-- browser pane -->
+      <section class="pane pane-browser">
+        <div class="btoolbar">
+          <button class="key nav-key" title="Back">&#9664;</button>
+          <button class="key nav-key" title="Forward">&#9654;</button>
+          <button class="key nav-key" title="Reload">&#10227;</button>
+          <div class="urlbar"><i class="lamp lamp-green"></i>http://localhost:5173/checkout</div>
+          <button id="btn-capture" class="key key-orange">&#x26F6; Capture</button>
+          <button class="key">Queue<span class="kbadge">2</span></button>
+          <span class="chip">console: 0</span>
+          <button class="key">&#8964; Collapse</button>
+        </div>
+        <div class="caption-plate">
+          <span>INSPECTION WINDOW &mdash; PAIRED BROWSER</span>
+          <span>AUTO-RELOAD <b>ON</b></span>
+        </div>
+        <div class="well browser-well">
+          <div class="webpage">
+            <div class="wp-head">
+              <div class="wp-logo">shop<span>/checkout</span></div>
+              <div class="wp-steps">cart &rsaquo; <b>payment</b> &rsaquo; done</div>
+            </div>
+            <div class="wp-body">
+              <div class="wp-card">
+                <h3>Order summary</h3>
+                <div class="wp-row"><span>Canvas Tote &times; 1</span><span>$28.00</span></div>
+                <div class="wp-row"><span>Enamel Mug &times; 1</span><span>$12.00</span></div>
+                <div class="wp-row"><span class="muted">Shipping</span><span class="muted">$8.00</span></div>
+                <div class="wp-row total"><span>Total</span><span>$48.00</span></div>
+                <button class="wp-cta">Pay $48.00</button>
+                <div class="wp-fine">Secured by shop-pay &middot; refunds within 30 days</div>
+              </div>
+            </div>
+            <div class="refreshed-chip">&#8635; REFRESHED</div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<!-- ══ status bar ══ -->
+<footer id="statusbar">
+  <span>ADAPTER</span><span class="sb-val">claude -p &middot; one-off</span>
+  <span class="sb-sep"></span>
+  <span>PAIRING</span><span class="sb-val">1:1 session &harr; pane</span>
+  <div class="sb-right">
+    <button class="sb-btn">DELIVERY LOG</button>
+    <span class="sb-serial">CHROMUX&middot;0.17.0&middot;CONCEPT-04</span>
+  </div>
+</footer>
+
+<div id="corner-tag">CONCEPT 04 &mdash; <b>FOREMAN</b></div>
+
+<!-- ══ capture modal ══ -->
+<div id="modal-capture" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Capture to agent">
+  <div class="modal">
+    <i class="screw tl"></i><i class="screw tr"></i><i class="screw bl"></i><i class="screw br"></i>
+    <div class="modal-head">
+      <span class="nameplate">Capture &rarr; Agent</span>
+      <button class="modal-x" data-close>&#10005;</button>
+    </div>
+    <div class="cap-grid">
+      <div class="cap-col">
+        <div class="cap-summary">
+          <div class="cap-sumrow"><span class="microlabel">SESSION</span><span class="v">checkout-flow &middot; claude</span></div>
+          <div class="cap-sumrow"><span class="microlabel">URL</span><span class="v">localhost:5173/checkout</span></div>
+          <div class="cap-sumrow"><span class="microlabel">SELECTION</span><span class="v">&ldquo;CTA button region 412&times;88&rdquo;</span></div>
+        </div>
+        <label class="field">
+          <span class="microlabel">NOTE TO AGENT — WHAT'S WRONG / WHAT TO DO</span>
+          <textarea rows="3" spellcheck="false" placeholder="e.g. the CTA button overflows its container — fix the CSS"></textarea>
+        </label>
+        <label class="field">
+          <span class="microlabel">TARGET</span>
+          <select><option>checkout-flow &middot; claude -p</option></select>
+        </label>
+        <div class="field">
+          <span class="microlabel">SCREENSHOT</span>
+          <div class="cap-shot">no screenshot &mdash; capture region to attach</div>
+        </div>
+      </div>
+      <div class="cap-col">
+        <span class="microlabel">PAYLOAD PREVIEW — YAML v1</span>
+        <div class="yaml-well"><pre><span class="yk">chromux_capture:</span> v1
+<span class="yk">session:</span> checkout-flow
+<span class="yk">agent:</span> claude
+<span class="yk">url:</span> http://localhost:5173/checkout
+<span class="yk">note:</span> CTA overflows container
+<span class="yk">screenshot:</span> ~/.chromux/captures/2026-07-11-0142.png
+<span class="yk">console_errors:</span> []</pre></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="key" data-close>Cancel</button>
+      <button class="key">File-Drop Only</button>
+      <button class="key key-orange">Send &mdash; claude -p</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var modal = document.getElementById('modal-capture');
+  document.getElementById('btn-capture').addEventListener('click', function(){
+    modal.classList.remove('hidden');
+  });
+  modal.querySelectorAll('[data-close]').forEach(function(b){
+    b.addEventListener('click', function(){ modal.classList.add('hidden'); });
+  });
+  modal.addEventListener('click', function(e){
+    if (e.target === modal) modal.classList.add('hidden');
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') modal.classList.add('hidden');
+  });
+})();
+</script>
+</body>
+</html>

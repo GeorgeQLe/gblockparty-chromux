@@ -9,4 +9,5 @@ docs/history/archive/
 research/_working/
 prototype/node_modules/
 prototype/dist/
-
+.vercel/
+dist-site/

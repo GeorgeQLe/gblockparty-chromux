@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Chromux — Paper Terminal</title>
+<style>
+/* ————————————————————————————————————————————————
+   CHROMUX · Nº 01 “PAPER TERMINAL”
+   Swiss editorial light — warm paper, ink hairlines,
+   one vermilion accent. No fills, no shadows: rules.
+   ———————————————————————————————————————————————— */
+
+:root{
+  --paper:      #faf7f0;
+  --paper-deep: #f3efe3;
+  --plate:      #fffefb;
+  --ink:        #1c1b17;
+  --ink-80:     rgba(28,27,23,.82);
+  --ink-70:     rgba(28,27,23,.70);
+  --ink-55:     rgba(28,27,23,.55);
+  --ink-45:     rgba(28,27,23,.45);
+  --ink-30:     rgba(28,27,23,.30);
+  --rule:       #ddd5c3;            /* hairline           */
+  --rule-mid:   #c9c1ad;            /* firmer hairline    */
+  --verm:       #d5341f;            /* the one accent     */
+  --verm-deep:  #b3290f;
+  --verm-faint: rgba(213,52,31,.10);
+  --green:      #47714b;            /* muted print green  */
+  --serif: "Iowan Old Style", Charter, "Charter", Baskerville, Georgia, serif;
+  --mono:  "SF Mono", Menlo, Monaco, "Courier New", monospace;
+}
+
+*{ margin:0; padding:0; box-sizing:border-box; }
+html,body{ height:100%; }
+body{
+  min-width:1280px;
+  height:100vh;
+  overflow:hidden;
+  display:grid;
+  grid-template-rows:44px minmax(0,1fr) 27px;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--serif);
+  font-feature-settings:"onum" 1, "pnum" 1;   /* old-style figures */
+  -webkit-font-smoothing:antialiased;
+}
+
+/* paper grain — inline SVG turbulence, multiplied on top of everything */
+body::after{
+  content:""; position:fixed; inset:0; z-index:120; pointer-events:none;
+  opacity:.05; mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+}
+
+button{ font-family:inherit; color:inherit; background:none; border:none; cursor:pointer; }
+button:focus-visible, textarea:focus-visible, select:focus-visible{
+  outline:1px solid var(--verm); outline-offset:2px;
+}
+
+/* shared printed-caption label */
+.microlabel{
+  font-family:var(--mono);
+  font-size:8.5px; font-weight:500;
+  letter-spacing:.18em; text-transform:uppercase;
+  color:var(--ink-55);
+}
+.fig{ color:var(--ink-45); }
+.fig b{ font-weight:600; color:var(--ink-70); letter-spacing:.18em; }
+
+/* hairline button — hover draws a red rule, never a fill */
+.btn{
+  font-family:var(--mono); font-size:9px; font-weight:500;
+  letter-spacing:.14em; text-transform:uppercase;
+  color:var(--ink-70);
+  border:1px solid var(--rule-mid);
+  padding:5px 11px;
+  transition:color .15s, border-color .15s, box-shadow .15s;
+}
+.btn:hover{ color:var(--verm); border-color:var(--verm); box-shadow:inset 0 -2px 0 var(--verm); }
+.btn-verm{
+  background:var(--verm); border-color:var(--verm); color:var(--paper);
+}
+.btn-verm:hover{ background:var(--verm-deep); border-color:var(--verm-deep); color:var(--paper); box-shadow:none; }
+
+/* ink-in reveal */
+@keyframes inkin{ from{ opacity:0; transform:translateY(7px); } to{ opacity:1; transform:none; } }
+.ink{ animation:inkin .55s cubic-bezier(.22,.7,.3,1) both; }
+#titlebar.ink       { animation-delay:.04s; }
+#rail.ink           { animation-delay:.14s; }
+#session-tabs.ink   { animation-delay:.22s; }
+#pane-terminal.ink  { animation-delay:.30s; }
+#pane-browser.ink   { animation-delay:.38s; }
+#statusbar.ink      { animation-delay:.46s; }
+
+@keyframes caretblink{ 0%,54%{ opacity:1; } 55%,100%{ opacity:0; } }
+@keyframes chipflash { 0%,100%{ opacity:.45; } 50%{ opacity:1; } }
+
+/* ══════════════ TITLEBAR ══════════════ */
+#titlebar{
+  position:relative;
+  display:flex; align-items:center;
+  padding:0 14px 0 84px;              /* traffic-light clearance */
+  border-top:2px solid var(--ink);    /* heavy newspaper rule    */
+  border-bottom:1px solid var(--rule);
+  -webkit-app-region:drag;
+}
+#titlebar button{ -webkit-app-region:no-drag; }
+.traffic{ position:absolute; left:17px; top:50%; transform:translateY(-50%); display:flex; gap:8px; }
+.traffic i{ width:11px; height:11px; border-radius:50%; border:1px solid var(--rule-mid); }
+
+.brand{ display:flex; align-items:baseline; gap:11px; }
+.brand-mark{ align-self:center; display:flex; }
+.brand-name{
+  font-family:var(--serif); font-size:15.5px; font-weight:600;
+  letter-spacing:.245em; text-transform:uppercase;
+}
+.brand-rule{ width:1px; height:13px; background:var(--rule-mid); align-self:center; }
+.brand-sub{
+  font-family:var(--mono); font-size:8.5px; letter-spacing:.22em;
+  text-transform:uppercase; color:var(--ink-45);
+}
+
+.titlebar-gauges{ margin-left:auto; display:flex; align-items:center; gap:18px; }
+.gauge{
+  font-family:var(--mono); font-size:9.5px; letter-spacing:.13em;
+  color:var(--ink-55); display:flex; align-items:center; gap:7px;
+}
+.gauge b{ font-weight:600; color:var(--ink); font-size:10.5px; }
+.gdot{ width:6px; height:6px; border-radius:50%; display:inline-block; }
+.g-live { background:var(--green); }
+.g-queue{ background:var(--verm); }
+.g-sent { background:none; border:1px solid var(--ink-45); }
+.gauge-sep{ width:1px; height:12px; background:var(--rule); }
+
+.top-btn.update-ready{
+  color:var(--verm); border-color:var(--verm);
+}
+.top-btn.update-ready::before{
+  content:""; display:inline-block; width:5px; height:5px; border-radius:50%;
+  background:var(--verm); margin-right:7px; vertical-align:1px;
+  animation:chipflash 2.2s ease-in-out infinite;
+}
+.top-btn.update-ready:hover{ background:var(--verm); color:var(--paper); box-shadow:none; }
+
+/* ══════════════ FRAME ══════════════ */
+#app{ display:flex; min-height:0; }
+
+/* ══════════════ LEFT RAIL ══════════════ */
+#rail{
+  position:relative;
+  width:232px; flex:0 0 232px;
+  display:flex; flex-direction:column;
+  border-right:1px solid var(--rule);
+  background:var(--paper);
+}
+/* ledger margin line */
+#rail::before{
+  content:""; position:absolute; top:0; bottom:0; left:22px; width:1px;
+  background:rgba(213,52,31,.38);
+}
+.rail-head{
+  display:flex; align-items:flex-start; justify-content:space-between;
+  padding:15px 12px 7px 34px;
+}
+.rail-head .btn{ padding:3px 8px; font-size:8.5px; }
+.rail-caption{ display:flex; flex-direction:column; gap:4px; }
+.rail-caption .rail-title{ color:var(--ink); letter-spacing:.2em; font-weight:600; font-size:9px; }
+
+#attention-list{ padding:8px 12px 0 34px; display:flex; flex-direction:column; gap:9px; }
+
+.qcard{
+  border:1px solid var(--rule);
+  padding:9px 11px 10px;
+  background:transparent;
+  transition:border-color .15s;
+}
+.qcard:hover{ border-color:var(--rule-mid); box-shadow:inset 0 -2px 0 var(--verm); }
+.qcard-top{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:4px; }
+.qkind{
+  font-family:var(--mono); font-size:8px; font-weight:600;
+  letter-spacing:.2em; color:var(--ink-45);
+}
+.qno{ font-family:var(--serif); font-size:9.5px; font-style:italic; color:var(--ink-30); }
+.qname{ font-family:var(--serif); font-size:13.5px; font-weight:600; font-style:italic; margin-bottom:3px; }
+.qdesc{ font-family:var(--mono); font-size:9.5px; line-height:1.55; color:var(--ink-55); }
+.qdesc code{ font-family:inherit; border-bottom:1px solid var(--rule-mid); padding-bottom:1px; }
+
+.qcard.urgent{ border-left:2px solid var(--verm); }
+.qcard.urgent .qkind{ color:var(--verm); }
+.qcard.exited .qname{ color:var(--ink-45); font-weight:400; }
+.qcard.exited .qdesc{ color:var(--ink-45); }
+
+.rail-foot{
+  margin-top:auto;
+  border-top:1px solid var(--rule);
+  padding:10px 12px 13px 34px;
+}
+.pathlink{
+  display:block; margin-top:4px; padding:0;
+  font-family:var(--mono); font-size:10px; color:var(--ink-70);
+  text-align:left; text-decoration:underline;
+  text-decoration-color:var(--rule-mid); text-underline-offset:3px;
+}
+.pathlink:hover{ color:var(--verm); text-decoration-color:var(--verm); }
+</style>
+</head>
+<body>
+<style>
+/* ══════════════ SESSION TABS ══════════════ */
+#workspace{ flex:1; min-width:0; display:flex; flex-direction:column; }
+
+#session-tabs{
+  display:flex; align-items:stretch;
+  height:39px; flex:0 0 39px;
+  border-bottom:1px solid var(--rule);
+  padding:0 10px;
+}
+.session-tab{
+  display:flex; align-items:center; gap:8px;
+  padding:0 16px;
+  font-family:var(--mono); font-size:10px; letter-spacing:.06em;
+  color:var(--ink-45);
+  border-bottom:2px solid transparent;
+  margin-bottom:-1px;
+  transition:color .15s, border-color .15s;
+}
+.session-tab:hover{ color:var(--ink); border-bottom-color:var(--rule-mid); }
+.session-tab.active{
+  color:var(--ink); font-weight:600;
+  border-bottom-color:var(--verm);
+}
+.tab-dot{ width:5px; height:5px; border-radius:50%; flex:0 0 auto; }
+.tab-dot.live{ background:var(--green); }
+.tab-dot.dead{ background:none; border:1px solid var(--verm); }
+.tab-badge{
+  font-size:8.5px; font-weight:600; color:var(--verm);
+  border:1px solid var(--verm); border-radius:50%;
+  width:14px; height:14px; line-height:12px; text-align:center;
+}
+.add-tab{
+  align-self:center; margin-left:6px;
+  width:22px; height:22px;
+  border:1px solid var(--rule-mid);
+  font-family:var(--serif); font-size:14px; line-height:1;
+  color:var(--ink-55);
+}
+.add-tab:hover{ color:var(--verm); border-color:var(--verm); }
+
+/* ══════════════ STAGE ══════════════ */
+#stage{ flex:1; min-height:0; display:flex; }
+
+.pane{ display:flex; flex-direction:column; min-width:0; min-height:0; }
+#pane-terminal{ flex:0 0 46%; }
+#pane-browser { flex:1; }
+
+.pane-head{
+  display:flex; align-items:baseline; justify-content:space-between;
+  height:33px; flex:0 0 33px;
+  padding:10px 18px 0;
+  border-bottom:1px solid var(--rule);
+}
+.pane-cwd{ font-family:var(--mono); font-size:9.5px; color:var(--ink-45); letter-spacing:.02em; }
+
+/* divider — twin hairlines like a newspaper column rule */
+#divider{
+  flex:0 0 7px; cursor:col-resize; position:relative;
+  border-left:1px solid var(--rule); border-right:1px solid var(--rule);
+}
+#divider::after{
+  content:""; position:absolute; left:50%; top:50%;
+  width:1px; height:26px; transform:translate(-50%,-50%);
+  background:var(--rule-mid);
+}
+#divider:hover{ border-color:var(--verm); }
+
+/* ——— terminal transcript, typeset ——— */
+.term-body{
+  flex:1; min-height:0; overflow:hidden;
+  padding:18px 22px;
+  font-family:var(--mono); font-size:11.5px; line-height:2.05;
+  color:var(--ink);
+}
+.tl{ white-space:pre-wrap; }
+.tl .pfx{ color:var(--ink-30); }
+.tl-welcome{ display:flex; justify-content:space-between; color:var(--ink-70); }
+.tl-welcome .path{ color:var(--ink-30); font-size:10px; }
+.tl-prompt{ font-weight:700; color:var(--ink); }
+.tl-diff{ padding-left:2ch; }
+.tl-del{ color:var(--ink-45); text-decoration:line-through; text-decoration-color:var(--ink-45); }
+.tl-add{ text-decoration:underline; text-underline-offset:4px; text-decoration-color:var(--rule-mid); }
+.tl-ok{ color:var(--ink-70); }
+.tl-ok .pfx{ color:var(--green); }
+.tl-await{ color:var(--verm); font-weight:600; }
+.caret{ animation:caretblink 1.1s step-end infinite; }
+
+/* ——— browser pane ——— */
+.browser-bar{
+  display:flex; align-items:center; gap:7px;
+  height:41px; flex:0 0 41px;
+  padding:0 12px;
+  border-bottom:1px solid var(--rule);
+}
+.browser-bar .btn{ padding:5px 9px; letter-spacing:.1em; }
+.nav-btn{
+  width:23px; height:23px; flex:0 0 auto;
+  border:1px solid var(--rule-mid);
+  font-family:var(--mono); font-size:11px; line-height:1;
+  color:var(--ink-55);
+}
+.nav-btn:hover{ color:var(--verm); border-color:var(--verm); }
+.url-bar{
+  flex:1; min-width:0;
+  border:1px solid var(--rule-mid);
+  padding:4px 11px;
+  font-family:var(--mono); font-size:10.5px; color:var(--ink-70);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.url-bar .proto{ color:var(--ink-30); }
+.chip-console{
+  font-family:var(--mono); font-size:8.5px; letter-spacing:.14em;
+  color:var(--ink-45); padding:4px 0;
+}
+.bar-btn{ white-space:nowrap; }
+.bar-btn .bdg{ color:var(--verm); font-weight:700; margin-left:5px; }
+.btn-collapse{ border-color:transparent; }
+.btn-collapse:hover{ border-color:transparent; box-shadow:none; color:var(--verm); }
+
+.browser-body{
+  flex:1; min-height:0; display:flex; flex-direction:column; align-items:center;
+  padding:22px 30px 12px;
+  position:relative;
+}
+.plate{
+  position:relative;
+  width:100%; max-width:660px; flex:1; min-height:0;
+  background:var(--plate);
+  border:1px solid var(--rule-mid);
+  display:flex; flex-direction:column;
+  overflow:hidden;
+}
+.plate-caption{
+  flex:0 0 auto;
+  margin:9px 0 0;
+  font-family:var(--mono); font-size:8.5px; letter-spacing:.2em;
+  color:var(--ink-45); text-transform:uppercase;
+}
+.plate-caption b{ color:var(--ink-70); font-weight:600; }
+.chip-refresh{
+  position:absolute; bottom:12px; right:12px; z-index:3;
+  font-family:var(--mono); font-size:8px; font-weight:600; letter-spacing:.18em;
+  color:var(--verm); border:1px solid var(--verm);
+  background:var(--plate);
+  padding:3px 7px;
+  animation:chipflash 2.6s ease-in-out infinite;
+}
+
+/* the fake web page — deliberately its own world (web-neutral sans) */
+.web{ font-family:-apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; color:#18181b;
+      display:flex; flex-direction:column; flex:1; min-height:0; }
+.web-head{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:13px 26px; border-bottom:1px solid #ececec;
+}
+.web-logo{ font-size:13.5px; font-weight:700; letter-spacing:-.01em; }
+.web-nav{ display:flex; gap:18px; font-size:11.5px; color:#71717a; }
+.web-main{ flex:1; overflow:hidden; display:flex; justify-content:center; align-items:center; padding:20px; }
+.web-col{ width:330px; }
+.web-h1{ font-size:19px; font-weight:700; letter-spacing:-.02em; margin-bottom:14px; }
+.web-card{ border:1px solid #e4e4e7; border-radius:9px; padding:16px 18px; background:#fff; }
+.web-row{ display:flex; justify-content:space-between; font-size:12.5px; color:#3f3f46; padding:5px 0; }
+.web-row.total{ border-top:1px solid #e4e4e7; margin-top:7px; padding-top:11px; font-weight:700; color:#18181b; font-size:13px; }
+.web-cta{
+  display:block; width:100%; margin-top:14px;
+  background:#18181b; color:#fff; border:none; border-radius:7px;
+  font-size:13.5px; font-weight:600; padding:11px 0; text-align:center;
+}
+.web-fine{ margin-top:10px; font-size:10px; color:#a1a1aa; text-align:center; }
+
+/* ══════════════ STATUS BAR ══════════════ */
+#statusbar{
+  display:flex; align-items:center; justify-content:space-between;
+  border-top:2px solid var(--ink);         /* heavy closing rule */
+  padding:0 14px;
+  font-family:var(--mono); font-size:9px; letter-spacing:.1em;
+  background:var(--paper);
+}
+.sb-left,.sb-right{ display:flex; align-items:center; gap:9px; }
+.sb-val{ color:var(--ink-70); letter-spacing:.04em; }
+.sb-sep{ width:1px; height:11px; background:var(--rule-mid); margin:0 4px; }
+.sb-btn{
+  font-family:var(--mono); font-size:8.5px; letter-spacing:.16em;
+  color:var(--ink-70); padding:2px 0;
+  border-bottom:1px solid var(--rule-mid);
+}
+.sb-btn:hover{ color:var(--verm); border-bottom-color:var(--verm); }
+.sb-ver{ color:var(--ink-45); letter-spacing:.06em; }
+
+/* ══════════════ CAPTURE MODAL — printed sheet ══════════════ */
+.overlay{
+  position:fixed; inset:0; z-index:60;
+  display:flex; align-items:center; justify-content:center;
+  background:rgba(250,247,240,.87);         /* screened, not blurred */
+}
+.overlay.hidden{ display:none; }
+.sheet{
+  width:880px; max-width:calc(100vw - 80px);
+  background:var(--paper);
+  border:1px solid var(--ink);
+  border-top-width:2px;
+}
+.sheet-head{
+  display:flex; align-items:baseline; justify-content:space-between;
+  padding:13px 18px 11px;
+  border-bottom:1px solid var(--rule);
+}
+.sheet-x{
+  font-family:var(--mono); font-size:11px; color:var(--ink-45); padding:0 2px;
+}
+.sheet-x:hover{ color:var(--verm); }
+.cap-grid{ display:grid; grid-template-columns:1fr 1fr; }
+.cap-col{ padding:16px 20px 18px; display:flex; flex-direction:column; gap:13px; }
+.cap-col.left{ border-right:1px solid var(--rule); }
+
+.cap-summary{ display:flex; flex-direction:column; }
+.cap-row{
+  display:grid; grid-template-columns:82px 1fr; align-items:baseline;
+  padding:6px 0 7px; border-bottom:1px solid var(--rule);
+}
+.cap-row:first-child{ border-top:1px solid var(--rule); }
+.cap-val{ font-family:var(--mono); font-size:10.5px; color:var(--ink-80); }
+
+.field{ display:flex; flex-direction:column; gap:6px; }
+.field textarea, .field select{
+  width:100%; background:var(--plate);
+  border:1px solid var(--rule-mid);
+  font-family:var(--mono); font-size:10.5px; color:var(--ink);
+  padding:8px 10px; resize:none; border-radius:0;
+  -webkit-appearance:none; appearance:none;
+}
+.field textarea::placeholder{ color:var(--ink-30); }
+.field select{ background-image:none; }
+.selectwrap{ position:relative; }
+.selectwrap::after{
+  content:"⌄"; position:absolute; right:10px; top:50%; transform:translateY(-55%);
+  font-family:var(--mono); font-size:10px; color:var(--ink-45); pointer-events:none;
+}
+.cap-shot{
+  height:74px; border:1px solid var(--rule-mid);
+  display:flex; align-items:center; justify-content:center;
+  background:repeating-linear-gradient(45deg, transparent 0 7px, rgba(28,27,23,.045) 7px 8px);
+  font-family:var(--mono); font-size:8.5px; letter-spacing:.16em; color:var(--ink-45);
+}
+.yaml-view{
+  flex:1; border:1px solid var(--rule-mid); background:var(--plate);
+  padding:12px 14px;
+  font-family:var(--mono); font-size:10.5px; line-height:1.95; color:var(--ink-80);
+  white-space:pre; overflow:auto;
+}
+.yaml-view .yk{ color:var(--ink-45); }
+.sheet-foot{
+  display:flex; align-items:center; justify-content:flex-end; gap:9px;
+  padding:12px 18px;
+  border-top:1px solid var(--rule);
+}
+
+/* ══════════════ CORNER TAG ══════════════ */
+#corner-tag{
+  position:fixed; right:13px; bottom:35px; z-index:40;
+  font-family:var(--mono); font-size:8px; letter-spacing:.2em;
+  color:var(--ink-45); background:var(--paper);
+  border:1px solid var(--rule-mid);
+  padding:4px 9px;
+}
+#corner-tag b{ color:var(--verm); font-weight:600; }
+</style>
+
+<!-- ══ titlebar ══ -->
+<header id="titlebar" class="ink">
+  <span class="traffic" aria-hidden="true"><i></i><i></i><i></i></span>
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 64 64" width="17" height="17">
+        <path d="M22 18 L44 32 L22 46" fill="none" stroke="#1c1b17" stroke-opacity=".35" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="22" cy="18" r="6.4" fill="#c9702e" stroke="#1c1b17" stroke-width="1.6"/>
+        <circle cx="44" cy="32" r="6.4" fill="#7b64a8" stroke="#1c1b17" stroke-width="1.6"/>
+        <circle cx="22" cy="46" r="6.4" fill="#47714b" stroke="#1c1b17" stroke-width="1.6"/>
+      </svg>
+    </span>
+    <span class="brand-name">Chromux</span>
+    <span class="brand-rule"></span>
+    <span class="brand-sub">Agent&nbsp;Cockpit</span>
+  </div>
+  <div class="titlebar-gauges">
+    <span class="gauge"><i class="gdot g-live"></i><b>3</b>&nbsp;SESSIONS</span>
+    <span class="gauge-sep"></span>
+    <span class="gauge"><i class="gdot g-queue"></i><b>2</b>&nbsp;QUEUED</span>
+    <span class="gauge-sep"></span>
+    <span class="gauge"><i class="gdot g-sent"></i><b>14</b>&nbsp;SENT</span>
+    <span class="gauge-sep"></span>
+    <button class="btn top-btn update-ready">Update&nbsp;Ready</button>
+    <button class="btn top-btn">Settings</button>
+  </div>
+</header>
+
+<!-- ══ main frame ══ -->
+<div id="app">
+
+  <!-- ══ left rail ══ -->
+  <aside id="rail" class="ink">
+    <div class="rail-head">
+      <div class="rail-caption">
+        <span class="microlabel fig"><b>Fig.&nbsp;1</b>&nbsp;—</span>
+        <span class="microlabel rail-title">Attention&nbsp;Queue</span>
+      </div>
+      <button class="btn">⛶&nbsp;Detect</button>
+    </div>
+
+    <div id="attention-list">
+      <article class="qcard urgent">
+        <div class="qcard-top"><span class="qkind">APPROVAL</span><span class="qno">i.</span></div>
+        <div class="qname">checkout-flow</div>
+        <div class="qdesc">claude wants to run <code>npm run db:migrate</code></div>
+      </article>
+
+      <article class="qcard">
+        <div class="qcard-top"><span class="qkind">PREVIEW</span><span class="qno">ii.</span></div>
+        <div class="qname">landing-page</div>
+        <div class="qdesc">localhost:5173 changed — review ready</div>
+      </article>
+
+      <article class="qcard exited">
+        <div class="qcard-top"><span class="qkind">EXITED</span><span class="qno">iii.</span></div>
+        <div class="qname">api-server</div>
+        <div class="qdesc">codex exited (code 0) · 12m ago</div>
+      </article>
+    </div>
+
+    <div class="rail-foot">
+      <span class="microlabel">Local Storage</span>
+      <button class="pathlink">~/.chromux/captures</button>
+    </div>
+  </aside>
+
+  <!-- ══ workspace ══ -->
+  <div id="workspace">
+
+    <nav id="session-tabs" class="ink" aria-label="Session tabs">
+      <button class="session-tab active">
+        <i class="tab-dot live"></i>checkout-flow&nbsp;·&nbsp;claude<span class="tab-badge">2</span>
+      </button>
+      <button class="session-tab">
+        <i class="tab-dot live"></i>landing-page&nbsp;·&nbsp;grok
+      </button>
+      <button class="session-tab">
+        <i class="tab-dot dead"></i>api-server&nbsp;·&nbsp;codex
+      </button>
+      <button class="add-tab" title="New session">+</button>
+    </nav>
+
+    <!-- ══ stage ══ -->
+    <main id="stage">
+
+      <!-- terminal pane -->
+      <section class="pane ink" id="pane-terminal">
+        <div class="pane-head">
+          <span class="microlabel fig"><b>Fig.&nbsp;2</b>&nbsp;—&nbsp;Terminal&nbsp;·&nbsp;claude</span>
+          <span class="pane-cwd">~/projects/shop/checkout-flow</span>
+        </div>
+        <div class="term-body">
+<div class="tl tl-welcome"><span><span class="pfx">✻</span> Welcome to Claude Code!</span><span class="path">/projects/shop/checkout-flow</span></div>
+<div class="tl tl-prompt"><span class="pfx">&gt;</span> fix the CTA overflow on the checkout page</div>
+<div class="tl"><span class="pfx">●</span> I'll look at the checkout component styles.</div>
+<div class="tl"><span class="pfx">●</span> Read src/components/CheckoutCTA.tsx <span class="pfx">(84 lines)</span></div>
+<div class="tl"><span class="pfx">●</span> Edit src/styles/checkout.css</div>
+<div class="tl tl-diff"><span class="pfx">−</span> <span class="tl-del">.cta-row { width: 120%; }</span></div>
+<div class="tl tl-diff"><span class="pfx">+</span> <span class="tl-add">.cta-row { width: 100%; max-width: 480px; }</span></div>
+<div class="tl tl-ok"><span class="pfx">✔</span> Change applied — dev server reloaded</div>
+<div class="tl"><span class="pfx">●</span> The button no longer overflows. Preview updated on the right.</div>
+<div class="tl tl-await"><span class="caret">▌</span>awaiting your next instruction…</div>
+        </div>
+      </section>
+
+      <div id="divider" title="Drag to resize"></div>
+
+      <!-- browser pane -->
+      <section class="pane ink" id="pane-browser">
+        <div class="browser-bar">
+          <button class="nav-btn" title="Back">←</button>
+          <button class="nav-btn" title="Forward">→</button>
+          <button class="nav-btn" title="Reload">↻</button>
+          <div class="url-bar"><span class="proto">http://</span>localhost:5173/checkout</div>
+          <button id="btn-capture" class="btn btn-verm bar-btn">⛶&nbsp;Capture</button>
+          <button class="btn bar-btn">Queue<span class="bdg">2</span></button>
+          <span class="chip-console">CONSOLE&nbsp;0</span>
+          <button class="btn bar-btn btn-collapse">⌄&nbsp;Collapse</button>
+        </div>
+
+        <div class="browser-body">
+          <figure class="plate">
+            <span class="chip-refresh">REFRESHED</span>
+            <div class="web">
+              <div class="web-head">
+                <span class="web-logo">Meridian&nbsp;Goods</span>
+                <nav class="web-nav"><span>Shop</span><span>About</span><span>Cart&nbsp;(2)</span></nav>
+              </div>
+              <div class="web-main">
+                <div class="web-col">
+                  <h1 class="web-h1">Checkout</h1>
+                  <div class="web-card">
+                    <div class="web-row"><span>Field Notebook × 2</span><span>$18.00</span></div>
+                    <div class="web-row"><span>Canvas Tote</span><span>$22.00</span></div>
+                    <div class="web-row"><span>Shipping</span><span>$8.00</span></div>
+                    <div class="web-row total"><span>Total</span><span>$48.00</span></div>
+                    <button class="web-cta">Pay $48.00</button>
+                    <div class="web-fine">Secured by Meridian Pay · Cancel anytime</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </figure>
+          <figcaption class="plate-caption"><b>Plate</b> — localhost:5173/checkout</figcaption>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- ══ status bar ══ -->
+<footer id="statusbar" class="ink">
+  <div class="sb-left">
+    <span class="microlabel">Adapter</span><span class="sb-val">claude -p · one-off</span>
+    <span class="sb-sep"></span>
+    <span class="microlabel">Pairing</span><span class="sb-val">1:1 session ↔ pane</span>
+  </div>
+  <div class="sb-right">
+    <button class="sb-btn">DELIVERY LOG</button>
+    <span class="sb-ver">chromux 0.17.0 — paper terminal concept</span>
+  </div>
+</footer>
+
+<!-- ══ capture modal — printed sheet ══ -->
+<div id="modal-capture" class="overlay hidden">
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Capture to agent">
+    <div class="sheet-head">
+      <span class="microlabel fig"><b>Fig.&nbsp;3</b>&nbsp;—&nbsp;Capture&nbsp;→&nbsp;Agent</span>
+      <button class="sheet-x" data-close>✕</button>
+    </div>
+
+    <div class="cap-grid">
+      <div class="cap-col left">
+        <div class="cap-summary">
+          <div class="cap-row"><span class="microlabel">Session</span><span class="cap-val">checkout-flow · claude</span></div>
+          <div class="cap-row"><span class="microlabel">URL</span><span class="cap-val">localhost:5173/checkout</span></div>
+          <div class="cap-row"><span class="microlabel">Selection</span><span class="cap-val">“CTA button region 412 × 88”</span></div>
+        </div>
+
+        <label class="field">
+          <span class="microlabel">Note to agent — what's wrong / what to do</span>
+          <textarea rows="3" spellcheck="false"
+            placeholder="e.g. the CTA button overflows its container — fix the CSS"></textarea>
+        </label>
+
+        <label class="field">
+          <span class="microlabel">Target</span>
+          <span class="selectwrap">
+            <select><option>checkout-flow · claude -p</option></select>
+          </span>
+        </label>
+
+        <div class="field">
+          <span class="microlabel">Screenshot</span>
+          <div class="cap-shot">CTA&nbsp;REGION&nbsp;·&nbsp;412&nbsp;×&nbsp;88&nbsp;—&nbsp;PENDING</div>
+        </div>
+      </div>
+
+      <div class="cap-col">
+        <span class="microlabel">Payload Preview — YAML v1</span>
+<pre class="yaml-view"><span class="yk">chromux_capture:</span> v1
+<span class="yk">session:</span> checkout-flow
+<span class="yk">agent:</span> claude
+<span class="yk">url:</span> http://localhost:5173/checkout
+<span class="yk">note:</span> CTA overflows container
+<span class="yk">screenshot:</span> ~/.chromux/captures/2026-07-11-0142.png
+<span class="yk">console_errors:</span> []</pre>
+      </div>
+    </div>
+
+    <div class="sheet-foot">
+      <button class="btn" data-close>Cancel</button>
+      <button class="btn">File-Drop Only</button>
+      <button class="btn btn-verm">Send — claude -p</button>
+    </div>
+  </div>
+</div>
+
+<div id="corner-tag"><b>Nº 01</b>&nbsp;·&nbsp;PAPER&nbsp;TERMINAL</div>
+
+<script>
+(function(){
+  var modal = document.getElementById('modal-capture');
+  document.getElementById('btn-capture').addEventListener('click', function(){
+    modal.classList.remove('hidden');
+  });
+  modal.querySelectorAll('[data-close]').forEach(function(el){
+    el.addEventListener('click', function(){ modal.classList.add('hidden'); });
+  });
+  modal.addEventListener('click', function(e){
+    if (e.target === modal) modal.classList.add('hidden');
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') modal.classList.add('hidden');
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Chromux — Streak</title>
+<style>
+/* ══════════════════════════════════════════════════════════════
+   CHROMUX — "STREAK" concept
+   Gamified learning-app energy: glossy saturated green, bubbly
+   pill chips, chunky 3D-bottom pressable buttons, XP-bar gauges.
+   ══════════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap');
+
+:root{
+  /* core brand */
+  --green:      #58cc02;
+  --green-hi:   #71dc1a;
+  --green-dk:   #46a302;
+  --green-dkr:  #3a8a00;
+  --green-tint: #e7f8d8;
+  --blue:       #1cb0f6;
+  --blue-dk:    #1899d6;
+  --blue-tint:  #ddf4ff;
+  --purple:     #a560e8;
+  --purple-dk:  #8549ba;
+  --purple-tint:#f2e7fd;
+  --flame:      #ff9600;
+  --flame-dk:   #e08600;
+  --flame-tint: #ffefd6;
+  --yellow:     #ffc800;
+  --yellow-dk:  #e0ac00;
+  --red:        #ff4b4b;
+  --red-dk:     #d33131;
+  --red-tint:   #ffe3e3;
+  /* chrome */
+  --bg:         #f2f7ec;
+  --card:       #ffffff;
+  --line:       #e4eadb;
+  --line-dk:    #d6ddcc;
+  --ink:        #3f4a3a;
+  --ink-strong: #2f3a2b;
+  --sub:        #8a967f;
+  /* terminal well */
+  --well:       #12222e;
+  --well-edge:  #0c1822;
+  --well-line:  #1e3444;
+  --well-txt:   #cfe3ee;
+  --well-dim:   #6d8798;
+  --well-green: #7bed4e;
+  /* type */
+  --round: 'Nunito','Avenir Next Rounded','Avenir Next','SF Pro Rounded',ui-rounded,-apple-system,'Helvetica Neue',sans-serif;
+  --mono:  'SF Mono',Menlo,Monaco,'Courier New',monospace;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:var(--round);
+  font-weight:700;
+  color:var(--ink);
+  background:var(--bg);
+  overflow:hidden;
+  height:100vh;
+  display:grid;
+  grid-template-rows:56px 1fr 32px;
+  -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;cursor:pointer}
+
+/* ── chunky 3D pressable buttons ─────────────────────────────── */
+.btn3{
+  display:inline-flex;align-items:center;gap:7px;
+  border:0;border-radius:14px;
+  font-weight:900;font-size:11.5px;letter-spacing:.07em;
+  padding:9px 14px;line-height:1;
+  color:#fff;background:var(--green);
+  border-bottom:4px solid var(--green-dk);
+  transition:filter .12s ease;
+  user-select:none;
+}
+.btn3:hover{filter:brightness(1.05)}
+.btn3:active{transform:translateY(3px);border-bottom-width:1px;margin-bottom:3px}
+.btn3.b-blue{background:var(--blue);border-bottom-color:var(--blue-dk)}
+.btn3.b-purple{background:var(--purple);border-bottom-color:var(--purple-dk)}
+.btn3.b-flame{background:var(--flame);border-bottom-color:var(--flame-dk)}
+.btn3.b-red{background:var(--red);border-bottom-color:var(--red-dk)}
+.btn3.b-white{
+  background:#fff;color:var(--sub);
+  border:2px solid var(--line-dk);border-bottom-width:4px;
+}
+.btn3.b-white:hover{background:#fafcf6;color:var(--ink)}
+.btn3.b-white:active{border-bottom-width:2px;margin-bottom:2px;transform:translateY(2px)}
+.btn3.b-lg{font-size:13px;padding:12px 20px;border-radius:16px;border-bottom-width:5px}
+.btn3.b-lg:active{transform:translateY(4px);border-bottom-width:1px;margin-bottom:4px}
+
+/* ── celebratory micro-motion ────────────────────────────────── */
+@keyframes badgepop{
+  0%,72%,100%{transform:scale(1)}
+  80%{transform:scale(1.22)}
+  90%{transform:scale(.96)}
+}
+@keyframes flameflick{
+  0%,100%{transform:scale(1) rotate(-2deg)}
+  50%{transform:scale(1.12) rotate(3deg)}
+}
+@keyframes successpop{
+  0%{transform:scale(.92);opacity:.4}
+  55%{transform:scale(1.04)}
+  100%{transform:scale(1);opacity:1}
+}
+@keyframes refreshpulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(88,204,2,.45)}
+  55%{box-shadow:0 0 0 7px rgba(88,204,2,0)}
+}
+@keyframes caretblink{
+  0%,55%{opacity:1}56%,100%{opacity:.15}
+}
+@keyframes xpshine{
+  0%{transform:translateX(-140%)}
+  60%,100%{transform:translateX(280%)}
+}
+/* ── titlebar ────────────────────────────────────────────────── */
+#titlebar{
+  display:flex;align-items:center;gap:10px;
+  padding:0 12px 0 84px;
+  background:var(--card);
+  border-bottom:2px solid var(--line);
+  position:relative;z-index:5;
+}
+.traffic{position:absolute;left:18px;top:50%;transform:translateY(-50%);display:flex;gap:8px}
+.traffic i{width:12px;height:12px;border-radius:50%;background:#e3e8dc;display:block}
+.brand{display:flex;align-items:center;gap:9px}
+.brand-mark{display:grid;place-items:center;width:34px;height:34px;border-radius:12px;
+  background:var(--green-tint);border-bottom:3px solid #cdeab2}
+.brand-name{font-weight:900;font-size:16px;letter-spacing:.12em;color:var(--ink-strong)}
+.brand-sub{font-weight:800;font-size:9.5px;letter-spacing:.2em;color:#fff;
+  background:var(--purple);border-radius:999px;padding:4px 9px 3px;
+  border-bottom:2px solid var(--purple-dk)}
+.titlebar-gauges{margin-left:auto;display:flex;align-items:center;gap:8px}
+.titlebar-gauges .btn3{font-size:10.5px;padding:8px 11px}
+
+/* game-stat gauges */
+.gauge{
+  display:inline-flex;align-items:center;gap:6px;
+  background:#fff;border:2px solid var(--line-dk);border-bottom-width:4px;
+  border-radius:999px;padding:5px 10px 4px;
+  font-weight:900;font-size:10.5px;letter-spacing:.05em;color:var(--sub);
+  white-space:nowrap;
+}
+.gauge b{font-size:12.5px;color:var(--ink-strong)}
+.gauge.g-sessions{border-color:#bfe89a;background:var(--green-tint);color:var(--green-dk)}
+.gauge.g-sessions b{color:var(--green-dk)}
+.gdot{width:9px;height:9px;border-radius:50%;background:var(--green);display:inline-block;
+  box-shadow:0 0 0 3px rgba(88,204,2,.2)}
+.gauge.g-flame{border-color:#ffd9a1;background:var(--flame-tint);color:var(--flame-dk)}
+.gauge.g-flame b{color:var(--flame-dk)}
+.flame-ico{display:inline-block;animation:flameflick 1.6s ease-in-out infinite;transform-origin:50% 90%}
+.gauge.g-xp{border-color:#a5ddf9;background:var(--blue-tint);color:var(--blue-dk);gap:8px}
+.gauge.g-xp b{color:var(--blue-dk)}
+.xpbar{position:relative;width:46px;height:10px;border-radius:999px;background:#c1e7fa;overflow:hidden}
+.xpfill{position:absolute;inset:0;width:70%;border-radius:999px;background:var(--blue);overflow:hidden}
+.xpfill::after{content:"";position:absolute;top:0;bottom:0;left:0;width:40%;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.55),transparent);
+  animation:xpshine 2.8s ease-in-out infinite}
+
+/* bouncy round badge tokens */
+.badge{
+  display:inline-grid;place-items:center;
+  min-width:20px;height:20px;padding:0 5px;border-radius:999px;
+  background:var(--yellow);color:#7a5a00;
+  border-bottom:2px solid var(--yellow-dk);
+  font-weight:900;font-size:11px;
+  animation:badgepop 2.6s ease-in-out infinite;
+}
+
+/* ── app frame ───────────────────────────────────────────────── */
+#app{display:flex;min-height:0}
+
+/* ── left rail: attention queue ──────────────────────────────── */
+#rail{
+  width:230px;flex:0 0 230px;display:flex;flex-direction:column;
+  padding:12px 10px 10px 12px;gap:9px;
+  border-right:2px solid var(--line);
+}
+.rail-head{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.microlabel{font-weight:900;font-size:10px;letter-spacing:.16em;color:var(--sub)}
+.q-card{
+  background:var(--card);border:2px solid var(--line);border-bottom-width:4px;
+  border-radius:18px;padding:10px 12px;display:flex;flex-direction:column;gap:4px;
+  transition:transform .12s ease;
+}
+.q-card:hover{transform:translateY(-2px)}
+.q-kind{display:inline-flex;align-self:flex-start;align-items:center;gap:5px;
+  border-radius:999px;padding:3px 9px 2px;font-size:9.5px;font-weight:900;letter-spacing:.14em}
+.q-card.q-approval{border-color:#ffd9a1;background:#fffaf1}
+.q-card.q-approval .q-kind{background:var(--flame);color:#fff;border-bottom:2px solid var(--flame-dk)}
+.q-card.q-preview{border-color:#a5ddf9;background:#f4fbff}
+.q-card.q-preview .q-kind{background:var(--blue);color:#fff;border-bottom:2px solid var(--blue-dk)}
+.q-card.q-exited{border-color:#f3c8c8;background:#fff6f6;opacity:.88}
+.q-card.q-exited .q-kind{background:var(--red);color:#fff;border-bottom:2px solid var(--red-dk)}
+.q-name{font-weight:900;font-size:13px;color:var(--ink-strong)}
+.q-desc{font-weight:700;font-size:11px;line-height:1.35;color:var(--sub)}
+.q-desc code{font-family:var(--mono);font-size:10px;background:var(--green-tint);
+  color:var(--green-dkr);border-radius:6px;padding:1px 4px}
+.rail-foot{margin-top:auto;display:flex;flex-direction:column;gap:4px;
+  background:var(--card);border:2px solid var(--line);border-radius:14px;padding:9px 11px}
+.pathlink{border:0;background:none;text-align:left;font-family:var(--mono);
+  font-size:10.5px;color:var(--blue-dk);text-decoration:underline;text-underline-offset:2px;padding:0}
+.pathlink:hover{color:var(--blue)}
+
+/* ── session tab strip ───────────────────────────────────────── */
+#workspace{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0}
+#session-tabs{display:flex;align-items:center;gap:8px;padding:10px 12px 4px}
+.session-tab{
+  display:inline-flex;align-items:center;gap:8px;
+  border-radius:999px;padding:8px 15px;
+  background:#fff;border:2px solid var(--line-dk);border-bottom-width:4px;
+  font-weight:900;font-size:12px;color:var(--sub);letter-spacing:.02em;
+}
+.session-tab:hover{color:var(--ink)}
+.session-tab:active{transform:translateY(2px);border-bottom-width:2px;margin-bottom:2px}
+.session-tab.on{
+  background:var(--green);border-color:var(--green);border-bottom-color:var(--green-dkr);
+  color:#fff;
+}
+.tdot{width:9px;height:9px;border-radius:50%;background:var(--green);display:inline-block}
+.session-tab.on .tdot{background:#d9ffb3;box-shadow:0 0 0 3px rgba(255,255,255,.25)}
+.tdot.dead{background:var(--red)}
+.add-tab{width:36px;justify-content:center;padding:8px 0;font-size:15px;line-height:.8}
+
+/* ── stage split view ────────────────────────────────────────── */
+#stage{flex:1;display:flex;min-height:0;padding:8px 12px 10px;gap:0}
+.pane{display:flex;flex-direction:column;min-width:0;min-height:0;
+  border-radius:20px;overflow:hidden}
+.pane-head{display:flex;align-items:center;gap:10px;padding:10px 14px;flex:0 0 auto}
+.cwd{font-family:var(--mono);font-size:10.5px;font-weight:400;margin-left:auto}
+
+/* terminal well */
+#pane-term{flex:0 0 43%;background:var(--well);
+  border:2px solid var(--well-edge);border-bottom-width:5px}
+#pane-term .pane-head{background:var(--well-edge);border-bottom:2px solid var(--well-line)}
+#pane-term .microlabel{color:#7fe24e}
+#pane-term .cwd{color:var(--well-dim)}
+.term-body{flex:1;overflow:hidden;padding:14px 16px;font-family:var(--mono);
+  font-size:11.5px;line-height:1.85;color:var(--well-txt);font-weight:400}
+.t-hello{color:#ffc800}
+.t-hello .t-path{color:var(--well-dim);float:right}
+.t-user{color:#5ad0ff}
+.t-dot{color:#7fe24e}
+.t-dim{color:var(--well-dim)}
+.t-del{color:#ff8080}
+.t-add{color:#7fe24e}
+.t-success{
+  display:inline-flex;align-items:center;gap:8px;
+  background:rgba(88,204,2,.16);color:#8df05c;
+  border:1px solid rgba(127,226,78,.4);border-radius:999px;
+  padding:2px 12px;margin:3px 0;
+  animation:successpop .5s ease-out both;
+}
+.t-await{color:var(--well-dim)}
+.t-caret{display:inline-block;width:8px;height:14px;background:#7fe24e;
+  vertical-align:text-bottom;border-radius:2px;margin-right:6px;
+  animation:caretblink 1.1s steps(1) infinite}
+
+/* divider */
+#divider{flex:0 0 12px;display:grid;place-items:center;cursor:col-resize}
+#divider i{width:5px;height:46px;border-radius:999px;background:var(--line-dk)}
+#divider:hover i{background:var(--green)}
+/* browser pane */
+#pane-web{flex:1;background:var(--card);
+  border:2px solid var(--line-dk);border-bottom-width:5px}
+.web-toolbar{display:flex;align-items:center;gap:5px;padding:8px;
+  background:#fafcf6;border-bottom:2px solid var(--line);flex:0 0 auto}
+.web-toolbar .btn3{font-size:9.5px;padding:7px 9px;white-space:nowrap;flex:0 0 auto}
+.navbtn{width:24px;height:24px;flex:0 0 24px;border-radius:50%;
+  border:2px solid var(--line-dk);border-bottom-width:3px;background:#fff;
+  color:var(--sub);font-size:11px;font-weight:900;
+  display:grid;place-items:center;padding:0}
+.navbtn:hover{color:var(--ink)}
+.navbtn:active{transform:translateY(1px);border-bottom-width:2px;margin-bottom:1px}
+.urlbar{flex:1;min-width:90px;display:flex;align-items:center;gap:5px;
+  background:#fff;border:2px solid var(--line-dk);border-radius:999px;
+  padding:6px 10px;font-family:var(--mono);font-size:10px;color:var(--ink);
+  overflow:hidden;white-space:nowrap}
+.urlbar .lock{color:var(--green-dk);font-size:9px;flex:0 0 auto}
+.urlbar .url-txt{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.chip{display:inline-flex;align-items:center;gap:4px;border-radius:999px;
+  padding:5px 8px;font-weight:900;font-size:9.5px;letter-spacing:.04em;
+  white-space:nowrap;flex:0 0 auto;
+  background:var(--green-tint);color:var(--green-dkr);border:2px solid #c6eba4}
+.web-body{flex:1;position:relative;overflow:hidden;background:#eef1f5;
+  display:grid;place-items:center}
+
+/* fake checkout page (kept deliberately plain/light) */
+.site{width:min(430px,88%);font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;color:#1f2937}
+.site-card{background:#fff;border:1px solid #e2e6ec;border-radius:10px;
+  box-shadow:0 8px 22px rgba(30,41,59,.08);padding:22px 24px}
+.site h1{font-size:17px;font-weight:600;margin-bottom:14px}
+.site-row{display:flex;justify-content:space-between;font-size:13px;font-weight:400;
+  color:#4b5563;padding:7px 0;border-bottom:1px solid #eef1f5}
+.site-row.total{border-bottom:0;padding-top:11px;font-weight:600;color:#111827;font-size:14px}
+.site-cta{display:block;width:100%;margin-top:16px;border:0;border-radius:8px;
+  background:#16a34a;color:#fff;font-size:14px;font-weight:600;padding:12px 0;
+  font-family:inherit}
+.site-cta:hover{background:#15803d}
+.site-foot{text-align:center;font-size:11px;color:#9ca3af;font-weight:400;margin-top:10px}
+.flash-chip{position:absolute;top:12px;right:14px;
+  background:var(--green);color:#fff;border-bottom:3px solid var(--green-dk);
+  border-radius:999px;padding:6px 13px;font-weight:900;font-size:10px;letter-spacing:.14em;
+  animation:refreshpulse 2s ease-out infinite}
+
+/* ── status bar ──────────────────────────────────────────────── */
+#statusbar{display:flex;align-items:center;gap:10px;padding:0 12px;
+  background:var(--card);border-top:2px solid var(--line);
+  font-size:10px;font-weight:800;color:var(--sub);overflow:hidden}
+.sb-left,.sb-right{display:flex;align-items:center;gap:8px;white-space:nowrap}
+.sb-right{margin-left:auto}
+.sb-val{color:var(--ink);letter-spacing:.02em}
+.sb-sep{width:5px;height:5px;border-radius:50%;background:var(--line-dk)}
+.sb-btn{border:0;background:var(--blue-tint);color:var(--blue-dk);
+  border-radius:999px;padding:4px 11px;font-weight:900;font-size:10px;letter-spacing:.1em;
+  border-bottom:2px solid #a5ddf9}
+.sb-btn:hover{filter:brightness(1.04)}
+.sb-ver{letter-spacing:.03em}
+
+/* ── corner variation tag ────────────────────────────────────── */
+#corner-tag{position:fixed;right:12px;bottom:40px;z-index:60;
+  background:var(--purple);color:#fff;border-bottom:3px solid var(--purple-dk);
+  border-radius:999px;padding:6px 13px;font-weight:900;font-size:10px;letter-spacing:.16em;
+  pointer-events:none}
+
+/* ── capture modal ───────────────────────────────────────────── */
+#overlay{position:fixed;inset:0;z-index:50;display:grid;place-items:center;
+  background:rgba(47,58,43,.45)}
+#overlay.hidden{display:none}
+.modal{width:min(860px,92vw);max-height:88vh;display:flex;flex-direction:column;
+  background:var(--bg);border-radius:24px;overflow:hidden;
+  border:2px solid var(--line-dk);border-bottom-width:6px;
+  box-shadow:0 24px 60px rgba(20,40,10,.25)}
+.modal-head{display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px;background:var(--card);border-bottom:2px solid var(--line)}
+.modal-title{display:flex;align-items:center;gap:9px;font-weight:900;font-size:13px;
+  letter-spacing:.12em;color:var(--ink-strong)}
+.modal-x{width:30px;height:30px;border-radius:50%;border:2px solid var(--line-dk);
+  border-bottom-width:3px;background:#fff;color:var(--sub);font-size:12px;font-weight:900;padding:0}
+.modal-x:hover{color:var(--red);border-color:#f3c8c8}
+.cap-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:14px;
+  padding:16px 18px;overflow:auto}
+.cap-col{display:flex;flex-direction:column;gap:11px;min-width:0}
+.cap-summary{background:var(--card);border:2px solid var(--line);border-radius:16px;
+  padding:4px 13px}
+.cap-row{display:flex;align-items:baseline;gap:10px;padding:8px 0;
+  border-bottom:1.5px solid var(--line)}
+.cap-row:last-child{border-bottom:0}
+.cap-row .microlabel{flex:0 0 76px}
+.cap-val{font-weight:800;font-size:12px;color:var(--ink-strong)}
+.cap-val code{font-family:var(--mono);font-weight:400;font-size:11px}
+.field{display:flex;flex-direction:column;gap:5px}
+textarea,select{font-family:var(--round);font-weight:700;font-size:12px;color:var(--ink);
+  background:#fff;border:2px solid var(--line-dk);border-radius:14px;padding:10px 12px;
+  resize:none;outline:none;width:100%}
+textarea:focus,select:focus{border-color:var(--green)}
+textarea::placeholder{color:#b3bda8;font-weight:700}
+select{appearance:none;-webkit-appearance:none;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8'><path d='M1 1l5 5 5-5' fill='none' stroke='%238a967f' stroke-width='2.4' stroke-linecap='round'/></svg>");
+  background-repeat:no-repeat;background-position:right 13px center}
+.cap-shot{display:grid;place-items:center;height:104px;border-radius:14px;
+  border:2.5px dashed var(--line-dk);background:#fff;
+  font-weight:800;font-size:11px;color:#b3bda8;letter-spacing:.08em}
+.yaml-view{flex:1;background:var(--well);border:2px solid var(--well-edge);
+  border-bottom-width:5px;border-radius:16px;padding:14px 16px;
+  font-family:var(--mono);font-size:11px;line-height:1.8;color:var(--well-txt);
+  overflow:auto;white-space:pre}
+.y-key{color:#5ad0ff}
+.y-str{color:#8df05c}
+.y-dim{color:var(--well-dim)}
+.modal-foot{display:flex;align-items:center;gap:10px;padding:13px 18px;
+  background:var(--card);border-top:2px solid var(--line)}
+.modal-foot .spacer{flex:1}
+
+/* ── reduced motion ──────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{
+    animation:none !important;
+    transition:none !important;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- ══ titlebar ══ -->
+<header id="titlebar">
+  <span class="traffic" aria-hidden="true"><i></i><i></i><i></i></span>
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 64 64" width="22" height="22">
+        <path d="M22 18 L44 32 L22 46" fill="none" stroke="#8fbf6a" stroke-width="5"
+              stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="22" cy="18" r="8.5" fill="#ff9600"/>
+        <circle cx="22" cy="18" r="3.2" fill="#ffd9a1" opacity=".8"/>
+        <circle cx="44" cy="32" r="8.5" fill="#a560e8"/>
+        <circle cx="44" cy="32" r="3.2" fill="#e6ccff" opacity=".8"/>
+        <circle cx="22" cy="46" r="8.5" fill="#58cc02"/>
+        <circle cx="22" cy="46" r="3.2" fill="#c8f59d" opacity=".8"/>
+      </svg>
+    </span>
+    <span class="brand-name">CHROMUX</span>
+    <span class="brand-sub">AGENT COCKPIT</span>
+  </div>
+
+  <div class="titlebar-gauges">
+    <span class="gauge g-sessions"><i class="gdot"></i><b>3</b> SESSIONS</span>
+    <span class="gauge g-flame">
+      <span class="flame-ico" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="14" height="14">
+          <path d="M12 2c1 4-3 5.5-3 9a3 3 0 0 0 1.6 2.7C10.2 12 12 11 12 9c2.5 1.6 4 4 4 6.3A4.7 4.7 0 0 1 11.3 20 5.9 5.9 0 0 1 6 14.2C6 8.7 11 7.3 12 2z"
+                fill="#ff9600" stroke="#e08600" stroke-width="1" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <b>2</b> QUEUED
+    </span>
+    <span class="gauge g-xp"><b>14</b> SENT <span class="xpbar"><span class="xpfill"></span></span></span>
+    <button class="btn3 b-flame">
+      <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
+        <path d="M12 3v10m0 0l-4-4m4 4l4-4M4 17h16v3H4z" fill="none" stroke="#fff"
+              stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      UPDATE READY
+    </button>
+    <button class="btn3 b-white">SETTINGS</button>
+  </div>
+</header>
+
+<!-- ══ main frame ══ -->
+<div id="app">
+
+  <!-- left rail -->
+  <aside id="rail">
+    <div class="rail-head">
+      <span class="microlabel">ATTENTION QUEUE</span>
+      <button class="btn3 b-blue" style="font-size:10px;padding:7px 10px">⛶ DETECT</button>
+    </div>
+
+    <div class="q-card q-approval">
+      <span class="q-kind">🔥 APPROVAL</span>
+      <span class="q-name">checkout-flow</span>
+      <span class="q-desc">claude wants to run <code>npm run db:migrate</code></span>
+    </div>
+
+    <div class="q-card q-preview">
+      <span class="q-kind">👀 PREVIEW</span>
+      <span class="q-name">landing-page</span>
+      <span class="q-desc">localhost:5173 changed — review ready</span>
+    </div>
+
+    <div class="q-card q-exited">
+      <span class="q-kind">💤 EXITED</span>
+      <span class="q-name">api-server</span>
+      <span class="q-desc">codex exited (code 0) · 12m ago</span>
+    </div>
+
+    <div class="rail-foot">
+      <span class="microlabel">LOCAL STORAGE</span>
+      <button class="pathlink">~/.chromux/captures</button>
+    </div>
+  </aside>
+
+  <!-- workspace -->
+  <div id="workspace">
+    <nav id="session-tabs" aria-label="Session tabs">
+      <button class="session-tab on"><i class="tdot"></i>checkout-flow · claude <span class="badge">2</span></button>
+      <button class="session-tab"><i class="tdot"></i>landing-page · grok</button>
+      <button class="session-tab"><i class="tdot dead"></i>api-server · codex</button>
+      <button class="session-tab add-tab" aria-label="New session">+</button>
+    </nav>
+
+    <main id="stage">
+      <!-- terminal pane -->
+      <section class="pane" id="pane-term">
+        <div class="pane-head">
+          <span class="microlabel">TERMINAL — CLAUDE</span>
+          <span class="cwd">~/projects/shop/checkout-flow</span>
+        </div>
+        <div class="term-body">
+<div class="t-hello">✻ Welcome to Claude Code!<span class="t-path">/projects/shop/checkout-flow</span></div>
+<div class="t-user">&gt; fix the CTA overflow on the checkout page</div>
+<div><span class="t-dot">●</span> I'll look at the checkout component styles.</div>
+<div><span class="t-dot">●</span> Read src/components/CheckoutCTA.tsx <span class="t-dim">(84 lines)</span></div>
+<div><span class="t-dot">●</span> Edit src/styles/checkout.css</div>
+<div class="t-del">&nbsp;&nbsp;- .cta-row { width: 120%; }</div>
+<div class="t-add">&nbsp;&nbsp;+ .cta-row { width: 100%; max-width: 480px; }</div>
+<div><span class="t-success">✔ Change applied — dev server reloaded</span></div>
+<div><span class="t-dot">●</span> The button no longer overflows. Preview updated on the right.</div>
+<div class="t-await"><span class="t-caret"></span>awaiting your next instruction…</div>
+        </div>
+      </section>
+
+      <!-- divider -->
+      <div id="divider" role="separator" aria-orientation="vertical"><i></i></div>
+
+      <!-- browser pane -->
+      <section class="pane" id="pane-web">
+        <div class="web-toolbar">
+          <button class="navbtn" aria-label="Back">‹</button>
+          <button class="navbtn" aria-label="Forward">›</button>
+          <button class="navbtn" aria-label="Reload">⟳</button>
+          <span class="urlbar"><span class="lock">●</span><span class="url-txt">http://localhost:5173/checkout</span></span>
+          <button class="btn3" id="btn-capture">⛶ CAPTURE</button>
+          <button class="btn3 b-white">QUEUE <span class="badge">2</span></button>
+          <span class="chip">console: 0</span>
+          <button class="btn3 b-white">⌄ COLLAPSE</button>
+        </div>
+        <div class="web-body">
+          <div class="site">
+            <div class="site-card">
+              <h1>Order summary</h1>
+              <div class="site-row"><span>Canvas tote — natural</span><span>$24.00</span></div>
+              <div class="site-row"><span>Enamel mug × 2</span><span>$18.00</span></div>
+              <div class="site-row"><span>Shipping</span><span>$6.00</span></div>
+              <div class="site-row total"><span>Total</span><span>$48.00</span></div>
+              <button class="site-cta">Pay $48.00</button>
+              <div class="site-foot">Secure checkout · shop.dev</div>
+            </div>
+          </div>
+          <span class="flash-chip">⟳ REFRESHED</span>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<!-- ══ status bar ══ -->
+<footer id="statusbar">
+  <div class="sb-left">
+    <span class="microlabel">ADAPTER</span><span class="sb-val">claude -p · one-off</span>
+    <span class="sb-sep"></span>
+    <span class="microlabel">PAIRING</span><span class="sb-val">1:1 session ↔ pane</span>
+  </div>
+  <div class="sb-right">
+    <button class="sb-btn">DELIVERY LOG</button>
+    <span class="sb-ver">chromux 0.17.0 — streak concept</span>
+  </div>
+</footer>
+
+<span id="corner-tag">14 · STREAK</span>
+<!-- ══ capture modal ══ -->
+<div id="overlay" class="hidden" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Capture to agent">
+    <div class="modal-head">
+      <span class="modal-title">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+          <path d="M12 2c1 4-3 5.5-3 9a3 3 0 0 0 1.6 2.7C10.2 12 12 11 12 9c2.5 1.6 4 4 4 6.3A4.7 4.7 0 0 1 11.3 20 5.9 5.9 0 0 1 6 14.2C6 8.7 11 7.3 12 2z"
+                fill="#ff9600" stroke="#e08600" stroke-width="1" stroke-linejoin="round"/>
+        </svg>
+        CAPTURE → AGENT
+      </span>
+      <button class="modal-x" id="modal-close" aria-label="Close">✕</button>
+    </div>
+
+    <div class="cap-grid">
+      <div class="cap-col">
+        <div class="cap-summary">
+          <div class="cap-row"><span class="microlabel">SESSION</span><span class="cap-val">checkout-flow · claude</span></div>
+          <div class="cap-row"><span class="microlabel">URL</span><span class="cap-val"><code>localhost:5173/checkout</code></span></div>
+          <div class="cap-row"><span class="microlabel">SELECTION</span><span class="cap-val">"CTA button region 412×88"</span></div>
+        </div>
+        <label class="field">
+          <span class="microlabel">NOTE TO AGENT — WHAT'S WRONG / WHAT TO DO</span>
+          <textarea rows="3" spellcheck="false"
+            placeholder="e.g. the CTA button overflows its container — fix the CSS"></textarea>
+        </label>
+        <label class="field">
+          <span class="microlabel">TARGET</span>
+          <select><option>checkout-flow · claude -p</option></select>
+        </label>
+        <div class="field">
+          <span class="microlabel">SCREENSHOT</span>
+          <div class="cap-shot">📸 CAPTURING PANE…</div>
+        </div>
+      </div>
+
+      <div class="cap-col">
+        <span class="microlabel">PAYLOAD PREVIEW — YAML v1</span>
+        <pre class="yaml-view"><span class="y-key">chromux_capture:</span> <span class="y-str">v1</span>
+<span class="y-key">session:</span> <span class="y-str">checkout-flow</span>
+<span class="y-key">agent:</span> <span class="y-str">claude</span>
+<span class="y-key">url:</span> <span class="y-str">http://localhost:5173/checkout</span>
+<span class="y-key">note:</span> <span class="y-str">CTA overflows container</span>
+<span class="y-key">screenshot:</span> <span class="y-str">~/.chromux/captures/2026-07-11-0142.png</span>
+<span class="y-key">console_errors:</span> <span class="y-dim">[]</span></pre>
+      </div>
+    </div>
+
+    <div class="modal-foot">
+      <button class="btn3 b-white" id="modal-cancel">CANCEL</button>
+      <span class="spacer"></span>
+      <button class="btn3 b-white">FILE-DROP ONLY</button>
+      <button class="btn3 b-lg" id="modal-send">🔥 SEND — claude -p</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var overlay = document.getElementById('overlay');
+
+  function openModal(){
+    overlay.classList.remove('hidden');
+    overlay.setAttribute('aria-hidden','false');
+  }
+  function closeModal(){
+    overlay.classList.add('hidden');
+    overlay.setAttribute('aria-hidden','true');
+  }
+
+  document.getElementById('btn-capture').addEventListener('click', openModal);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  document.getElementById('modal-cancel').addEventListener('click', closeModal);
+  overlay.addEventListener('click', function(e){
+    if (e.target === overlay) closeModal();
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') closeModal();
+  });
+
+  /* headless screenshot hook: ?modal=1 auto-opens the capture modal */
+  if (/[?&]modal=1/.test(location.search)) openModal();
+})();
+</script>
+
+</body>
+</html>

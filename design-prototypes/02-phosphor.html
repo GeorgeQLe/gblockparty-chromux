@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Chromux — Phosphor</title>
+<style>
+/* ════════════════════════════════════════════════════════════════════
+   CHROMUX / VARIATION 02 — "PHOSPHOR"
+   Maximal green-CRT retro terminal. VT220 / IBM 3278 lineage.
+   Every tone is a tier of phosphor green; magenta is the ONE secondary
+   channel, reserved strictly for urgent items (APPROVAL, UPDATE READY).
+   ════════════════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=VT323&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap');
+
+:root {
+  /* screen */
+  --crt-bg:      #050a06;
+  --crt-bg-2:    #071108;
+  --crt-well:    #030704;
+  /* phosphor tiers */
+  --g-hot:       #c8ffd6;   /* white-green flare — only on the very brightest */
+  --g-bright:    #3bff6f;   /* primary phosphor */
+  --g-mid:       #23c058;
+  --g-dim:       #178041;
+  --g-faint:     #0e5129;
+  --g-ghost:     #093418;
+  --g-trace:     #062312;
+  /* secondary channel — URGENT ONLY */
+  --mag:         #ff5fd0;
+  --mag-dim:     #8f2e78;
+  --mag-ghost:   #2b0d24;
+  /* glow */
+  --glow-sm: 0 0 5px rgba(59,255,111,.6), 0 0 14px rgba(59,255,111,.22);
+  --glow-lg: 0 0 6px rgba(59,255,111,.75), 0 0 22px rgba(59,255,111,.35), 0 0 46px rgba(59,255,111,.14);
+  --glow-mag: 0 0 5px rgba(255,95,208,.7), 0 0 16px rgba(255,95,208,.3);
+  /* type */
+  --mono: "IBM Plex Mono", Menlo, Monaco, "SF Mono", "Courier New", monospace;
+  --crtfont: "VT323", "IBM Plex Mono", Menlo, Monaco, monospace;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+html, body { height:100%; }
+body {
+  min-width:1280px;
+  height:100vh;
+  overflow:hidden;
+  background:
+    radial-gradient(130% 120% at 50% 38%, var(--crt-bg-2) 0%, var(--crt-bg) 58%, #020503 100%);
+  color:var(--g-mid);
+  font-family:var(--mono);
+  font-size:12px;
+  line-height:1.45;
+  display:flex;
+  flex-direction:column;
+  text-transform:uppercase;
+  -webkit-font-smoothing:antialiased;
+}
+button { font:inherit; color:inherit; background:none; border:none; cursor:pointer; text-transform:inherit; }
+::selection { background:var(--g-bright); color:var(--crt-well); }
+
+/* ── CRT physical treatment ──────────────────────────────────────── */
+.crt-scanlines {
+  position:fixed; inset:0; z-index:900; pointer-events:none;
+  background:repeating-linear-gradient(
+    to bottom,
+    rgba(0,0,0,0)    0px,
+    rgba(0,0,0,0)    2px,
+    rgba(0,0,0,.22)  3px,
+    rgba(0,0,0,0)    4px);
+  mix-blend-mode:multiply;
+}
+.crt-mask {
+  /* aperture-grille shimmer: faint vertical RGB stripes */
+  position:fixed; inset:0; z-index:901; pointer-events:none; opacity:.05;
+  background:repeating-linear-gradient(
+    to right,
+    rgba(255,60,60,.7) 0px,  rgba(60,255,120,.7) 1px,
+    rgba(60,120,255,.7) 2px, rgba(255,60,60,0) 3px);
+}
+.crt-vignette {
+  position:fixed; inset:0; z-index:902; pointer-events:none;
+  background:radial-gradient(115% 108% at 50% 46%,
+    rgba(0,0,0,0) 62%, rgba(0,0,0,.34) 86%, rgba(0,0,0,.72) 100%);
+  box-shadow:inset 0 0 180px rgba(2,6,3,.9);
+  border-radius:18px;
+}
+.crt-band {
+  /* slow travelling refresh band */
+  position:fixed; left:0; right:0; top:-18%; height:16%;
+  z-index:903; pointer-events:none;
+  background:linear-gradient(to bottom,
+    rgba(120,255,160,0) 0%, rgba(120,255,160,.045) 45%,
+    rgba(200,255,220,.075) 52%, rgba(120,255,160,.045) 60%, rgba(120,255,160,0) 100%);
+  animation:crt-sweep 9s linear infinite;
+}
+@keyframes crt-sweep {
+  0%   { transform:translateY(0); }
+  100% { transform:translateY(880%); }
+}
+.crt-flicker {
+  position:fixed; inset:0; z-index:899; pointer-events:none;
+  background:rgba(80,255,140,.02);
+  animation:crt-flicker 6s steps(1) infinite;
+}
+@keyframes crt-flicker {
+  0%,93.8%,94.4%,100% { opacity:1; }
+  94%   { opacity:.55; }
+  94.2% { opacity:.85; }
+}
+
+/* ── TITLEBAR ────────────────────────────────────────────────────── */
+#titlebar {
+  height:44px; flex:none;
+  display:flex; align-items:center;
+  padding:0 14px 0 84px;      /* traffic-light gutter */
+  gap:18px;
+  background:linear-gradient(to bottom, #08160b, var(--crt-bg));
+  border-bottom:1px solid var(--g-faint);
+  position:relative; z-index:20;
+}
+#titlebar::after {           /* etched rule of ─ characters */
+  content:""; position:absolute; left:0; right:0; bottom:-1px; height:1px;
+  background:linear-gradient(to right, transparent, var(--g-dim) 18%, var(--g-dim) 82%, transparent);
+  opacity:.5;
+}
+.brand { display:flex; align-items:baseline; gap:10px; }
+.brand-mark {
+  align-self:center; display:grid; place-items:center;
+  filter:drop-shadow(-1px 0 rgba(255,70,110,.4)) drop-shadow(1px 0 rgba(70,170,255,.4))
+         drop-shadow(0 0 6px rgba(59,255,111,.5));
+}
+.brand-name {
+  font-family:var(--crtfont); font-size:24px; letter-spacing:3px;
+  color:var(--g-bright); text-shadow:var(--glow-lg);
+}
+.brand-sub {
+  font-size:10px; letter-spacing:2px; color:var(--g-dim);
+}
+.titlebar-gauges {
+  margin-left:auto; display:flex; align-items:center; gap:14px;
+}
+.gauge-line {
+  display:flex; align-items:center; gap:0;
+  border:1px solid var(--g-faint); padding:3px 10px;
+  background:var(--crt-well);
+  font-size:11px; letter-spacing:1px; color:var(--g-dim);
+  box-shadow:inset 0 0 12px rgba(9,52,24,.6);
+}
+.gauge-line b { font-weight:600; margin:0 5px 0 6px; }
+.gauge-line .gv-ses b { color:var(--g-bright); text-shadow:var(--glow-sm); }
+.gauge-line .gv-que b { color:var(--g-hot);   text-shadow:var(--glow-sm); }
+.gauge-line .gv-tx  b { color:var(--g-mid); }
+.gauge-line .gsep { color:var(--g-ghost); margin:0 8px; }
+.gdot { display:inline-block; width:6px; height:6px; border-radius:50%; vertical-align:1px; }
+.gdot.on   { background:var(--g-bright); box-shadow:0 0 6px var(--g-bright); animation:dot-breathe 2.4s ease-in-out infinite; }
+.gdot.warn { background:var(--g-hot);    box-shadow:0 0 6px var(--g-hot); }
+.gdot.info { background:var(--g-dim); }
+@keyframes dot-breathe { 0%,100% { opacity:1; } 50% { opacity:.45; } }
+
+.cmd-btn {
+  font-size:11px; letter-spacing:1px; padding:4px 8px;
+  color:var(--g-mid); white-space:nowrap;
+}
+.cmd-btn::before { content:"[ "; color:var(--g-faint); }
+.cmd-btn::after  { content:" ]"; color:var(--g-faint); }
+.cmd-btn:hover { color:var(--g-bright); text-shadow:var(--glow-sm); }
+.cmd-btn:hover::before, .cmd-btn:hover::after { color:var(--g-dim); }
+.cmd-btn.urgent {
+  color:var(--mag); text-shadow:var(--glow-mag);
+  animation:urgent-blink 1.6s steps(2) infinite;
+}
+.cmd-btn.urgent::before, .cmd-btn.urgent::after { color:var(--mag-dim); }
+@keyframes urgent-blink { 0%,60% { opacity:1; } 80% { opacity:.5; } }
+
+/* ── APP FRAME / LEFT RAIL ───────────────────────────────────────── */
+#app { flex:1; display:flex; min-height:0; position:relative; z-index:10; }
+
+#rail {
+  width:230px; flex:none;
+  display:flex; flex-direction:column;
+  background:linear-gradient(to right, #040a05, var(--crt-bg));
+  border-right:1px solid var(--g-faint);
+}
+.rail-head {
+  padding:10px 10px 8px;
+  display:flex; align-items:center; justify-content:space-between;
+  border-bottom:1px dashed var(--g-ghost);
+}
+.microlabel {
+  font-size:10px; letter-spacing:2px; color:var(--g-dim);
+}
+.rail-head .microlabel { color:var(--g-mid); text-shadow:0 0 8px rgba(59,255,111,.18); }
+#attention-list { flex:1; overflow:hidden; padding:10px 8px; display:flex; flex-direction:column; gap:12px; }
+
+/* attention cards drawn as ASCII boxes */
+.qcard {
+  position:relative;
+  border:1px solid var(--g-faint);
+  background:var(--crt-well);
+  padding:9px 9px 8px;
+  box-shadow:inset 0 0 16px rgba(6,35,18,.7);
+  cursor:pointer;
+}
+.qcard .corner { position:absolute; font-size:11px; line-height:1; color:var(--g-dim); background:var(--crt-bg); }
+.qcard .c-tl { top:-6px; left:-4px; }
+.qcard .c-tr { top:-6px; right:-4px; }
+.qcard .c-bl { bottom:-6px; left:-4px; }
+.qcard .c-br { bottom:-6px; right:-4px; }
+.qcard-tag {
+  position:absolute; top:-7px; left:12px;
+  padding:0 5px; background:var(--crt-bg);
+  font-size:10px; letter-spacing:2px; color:var(--g-mid);
+}
+.qcard-session { font-size:11px; color:var(--g-bright); text-shadow:var(--glow-sm); margin-bottom:3px; }
+.qcard-copy { font-size:10.5px; line-height:1.5; color:var(--g-dim); text-transform:none; }
+.qcard-copy code { font-family:inherit; color:var(--g-mid); }
+.qcard:hover { border-color:var(--g-dim); }
+
+.qcard.urgent { border-color:var(--mag-dim); box-shadow:inset 0 0 16px rgba(43,13,36,.8), 0 0 14px rgba(255,95,208,.08); }
+.qcard.urgent .qcard-tag { color:var(--mag); text-shadow:var(--glow-mag); }
+.qcard.urgent .corner { color:var(--mag-dim); }
+.qcard.urgent .qcard-session { color:var(--g-hot); }
+.qcard.muted .qcard-session { color:var(--g-dim); text-shadow:none; }
+.qcard.muted .qcard-tag, .qcard.muted .qcard-copy, .qcard.muted .corner { color:var(--g-faint); }
+
+.rail-foot {
+  padding:9px 10px 11px;
+  border-top:1px dashed var(--g-ghost);
+}
+.pathlink {
+  display:block; margin-top:3px; font-size:11px; text-transform:none;
+  color:var(--g-mid); text-decoration:underline; text-underline-offset:3px;
+  text-decoration-color:var(--g-faint); text-align:left; padding:0;
+}
+.pathlink:hover { color:var(--g-bright); text-shadow:var(--glow-sm); }
+</style>
+<style>
+/* ── SESSION TAB STRIP — function-key slots ──────────────────────── */
+#workspace { flex:1; display:flex; flex-direction:column; min-width:0; }
+#session-tabs {
+  height:36px; flex:none;
+  display:flex; align-items:center; gap:2px;
+  padding:0 10px;
+  background:var(--crt-well);
+  border-bottom:1px solid var(--g-faint);
+  overflow:hidden;
+}
+.fkey {
+  display:flex; align-items:center; gap:7px;
+  padding:5px 10px;
+  font-size:11.5px; letter-spacing:1px;
+  color:var(--g-dim); white-space:nowrap;
+}
+.fkey .brk { color:var(--g-ghost); }
+.fkey .fnum { color:var(--g-faint); }
+.fkey:hover { color:var(--g-mid); }
+.fkey:hover .brk { color:var(--g-faint); }
+.fkey.active {
+  background:var(--g-bright); color:var(--crt-well);
+  box-shadow:0 0 16px rgba(59,255,111,.4), inset 0 0 0 1px var(--g-hot);
+  text-shadow:none;
+}
+.fkey.active .brk, .fkey.active .fnum { color:rgba(3,7,4,.55); }
+.fkey .livedot { width:6px; height:6px; border-radius:50%; background:var(--g-bright); box-shadow:0 0 6px var(--g-bright); animation:dot-breathe 2.2s ease-in-out infinite; }
+.fkey.active .livedot { background:var(--crt-well); box-shadow:none; animation:none; }
+.fkey .deaddot { width:6px; height:6px; border-radius:50%; background:transparent; border:1px solid var(--g-faint); position:relative; }
+.fkey .deaddot::after { content:"×"; position:absolute; top:-5px; left:-1px; font-size:9px; color:var(--g-faint); }
+.fkey .tabbadge { color:var(--g-hot); text-shadow:var(--glow-sm); }
+.fkey.active .tabbadge { color:var(--crt-well); text-shadow:none; font-weight:600; }
+.fkey.addtab { margin-left:auto; color:var(--g-faint); }
+.fkey.addtab:hover { color:var(--g-bright); text-shadow:var(--glow-sm); }
+
+/* ── STAGE — split view ──────────────────────────────────────────── */
+#stage { flex:1; display:flex; min-height:0; padding:10px 10px 8px; gap:0; }
+
+.pane { display:flex; flex-direction:column; min-width:0; min-height:0; }
+.pane-term { flex:0 0 46%; }
+.pane-web  { flex:1; }
+
+/* box-drawing pane frame: text corners + 1px rules that read as ─ │ */
+.boxframe { position:relative; display:flex; flex-direction:column; height:100%; }
+.bf-top, .bf-bot {
+  flex:none; display:flex; align-items:center;
+  font-size:12px; line-height:1; color:var(--g-dim);
+  white-space:nowrap;
+}
+.bf-top { padding-bottom:6px; }
+.bf-bot { padding-top:6px; }
+.bf-rule { flex:1; height:1px; background:var(--g-faint); margin:0 2px; min-width:8px; }
+.bf-rule.short { flex:0 0 12px; }
+.bf-label { padding:0 7px; letter-spacing:2px; font-size:10.5px; color:var(--g-bright); text-shadow:var(--glow-sm); }
+.bf-label .lbl-dim { color:var(--g-dim); text-shadow:none; text-transform:none; letter-spacing:0; }
+.bf-body {
+  flex:1; min-height:0;
+  border-left:1px solid var(--g-faint);
+  border-right:1px solid var(--g-faint);
+  position:relative; overflow:hidden;
+  display:flex; flex-direction:column;
+}
+.bf-scrollmark { position:absolute; right:5px; font-size:9px; color:var(--g-faint); z-index:3; }
+.bf-scrollmark.up { top:6px; } .bf-scrollmark.dn { bottom:6px; }
+
+/* terminal transcript */
+.term-body {
+  background:var(--crt-well);
+  box-shadow:inset 0 0 42px rgba(6,35,18,.55);
+  padding:14px 16px;
+  font-size:12.5px; line-height:1.62;
+  text-transform:none;
+  overflow:hidden; flex:1;
+}
+.tl { white-space:pre-wrap; }
+.tl-meta   { color:var(--g-dim); }
+.tl-user   { color:var(--g-hot); text-shadow:var(--glow-sm); }
+.tl-agent  { color:var(--g-bright); text-shadow:0 0 4px rgba(59,255,111,.4); }
+.tl-tool   { color:var(--g-mid); }
+.tl-del    { color:var(--g-faint); text-decoration:line-through; text-decoration-color:var(--g-faint); }
+.tl-add    { color:var(--g-bright); }
+.tl-ok     { color:var(--g-hot); text-shadow:var(--glow-sm); }
+.tl-await  { color:var(--g-mid); margin-top:4px; }
+.blockcursor {
+  display:inline-block; width:8px; height:14px; vertical-align:-2px;
+  background:var(--g-bright); box-shadow:0 0 8px var(--g-bright);
+  animation:cursor-blink 1.06s steps(1) infinite;
+}
+@keyframes cursor-blink { 0%,49% { opacity:1; } 50%,100% { opacity:0; } }
+.term-welcome { color:var(--g-mid); display:flex; justify-content:space-between; }
+.term-welcome .spark { color:var(--g-bright); text-shadow:var(--glow-sm); }
+
+/* divider */
+#divider {
+  flex:0 0 14px; display:flex; align-items:center; justify-content:center;
+  cursor:col-resize; color:var(--g-faint); font-size:10px; line-height:1.1;
+  letter-spacing:0; user-select:none;
+}
+#divider:hover { color:var(--g-mid); text-shadow:var(--glow-sm); }
+
+/* browser pane */
+.web-toolbar {
+  flex:none; display:flex; align-items:center; gap:4px;
+  padding:6px 8px;
+  background:var(--crt-well);
+  border-bottom:1px dashed var(--g-ghost);
+  font-size:11px; white-space:nowrap; overflow:hidden;
+}
+.web-toolbar > * { flex:none; }
+.web-toolbar .cmd-btn { font-size:10px; letter-spacing:.5px; }
+.navkey { padding:2px 2px; color:var(--g-dim); font-size:10px; }
+.navkey:hover { color:var(--g-bright); text-shadow:var(--glow-sm); }
+.urlbar {
+  flex:1 1 auto; min-width:60px;
+  border:1px solid var(--g-faint); background:var(--crt-bg);
+  color:var(--g-bright); text-shadow:0 0 4px rgba(59,255,111,.35);
+  padding:3px 8px; font-size:11.5px; text-transform:none;
+  overflow:hidden; text-overflow:ellipsis;
+  box-shadow:inset 0 0 10px rgba(6,35,18,.7);
+}
+.cmd-btn.primary {
+  background:var(--g-bright); color:var(--crt-well);
+  box-shadow:0 0 14px rgba(59,255,111,.45);
+  padding:4px 6px;
+}
+.cmd-btn.primary::before, .cmd-btn.primary::after { color:rgba(3,7,4,.5); }
+.cmd-btn.primary:hover { background:var(--g-hot); color:var(--crt-well); text-shadow:none; }
+.chip {
+  font-size:10px; letter-spacing:1px; color:var(--g-dim);
+  border:1px solid var(--g-ghost); padding:2px 6px; text-transform:none;
+}
+.qbadge { color:var(--g-hot); text-shadow:var(--glow-sm); }
+
+/* the REMOTE FRAMEBUFFER — deliberately modern & light inside the CRT */
+.fb-strip {
+  flex:none; display:flex; align-items:center; gap:8px;
+  padding:4px 10px; font-size:9.5px; letter-spacing:2px;
+  color:var(--g-dim); background:var(--crt-bg);
+  border-bottom:1px solid var(--g-ghost);
+}
+.fb-strip .fb-live { color:var(--g-bright); text-shadow:var(--glow-sm); animation:dot-breathe 2s ease-in-out infinite; }
+.fb-strip .fb-url { text-transform:none; letter-spacing:.5px; color:var(--g-mid); }
+.fb-wrap { flex:1; min-height:0; position:relative; padding:10px; background:var(--crt-bg); }
+.fb-window {
+  position:relative; height:100%; overflow:hidden;
+  background:#f4f5f7; border-radius:6px;
+  box-shadow:0 0 0 1px var(--g-faint), 0 0 34px rgba(59,255,111,.14), inset 0 0 0 1px rgba(255,255,255,.7);
+  font-family:-apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  text-transform:none; color:#1c2330;
+}
+.refreshed-chip {
+  position:absolute; bottom:16px; right:16px; z-index:5;
+  font-family:var(--mono); font-size:9px; letter-spacing:2px;
+  color:var(--crt-well); background:var(--g-bright);
+  padding:3px 8px; box-shadow:0 0 12px rgba(59,255,111,.55);
+  animation:refresh-flash 3.5s ease-in-out infinite;
+}
+@keyframes refresh-flash { 0%,72%,100% { opacity:1; } 84% { opacity:.25; } }
+
+/* light checkout mock */
+.shop { padding:26px 30px; height:100%; overflow:hidden; }
+.shop-top { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:18px; }
+.shop-logo { font-weight:700; font-size:15px; letter-spacing:-.2px; color:#111827; }
+.shop-step { font-size:11px; color:#8a93a3; }
+.shop-h1 { font-size:19px; font-weight:700; color:#111827; margin-bottom:14px; }
+.order-card {
+  background:#fff; border:1px solid #e3e6ec; border-radius:10px;
+  box-shadow:0 1px 3px rgba(16,24,40,.06), 0 8px 22px rgba(16,24,40,.05);
+  padding:16px 18px; max-width:430px;
+}
+.order-row { display:flex; justify-content:space-between; font-size:12.5px; color:#3c4657; padding:7px 0; border-bottom:1px solid #eef0f4; }
+.order-row .oq { color:#98a1b1; }
+.order-row.total { border-bottom:none; font-weight:700; color:#111827; font-size:13.5px; padding-top:11px; }
+.cta-btn {
+  display:block; width:100%; max-width:430px; margin-top:14px;
+  background:#1f6feb; color:#fff; border:none; border-radius:8px;
+  font-size:14px; font-weight:600; padding:12px 0; cursor:pointer;
+  box-shadow:0 2px 6px rgba(31,111,235,.35), 0 0 0 3px rgba(31,111,235,.12);
+}
+.cta-btn:hover { background:#1a5fd0; }
+.shop-secure { margin-top:10px; font-size:10.5px; color:#98a1b1; display:flex; gap:6px; align-items:center; }
+
+/* ── STATUS BAR — inverse video ──────────────────────────────────── */
+#statusbar {
+  height:26px; flex:none;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 12px;
+  background:var(--g-bright); color:var(--crt-well);
+  font-size:10.5px; letter-spacing:1px; font-weight:500;
+  box-shadow:0 -1px 18px rgba(59,255,111,.28);
+  position:relative; z-index:20;
+}
+#statusbar .sb-left, #statusbar .sb-right { display:flex; align-items:center; gap:8px; white-space:nowrap; }
+#statusbar .sb-key { background:var(--crt-well); color:var(--g-bright); padding:1px 5px; font-size:9.5px; letter-spacing:2px; }
+#statusbar .sb-val { color:#04240f; text-transform:none; }
+#statusbar .sb-sep { color:rgba(3,7,4,.4); margin:0 4px; }
+.sb-btn { font-size:10.5px; letter-spacing:1px; color:var(--crt-well); font-weight:600; padding:2px 4px; }
+.sb-btn::before { content:"[ "; opacity:.5; } .sb-btn::after { content:" ]"; opacity:.5; }
+.sb-btn:hover { background:var(--crt-well); color:var(--g-bright); }
+.sb-ver { text-transform:none; color:#04240f; }
+
+/* ── CAPTURE MODAL — ASCII frame ─────────────────────────────────── */
+.overlay {
+  position:fixed; inset:0; z-index:800;
+  background:rgba(2,5,3,.78);
+  backdrop-filter:blur(1.5px);
+  display:flex; align-items:center; justify-content:center;
+}
+.overlay.hidden { display:none; }
+.modal {
+  width:880px; max-width:92vw; max-height:86vh;
+  background:var(--crt-bg);
+  border:1px solid var(--g-dim);
+  box-shadow:0 0 0 1px var(--crt-well), 0 0 44px rgba(59,255,111,.22), inset 0 0 60px rgba(6,35,18,.5);
+  display:flex; flex-direction:column; position:relative;
+}
+.modal .m-corner { position:absolute; font-size:13px; line-height:1; color:var(--g-bright); text-shadow:var(--glow-sm); background:var(--crt-bg); z-index:2; }
+.m-tl { top:-7px; left:-5px; } .m-tr { top:-7px; right:-5px; }
+.m-bl { bottom:-7px; left:-5px; } .m-br { bottom:-7px; right:-5px; }
+.modal-head {
+  flex:none; display:flex; align-items:center; justify-content:space-between;
+  padding:10px 14px; border-bottom:1px dashed var(--g-ghost);
+}
+.modal-title { font-size:11px; letter-spacing:3px; color:var(--g-bright); text-shadow:var(--glow-sm); }
+.modal-x { color:var(--g-dim); font-size:12px; padding:2px 6px; }
+.modal-x:hover { color:var(--mag); text-shadow:var(--glow-mag); }
+.cap-grid { flex:1; min-height:0; display:grid; grid-template-columns:1fr 1fr; gap:0; overflow:hidden; }
+.cap-col { padding:14px 16px; display:flex; flex-direction:column; gap:12px; min-width:0; overflow:hidden; }
+.cap-col + .cap-col { border-left:1px dashed var(--g-ghost); }
+.cap-row { display:flex; gap:10px; font-size:11px; align-items:baseline; }
+.cap-row .microlabel { flex:0 0 76px; }
+.cap-row .cap-val { color:var(--g-bright); text-transform:none; text-shadow:0 0 4px rgba(59,255,111,.3); }
+.field textarea, .field select {
+  width:100%; margin-top:5px;
+  background:var(--crt-well); color:var(--g-bright);
+  border:1px solid var(--g-faint); padding:7px 9px;
+  font-family:var(--mono); font-size:11.5px; text-transform:none;
+  box-shadow:inset 0 0 12px rgba(6,35,18,.7);
+  resize:none; outline:none;
+}
+.field textarea::placeholder { color:var(--g-dim); }
+.field select { appearance:none; -webkit-appearance:none; }
+.cap-shot {
+  margin-top:5px; height:88px;
+  border:1px dashed var(--g-faint);
+  display:grid; place-items:center;
+  color:var(--g-dim); font-size:10px; letter-spacing:2px;
+  background:repeating-linear-gradient(45deg, transparent 0 8px, rgba(9,52,24,.35) 8px 9px);
+}
+.yaml-view {
+  flex:1; min-height:0; margin-top:5px;
+  background:var(--crt-well); border:1px solid var(--g-faint);
+  box-shadow:inset 0 0 20px rgba(6,35,18,.7);
+  padding:12px 14px; overflow:hidden;
+  font-family:var(--mono); font-size:11.5px; line-height:1.7; text-transform:none;
+  color:var(--g-mid); white-space:pre;
+}
+.yaml-view .yk { color:var(--g-dim); }
+.yaml-view .yv { color:var(--g-bright); text-shadow:0 0 4px rgba(59,255,111,.3); }
+.modal-foot {
+  flex:none; display:flex; justify-content:flex-end; gap:10px;
+  padding:11px 14px; border-top:1px dashed var(--g-ghost);
+}
+
+/* corner variation tag */
+#vartag {
+  position:fixed; right:14px; bottom:34px; z-index:950;
+  font-size:9px; letter-spacing:3px; color:var(--g-dim);
+  border:1px solid var(--g-ghost); padding:3px 8px;
+  background:rgba(3,7,4,.8); pointer-events:none;
+}
+
+/* reduced motion: still every animation */
+@media (prefers-reduced-motion: reduce) {
+  .crt-band, .crt-flicker { display:none; }
+  *, *::before, *::after {
+    animation-duration:.001s !important;
+    animation-iteration-count:1 !important;
+  }
+  .blockcursor { opacity:1; }
+}
+</style>
+</head>
+<body>
+
+<!-- CRT physical layers -->
+<div class="crt-flicker" aria-hidden="true"></div>
+<div class="crt-scanlines" aria-hidden="true"></div>
+<div class="crt-mask" aria-hidden="true"></div>
+<div class="crt-vignette" aria-hidden="true"></div>
+<div class="crt-band" aria-hidden="true"></div>
+
+<!-- ══ TITLEBAR ══ -->
+<header id="titlebar">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 64 64" width="20" height="20">
+        <path d="M22 18 L44 32 L22 46" fill="none" stroke="#178041" stroke-width="2.4"
+              stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="22" cy="18" r="7" fill="none" stroke="#3bff6f" stroke-width="2.2"/>
+        <circle cx="44" cy="32" r="7" fill="#3bff6f"/>
+        <circle cx="22" cy="46" r="7" fill="none" stroke="#23c058" stroke-width="2.2" stroke-dasharray="3 2.4"/>
+      </svg>
+    </span>
+    <span class="brand-name">CHROMUX</span>
+    <span class="brand-sub">AGENT COCKPIT</span>
+  </div>
+  <div class="titlebar-gauges">
+    <span class="gauge-line" role="status">
+      <span class="gv-ses"><i class="gdot on"></i><b>3</b>SESSIONS</span>
+      <span class="gsep">│</span>
+      <span class="gv-que"><i class="gdot warn"></i><b>2</b>QUEUED</span>
+      <span class="gsep">│</span>
+      <span class="gv-tx"><i class="gdot info"></i><b>14</b>SENT</span>
+    </span>
+    <button class="cmd-btn urgent" title="A new Chromux release is ready to install">▲ UPDATE READY</button>
+    <button class="cmd-btn" title="Settings">SETTINGS</button>
+  </div>
+</header>
+
+<!-- ══ MAIN FRAME ══ -->
+<div id="app">
+  <aside id="rail">
+    <div class="rail-head">
+      <span class="microlabel">ATTENTION QUEUE</span>
+      <button class="cmd-btn" style="padding:2px 4px;">⛶ DETECT</button>
+    </div>
+    <div id="attention-list">
+
+      <div class="qcard urgent">
+        <span class="corner c-tl">┌</span><span class="corner c-tr">┐</span>
+        <span class="corner c-bl">└</span><span class="corner c-br">┘</span>
+        <span class="qcard-tag">▲ APPROVAL</span>
+        <div class="qcard-session">checkout-flow</div>
+        <div class="qcard-copy">claude wants to run <code>npm run db:migrate</code></div>
+      </div>
+
+      <div class="qcard">
+        <span class="corner c-tl">┌</span><span class="corner c-tr">┐</span>
+        <span class="corner c-bl">└</span><span class="corner c-br">┘</span>
+        <span class="qcard-tag">◆ PREVIEW</span>
+        <div class="qcard-session">landing-page</div>
+        <div class="qcard-copy">localhost:5173 changed — review ready</div>
+      </div>
+
+      <div class="qcard muted">
+        <span class="corner c-tl">┌</span><span class="corner c-tr">┐</span>
+        <span class="corner c-bl">└</span><span class="corner c-br">┘</span>
+        <span class="qcard-tag">× EXITED</span>
+        <div class="qcard-session">api-server</div>
+        <div class="qcard-copy">codex exited (code 0) · 12m ago</div>
+      </div>
+
+    </div>
+    <div class="rail-foot">
+      <div class="microlabel">LOCAL STORAGE</div>
+      <button class="pathlink" title="Reveal in Finder">~/.chromux/captures</button>
+    </div>
+  </aside>
+  <div id="workspace">
+
+    <!-- ══ SESSION TAB STRIP — function-key slots ══ -->
+    <nav id="session-tabs" aria-label="Session tabs">
+      <button class="fkey active">
+        <span class="brk">[</span><span class="fnum">F1</span>
+        <span class="livedot" aria-hidden="true"></span>
+        CHECKOUT-FLOW·CLAUDE
+        <span class="tabbadge">(02)</span><span class="brk">]</span>
+      </button>
+      <button class="fkey">
+        <span class="brk">[</span><span class="fnum">F2</span>
+        <span class="livedot" aria-hidden="true"></span>
+        LANDING-PAGE·GROK
+        <span class="brk">]</span>
+      </button>
+      <button class="fkey">
+        <span class="brk">[</span><span class="fnum">F3</span>
+        <span class="deaddot" aria-hidden="true"></span>
+        API-SERVER·CODEX
+        <span class="brk">]</span>
+      </button>
+      <button class="fkey addtab" title="New session (⌘T)">
+        <span class="brk">[</span><span class="fnum">F4</span> + <span class="brk">]</span>
+      </button>
+    </nav>
+
+    <!-- ══ STAGE — split view ══ -->
+    <main id="stage">
+
+      <!-- terminal pane -->
+      <section class="pane pane-term">
+        <div class="boxframe">
+          <div class="bf-top">
+            <span>┌</span><span class="bf-rule short"></span>
+            <span class="bf-label">TERMINAL — CLAUDE
+              <span class="lbl-dim">&nbsp;~/projects/shop/checkout-flow</span></span>
+            <span class="bf-rule"></span><span>┐</span>
+          </div>
+          <div class="bf-body">
+            <span class="bf-scrollmark up">▲</span>
+            <span class="bf-scrollmark dn">▼</span>
+            <div class="term-body">
+              <div class="tl term-welcome"><span><span class="spark">✻</span> Welcome to Claude Code!</span><span class="tl-meta">/projects/shop/checkout-flow</span></div>
+              <div class="tl">&nbsp;</div>
+              <div class="tl tl-user">&gt; fix the CTA overflow on the checkout page</div>
+              <div class="tl">&nbsp;</div>
+              <div class="tl tl-agent">● I'll look at the checkout component styles.</div>
+              <div class="tl tl-tool">● Read src/components/CheckoutCTA.tsx <span class="tl-meta">(84 lines)</span></div>
+              <div class="tl tl-tool">● Edit src/styles/checkout.css</div>
+              <div class="tl tl-del">&nbsp;&nbsp;- .cta-row { width: 120%; }</div>
+              <div class="tl tl-add">&nbsp;&nbsp;+ .cta-row { width: 100%; max-width: 480px; }</div>
+              <div class="tl tl-ok">✔ Change applied — dev server reloaded</div>
+              <div class="tl tl-agent">● The button no longer overflows. Preview updated on the right.</div>
+              <div class="tl">&nbsp;</div>
+              <div class="tl tl-await"><span class="blockcursor" aria-hidden="true"></span>&nbsp;awaiting your next instruction…</div>
+            </div>
+          </div>
+          <div class="bf-bot">
+            <span>└</span><span class="bf-rule"></span>
+            <span class="bf-label" style="color:var(--g-dim);text-shadow:none;">TTY 46×132 · PTY LIVE</span>
+            <span class="bf-rule short"></span><span>┘</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- divider -->
+      <div id="divider" title="Drag to resize" aria-hidden="true">┃<br>┃<br>┃<br>┃<br>┃</div>
+
+      <!-- browser pane -->
+      <section class="pane pane-web">
+        <div class="boxframe">
+          <div class="bf-top">
+            <span>┌</span><span class="bf-rule short"></span>
+            <span class="bf-label">BROWSER — PAIRED PANE</span>
+            <span class="bf-rule"></span><span>┐</span>
+          </div>
+          <div class="bf-body">
+            <div class="web-toolbar">
+              <button class="navkey" title="Back">[◀]</button>
+              <button class="navkey" title="Forward">[▶]</button>
+              <button class="navkey" title="Reload">[⟳]</button>
+              <span class="urlbar">http://localhost:5173/checkout</span>
+              <button class="cmd-btn primary" id="btn-capture">⛶ CAPTURE</button>
+              <button class="cmd-btn" style="padding:4px 2px;">QUEUE <span class="qbadge">(02)</span></button>
+              <span class="chip">console: 0</span>
+              <button class="cmd-btn" style="padding:4px 2px;">⌄ COLLAPSE</button>
+            </div>
+            <div class="fb-strip">
+              <span class="fb-live">●</span>
+              <span>REMOTE FRAMEBUFFER</span>
+              <span style="color:var(--g-ghost);">──</span>
+              <span class="fb-url">localhost:5173/checkout</span>
+              <span style="margin-left:auto;color:var(--g-faint);">RGB·60HZ·1:1</span>
+            </div>
+            <div class="fb-wrap">
+              <div class="fb-window">
+                <span class="refreshed-chip">⟳ REFRESHED</span>
+                <div class="shop">
+                  <div class="shop-top">
+                    <span class="shop-logo">shop/checkout</span>
+                    <span class="shop-step">Step 3 of 3 — Payment</span>
+                  </div>
+                  <div class="shop-h1">Order summary</div>
+                  <div class="order-card">
+                    <div class="order-row"><span>Concourse Tee — Black <span class="oq">× 1</span></span><span>$28.00</span></div>
+                    <div class="order-row"><span>Sticker Pack — Dev Icons <span class="oq">× 2</span></span><span>$12.00</span></div>
+                    <div class="order-row"><span>Shipping <span class="oq">standard</span></span><span>$8.00</span></div>
+                    <div class="order-row total"><span>Total</span><span>$48.00</span></div>
+                  </div>
+                  <button class="cta-btn">Pay $48.00</button>
+                  <div class="shop-secure">🔒 Payments are encrypted &amp; processed securely</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="bf-bot">
+            <span>└</span><span class="bf-rule short"></span>
+            <span class="bf-label" style="color:var(--g-dim);text-shadow:none;">AUTO-RELOAD ON · LAST PAINT 00:00:03</span>
+            <span class="bf-rule"></span><span>┘</span>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+<!-- ══ STATUS BAR — inverse video ══ -->
+<footer id="statusbar">
+  <div class="sb-left">
+    <span class="sb-key">ADAPTER</span><span class="sb-val">claude -p · one-off</span>
+    <span class="sb-sep">│</span>
+    <span class="sb-key">PAIRING</span><span class="sb-val">1:1 session ↔ pane</span>
+  </div>
+  <div class="sb-right">
+    <button class="sb-btn">DELIVERY LOG</button>
+    <span class="sb-sep">│</span>
+    <span class="sb-ver">chromux 0.17.0 — phosphor concept</span>
+  </div>
+</footer>
+
+<div id="vartag">VARIATION 02 · PHOSPHOR</div>
+
+<!-- ══ CAPTURE MODAL ══ -->
+<div id="modal-capture" class="overlay hidden">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Capture to agent">
+    <span class="m-corner m-tl">╔</span><span class="m-corner m-tr">╗</span>
+    <span class="m-corner m-bl">╚</span><span class="m-corner m-br">╝</span>
+    <div class="modal-head">
+      <span class="modal-title">╡ CAPTURE → AGENT ╞</span>
+      <button class="modal-x" data-close>[ ✕ ]</button>
+    </div>
+    <div class="cap-grid">
+      <div class="cap-col">
+        <div class="cap-row"><span class="microlabel">SESSION</span><span class="cap-val">checkout-flow · claude</span></div>
+        <div class="cap-row"><span class="microlabel">URL</span><span class="cap-val">localhost:5173/checkout</span></div>
+        <div class="cap-row"><span class="microlabel">SELECTION</span><span class="cap-val">"CTA button region 412×88"</span></div>
+        <label class="field">
+          <span class="microlabel">NOTE TO AGENT — WHAT'S WRONG / WHAT TO DO</span>
+          <textarea rows="3" spellcheck="false"
+            placeholder="e.g. the CTA button overflows its container — fix the CSS"></textarea>
+        </label>
+        <label class="field">
+          <span class="microlabel">TARGET</span>
+          <select><option>checkout-flow · claude -p</option></select>
+        </label>
+        <div class="field">
+          <span class="microlabel">SCREENSHOT</span>
+          <div class="cap-shot">▚▞ FRAME 2026-07-11-0142.PNG ▚▞</div>
+        </div>
+      </div>
+      <div class="cap-col">
+        <span class="microlabel">PAYLOAD PREVIEW — YAML V1</span>
+        <pre class="yaml-view"><span class="yk">chromux_capture:</span> <span class="yv">v1</span>
+<span class="yk">session:</span> <span class="yv">checkout-flow</span>
+<span class="yk">agent:</span> <span class="yv">claude</span>
+<span class="yk">url:</span> <span class="yv">http://localhost:5173/checkout</span>
+<span class="yk">note:</span> <span class="yv">CTA overflows container</span>
+<span class="yk">screenshot:</span> <span class="yv">~/.chromux/captures/2026-07-11-0142.png</span>
+<span class="yk">console_errors:</span> <span class="yv">[]</span></pre>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="cmd-btn" data-close>CANCEL</button>
+      <button class="cmd-btn">FILE-DROP ONLY</button>
+      <button class="cmd-btn primary">SEND — CLAUDE -P</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var modal = document.getElementById('modal-capture');
+  document.getElementById('btn-capture').addEventListener('click', function () {
+    modal.classList.remove('hidden');
+  });
+  modal.querySelectorAll('[data-close]').forEach(function (el) {
+    el.addEventListener('click', function () { modal.classList.add('hidden'); });
+  });
+  modal.addEventListener('click', function (e) {
+    if (e.target === modal) modal.classList.add('hidden');
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') modal.classList.add('hidden');
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Chromux — Memphis</title>
+<style>
+/* Progressive enhancement — strong local fallbacks (Futura IS the Memphis face) */
+@import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Mono:wght@400;700&display=swap');
+
+/* ─────────────────────────────────────────────
+   CHROMUX №12 — MEMPHIS
+   Bold primaries · thick outlines · geometric confetti
+   ───────────────────────────────────────────── */
+:root{
+  --red:#F5333F;
+  --red-deep:#D21F2C;
+  --yellow:#FFD23F;
+  --yellow-hot:#FFC400;
+  --blue:#1E5AFF;
+  --blue-deep:#0B3FCE;
+  --green:#0FA958;
+  --cyan:#00B3D6;
+  --ink:#131313;
+  --paper:#FFFDF4;
+  --paper-dim:#F6F1E3;
+  --term:#161418;
+  --term-text:#F4EFE2;
+  --line:3px;
+  --line-fat:4px;
+  --disp:'Archivo Black','Futura','Avenir Next Condensed','Avenir Next',sans-serif;
+  --body:'Futura','Avenir Next','Trebuchet MS',sans-serif;
+  --mono:'Space Mono','Menlo','SF Mono','Monaco',monospace;
+  --spring:cubic-bezier(.3,1.8,.4,1);
+  /* confetti tile — triangles, rings, half-circles, squiggles, plus, dots */
+  --confetti:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='150' height='58'><path d='M10 42 L22 20 L34 42 Z' fill='%23F5333F' stroke='%23131313' stroke-width='2'/><circle cx='60' cy='16' r='7' fill='none' stroke='%231E5AFF' stroke-width='3.5'/><path d='M86 46 a11 11 0 0 1 22 0 Z' fill='%23FFD23F' stroke='%23131313' stroke-width='2'/><path d='M112 14 q6 -9 12 0 t12 0' fill='none' stroke='%23131313' stroke-width='2.5'/><path d='M46 40 h11 M51.5 34.5 v11' stroke='%23131313' stroke-width='3'/><circle cx='138' cy='36' r='3.4' fill='%23131313'/><rect x='68' y='38' width='9' height='9' fill='%231E5AFF' transform='rotate(18 72 42)'/></svg>");
+  --squiggle:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='22' height='9'><path d='M0 7 Q5.5 0 11 7 T22 7' fill='none' stroke='%23131313' stroke-width='2.4'/></svg>");
+  --squiggle-y:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='22' height='9'><path d='M0 7 Q5.5 0 11 7 T22 7' fill='none' stroke='%23FFD23F' stroke-width='2.6'/></svg>");
+  --zigzag:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='8'><path d='M0 7 L4.5 1 L9 7 L13.5 1 L18 7' fill='none' stroke='%23131313' stroke-width='2.2'/></svg>");
+  --terrazzo:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='90' height='90'><circle cx='14' cy='18' r='4' fill='%23F5333F'/><rect x='52' y='8' width='9' height='9' fill='%231E5AFF' transform='rotate(24 56 12)'/><path d='M70 66 L79 52 L88 66 Z' fill='%23FFD23F' stroke='%23131313' stroke-width='1.6'/><circle cx='30' cy='62' r='5' fill='none' stroke='%23131313' stroke-width='2'/><path d='M8 82 h9 M12.5 77.5 v9' stroke='%23F5333F' stroke-width='2.4'/><circle cx='62' cy='34' r='2.6' fill='%23131313'/><path d='M34 34 q5 -7 10 0' fill='none' stroke='%231E5AFF' stroke-width='2.2'/></svg>");
+}
+
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:var(--body);
+  background:var(--paper);
+  color:var(--ink);
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  min-width:1280px;
+  -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;cursor:pointer;color:inherit}
+.microlabel{
+  font-family:var(--disp);
+  font-size:10px;
+  letter-spacing:.14em;
+}
+
+/* ══ shared flat Memphis button — thick outline, springy, NO offset shadows ══ */
+.btn{
+  background:var(--paper);
+  border:var(--line) solid var(--ink);
+  font-family:var(--disp);
+  font-size:10.5px;
+  letter-spacing:.1em;
+  padding:6px 12px;
+  border-radius:3px;
+  transition:transform .18s var(--spring),background .18s ease;
+}
+.btn:hover{transform:rotate(-2deg) scale(1.07)}
+.btn-red{background:var(--red);color:#fff}
+.btn-red:hover{background:var(--red-deep)}
+.btn-yellow{background:var(--yellow)}
+.btn-yellow:hover{background:var(--yellow-hot)}
+.btn-blue{background:var(--blue);color:#fff}
+.btn-blue:hover{background:var(--blue-deep)}
+
+/* ══ 1 · TITLEBAR ══ */
+#titlebar{
+  height:52px;
+  flex:0 0 52px;
+  display:flex;
+  align-items:center;
+  gap:14px;
+  padding-left:84px;            /* macOS traffic-light gutter */
+  padding-right:14px;
+  background:var(--paper);
+  border-bottom:var(--line-fat) solid var(--ink);
+  position:relative;
+  z-index:5;
+}
+.brand{display:flex;align-items:center;gap:10px}
+.brand-mark{
+  display:grid;place-items:center;
+  width:34px;height:34px;
+  background:var(--yellow);
+  border:var(--line) solid var(--ink);
+  border-radius:4px;
+  transform:rotate(-4deg);
+  transition:transform .25s var(--spring);
+}
+.brand-mark:hover{transform:rotate(4deg) scale(1.1)}
+.brand-name{
+  font-family:var(--disp);
+  font-size:17px;
+  letter-spacing:.06em;
+}
+.brand-sub{
+  font-family:var(--disp);
+  font-size:9px;
+  letter-spacing:.16em;
+  background:var(--blue);
+  color:#fff;
+  border:2px solid var(--ink);
+  padding:3px 7px 2px;
+  border-radius:2px;
+  transform:rotate(-2deg);
+}
+/* confetti lives in the empty middle stretch, not behind text */
+.title-confetti{
+  flex:1;
+  align-self:stretch;
+  margin:5px 6px;
+  background-image:var(--confetti);
+  background-repeat:repeat-x;
+  background-position:left center;
+  background-size:150px 42px;
+  min-width:60px;
+}
+.titlebar-gauges{display:flex;align-items:center;gap:10px}
+.gauge{
+  display:flex;align-items:center;gap:6px;
+  font-family:var(--disp);
+  font-size:10px;letter-spacing:.1em;
+  border:2.5px solid var(--ink);
+  border-radius:999px;
+  background:#fff;
+  padding:4px 11px 3px;
+}
+.gauge b{font-weight:400}
+.gdot{width:10px;height:10px;border-radius:50%;border:2px solid var(--ink);display:inline-block}
+.g-green{background:var(--green)}
+.g-amber{background:var(--yellow-hot)}
+.g-cyan{background:var(--cyan)}
+.update-ready{
+  background:var(--red);color:#fff;
+  transform:rotate(2deg);
+  animation:wiggle 2.6s ease-in-out infinite;
+}
+.update-ready:hover{background:var(--red-deep);transform:rotate(-2deg) scale(1.08)}
+@keyframes wiggle{
+  0%,86%,100%{transform:rotate(2deg)}
+  90%{transform:rotate(-2deg) scale(1.04)}
+  94%{transform:rotate(2.5deg)}
+}
+/* ══ layout frame ══ */
+#app{flex:1;display:flex;min-height:0}
+
+/* ══ 2 · LEFT RAIL ══ */
+#rail{
+  width:230px;flex:0 0 230px;
+  display:flex;flex-direction:column;
+  border-right:var(--line-fat) solid var(--ink);
+  background:var(--paper-dim);
+  position:relative;
+}
+.rail-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 10px;
+  background:var(--yellow);
+  border-bottom:var(--line) solid var(--ink);
+}
+.rail-head .microlabel{font-size:10.5px}
+.rail-head .btn{padding:4px 8px;font-size:9.5px;background:#fff}
+#attention-list{padding:12px 10px;display:flex;flex-direction:column;gap:14px}
+.queue-card{
+  background:#fff;
+  border:var(--line) solid var(--ink);
+  border-radius:4px;
+  padding:9px 10px 10px;
+  transition:transform .2s var(--spring);
+}
+.queue-card:nth-child(1){transform:rotate(-1.2deg)}
+.queue-card:nth-child(2){transform:rotate(1deg)}
+.queue-card:nth-child(3){transform:rotate(-.8deg)}
+.queue-card:hover{transform:rotate(0) scale(1.04)}
+.qc-top{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+.qc-kind{
+  font-family:var(--disp);font-size:8.5px;letter-spacing:.12em;
+  border:2px solid var(--ink);border-radius:2px;
+  padding:2.5px 6px 1.5px;color:#fff;
+  transform:rotate(-2deg);
+}
+.qc-kind.k-approval{background:var(--red)}
+.qc-kind.k-preview{background:var(--blue)}
+.qc-kind.k-exited{background:var(--ink)}
+.qc-session{font-family:var(--mono);font-size:11px;font-weight:700}
+.qc-msg{font-size:11.5px;line-height:1.45;color:#2b2b2b}
+.qc-msg code{font-family:var(--mono);font-size:10.5px;background:var(--paper-dim);border:1.5px solid var(--ink);border-radius:2px;padding:0 3px}
+/* squiggle separator under each card */
+.qc-sep{height:9px;margin:12px 14px 0;background:var(--squiggle) repeat-x left center/22px 9px}
+/* terrazzo patch fills the rail's empty belly */
+.rail-fill{flex:1;margin:6px 10px;background:var(--terrazzo) repeat;background-size:90px 90px;opacity:.5}
+.rail-foot{
+  padding:9px 10px 11px;
+  border-top:var(--line) solid var(--ink);
+  background:#fff;
+}
+.rail-foot .microlabel{display:block;margin-bottom:4px;color:#555}
+.pathlink{
+  background:none;border:none;
+  font-family:var(--mono);font-size:11px;font-weight:700;
+  color:var(--blue);text-decoration:underline;
+  text-underline-offset:3px;text-decoration-thickness:2px;
+  padding:0;
+}
+.pathlink:hover{color:var(--red)}
+
+/* ══ workspace column ══ */
+#workspace{flex:1;display:flex;flex-direction:column;min-width:0}
+
+/* ══ 3 · SESSION TAB STRIP ══ */
+#session-tabs{
+  flex:0 0 46px;
+  display:flex;align-items:center;gap:10px;
+  padding:0 12px;
+  background:var(--blue);
+  border-bottom:var(--line-fat) solid var(--ink);
+}
+.session-tab{
+  display:flex;align-items:center;gap:7px;
+  background:#fff;
+  border:var(--line) solid var(--ink);
+  border-radius:3px;
+  font-family:var(--disp);font-size:10px;letter-spacing:.06em;
+  padding:6px 11px;
+  transition:transform .2s var(--spring),background .2s ease;
+}
+.session-tab:hover{transform:rotate(1.5deg) scale(1.06)}
+.session-tab.active{background:var(--yellow);transform:rotate(-1.5deg)}
+.session-tab.active:hover{transform:rotate(-1.5deg) scale(1.05)}
+.tab-dot{width:9px;height:9px;border-radius:50%;border:2px solid var(--ink)}
+.tab-dot.live{background:var(--green)}
+.tab-dot.dead{background:var(--red)}
+.tab-badge{
+  font-family:var(--disp);font-size:9px;
+  background:var(--red);color:#fff;
+  border:2px solid var(--ink);border-radius:999px;
+  min-width:17px;height:17px;
+  display:grid;place-items:center;
+  transform:rotate(4deg);
+}
+.add-tab{
+  font-family:var(--disp);font-size:14px;
+  width:32px;height:32px;padding:0;
+  display:grid;place-items:center;
+  background:var(--yellow);
+  border:var(--line) solid var(--ink);
+  border-radius:50%;
+  transition:transform .2s var(--spring);
+}
+.add-tab:hover{transform:rotate(90deg) scale(1.12)}
+/* zigzag filler after the tabs */
+.tabs-fill{flex:1;align-self:stretch;margin:14px 4px;background:var(--squiggle-y) repeat-x left center/22px 9px;min-width:40px}
+
+/* ══ 4 · STAGE — SPLIT VIEW ══ */
+#stage{flex:1;display:flex;min-height:0;background:var(--paper)}
+
+/* terminal pane */
+#terminal-pane{
+  flex:0 0 44%;
+  display:flex;flex-direction:column;
+  min-width:0;
+}
+.pane-head{
+  flex:0 0 38px;
+  display:flex;align-items:center;gap:10px;
+  padding:0 12px;
+  border-bottom:var(--line) solid var(--ink);
+}
+#terminal-pane .pane-head{background:var(--red);color:#fff}
+.pane-title{font-family:var(--disp);font-size:11px;letter-spacing:.1em}
+.pane-cwd{
+  font-family:var(--mono);font-size:10.5px;font-weight:700;
+  margin-left:auto;
+  background:#fff;color:var(--ink);
+  border:2px solid var(--ink);border-radius:2px;
+  padding:2.5px 7px;
+  transform:rotate(1deg);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  max-width:60%;
+}
+.term-body{
+  flex:1;
+  background:var(--term);
+  color:var(--term-text);
+  font-family:var(--mono);
+  font-size:12.5px;line-height:1.72;
+  padding:16px 18px;
+  overflow:hidden;
+}
+.term-body .t-wel{color:var(--yellow)}
+.term-body .t-wel small{color:#8f8a7c;float:right;font-size:11px}
+.term-body .t-user{color:#fff;font-weight:700}
+.term-body .t-user::before{content:'> ';color:var(--cyan)}
+.term-body .t-act{color:#cfc9ba}
+.term-body .t-act::before{content:'● ';color:var(--blue);filter:brightness(1.6)}
+.term-body .t-del{color:#ff7b84}
+.term-body .t-add{color:#5fe0a1}
+.term-body .t-ok{color:var(--green);filter:brightness(1.35)}
+.term-body .t-dim{color:#8f8a7c}
+.term-body .t-ind{padding-left:2ch}
+.t-cursor{color:var(--yellow);animation:blink 1.1s steps(2) infinite}
+@keyframes blink{50%{opacity:.15}}
+
+/* divider — dotted drag strip */
+#divider{
+  flex:0 0 10px;
+  background:var(--yellow);
+  border-left:var(--line) solid var(--ink);
+  border-right:var(--line) solid var(--ink);
+  background-image:radial-gradient(circle at 50% 6px,var(--ink) 1.8px,transparent 2.1px);
+  background-size:10px 14px;
+  background-position:center top;
+  cursor:col-resize;
+}
+/* browser pane */
+#browser-pane{flex:1;display:flex;flex-direction:column;min-width:0}
+#browser-pane .pane-head{
+  background:var(--paper);
+  gap:7px;
+  flex-basis:44px;
+}
+#browser-pane .pane-head > *{flex:0 0 auto}
+#browser-pane .pane-head .btn{padding:5px 9px;font-size:9.5px}
+.nav-btn{
+  width:24px;height:24px;padding:0;
+  display:grid;place-items:center;
+  background:#fff;
+  border:2.5px solid var(--ink);border-radius:50%;
+  font-size:12px;font-weight:700;
+  transition:transform .18s var(--spring);
+}
+.nav-btn:hover{transform:rotate(-8deg) scale(1.15)}
+.url-bar{
+  flex:1 1 auto !important;min-width:100px;
+  font-family:var(--mono);font-size:11px;font-weight:700;
+  background:#fff;
+  border:2.5px solid var(--ink);border-radius:999px;
+  padding:5px 11px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.url-bar span{color:var(--blue)}
+.chip-console{
+  font-family:var(--mono);font-size:10px;font-weight:700;
+  border:2px solid var(--ink);border-radius:2px;
+  background:#fff;
+  padding:3px 7px;
+  transform:rotate(-2deg);
+  white-space:nowrap;
+}
+.chip-console b{color:var(--green)}
+#btn-capture{white-space:nowrap}
+#btn-queue{position:relative;white-space:nowrap}
+#btn-queue .tab-badge{
+  position:absolute;top:-9px;right:-9px;
+  background:var(--blue);
+}
+/* tighter toolbar on narrower windows — hide the scheme like a real browser */
+@media (max-width:1360px){
+  #browser-pane .pane-head{gap:6px}
+  #browser-pane .pane-head .btn{padding:5px 7px;font-size:9px}
+  .nav-btn{width:22px;height:22px;font-size:11px}
+  .url-bar span{display:none}
+  .chip-console{font-size:9.5px;padding:2px 5px}
+}
+
+/* fake rendered page — deliberately calm inside the party */
+.web-body{
+  flex:1;
+  background:#eef0f3;
+  position:relative;
+  overflow:hidden;
+  display:grid;place-items:center;
+  font-family:'Helvetica Neue','Avenir Next',Arial,sans-serif;
+}
+.web-page{
+  width:min(440px,80%);
+  background:#fff;
+  border:1px solid #dcdfe4;
+  border-radius:10px;
+  padding:26px 28px;
+  color:#1c2430;
+  box-shadow:0 8px 28px rgba(28,36,48,.09);
+}
+.web-shop{display:flex;align-items:center;gap:8px;font-size:12px;color:#66707d;margin-bottom:14px}
+.web-shop i{width:20px;height:20px;border-radius:5px;background:#1c2430;display:inline-grid;place-items:center;color:#fff;font-style:normal;font-size:10px;font-weight:700}
+.web-h1{font-size:19px;font-weight:700;letter-spacing:-.01em;margin-bottom:16px}
+.web-row{display:flex;justify-content:space-between;font-size:13px;color:#454e5a;padding:7px 0;border-bottom:1px solid #edeff2}
+.web-row.total{border-bottom:none;padding-top:11px;font-weight:700;color:#1c2430;font-size:14px}
+.web-cta{
+  display:block;width:100%;
+  margin-top:16px;
+  background:#1c2430;color:#fff;
+  border:none;border-radius:8px;
+  font-size:14px;font-weight:600;
+  padding:12px 0;
+  max-width:480px;
+  transition:background .15s ease;
+}
+.web-cta:hover{background:#323d4d}
+.web-secure{text-align:center;font-size:11px;color:#8a939e;margin-top:10px}
+.refreshed-chip{
+  position:absolute;top:14px;right:16px;
+  font-family:var(--disp);font-size:9px;letter-spacing:.12em;
+  background:var(--green);color:#fff;
+  border:2.5px solid var(--ink);border-radius:2px;
+  padding:4px 9px 3px;
+  transform:rotate(3deg);
+  animation:flashin .5s var(--spring) both;
+}
+@keyframes flashin{from{transform:rotate(3deg) scale(.4);opacity:0}to{transform:rotate(3deg) scale(1);opacity:1}}
+
+/* ══ 5 · STATUS BAR ══ */
+#statusbar{
+  flex:0 0 30px;
+  display:flex;align-items:center;gap:14px;
+  padding:0 12px;
+  background:var(--ink);color:var(--paper);
+  border-top:var(--line-fat) solid var(--ink);
+  font-size:10px;
+  position:relative;z-index:5;
+}
+#statusbar .microlabel{color:var(--yellow);font-size:8.5px}
+.sb-val{font-family:var(--mono);font-size:10.5px;font-weight:700;margin-right:6px}
+.sb-sep{width:22px;height:8px;background:var(--squiggle-y) repeat-x left center/22px 9px;display:inline-block}
+.sb-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.sb-btn{
+  background:var(--yellow);color:var(--ink);
+  border:2px solid var(--paper);border-radius:2px;
+  font-family:var(--disp);font-size:8.5px;letter-spacing:.12em;
+  padding:3px 8px 2px;
+  transform:rotate(-1.5deg);
+  transition:transform .18s var(--spring);
+}
+.sb-btn:hover{transform:rotate(1.5deg) scale(1.08)}
+.sb-ver{font-family:var(--mono);font-size:10px;color:#b9b3a4}
+
+/* ══ corner variation tag ══ */
+#corner-tag{
+  position:fixed;right:14px;bottom:40px;z-index:60;
+  font-family:var(--disp);font-size:10px;letter-spacing:.14em;
+  background:var(--red);color:#fff;
+  border:var(--line) solid var(--ink);
+  padding:6px 11px 5px;
+  transform:rotate(-3deg);
+  pointer-events:none;
+}
+#corner-tag i{font-style:normal;color:var(--yellow)}
+
+/* ══ 6 · CAPTURE MODAL ══ */
+#modal-capture{
+  position:fixed;inset:0;z-index:100;
+  display:grid;place-items:center;
+  background:rgba(19,19,19,.55);
+  background-image:radial-gradient(circle at 4px 4px,rgba(255,210,63,.28) 1.7px,transparent 2px);
+  background-size:22px 22px;
+}
+#modal-capture.hidden{display:none}
+.modal{
+  width:min(880px,92vw);
+  max-height:88vh;
+  background:var(--paper);
+  border:var(--line-fat) solid var(--ink);
+  border-radius:5px;
+  display:flex;flex-direction:column;
+  animation:popin .35s var(--spring) both;
+}
+@keyframes popin{from{transform:scale(.85) rotate(-2deg);opacity:0}to{transform:scale(1) rotate(0);opacity:1}}
+.modal-head{
+  display:flex;align-items:center;gap:12px;
+  padding:11px 14px;
+  background:var(--yellow);
+  border-bottom:var(--line) solid var(--ink);
+}
+.modal-head .microlabel{font-size:11px}
+.modal-head-confetti{flex:1;align-self:stretch;background:var(--zigzag) repeat-x left center/18px 8px;min-width:40px}
+.modal-x{
+  width:28px;height:28px;padding:0;
+  display:grid;place-items:center;
+  background:var(--red);color:#fff;
+  border:var(--line) solid var(--ink);border-radius:50%;
+  font-size:12px;font-weight:700;
+  transition:transform .2s var(--spring);
+}
+.modal-x:hover{transform:rotate(90deg) scale(1.12)}
+.cap-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:18px;
+  padding:16px;
+  overflow:auto;
+}
+.cap-col{display:flex;flex-direction:column;gap:12px;min-width:0}
+.cap-summary{border:var(--line) solid var(--ink);border-radius:3px;background:#fff;overflow:hidden}
+.cap-row{display:flex;gap:10px;padding:7px 10px;font-size:11.5px;align-items:baseline}
+.cap-row + .cap-row{border-top:2px dashed var(--ink)}
+.cap-row .microlabel{flex:0 0 74px;color:#555;font-size:8.5px}
+.cap-row b{font-family:var(--mono);font-size:11px}
+.field{display:flex;flex-direction:column;gap:5px}
+.field .microlabel{color:#555;font-size:8.5px}
+textarea,select{
+  font-family:var(--mono);font-size:11.5px;
+  border:var(--line) solid var(--ink);border-radius:3px;
+  background:#fff;color:var(--ink);
+  padding:8px 9px;
+  resize:none;
+  outline:none;
+}
+textarea:focus,select:focus{background:#fffbe8}
+.cap-shot{
+  height:86px;
+  border:var(--line) dashed var(--ink);border-radius:3px;
+  display:grid;place-items:center;
+  font-family:var(--mono);font-size:10.5px;color:#777;
+  background:var(--terrazzo) repeat #fff;
+  background-size:90px 90px;
+  background-blend-mode:luminosity;
+}
+.cap-shot span{background:#fff;border:2px solid var(--ink);border-radius:2px;padding:3px 9px;transform:rotate(-1.5deg)}
+.yaml-view{
+  flex:1;
+  font-family:var(--mono);font-size:11.5px;line-height:1.75;
+  background:var(--term);color:var(--term-text);
+  border:var(--line) solid var(--ink);border-radius:3px;
+  padding:13px 14px;
+  overflow:auto;white-space:pre;
+}
+.yaml-view .y-key{color:var(--yellow)}
+.yaml-view .y-str{color:#8fd2ff}
+.modal-foot{
+  display:flex;align-items:center;justify-content:flex-end;gap:10px;
+  padding:12px 14px;
+  border-top:var(--line) solid var(--ink);
+  background:var(--paper-dim);
+}
+.modal-foot .spring{margin-right:auto;width:120px;height:9px;background:var(--squiggle) repeat-x left center/22px 9px}
+
+/* ══ reduced motion ══ */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{
+    animation:none !important;
+    transition:none !important;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- ══ 1 · TITLEBAR ══ -->
+<header id="titlebar">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 64 64" width="22" height="22">
+        <path d="M22 18 L44 32 L22 46" fill="none" stroke="#131313" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="22" cy="18" r="8" fill="#ec8a4a" stroke="#131313" stroke-width="3"/>
+        <circle cx="44" cy="32" r="8" fill="#a97cf2" stroke="#131313" stroke-width="3"/>
+        <circle cx="22" cy="46" r="8" fill="#35c97e" stroke="#131313" stroke-width="3"/>
+      </svg>
+    </span>
+    <span class="brand-name">CHROMUX</span>
+    <span class="brand-sub">AGENT COCKPIT</span>
+  </div>
+  <div class="title-confetti" aria-hidden="true"></div>
+  <div class="titlebar-gauges">
+    <span class="gauge"><i class="gdot g-green"></i><b>3</b>&nbsp;SESSIONS</span>
+    <span class="gauge"><i class="gdot g-amber"></i><b>2</b>&nbsp;QUEUED</span>
+    <span class="gauge"><i class="gdot g-cyan"></i><b>14</b>&nbsp;SENT</span>
+    <button class="btn update-ready">UPDATE READY</button>
+    <button class="btn">SETTINGS</button>
+  </div>
+</header>
+<!-- ══ main frame ══ -->
+<div id="app">
+
+  <!-- ══ 2 · LEFT RAIL ══ -->
+  <aside id="rail">
+    <div class="rail-head">
+      <span class="microlabel">ATTENTION QUEUE</span>
+      <button class="btn">⛶ DETECT</button>
+    </div>
+    <div id="attention-list">
+      <div class="queue-card">
+        <div class="qc-top"><span class="qc-kind k-approval">APPROVAL</span><span class="qc-session">checkout-flow</span></div>
+        <div class="qc-msg">claude wants to run <code>npm run db:migrate</code></div>
+      </div>
+      <div class="queue-card">
+        <div class="qc-top"><span class="qc-kind k-preview">PREVIEW</span><span class="qc-session">landing-page</span></div>
+        <div class="qc-msg">localhost:5173 changed — review ready</div>
+      </div>
+      <div class="queue-card">
+        <div class="qc-top"><span class="qc-kind k-exited">EXITED</span><span class="qc-session">api-server</span></div>
+        <div class="qc-msg">codex exited (code 0) · 12m ago</div>
+      </div>
+    </div>
+    <div class="qc-sep" aria-hidden="true"></div>
+    <div class="rail-fill" aria-hidden="true"></div>
+    <div class="rail-foot">
+      <span class="microlabel">LOCAL STORAGE</span>
+      <button class="pathlink">~/.chromux/captures</button>
+    </div>
+  </aside>
+
+  <!-- ══ workspace ══ -->
+  <div id="workspace">
+
+    <!-- ══ 3 · SESSION TABS ══ -->
+    <nav id="session-tabs" aria-label="Session tabs">
+      <button class="session-tab active"><span class="tab-dot live"></span>checkout-flow · claude<span class="tab-badge">2</span></button>
+      <button class="session-tab"><span class="tab-dot live"></span>landing-page · grok</button>
+      <button class="session-tab"><span class="tab-dot dead"></span>api-server · codex</button>
+      <button class="add-tab" aria-label="New session">+</button>
+      <div class="tabs-fill" aria-hidden="true"></div>
+    </nav>
+
+    <!-- ══ 4 · STAGE ══ -->
+    <main id="stage">
+
+      <!-- terminal pane -->
+      <section id="terminal-pane">
+        <div class="pane-head">
+          <span class="pane-title">TERMINAL — CLAUDE</span>
+          <span class="pane-cwd">~/projects/shop/checkout-flow</span>
+        </div>
+        <div class="term-body">
+          <div class="t-wel">✻ Welcome to Claude Code! <small>/projects/shop/checkout-flow</small></div>
+          <div class="t-user">fix the CTA overflow on the checkout page</div>
+          <div class="t-act">I'll look at the checkout component styles.</div>
+          <div class="t-act">Read src/components/CheckoutCTA.tsx <span class="t-dim">(84 lines)</span></div>
+          <div class="t-act">Edit src/styles/checkout.css</div>
+          <div class="t-del t-ind">- .cta-row { width: 120%; }</div>
+          <div class="t-add t-ind">+ .cta-row { width: 100%; max-width: 480px; }</div>
+          <div class="t-ok">✔ Change applied — dev server reloaded</div>
+          <div class="t-act">The button no longer overflows. Preview updated on the right.</div>
+          <div class="t-dim"><span class="t-cursor">▌</span>awaiting your next instruction…</div>
+        </div>
+      </section>
+
+      <!-- divider -->
+      <div id="divider" role="separator" aria-orientation="vertical" title="Drag to resize"></div>
+
+      <!-- browser pane -->
+      <section id="browser-pane">
+        <div class="pane-head">
+          <button class="nav-btn" aria-label="Back">‹</button>
+          <button class="nav-btn" aria-label="Forward">›</button>
+          <button class="nav-btn" aria-label="Reload">⟳</button>
+          <span class="url-bar"><span>http://</span>localhost:5173/checkout</span>
+          <button id="btn-capture" class="btn btn-red">⛶ CAPTURE</button>
+          <button id="btn-queue" class="btn">QUEUE<span class="tab-badge">2</span></button>
+          <span class="chip-console">console: <b>0</b></span>
+          <button class="btn">⌄ COLLAPSE</button>
+        </div>
+        <div class="web-body">
+          <div class="web-page">
+            <div class="web-shop"><i>S</i> shop.dev — secure checkout</div>
+            <div class="web-h1">Order summary</div>
+            <div class="web-row"><span>Studio Tee — Charcoal (M)</span><span>$32.00</span></div>
+            <div class="web-row"><span>Sticker pack × 2</span><span>$8.00</span></div>
+            <div class="web-row"><span>Shipping</span><span>$8.00</span></div>
+            <div class="web-row total"><span>Total</span><span>$48.00</span></div>
+            <button class="web-cta">Pay $48.00</button>
+            <div class="web-secure">🔒 Encrypted · powered by shop.dev pay</div>
+          </div>
+          <span class="refreshed-chip">REFRESHED</span>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- ══ 5 · STATUS BAR ══ -->
+<footer id="statusbar">
+  <span class="microlabel">ADAPTER</span><span class="sb-val">claude -p · one-off</span>
+  <span class="sb-sep" aria-hidden="true"></span>
+  <span class="microlabel">PAIRING</span><span class="sb-val">1:1 session ↔ pane</span>
+  <div class="sb-right">
+    <button class="sb-btn">DELIVERY LOG</button>
+    <span class="sb-ver">chromux 0.17.0 — memphis concept</span>
+  </div>
+</footer>
+
+<!-- ══ corner tag ══ -->
+<div id="corner-tag"><i>№12</i> MEMPHIS</div>
+<!-- ══ 6 · CAPTURE MODAL ══ -->
+<div id="modal-capture" class="hidden" role="dialog" aria-modal="true" aria-label="Capture to agent">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="microlabel">CAPTURE → AGENT</span>
+      <div class="modal-head-confetti" aria-hidden="true"></div>
+      <button class="modal-x" id="cap-close" aria-label="Close">✕</button>
+    </div>
+    <div class="cap-grid">
+      <div class="cap-col">
+        <div class="cap-summary">
+          <div class="cap-row"><span class="microlabel">SESSION</span><b>checkout-flow · claude</b></div>
+          <div class="cap-row"><span class="microlabel">URL</span><b>localhost:5173/checkout</b></div>
+          <div class="cap-row"><span class="microlabel">SELECTION</span><b>"CTA button region 412×88"</b></div>
+        </div>
+        <label class="field">
+          <span class="microlabel">NOTE TO AGENT — WHAT'S WRONG / WHAT TO DO</span>
+          <textarea rows="3" spellcheck="false" placeholder="e.g. the CTA button overflows its container — fix the CSS"></textarea>
+        </label>
+        <label class="field">
+          <span class="microlabel">TARGET</span>
+          <select><option>checkout-flow · claude -p</option></select>
+        </label>
+        <div class="field">
+          <span class="microlabel">SCREENSHOT</span>
+          <div class="cap-shot"><span>2026-07-11-0142.png · 412×88</span></div>
+        </div>
+      </div>
+      <div class="cap-col">
+        <span class="microlabel">PAYLOAD PREVIEW — YAML v1</span>
+        <pre class="yaml-view"><span class="y-key">chromux_capture:</span> v1
+<span class="y-key">session:</span> checkout-flow
+<span class="y-key">agent:</span> claude
+<span class="y-key">url:</span> <span class="y-str">http://localhost:5173/checkout</span>
+<span class="y-key">note:</span> CTA overflows container
+<span class="y-key">screenshot:</span> <span class="y-str">~/.chromux/captures/2026-07-11-0142.png</span>
+<span class="y-key">console_errors:</span> []</pre>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <div class="spring" aria-hidden="true"></div>
+      <button class="btn" id="cap-cancel">CANCEL</button>
+      <button class="btn btn-yellow">FILE-DROP ONLY</button>
+      <button class="btn btn-blue">SEND — claude -p</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var modal = document.getElementById('modal-capture');
+  function open(){ modal.classList.remove('hidden'); }
+  function close(){ modal.classList.add('hidden'); }
+  document.getElementById('btn-capture').addEventListener('click', open);
+  document.getElementById('cap-close').addEventListener('click', close);
+  document.getElementById('cap-cancel').addEventListener('click', close);
+  modal.addEventListener('click', function(e){ if (e.target === modal) close(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') close(); });
+  if (/[?&]modal=1/.test(location.search)) open();
+})();
+</script>
+</body>
+</html>
