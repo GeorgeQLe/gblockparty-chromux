@@ -1,5 +1,13 @@
 # Session History
 
+## 2026-07-12 — Chromux v0.19.0 Liquid Glass design prototype
+
+- Added `design-prototypes/16-liquid-glass.html`, a 16th self-contained design concept: bright silver-blue optical-glass cockpit with rounded edge-lit glass panes, a smoked-glass terminal slab, edge-concentrated attention capsules, traveling-highlight interactions, and a thicker floating capture sheet — per the shared `SPEC.md` contract.
+- Wired the concept into the gallery (`index.html` Batch 3 card with a glass-reflection swatch) and `design-prototypes/README.md`; the website build script picks the file up via its existing glob.
+- Pipeline: Sonnet 5 subagents built the prototype and gallery wiring; a Fable 5 review (code + headless renders at 1440×900 and 1280×860, modal open/closed) produced findings; Opus 4.8 subagents remediated (rounded/edge-lit stage panes, browser-pane backdrop blur, divider presence at rest, dead CSS removal, gallery swatch reflection); final Fable 5 review fixed URL-bar overflow at the 1280 spec minimum (`min-width: 96px`) and kept the terminal pane at 44% so the full spec URL renders at 1440.
+- Bumped Chromux metadata to `0.19.0`; planned tag is `chromux-v0.19.0`.
+- Validation: `./scripts/build-website.sh` and headless Chromium renders of the prototype (main, capture modal, 1280-width toolbar) and gallery Batch 3 passed; exact spec strings, region ids, and modal toggle verified.
+
 ## 2026-07-11 — Chromux v0.18.0 static website and design gallery
 
 - Compiled the existing product landing page and all 15 design-refresh prototypes into a production-only static artifact: `/` serves the landing page and `/designs/` serves the gallery.

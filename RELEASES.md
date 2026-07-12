@@ -1,5 +1,12 @@
 # Release Notes
 
+## GBlockParty Chromux v0.19.0
+
+Planned tag: `chromux-v0.19.0`
+
+- Add the 16th design-refresh prototype, "Liquid Glass": a bright silver-blue optical-glass cockpit with rounded edge-lit panes, a smoked-glass terminal slab, restrained cyan/violet/green/amber/coral state color, traveling-highlight interactions, and a thicker floating capture sheet.
+- Wire the new prototype into the design gallery as Batch 3 with a glass-reflection swatch, and update the gallery README and counts (the website build picks up the new file automatically).
+
 ## GBlockParty Chromux v0.18.0
 
 Planned tag: `chromux-v0.18.0`

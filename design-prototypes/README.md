@@ -1,6 +1,6 @@
 # Chromux Design Refresh Prototypes
 
-Fifteen self-contained visual design explorations for the Chromux desktop app.
+Sixteen self-contained visual design explorations for the Chromux desktop app.
 These are **static HTML mockups only** — they do not replace or modify the
 shipping app in `prototype/`. Each file mocks the full main window (titlebar,
 attention rail, session tabs, terminal + browser split, status bar) plus the
@@ -26,8 +26,9 @@ Open `index.html` for a gallery, or open any variation directly in a browser:
 | 13 | `13-e-ink.html` | E-Ink | Kindle-like grayscale — ink on paper white, one accent color total, zero motion |
 | 14 | `14-streak.html` | Streak | Gamified learning-app energy — saturated green, bubbly rounded UI, 3D-bottom buttons, XP gauges |
 | 15 | `15-offset.html` | Offset | Neubrutalism — flat pastel panels, thick black outlines, hard offset shadows, sticker chips |
+| 16 | `16-liquid-glass.html` | Liquid Glass | Optical glass layers — bright silver-blue translucency, fine white edge light, refractive depth, restrained spectral accents |
 
-Rows 01–05 are batch 1; rows 06–15 are batch 2.
+Rows 01–05 are batch 1; rows 06–15 are batch 2; row 16 is batch 3.
 
 For reference, the current shipping design is a "flight-deck instrument panel":
 graphite black, phosphor amber, hairline bezels, condensed instrument labels
