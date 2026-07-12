@@ -1,5 +1,12 @@
 # Chromux privacy and local data
 
+## Saved projects
+
+Saved project start configurations are stored in `~/.chromux/projects.json`. Each record contains a
+display name, absolute project directory, `package.json` script name, detected package runner, and derived
+start command. Chromux revalidates the directory and script against the current `package.json`; it does not
+store arbitrary command text and does not sync these paths or commands.
+
 This document describes the current Chromux prototype. It is a product data
 handling notice, not a legal privacy policy, compliance certification, or legal
 advice.

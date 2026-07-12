@@ -1,5 +1,14 @@
 # Release Notes
 
+## GBlockParty Chromux v0.22.0
+
+Tag: `chromux-v0.22.0`
+
+- Add locally persisted saved projects with validated project directories and `package.json` start scripts.
+- Derive an allowlisted npm, pnpm, yarn, or bun start command instead of storing arbitrary shell commands.
+- Start a saved project in its own terminal-first session and route detected server URLs into the approval queue without silently opening the paired browser.
+- Document `package.json` as the v1 configuration source; `devctl` / `apps.json` remains deferred pending a stable schema.
+
 ## GBlockParty Chromux v0.21.0
 
 Tag: `chromux-v0.21.0`

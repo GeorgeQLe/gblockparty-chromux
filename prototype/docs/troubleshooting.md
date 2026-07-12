@@ -1,5 +1,13 @@
 # Chromux troubleshooting
 
+## Saved project cannot start
+
+Chromux enables **START PROJECT** only when the directory exists, contains a readable `package.json`, and
+the selected script still exists. The runner comes from `packageManager` or a recognized lockfile, falling
+back to npm. Started server URLs remain in the review queue until explicitly opened. Delete
+`~/.chromux/projects.json` while Chromux is closed to clear saved projects; malformed or stale entries are
+ignored safely.
+
 This guide covers the first local loop: terminal output opens a paired browser preview, browser evidence becomes a capture payload, and delivery runs through `claude -p`.
 
 ## Preview detection

@@ -932,6 +932,12 @@ body.dragging webview { pointer-events: none; }
 
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field-row { display: flex; gap: 6px; }
+.saved-projects { border-top: 1px solid var(--line); padding-top: 12px; }
+.saved-projects-head, .saved-project-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.saved-project-list { max-height: 116px; overflow: auto; border: 1px solid var(--line); margin: 6px 0 10px; }
+.saved-project-row { padding: 6px; border-bottom: 1px solid var(--line); }
+.saved-project-row:last-child { border-bottom: 0; }
+.saved-project-use { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--text); text-align: left; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .field-row input { flex: 1; }
 
 input[type="text"], textarea, select {

@@ -15,6 +15,8 @@ const state = {
   deliveryIndex: new Map(), // deliveryId -> captureId
   favorites: [], // global v1 { url, title, createdAt }
   favoritesReady: null,
+  projects: [],
+  projectConfig: null,
   events: [], // ring buffer of applied events (diagnostics), max EVENT_RING_MAX
   ui: {
     captureModal: null, // { captureId, pngBase64, payloadBase } while composing/delivering
@@ -3563,6 +3565,8 @@ function openNewSessionModal() {
   $('#ns-name').value = `session-${state.counter + 1}`;
   $('#ns-cwd').value = state.lastCwd || (state.env ? state.env.home : '');
   $('#modal-new').classList.remove('hidden');
+  renderSavedProjects();
+  refreshProjectConfig().catch(() => {});
   invalidate('shortcutDebug');
   $('#ns-name').focus();
   $('#ns-name').select();
@@ -3588,7 +3592,53 @@ $('#btn-update-ready').onclick = () => {
 
 $('#ns-browse').onclick = async () => {
   const dir = await window.chromux.pickDirectory();
-  if (dir) $('#ns-cwd').value = dir;
+  if (dir) { $('#ns-cwd').value = dir; await refreshProjectConfig(); }
+};
+
+async function refreshProjectConfig() {
+  let cwd = $('#ns-cwd').value.trim();
+  if (cwd.startsWith('~')) cwd = (state.env ? state.env.home : '') + cwd.slice(1);
+  const config = await window.chromux.projectConfig(cwd);
+  state.projectConfig = config;
+  const select = $('#ns-start-script'); select.innerHTML = '';
+  for (const script of config.scripts || []) {
+    const option = document.createElement('option'); option.value = script; option.textContent = `${config.runner} run ${script}`; select.appendChild(option);
+  }
+  select.disabled = !config.valid;
+  $('#ns-save-project').disabled = !config.valid;
+  $('#ns-start-project').disabled = !config.valid;
+  $('#ns-project-status').textContent = config.valid ? `${config.scripts.length} SCRIPTS · ${config.runner}` : config.reason;
+}
+
+function renderSavedProjects() {
+  const host = $('#ns-project-list'); host.innerHTML = '';
+  if (!state.projects.length) { const empty = document.createElement('div'); empty.className = 'queue-empty'; empty.textContent = 'No saved projects.'; host.appendChild(empty); }
+  for (const project of state.projects) {
+    const row = document.createElement('div'); row.className = 'saved-project-row';
+    const use = document.createElement('button'); use.className = 'saved-project-use'; use.textContent = `${project.name} · ${project.startCommand}`;
+    use.onclick = async () => { $('#ns-name').value = project.name; $('#ns-cwd').value = project.cwd; await refreshProjectConfig(); $('#ns-start-script').value = project.script; };
+    const remove = document.createElement('button'); remove.className = 'qi-btn'; remove.textContent = 'REMOVE';
+    remove.onclick = async () => { state.projects = await window.chromux.projectsReplace(state.projects.filter((item) => !(item.cwd === project.cwd && item.script === project.script))); renderSavedProjects(); };
+    row.append(use, remove); host.appendChild(row);
+  }
+}
+
+async function saveCurrentProject() {
+  const config = state.projectConfig; const script = $('#ns-start-script').value;
+  if (!config || !config.valid || !config.scripts.includes(script)) return null;
+  const name = $('#ns-name').value.trim() || config.cwd.split('/').pop();
+  state.projects = await window.chromux.projectsReplace([...state.projects, { name, cwd: config.cwd, script }]);
+  renderSavedProjects();
+  return state.projects.find((item) => item.cwd === config.cwd && item.script === script) || null;
+}
+
+$('#ns-cwd').addEventListener('change', () => refreshProjectConfig().catch(() => {}));
+$('#ns-save-project').onclick = () => saveCurrentProject();
+$('#ns-start-project').onclick = async () => {
+  const project = await saveCurrentProject();
+  if (!project) return;
+  $('#modal-new').classList.add('hidden');
+  await createSession({ name: project.name, cwd: project.cwd, agent: '', command: project.startCommand });
 };
 
 $('#ns-agent').addEventListener('click', (e) => {
@@ -4601,6 +4651,23 @@ if (window.chromuxTest) {
     replaceRaw: (records) => window.chromux.favoritesReplace(records),
   };
 
+  window.chromuxTestProjects = {
+    ready: async () => { await state.favoritesReady; return state.projects; },
+    config: (cwd) => window.chromux.projectConfig(cwd),
+    replace: async (records) => { state.projects = await window.chromux.projectsReplace(records); renderSavedProjects(); return state.projects; },
+    records: () => state.projects.map((item) => ({ ...item })),
+    open: async () => { openNewSessionModal(); await refreshProjectConfig(); },
+    selectScript: (script) => { $('#ns-start-script').value = script; },
+    setCwd: async (cwd) => { $('#ns-cwd').value = cwd; await refreshProjectConfig(); },
+    setName: (name) => { $('#ns-name').value = name; },
+    start: async () => { $('#ns-start-project').click(); await new Promise((resolve) => setTimeout(resolve, 150)); },
+    startEnabled: () => !$('#ns-start-project').disabled,
+    sessionState: () => {
+      const session = state.sessions.get(state.activeId);
+      return session ? { name: session.name, cwd: session.cwd, queue: session.browser.queue.slice(), currentUrl: session.browser.currentUrl, collapsed: session.browser.collapsed } : null;
+    },
+  };
+
   window.chromuxTestAgentCommand = {
     build: (agent, resumeId = null) => agentCommand(agent, resumeId),
     env: () => ({ ...state.env }),
@@ -4714,6 +4781,7 @@ setInterval(() => {
     renderAllFavorites();
   }).catch(() => { state.favorites = []; });
   await state.favoritesReady;
+  state.projects = await window.chromux.projectsRead().catch(() => []);
   state.env = await window.chromux.getEnv();
   state.restoreSessions = state.env.restoreSessions || null;
   window.chromux.onUpdateStatus((status) => renderUpdateStatus(status));

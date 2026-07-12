@@ -90,7 +90,7 @@
     </div>
     <div class="sb-right">
       <button id="btn-log" class="sb-btn">DELIVERY LOG</button>
-      <span class="sb-ver">chromux 0.20.0</span>
+      <span class="sb-ver">chromux 0.22.0</span>
     </div>
   </footer>
 
@@ -146,6 +146,18 @@
             <button id="ns-browse" class="btn">BROWSE…</button>
           </div>
         </label>
+        <div class="field saved-projects">
+          <div class="saved-projects-head"><span class="microlabel">SAVED PROJECTS</span><span id="ns-project-status" class="dim"></span></div>
+          <div id="ns-project-list" class="saved-project-list"></div>
+          <label class="field">
+            <span class="microlabel">START SCRIPT — PACKAGE.JSON</span>
+            <select id="ns-start-script" disabled><option value="">SELECT A VALID PROJECT DIRECTORY</option></select>
+          </label>
+          <div class="field-row">
+            <button id="ns-save-project" class="btn" disabled>SAVE PROJECT</button>
+            <button id="ns-start-project" class="btn btn-amber" disabled>START PROJECT</button>
+          </div>
+        </div>
         <div class="field">
           <span class="microlabel">AGENT — CLI RUNS UNCHANGED</span>
           <div class="segmented" id="ns-agent">

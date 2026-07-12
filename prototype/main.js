@@ -30,6 +30,7 @@ const UPDATE_SOURCE = path.join(CHROMUX_HOME, 'update-source.json');
 const UPDATE_INSTALL_LOG = path.join(CHROMUX_HOME, 'update-install.log');
 const RESTORE_SESSIONS = path.join(CHROMUX_HOME, 'restore-sessions.json');
 const FAVORITES_FILE = path.join(CHROMUX_HOME, 'favorites.json');
+const PROJECTS_FILE = path.join(CHROMUX_HOME, 'projects.json');
 const HOOKS_CLAUDE = path.join(CHROMUX_HOME, 'hooks-claude.json');
 const CODEX_NOTIFY = path.join(CHROMUX_HOME, 'codex-notify.sh');
 const GROK_HOOK_SCRIPT = path.join(CHROMUX_HOME, 'grok-hook.sh');
@@ -49,6 +50,10 @@ const FAVORITES_INPUT_MAX = 400;
 const FAVORITES_FILE_BYTES_MAX = 1024 * 1024;
 const FAVORITE_URL_MAX = 4096;
 const FAVORITE_TITLE_MAX = 200;
+const PROJECTS_MAX = 100;
+const PROJECTS_FILE_BYTES_MAX = 1024 * 1024;
+const PROJECT_NAME_MAX = 100;
+const PACKAGE_JSON_BYTES_MAX = 1024 * 1024;
 
 let win = null;
 const ptys = new Map(); // sessionId -> IPty
@@ -139,6 +144,71 @@ function replaceFavorites(records) {
   } finally {
     try { fs.unlinkSync(tmp); } catch { /* renamed or absent */ }
   }
+  return valid;
+}
+
+function packageProjectConfig(cwd) {
+  if (typeof cwd !== 'string' || !cwd.trim() || cwd.includes('\0')) return { valid: false, reason: 'Choose a project directory.' };
+  const resolved = path.resolve(cwd.trim());
+  let stat;
+  try { stat = fs.statSync(resolved); } catch { return { valid: false, reason: 'Project directory does not exist.' }; }
+  if (!stat.isDirectory()) return { valid: false, reason: 'Project path is not a directory.' };
+  const packagePath = path.join(resolved, 'package.json');
+  let pkg;
+  try {
+    if (fs.statSync(packagePath).size > PACKAGE_JSON_BYTES_MAX) return { valid: false, reason: 'package.json is too large.' };
+    pkg = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+  } catch { return { valid: false, reason: 'No readable package.json was found.' }; }
+  const scripts = pkg && pkg.scripts && typeof pkg.scripts === 'object' && !Array.isArray(pkg.scripts)
+    ? Object.keys(pkg.scripts).filter((name) => typeof pkg.scripts[name] === 'string' && name.length <= 100).sort()
+    : [];
+  if (!scripts.length) return { valid: false, reason: 'package.json has no runnable scripts.' };
+  let runner = 'npm';
+  const declared = typeof pkg.packageManager === 'string' ? pkg.packageManager.split('@')[0] : '';
+  if (['npm', 'pnpm', 'yarn', 'bun'].includes(declared)) runner = declared;
+  else if (fs.existsSync(path.join(resolved, 'pnpm-lock.yaml'))) runner = 'pnpm';
+  else if (fs.existsSync(path.join(resolved, 'yarn.lock'))) runner = 'yarn';
+  else if (fs.existsSync(path.join(resolved, 'bun.lockb')) || fs.existsSync(path.join(resolved, 'bun.lock'))) runner = 'bun';
+  return { valid: true, cwd: resolved, source: 'package.json', runner, scripts };
+}
+
+function normalizeProjectRecord(record) {
+  if (!record || typeof record !== 'object' || Array.isArray(record)) return null;
+  const config = packageProjectConfig(record.cwd);
+  const script = typeof record.script === 'string' ? record.script.trim() : '';
+  if (!config.valid || !config.scripts.includes(script)) return null;
+  const name = typeof record.name === 'string' ? record.name.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, PROJECT_NAME_MAX) : '';
+  return { name: name || path.basename(config.cwd), cwd: config.cwd, source: config.source, script, runner: config.runner, startCommand: `${config.runner} run ${shellQuote(script)}` };
+}
+
+function validateProjects(records) {
+  if (!Array.isArray(records)) return [];
+  const seen = new Set(); const valid = [];
+  for (const candidate of records.slice(0, PROJECTS_MAX * 2)) {
+    const record = normalizeProjectRecord(candidate); const key = record && `${record.cwd}\n${record.script}`;
+    if (!record || seen.has(key)) continue;
+    seen.add(key); valid.push(record);
+    if (valid.length >= PROJECTS_MAX) break;
+  }
+  return valid;
+}
+
+function readProjects() {
+  try {
+    if (fs.statSync(PROJECTS_FILE).size > PROJECTS_FILE_BYTES_MAX) return [];
+    return validateProjects(JSON.parse(fs.readFileSync(PROJECTS_FILE, 'utf8')));
+  } catch { return []; }
+}
+
+function replaceProjects(records) {
+  if (!Array.isArray(records) || records.length > PROJECTS_MAX * 2) throw new Error('projects must be a bounded array');
+  const valid = validateProjects(records); ensureDirs();
+  const tmp = path.join(CHROMUX_HOME, `.projects-${process.pid}-${crypto.randomBytes(6).toString('hex')}.tmp`);
+  try {
+    fs.writeFileSync(tmp, JSON.stringify(valid, null, 2) + '\n', { mode: 0o600 });
+    fs.renameSync(tmp, PROJECTS_FILE);
+    try { fs.chmodSync(PROJECTS_FILE, 0o600); } catch { /* best effort */ }
+  } finally { try { fs.unlinkSync(tmp); } catch { /* renamed or absent */ } }
   return valid;
 }
 
@@ -1435,6 +1505,9 @@ ipcMain.handle('get-env', () => ({
 
 ipcMain.handle('favorites-read', () => readFavorites());
 ipcMain.handle('favorites-replace', (_e, records) => replaceFavorites(records));
+ipcMain.handle('projects-read', () => readProjects());
+ipcMain.handle('projects-replace', (_e, records) => replaceProjects(records));
+ipcMain.handle('project-config', (_e, cwd) => packageProjectConfig(cwd));
 
 ipcMain.handle('check-updates', (_e, opts = {}) => getUpdateStatus(opts));
 

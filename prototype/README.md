@@ -58,6 +58,14 @@ Then complete the loop:
    Opening a URL also restores a shut browser. New sessions start with the paired browser
    shut; use **RESTORE** / **COLLAPSE** or `Command+Shift+B` to open/shut it. Re-emitting
    the same already-open URL auto-refreshes the pane (throttled). Popups queue too.
+### Saved projects
+
+In **NEW SESSION**, choose a directory with a readable `package.json`, select a script, and save the
+validated configuration. **START PROJECT** opens a shell-only Chromux session in that directory and runs
+the derived package-manager command. A detected dev-server URL enters that session's review queue and is
+never opened until you approve **OPEN**. v1 uses `package.json` scripts only; `devctl` / `apps.json` sources
+are deferred until their schema is defined.
+
 3. **Capture evidence** — hit **⌖ PICK ELEMENT**, hover to highlight, click the broken thing
    (Esc cancels). Or **⚡ CAPTURE** for a page-level capture. Review the YAML payload, add a
    note, pick a target (paired session by default, redirectable), then:
@@ -111,6 +119,7 @@ See [`docs/troubleshooting.md`](docs/troubleshooting.md) for the full support gu
 | Capture payloads + screenshots | `~/.chromux/captures/<timestamp>/` |
 | Delivery log | `~/.chromux/delivery-log.jsonl` |
 | Restore snapshot | `~/.chromux/restore-sessions.json` |
+| Saved projects | `~/.chromux/projects.json` |
 | Update cache/source/install log | `~/.chromux/update-cache.json`, `~/.chromux/update-source.json`, `~/.chromux/update-install.log` |
 | Hook settings and notify scripts | `~/.chromux/hooks-claude.json`, `~/.chromux/codex-notify.sh`, `~/.chromux/hooks-grok.json`, `~/.chromux/grok-hook.sh`, and `~/.grok/hooks/chromux-turn-signals.json` |
 
