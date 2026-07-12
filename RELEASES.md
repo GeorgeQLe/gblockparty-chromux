@@ -1,5 +1,12 @@
 # Release Notes
 
+## GBlockParty Chromux v0.20.1
+
+Tag: `chromux-v0.20.1`
+
+- Add a structured first-success issue form for the controlled OSS preview, covering environment, agent CLI, preview routing, capture, delivery, recovery, and documentation friction.
+- Require reporters to confirm that credentials, private source, sensitive paths, and other private project data have been removed before submission.
+
 ## GBlockParty Chromux v0.20.0
 
 Tag: `chromux-v0.20.0`

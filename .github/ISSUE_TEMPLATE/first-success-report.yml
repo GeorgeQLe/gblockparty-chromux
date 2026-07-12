@@ -1,0 +1,129 @@
+name: First-success report
+description: Tell us what happened during your first Chromux preview, capture, and delivery loop.
+title: "[First success]: "
+labels:
+  - first-success
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for trying Chromux. This report helps us improve the controlled OSS preview.
+
+        Before submitting, remove secrets and private project data. Do not paste tokens, credentials, complete capture payloads, private source code, or sensitive filesystem paths. Prefer a short redacted excerpt when context is useful.
+
+  - type: input
+    id: macos-version
+    attributes:
+      label: macOS version
+      description: Choose About This Mac and provide the version shown there.
+      placeholder: macOS 15.5
+    validations:
+      required: true
+
+  - type: dropdown
+    id: agent-cli
+    attributes:
+      label: Agent CLI
+      description: Which agent was paired with the preview?
+      options:
+        - Claude Code
+        - Codex
+        - Grok Build
+        - Chromux Shell only
+        - Another CLI
+    validations:
+      required: true
+
+  - type: input
+    id: agent-version
+    attributes:
+      label: Agent CLI version
+      description: Provide the version if known; do not include authentication or account details.
+      placeholder: codex-cli 1.2.3
+
+  - type: dropdown
+    id: preview-type
+    attributes:
+      label: Preview type
+      description: What kind of preview did Chromux detect or open?
+      options:
+        - Localhost or loopback URL
+        - Local HTML file
+        - Manually entered URL
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: preview-result
+    attributes:
+      label: Preview result
+      description: Did the intended preview reach the active session's paired browser?
+      options:
+        - Detected, approved, and opened in the correct session
+        - Opened after manual URL entry
+        - Detected but did not open as expected
+        - Not detected
+        - Opened in the wrong session
+    validations:
+      required: true
+
+  - type: dropdown
+    id: capture-result
+    attributes:
+      label: Capture result
+      description: What happened when you captured browser evidence?
+      options:
+        - Capture completed with screenshot and payload
+        - Capture completed without a screenshot
+        - Capture started but failed
+        - I did not try capture
+    validations:
+      required: true
+
+  - type: dropdown
+    id: delivery-result
+    attributes:
+      label: Delivery result
+      description: What happened when Chromux delivered or saved the capture?
+      options:
+        - Delivered to the intended agent
+        - File-drop fallback succeeded
+        - Delivery failed, then manual retry succeeded
+        - Delivery failed and retry did not succeed
+        - I did not try delivery
+    validations:
+      required: true
+
+  - type: textarea
+    id: journey
+    attributes:
+      label: What happened?
+      description: Briefly describe the command you ran, the expected journey, and the result. Redact usernames, project names, URLs, paths, and source content as needed.
+      placeholder: I started a local dev server, approved the queued preview, captured the page, and delivered the capture to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: recovery
+    attributes:
+      label: Recovery or workaround
+      description: If any step failed, what did you try and did the troubleshooting guide help?
+      placeholder: I used the file-drop fallback described in troubleshooting...
+
+  - type: textarea
+    id: docs-gap
+    attributes:
+      label: Documentation gap
+      description: Which quickstart or troubleshooting step was missing, unclear, or misleading? Write "None" if the docs covered your journey.
+      placeholder: The preview approval step should explain...
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: privacy-check
+    attributes:
+      label: Privacy check
+      options:
+        - label: I removed credentials, tokens, private source code, sensitive paths, and other private project data from this report.
+          required: true
