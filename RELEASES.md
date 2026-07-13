@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.24.1
+
+Tag: `chromux-v0.24.1`
+
+- Close the mobile-gallery release audit with an explicit ship-ready verdict for the seven static prototypes and document the intentionally non-functional interaction boundary.
+- Remove the stale root Electron `main.js`; `prototype/main.js` remains the sole packaged Electron entrypoint.
+- Verify the generated mobile gallery and its seven clean production routes, including content, clean-URL behavior, and security headers.
+
 ## GBlockParty Chromux v0.24.0
 
 Tag: `chromux-v0.24.0`
