@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Chromux Mobile — Command Lens</title>
+<style>
+/* ================================================================
+   CHROMUX MOBILE — PROTOTYPE F — COMMAND LENS
+   minimal expert OLED: near-black canvas, crisp monochrome type,
+   electric cyan focus state, almost no permanent chrome.
+   ================================================================ */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+:root{
+  --void:#020304;
+  --surface:#0A0C0E;
+  --surface-2:#111417;
+  --line:#1E2226;
+  --line-soft:#16191C;
+  --ink:#E9EDEF;
+  --ink-dim:#7C868C;
+  --ink-dimmer:#4B5257;
+  --cyan:#3FF0E8;
+  --cyan-dim:#1A4B49;
+  --red:#FF5C4D;
+  --amber:#FFB648;
+  --green:#4FE38A;
+  --mono:'JetBrains Mono','SF Mono',Menlo,Monaco,Consolas,monospace;
+  --sans:'Inter','SF Pro Text','Helvetica Neue',system-ui,sans-serif;
+}
+
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;}
+body{
+  min-height:100vh;
+  background:
+    radial-gradient(ellipse at 50% 0%, #0d1113 0%, #020304 62%);
+  color:var(--ink);
+  font-family:var(--sans);
+  display:flex;align-items:center;justify-content:center;
+  padding:44px 20px;
+  overflow-x:hidden;
+}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;-webkit-appearance:none;}
+input,textarea{font:inherit;color:inherit;background:none;border:none;}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
+::selection{background:var(--cyan-dim);color:var(--cyan);}
+::placeholder{color:var(--ink-dimmer);}
+
+/* ================= PHONE FRAME ================= */
+.phone{
+  position:relative;
+  width:393px;height:852px;flex:0 0 auto;
+  background:var(--void);
+  border:9px solid #000;
+  border-radius:54px;
+  box-shadow:0 0 0 1px #1c1f22, 0 40px 90px rgba(0,0,0,.6), 0 0 60px rgba(63,240,232,.05);
+  overflow:hidden;
+  display:flex;flex-direction:column;
+}
+.dynamic-island{
+  position:absolute;top:14px;left:50%;transform:translateX(-50%);
+  width:108px;height:27px;background:#000;border-radius:20px;z-index:80;
+  box-shadow:0 0 0 1px #1c1f22 inset;
+}
+
+/* ---------- status bar ---------- */
+.statusbar{
+  flex:0 0 44px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 27px 0 29px;font-weight:600;font-size:14px;letter-spacing:.01em;
+  color:var(--ink);position:relative;z-index:60;
+}
+.statusbar .icons{display:flex;align-items:center;gap:5px;}
+.icon-battery{display:flex;align-items:center;gap:2px;}
+.icon-battery .shell{width:22px;height:11px;border:1.4px solid var(--ink);border-radius:3px;position:relative;padding:1.4px;opacity:.9;}
+.icon-battery .shell::after{content:'';position:absolute;right:-3.5px;top:3px;width:2px;height:5px;background:var(--ink);border-radius:0 2px 2px 0;opacity:.9;}
+.icon-battery .fill{background:var(--cyan);height:100%;width:78%;border-radius:1px;}
+
+/* ================= SCREENS ================= */
+.screens{flex:1;position:relative;min-height:0;}
+.screen{position:absolute;inset:0;display:none;flex-direction:column;background:var(--void);}
+.screen.active{display:flex;}
+
+/* ================= HOME — COMMAND FIELD ================= */
+#screen-home{padding:10px 20px 18px;gap:16px;overflow-y:auto;}
+
+.cmd-field-wrap{flex:0 0 auto;}
+.cmd-field{
+  display:flex;align-items:center;gap:10px;
+  border:1px solid var(--line);border-radius:14px;
+  background:var(--surface);padding:14px 14px;
+}
+.cmd-field.focused{border-color:var(--cyan);box-shadow:0 0 0 3px var(--cyan-dim);}
+.cmd-prompt{color:var(--cyan);font-family:var(--mono);font-size:15px;flex:0 0 auto;}
+.cmd-text{flex:1;min-width:0;font-family:var(--mono);font-size:13.5px;color:var(--ink);display:flex;align-items:center;gap:1px;}
+.cmd-placeholder{color:var(--ink-dimmer);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cmd-caret{display:inline-block;width:2px;height:16px;background:var(--cyan);animation:caretblink 1s steps(2,start) infinite;flex:0 0 auto;}
+@keyframes caretblink{to{opacity:0;}}
+.cmd-mic{
+  flex:0 0 auto;width:30px;height:30px;border-radius:9px;border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;color:var(--ink-dim);
+}
+.cmd-mic:active{color:var(--cyan);border-color:var(--cyan);}
+
+.section-label{
+  font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--ink-dimmer);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;
+}
+.section-label .count{color:var(--red);}
+
+/* fleet totals — one quiet monochrome line, no chrome */
+.fleet-line{
+  margin-top:9px;padding:0 4px;
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--ink-dimmer);display:flex;flex-wrap:wrap;gap:4px 10px;
+}
+.fleet-line b{font-weight:700;color:var(--ink-dim);}
+.fleet-line .fl-alert b{color:var(--red);}
+
+/* ---------- active alerts ---------- */
+.alerts{display:flex;flex-direction:column;gap:7px;}
+.alert-row{
+  display:flex;align-items:center;gap:10px;padding:11px 12px;
+  border:1px solid var(--line);border-radius:12px;background:var(--surface);
+  position:relative;overflow:hidden;
+}
+.alert-row::before{
+  content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--edge,var(--ink-dim));
+}
+.alert-row.urgent{--edge:var(--red);}
+.alert-row.info{--edge:var(--amber);}
+.alert-row.muted{--edge:var(--ink-dimmer);opacity:.75;}
+.alert-kind{
+  font-family:var(--mono);font-size:8.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--edge,var(--ink-dim));border:1px solid currentColor;border-radius:5px;padding:2px 6px;flex:0 0 auto;
+}
+.alert-body{flex:1;min-width:0;}
+.alert-name{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--ink);}
+.alert-msg{font-family:var(--sans);font-size:11px;color:var(--ink-dim);margin-top:2px;line-height:1.4;}
+.alert-msg code{font-family:var(--mono);font-size:10.5px;color:var(--ink);background:var(--surface-2);padding:0 4px;border-radius:3px;}
+.alert-chev{color:var(--ink-dimmer);font-size:13px;flex:0 0 auto;}
+
+/* ---------- recent contexts ---------- */
+.contexts{display:flex;flex-direction:column;gap:5px;}
+.ctx-row{
+  display:flex;align-items:center;gap:9px;padding:9px 12px;
+  border:1px solid transparent;border-radius:10px;
+}
+.ctx-row:hover,.ctx-row:focus-visible{background:var(--surface);border-color:var(--line);}
+.ctx-dot{width:6px;height:6px;border-radius:50%;background:var(--ink-dimmer);flex:0 0 auto;}
+.ctx-dot.live{background:var(--green);}
+.ctx-name{font-family:var(--mono);font-size:11.5px;color:var(--ink-dim);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ctx-time{font-family:var(--mono);font-size:9.5px;color:var(--ink-dimmer);flex:0 0 auto;}
+
+/* ---------- suggestions ---------- */
+.suggestions{display:flex;flex-direction:column;gap:2px;}
+.sugg-row{
+  display:flex;align-items:baseline;gap:8px;padding:8px 12px;border-radius:9px;
+}
+.sugg-row:hover,.sugg-row:focus-visible{background:var(--surface);}
+.sugg-cmd{font-family:var(--mono);font-size:11.5px;color:var(--cyan);flex:0 0 auto;white-space:nowrap;}
+.sugg-cmd .plain{color:var(--ink);}
+.sugg-desc{font-family:var(--sans);font-size:10.5px;color:var(--ink-dimmer);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* ================= CONTEXT CAPSULE (materialized surfaces) ================= */
+.capsule-bar{
+  flex:0 0 46px;display:flex;align-items:center;gap:8px;padding:0 16px;
+  border-bottom:1px solid var(--line-soft);
+}
+.capsule-back{
+  font-family:var(--mono);font-size:11px;color:var(--ink-dim);display:flex;align-items:center;gap:4px;flex:0 0 auto;
+}
+.capsule-back:active{color:var(--cyan);}
+.capsule{
+  flex:1;min-width:0;display:flex;align-items:center;gap:6px;
+  font-family:var(--mono);font-size:10.5px;color:var(--ink-dim);
+  overflow-x:auto;white-space:nowrap;
+}
+.capsule b{color:var(--ink);font-weight:600;}
+.capsule .sep{color:var(--ink-dimmer);}
+.capsule .live-chip{
+  margin-left:auto;display:flex;align-items:center;gap:4px;color:var(--green);flex:0 0 auto;
+  font-size:9.5px;letter-spacing:.04em;
+}
+.capsule .live-chip .dot{width:5px;height:5px;border-radius:50%;background:var(--green);animation:caretblink 1.6s steps(2,start) infinite;}
+.capsule .durable-chip{
+  flex:0 0 auto;font-size:9px;color:var(--cyan);border:1px solid var(--cyan-dim);border-radius:10px;padding:2px 7px;letter-spacing:.03em;
+}
+.pull-hint{
+  flex:0 0 22px;display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:9px;color:var(--ink-dimmer);letter-spacing:.1em;
+  border-bottom:1px solid var(--line-soft);background:var(--surface);
+}
+
+.surface-body{flex:1;min-height:0;overflow-y:auto;padding:16px;}
+
+/* ---------- session summary (materialized) ---------- */
+.state-line{
+  font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--red);margin-bottom:8px;display:flex;align-items:center;gap:6px;
+}
+.state-line::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--red);box-shadow:0 0 8px var(--red);}
+.session-title{font-family:var(--sans);font-weight:700;font-size:19px;color:var(--ink);margin-bottom:3px;}
+.session-title .agent{font-family:var(--mono);font-weight:400;font-size:12px;color:var(--ink-dim);}
+.session-path{font-family:var(--mono);font-size:10px;color:var(--ink-dimmer);margin-bottom:16px;}
+.summary-lines{display:flex;flex-direction:column;gap:9px;margin-bottom:4px;}
+.sline{display:flex;gap:9px;font-size:12.5px;color:var(--ink-dim);line-height:1.5;}
+.sline::before{content:'—';color:var(--ink-dimmer);flex:0 0 auto;}
+.sline.warn{color:var(--ink);}
+.sline.warn::before{content:'⚠';color:var(--amber);}
+.sline code{font-family:var(--mono);font-size:11px;color:var(--cyan);background:var(--surface-2);padding:0 5px;border-radius:4px;}
+
+/* ---------- intervention modes ---------- */
+.intervene{margin-top:20px;border-top:1px solid var(--line-soft);padding-top:16px;}
+.mode-tabs{display:flex;gap:6px;margin-bottom:12px;}
+.mode-tab{
+  flex:1;padding:8px 4px;border:1px solid var(--line);border-radius:9px;
+  font-family:var(--mono);font-weight:600;font-size:10px;letter-spacing:.03em;text-transform:uppercase;
+  color:var(--ink-dim);background:var(--surface);
+}
+.mode-tab.active[data-mode="tool"]{color:var(--red);border-color:var(--red);background:rgba(255,92,77,.08);}
+.mode-tab.active[data-mode="reply"]{color:var(--cyan);border-color:var(--cyan);background:var(--cyan-dim);}
+.mode-tab.active[data-mode="shell"]{color:var(--ink);border-color:var(--ink-dim);background:var(--surface-2);}
+
+.mode-panel{display:none;flex-direction:column;gap:10px;}
+.mode-panel.active{display:flex;}
+
+.tool-call-box{
+  border:1px solid rgba(255,92,77,.35);border-radius:10px;padding:11px 13px;background:rgba(255,92,77,.06);
+}
+.tool-call-label{font-family:var(--mono);font-size:9px;color:var(--ink-dim);text-transform:uppercase;letter-spacing:.08em;}
+.tool-call-cmd{display:block;margin-top:4px;font-family:var(--mono);font-size:14px;color:var(--ink);font-weight:600;}
+.tool-btns{display:flex;gap:8px;}
+.btn-approve,.btn-deny{
+  flex:1;padding:13px 0;border-radius:11px;font-family:var(--mono);font-weight:700;font-size:12.5px;letter-spacing:.04em;
+}
+.btn-approve{background:var(--green);color:#062;}
+.btn-deny{background:transparent;color:var(--red);border:1.5px solid var(--red);}
+.btn-approve:active,.btn-deny:active{opacity:.7;}
+.btn-always{
+  padding:9px;border:1px solid var(--line);border-radius:9px;font-family:var(--mono);font-size:10px;color:var(--ink-dim);text-align:center;
+}
+.confirm-row{
+  display:none;flex-direction:column;gap:7px;border:1px solid var(--amber);border-radius:10px;padding:10px;background:rgba(255,182,72,.07);
+}
+.confirm-row.show{display:flex;}
+.confirm-row .cr-txt{font-family:var(--mono);font-size:10.5px;color:var(--amber);}
+.confirm-row .cr-btns{display:flex;gap:8px;}
+.btn-confirm-yes,.btn-confirm-cancel{
+  flex:1;padding:8px;border-radius:8px;font-weight:700;font-family:var(--mono);font-size:10px;
+}
+.btn-confirm-yes{background:var(--amber);color:#231600;}
+.btn-confirm-cancel{background:transparent;border:1px solid var(--line);color:var(--ink-dim);}
+
+.reply-textarea{
+  min-height:64px;border:1px solid var(--cyan-dim);border-radius:10px;padding:10px;
+  font-family:var(--sans);font-size:12.5px;color:var(--ink);background:var(--surface);resize:none;
+}
+.reply-row{display:flex;gap:8px;}
+.btn-hold-speak,.btn-send-reply{
+  flex:1;padding:11px;border-radius:10px;font-family:var(--mono);font-weight:600;font-size:10px;
+  display:flex;align-items:center;justify-content:center;gap:6px;letter-spacing:.03em;
+}
+.btn-hold-speak{border:1px solid var(--cyan-dim);color:var(--cyan);}
+.btn-send-reply{background:var(--cyan);color:#00201f;}
+.mic-ring{width:6px;height:6px;border-radius:50%;background:currentColor;}
+
+.shell-input{
+  display:flex;align-items:center;gap:6px;border:1px solid var(--ink-dimmer);border-radius:9px;
+  background:#000;color:var(--green);padding:10px;font-family:var(--mono);font-size:10.5px;
+}
+.shell-input .prompt{opacity:.75;white-space:nowrap;}
+.shell-input input{flex:1;min-width:0;color:var(--ink);}
+.shell-warning{font-family:var(--mono);font-size:9px;color:var(--red);}
+
+/* ---------- terminal surface ---------- */
+.term-scroll{
+  font-family:var(--mono);font-size:11px;line-height:1.8;color:var(--ink-dim);
+  white-space:pre-wrap;word-break:break-word;
+}
+.t-hello{color:var(--amber);}
+.t-user{color:var(--ink);font-weight:600;}
+.t-user::before{content:'❯ ';color:var(--cyan);}
+.t-dot{color:var(--cyan);}
+.t-del{color:var(--red);}
+.t-add{color:var(--green);}
+.t-ok{color:var(--green);font-weight:600;}
+.t-warn{color:var(--amber);font-weight:700;}
+.t-dim{color:var(--ink-dimmer);}
+.t-cursor{display:inline-block;width:6px;height:12px;background:var(--cyan);vertical-align:-1px;animation:caretblink 1s steps(2,start) infinite;}
+
+.macro-row{display:flex;gap:8px;padding:12px 16px 16px;border-top:1px solid var(--line-soft);flex-wrap:wrap;}
+.macro-key{
+  flex:1 1 40%;padding:12px 6px;border:1px solid var(--line);border-radius:10px;background:var(--surface);
+  font-family:var(--mono);font-size:11px;color:var(--ink);text-align:center;
+}
+.macro-key span{display:block;font-size:8.5px;color:var(--ink-dim);letter-spacing:.04em;margin-top:3px;}
+.macro-key.stop{border-color:var(--red);color:var(--red);}
+.macro-key:active{background:var(--surface-2);}
+
+/* ---------- browser surface ---------- */
+.browser-meta{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
+.chip-sm{
+  border:1px solid var(--line);border-radius:20px;padding:3px 9px;
+  font-family:var(--mono);font-size:9px;color:var(--ink-dim);background:var(--surface);
+}
+.chip-sm.warn{border-color:var(--red);color:var(--red);}
+.chip-sm.hint{border-color:var(--cyan-dim);color:var(--cyan);}
+.chip-sm.url{max-width:100%;overflow:hidden;text-overflow:ellipsis;}
+
+.wp-mock{
+  border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;color:#1c2330;font-family:var(--sans);
+}
+.wp-nav-mock{padding:10px 14px;border-bottom:1px solid #e4e7ec;font-size:11px;font-weight:700;display:flex;justify-content:space-between;}
+.wp-nav-mock em{font-style:normal;color:#0F9E97;}
+.wp-body-mock{padding:16px;}
+.wp-h{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;opacity:.55;margin-bottom:8px;}
+.wp-line{display:flex;justify-content:space-between;font-size:12px;padding:6px 0;}
+.wp-line.total{border-top:1px solid #e4e7ec;margin-top:6px;padding-top:10px;font-weight:800;font-size:13.5px;}
+.wp-cta{width:100%;margin-top:14px;padding:13px;background:#0F9E97;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:13.5px;position:relative;}
+.wp-cta.selected{outline:2px dashed var(--cyan);outline-offset:3px;}
+.inspector-tag{
+  margin-top:10px;font-family:var(--mono);font-size:9.5px;color:var(--void);
+  background:var(--cyan);border-radius:6px;padding:5px 8px;display:inline-block;font-weight:600;
+}
+
+.touch-dock{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;padding:14px 16px 18px;border-top:1px solid var(--line-soft);}
+.touch-key{
+  border:1px solid var(--line);border-radius:9px;background:var(--surface);padding:9px 2px;
+  font-family:var(--mono);font-size:9.5px;color:var(--ink-dim);text-align:center;
+}
+.touch-key:active{color:var(--cyan);border-color:var(--cyan-dim);}
+
+/* ---------- evidence surface ---------- */
+.evidence-reel{display:flex;flex-direction:column;gap:8px;}
+.eitem{
+  display:flex;gap:10px;align-items:center;padding:10px 11px;
+  border:1px solid var(--line);border-radius:11px;background:var(--surface);
+}
+.eitem-thumb{
+  width:42px;height:42px;border-radius:8px;flex:0 0 auto;
+  background:linear-gradient(135deg,var(--surface-2),#050607);border:1px solid var(--line);
+}
+.eitem-thumb.rec{display:flex;align-items:center;justify-content:center;color:var(--red);font-family:var(--mono);font-size:9px;border-color:var(--red);}
+.eitem-body{flex:1;min-width:0;}
+.eitem-title{font-family:var(--mono);font-size:10.5px;color:var(--ink);}
+.eitem-meta{font-family:var(--sans);font-size:9.5px;color:var(--ink-dimmer);margin-top:2px;}
+.eitem-send{
+  flex:0 0 auto;border:1px solid var(--cyan-dim);border-radius:8px;padding:7px 10px;
+  font-family:var(--mono);font-size:9px;color:var(--cyan);
+}
+.eitem-send:active{background:var(--cyan-dim);}
+
+.flick-note{
+  margin-top:14px;padding:11px 13px;border:1px dashed var(--line);border-radius:10px;
+  font-family:var(--mono);font-size:9.5px;color:var(--ink-dimmer);line-height:1.6;
+}
+.flick-note b{color:var(--ink-dim);}
+
+/* ================= VOICE MULTI-STEP PANEL ================= */
+.voice-fab{
+  position:absolute;right:16px;bottom:18px;z-index:40;
+  width:52px;height:52px;border-radius:50%;background:var(--cyan);color:#00201f;
+  display:flex;align-items:center;justify-content:center;font-size:18px;
+  box-shadow:0 4px 18px rgba(63,240,232,.35);
+}
+.voice-fab:active{transform:scale(.94);}
+
+#sheet-voice{
+  position:fixed;inset:0;z-index:110;display:none;align-items:flex-end;justify-content:center;
+  background:rgba(2,3,4,.72);backdrop-filter:blur(2px);
+}
+#sheet-voice.open{display:flex;}
+.voice-panel{
+  width:393px;max-width:100%;max-height:80vh;background:var(--surface);
+  border:1px solid var(--line);border-bottom:none;border-radius:22px 22px 0 0;
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.voice-head{padding:16px 18px 10px;border-bottom:1px solid var(--line-soft);}
+.voice-label{font-family:var(--mono);font-size:9px;color:var(--cyan);letter-spacing:.14em;text-transform:uppercase;margin-bottom:8px;}
+.voice-transcript{font-family:var(--sans);font-size:14px;color:var(--ink);line-height:1.5;font-style:italic;}
+.voice-steps{flex:1;overflow-y:auto;padding:12px 18px;display:flex;flex-direction:column;gap:9px;}
+.vstep{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);}
+.vstep-num{
+  flex:0 0 auto;width:20px;height:20px;border-radius:50%;border:1px solid var(--cyan-dim);color:var(--cyan);
+  font-family:var(--mono);font-size:10px;display:flex;align-items:center;justify-content:center;
+}
+.vstep-body{font-family:var(--sans);font-size:12px;color:var(--ink-dim);line-height:1.45;}
+.vstep-body code{font-family:var(--mono);font-size:10.5px;color:var(--cyan);}
+.voice-foot{border-top:1px solid var(--line-soft);padding:12px 18px;display:flex;gap:10px;}
+.btn-voice-cancel,.btn-voice-confirm{
+  padding:12px;border-radius:10px;font-weight:700;font-family:var(--mono);font-size:11px;letter-spacing:.03em;
+}
+.btn-voice-cancel{flex:1;border:1px solid var(--line);color:var(--ink-dim);}
+.btn-voice-confirm{flex:2;background:var(--cyan);color:#00201f;}
+
+/* ================= SEND SHEET ================= */
+#sheet-send{
+  position:fixed;inset:0;z-index:100;display:none;align-items:flex-end;justify-content:center;
+  background:rgba(2,3,4,.72);backdrop-filter:blur(2px);
+}
+#sheet-send.open{display:flex;}
+.sheet-panel{
+  width:393px;max-width:100%;max-height:84vh;background:var(--surface);
+  border:1px solid var(--line);border-bottom:none;border-radius:22px 22px 0 0;
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.sheet-head{padding:16px 18px 12px;border-bottom:1px solid var(--line-soft);display:flex;justify-content:space-between;align-items:center;}
+.sheet-title{font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--cyan);text-transform:uppercase;}
+.sheet-close{width:28px;height:28px;border-radius:8px;border:1px solid var(--line);color:var(--ink-dim);}
+.sheet-close:active{border-color:var(--cyan);color:var(--cyan);}
+.sheet-body{flex:1;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:14px;}
+.sheet-row-label{font-family:var(--mono);font-size:9px;color:var(--ink-dimmer);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px;display:block;}
+.sheet-target{border:1px solid var(--cyan-dim);border-radius:10px;padding:10px;font-family:var(--mono);font-size:11px;color:var(--cyan);background:var(--cyan-dim);}
+.sheet-attach{display:flex;gap:10px;align-items:center;border:1px dashed var(--line);border-radius:10px;padding:9px;}
+.sheet-thumb{width:42px;height:42px;border-radius:8px;flex:0 0 auto;background:linear-gradient(135deg,var(--surface-2),#050607);border:1px solid var(--line);}
+.sheet-attach-meta{font-family:var(--mono);font-size:10px;color:var(--ink-dim);line-height:1.5;}
+.sheet-note textarea{
+  width:100%;min-height:56px;border:1px solid var(--line);border-radius:10px;padding:9px;
+  font-family:var(--sans);font-size:12px;color:var(--ink);background:var(--surface-2);resize:none;
+}
+.yaml-block{
+  background:#000;color:var(--ink-dim);border:1px solid var(--line);border-radius:10px;
+  padding:12px;font-family:var(--mono);font-size:10px;line-height:1.7;white-space:pre;overflow-x:auto;
+}
+.yaml-block .yk{color:var(--cyan);}
+.yaml-block .yv{color:var(--green);}
+.yaml-block .yh{color:var(--ink-dimmer);}
+.sheet-foot{border-top:1px solid var(--line-soft);padding:12px 18px;display:flex;gap:10px;}
+.btn-cancel,.btn-send-final{padding:12px;border-radius:10px;font-weight:700;font-family:var(--mono);font-size:11px;}
+.btn-cancel{flex:1;border:1px solid var(--line);color:var(--ink-dim);}
+.btn-send-final{flex:2;background:var(--cyan);color:#00201f;}
+.btn-cancel:active,.btn-send-final:active{opacity:.7;}
+
+/* ================= CORNER TAG ================= */
+#corner-tag{
+  position:fixed;right:18px;bottom:18px;z-index:200;
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;
+  background:var(--surface);color:var(--cyan);border:1px solid var(--cyan-dim);border-radius:7px;
+  padding:6px 11px;pointer-events:none;
+}
+
+/* ================= RESPONSIVE COLLAPSE ================= */
+@media (max-width:430px){
+  body{padding:0;align-items:stretch;background:var(--void);}
+  .phone{width:100vw;height:100dvh;border:0;border-radius:0;box-shadow:none;}
+  #corner-tag{bottom:10px;right:10px;font-size:8.5px;}
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none !important;transition:none !important;}
+}
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <div class="dynamic-island" aria-hidden="true"></div>
+
+  <div class="statusbar">
+    <span class="time">9:41</span>
+    <span class="icons">
+      <svg width="17" height="11" viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" fill="var(--ink)"/><rect x="5" y="6" width="3" height="6" fill="var(--ink)"/><rect x="10" y="3" width="3" height="9" fill="var(--ink)"/><rect x="15" y="0" width="3" height="12" fill="var(--ink)"/></svg>
+      <svg width="15" height="11" viewBox="0 0 16 12" aria-hidden="true"><path d="M8 10.5a1.4 1.4 0 100 2.8 1.4 1.4 0 000-2.8z" fill="var(--ink)"/><path d="M2.5 6.2a8 8 0 0111 0l-1.7 1.8a5.6 5.6 0 00-7.6 0z" fill="var(--ink)"/><path d="M0 2.9a12 12 0 0116 0l-1.7 1.8a9.6 9.6 0 00-12.6 0z" fill="var(--ink)"/></svg>
+      <span class="icon-battery"><span class="shell"><span class="fill"></span></span></span>
+    </span>
+  </div>
+
+  <main class="screens">
+
+    <!-- ══════════════ HOME — COMMAND FIELD ══════════════ -->
+    <section id="screen-home" class="screen active">
+      <div class="cmd-field-wrap">
+        <div class="cmd-field focused">
+          <span class="cmd-prompt">›</span>
+          <span class="cmd-text">
+            <span class="cmd-placeholder">Jump to agent, host, URL, command, capture, or action…</span>
+            <span class="cmd-caret" aria-hidden="true"></span>
+          </span>
+          <button class="cmd-mic" id="btnHoldSpeakHome" aria-label="Hold to speak" title="Hold to speak">●</button>
+        </div>
+        <div class="fleet-line">
+          <span class="fl-alert"><b>3</b> need you</span>
+          <span><b>5</b> working</span>
+          <span><b>2</b> completed</span>
+          <span class="fl-alert"><b>1</b> host offline</span>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-label">Needs attention <span class="count">· 3</span></div>
+        <div class="alerts">
+          <button class="alert-row urgent" data-nav="screen-session">
+            <span class="alert-kind">Approval</span>
+            <span class="alert-body">
+              <span class="alert-name">checkout-flow · claude</span>
+              <span class="alert-msg">wants to run <code>npm run db:migrate</code> · 18m elapsed</span>
+            </span>
+            <span class="alert-chev">›</span>
+          </button>
+          <button class="alert-row info" data-nav="screen-browser">
+            <span class="alert-kind">Preview</span>
+            <span class="alert-body">
+              <span class="alert-name">landing-page · grok</span>
+              <span class="alert-msg">localhost:5173 changed — 4 files · 2m ago</span>
+            </span>
+            <span class="alert-chev">›</span>
+          </button>
+          <button class="alert-row muted" data-nav="screen-terminal">
+            <span class="alert-kind">Exited</span>
+            <span class="alert-body">
+              <span class="alert-name">api-server · codex</span>
+              <span class="alert-msg">exited (code 0) · 12m ago</span>
+            </span>
+            <span class="alert-chev">›</span>
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-label">Connection <span class="count">· 1</span></div>
+        <div class="alerts">
+          <button class="alert-row muted" data-nav="screen-session">
+            <span class="alert-kind">Offline</span>
+            <span class="alert-body">
+              <span class="alert-name">build-server · relay</span>
+              <span class="alert-msg">unreachable 26m — <code>ci-runner · claude</code> disconnected · session durable</span>
+            </span>
+            <span class="alert-chev">›</span>
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-label">Recent contexts</div>
+        <div class="contexts">
+          <button class="ctx-row" data-nav="screen-terminal"><span class="ctx-dot live"></span><span class="ctx-name">worker-queue · claude @ staging-2</span><span class="ctx-time">4m</span></button>
+          <button class="ctx-row" data-nav="screen-terminal"><span class="ctx-dot live"></span><span class="ctx-name">auth-service · claude @ staging-2</span><span class="ctx-time">1m</span></button>
+          <button class="ctx-row" data-nav="screen-terminal"><span class="ctx-dot"></span><span class="ctx-name">docs-site · codex @ home-mac</span><span class="ctx-time">12m</span></button>
+          <button class="ctx-row" data-nav="screen-evidence"><span class="ctx-dot"></span><span class="ctx-name">payments-api · claude @ staging-2</span><span class="ctx-time">18m</span></button>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-label">Suggestions</div>
+        <div class="suggestions">
+          <button class="sugg-row" data-nav="screen-browser"><span class="sugg-cmd">@checkout <span class="plain">open browser</span></span><span class="sugg-desc">jump into paired preview</span></button>
+          <button class="sugg-row" data-nav="screen-session"><span class="sugg-cmd">@api <span class="plain">approve</span></span><span class="sugg-desc">approve pending tool call</span></button>
+          <button class="sugg-row" data-nav="screen-terminal"><span class="sugg-cmd">host staging-2</span><span class="sugg-desc">switch active host context</span></button>
+          <button class="sugg-row" data-nav="screen-evidence"><span class="sugg-cmd">record <span class="plain">checkout mobile</span></span><span class="sugg-desc">start a tap-flow recording</span></button>
+          <button class="sugg-row" data-nav="screen-browser"><span class="sugg-cmd">capture <span class="plain">element</span></span><span class="sugg-desc">select and capture a node</span></button>
+          <button class="sugg-row btn-open-sheet"><span class="sugg-cmd">send last screenshot <span class="plain">to @frontend</span></span><span class="sugg-desc">deliver evidence to an agent</span></button>
+          <button class="sugg-row" data-nav="screen-terminal"><span class="sugg-cmd">tail <span class="plain">@worker</span></span><span class="sugg-desc">stream live output</span></button>
+          <button class="sugg-row" data-nav="screen-browser"><span class="sugg-cmd">viewport <span class="plain">iphone 15</span></span><span class="sugg-desc">set browser viewport preset</span></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════ SESSION — MATERIALIZED SURFACE ══════════════ -->
+    <section id="screen-session" class="screen">
+      <div class="capsule-bar">
+        <button class="capsule-back" data-nav="screen-home">← ⌘K</button>
+        <span class="capsule">
+          <b>home-mac</b><span class="sep">·</span>checkout-flow<span class="sep">·</span>claude<span class="sep">·</span>summary
+          <span class="live-chip"><span class="dot"></span>SSH 42ms</span>
+        </span>
+      </div>
+      <div class="pull-hint" aria-hidden="true">⌄ pull down for command lens</div>
+      <div class="surface-body">
+        <div class="state-line">Needs approval</div>
+        <div class="session-title">checkout-flow <span class="agent">· claude</span></div>
+        <div class="session-path">~/projects/shop/checkout-flow · fix/cta-overflow · elapsed 18m</div>
+        <div class="summary-lines">
+          <div class="sline">Fixed CTA overflow in <code>checkout.css</code></div>
+          <div class="sline">Dev server reloaded — preview updated</div>
+          <div class="sline warn">Wants to run <code>npm run db:migrate</code> — waiting 6m</div>
+        </div>
+
+        <div class="intervene">
+          <div class="mode-tabs">
+            <button class="mode-tab active" data-mode="tool">Tool call</button>
+            <button class="mode-tab" data-mode="reply">Reply</button>
+            <button class="mode-tab" data-mode="shell">Shell</button>
+          </div>
+
+          <div class="mode-panel active" data-panel="tool">
+            <div class="tool-call-box">
+              <span class="tool-call-label">claude wants to run</span>
+              <code class="tool-call-cmd">npm run db:migrate</code>
+            </div>
+            <div class="tool-btns">
+              <button class="btn-approve" id="btnApprove">APPROVE</button>
+              <button class="btn-deny">DENY</button>
+            </div>
+            <button class="btn-always">ALWAYS ALLOW db:migrate</button>
+            <div class="confirm-row" id="confirmRow">
+              <span class="cr-txt">⚠ confirm — run migration against home-mac now?</span>
+              <div class="cr-btns">
+                <button class="btn-confirm-yes">YES, RUN</button>
+                <button class="btn-confirm-cancel">CANCEL</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="mode-panel" data-panel="reply">
+            <textarea class="reply-textarea" placeholder="Reply to claude — plain-language instruction…"></textarea>
+            <div class="reply-row">
+              <button class="btn-hold-speak"><span class="mic-ring"></span>HOLD TO SPEAK</button>
+              <button class="btn-send-reply">SEND REPLY</button>
+            </div>
+          </div>
+
+          <div class="mode-panel" data-panel="shell">
+            <div class="shell-input">
+              <span class="prompt">~/projects/shop/checkout-flow&nbsp;$</span>
+              <input type="text" placeholder="type raw shell command…" spellcheck="false"/>
+            </div>
+            <span class="shell-warning">⚠ raw shell — bypasses the agent, runs directly on home-mac</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════ TERMINAL — MATERIALIZED SURFACE ══════════════ -->
+    <section id="screen-terminal" class="screen">
+      <div class="capsule-bar">
+        <button class="capsule-back" data-nav="screen-home">← ⌘K</button>
+        <span class="capsule">
+          <b>home-mac</b><span class="sep">·</span>checkout-flow<span class="sep">·</span>claude<span class="sep">·</span>terminal
+          <span class="live-chip"><span class="dot"></span>streaming</span>
+        </span>
+      </div>
+      <div class="pull-hint" aria-hidden="true">⌄ pull down for command lens</div>
+      <div class="surface-body">
+        <pre class="term-scroll"><span class="t-hello">✻ Welcome to Claude Code!</span>          ~/projects/shop/checkout-flow
+<span class="t-user">fix the CTA overflow on the checkout page</span>
+<span class="t-dot">●</span> I'll look at the checkout component styles.
+<span class="t-dot">●</span> Read src/components/CheckoutCTA.tsx <span class="t-dim">(84 lines)</span>
+<span class="t-dot">●</span> Edit src/styles/checkout.css
+<span class="t-del">  - .cta-row { width: 120%; }</span>
+<span class="t-add">  + .cta-row { width: 100%; max-width: 480px; }</span>
+<span class="t-ok">✔ Change applied — dev server reloaded</span>
+<span class="t-dot">●</span> The button no longer overflows. Preview updated.
+<span class="t-dot">●</span> Next I need the new orders table locally.
+<span class="t-warn">⚠ APPROVAL REQUIRED</span>
+  npm run db:migrate
+<span class="t-dim">▌waiting for your decision…</span><span class="t-cursor"></span></pre>
+      </div>
+      <div class="macro-row">
+        <button class="macro-key">⏎ CONTINUE<span>run next step</span></button>
+        <button class="macro-key stop">^C STOP<span>interrupt agent</span></button>
+        <button class="macro-key">TESTS<span>run test suite</span></button>
+        <button class="macro-key">LOGS<span>tail service logs</span></button>
+      </div>
+    </section>
+
+    <!-- ══════════════ BROWSER — MATERIALIZED SURFACE ══════════════ -->
+    <section id="screen-browser" class="screen">
+      <div class="capsule-bar">
+        <button class="capsule-back" data-nav="screen-home">← ⌘K</button>
+        <span class="capsule">
+          <b>home-mac</b><span class="sep">·</span>checkout-flow<span class="sep">·</span>claude<span class="sep">·</span>browser
+          <span class="durable-chip">DURABLE</span>
+        </span>
+      </div>
+      <div class="pull-hint" aria-hidden="true">⌄ pull down for command lens</div>
+      <div class="surface-body">
+        <div class="browser-meta">
+          <span class="chip-sm url">http://localhost:5173/checkout</span>
+          <span class="chip-sm">iPhone 15 · 393×852</span>
+          <span class="chip-sm">console: 0</span>
+          <span class="chip-sm warn">net: 1 failed</span>
+          <span class="chip-sm hint">✌ two-finger drag resizes viewport</span>
+        </div>
+        <div class="wp-mock">
+          <div class="wp-nav-mock"><span>shop<em>ly</em></span><span>Step 3 of 3</span></div>
+          <div class="wp-body-mock">
+            <div class="wp-h">Order summary</div>
+            <div class="wp-line"><span>Canvas Tote ×1</span><span>$38.00</span></div>
+            <div class="wp-line"><span>Shipping</span><span>$10.00</span></div>
+            <div class="wp-line total"><span>Total</span><span>$48.00</span></div>
+            <button class="wp-cta selected">Pay $48.00</button>
+            <span class="inspector-tag">button.cta-pay · "Pay $48.00" · 412×88</span>
+          </div>
+        </div>
+      </div>
+      <div class="touch-dock">
+        <button class="touch-key">tap</button>
+        <button class="touch-key">hold</button>
+        <button class="touch-key">type</button>
+        <button class="touch-key">scroll</button>
+        <button class="touch-key">viewport</button>
+        <button class="touch-key">back</button>
+        <button class="touch-key">fwd</button>
+        <button class="touch-key">reload</button>
+        <button class="touch-key">shot</button>
+        <button class="touch-key btn-open-sheet">record</button>
+      </div>
+    </section>
+
+    <!-- ══════════════ EVIDENCE — MATERIALIZED SURFACE ══════════════ -->
+    <section id="screen-evidence" class="screen">
+      <div class="capsule-bar">
+        <button class="capsule-back" data-nav="screen-home">← ⌘K</button>
+        <span class="capsule">
+          <b>home-mac</b><span class="sep">·</span>checkout-flow<span class="sep">·</span>claude<span class="sep">·</span>evidence
+          <span class="durable-chip">DURABLE</span>
+        </span>
+      </div>
+      <div class="pull-hint" aria-hidden="true">⌄ pull down for command lens</div>
+      <div class="surface-body">
+        <div class="evidence-reel">
+          <div class="eitem">
+            <div class="eitem-thumb" aria-hidden="true"></div>
+            <div class="eitem-body">
+              <div class="eitem-title">2026-07-12-0912.png</div>
+              <div class="eitem-meta">Screenshot · checkout CTA after fix · 2m ago</div>
+            </div>
+            <button class="eitem-send btn-open-sheet">send</button>
+          </div>
+          <div class="eitem">
+            <div class="eitem-thumb rec" aria-hidden="true">0:14</div>
+            <div class="eitem-body">
+              <div class="eitem-title">checkout-tap-flow.webm</div>
+              <div class="eitem-meta">Recording · 3 taps · 1 console error · iPhone 15 · 9m ago</div>
+            </div>
+            <button class="eitem-send btn-open-sheet">send</button>
+          </div>
+          <div class="eitem">
+            <div class="eitem-thumb" aria-hidden="true"></div>
+            <div class="eitem-body">
+              <div class="eitem-title">button.cta-pay</div>
+              <div class="eitem-meta">Element capture · "Pay $48.00" · 412×88 · 11m ago</div>
+            </div>
+            <button class="eitem-send btn-open-sheet">send</button>
+          </div>
+        </div>
+        <div class="flick-note"><b>command:</b> type <code style="color:var(--cyan);font-family:var(--mono)">send last screenshot to @frontend</code> or tap send on any item above.</div>
+      </div>
+    </section>
+
+  </main>
+
+  <button class="voice-fab" id="btnVoiceFab" aria-label="Staged voice command">🎙</button>
+</div>
+
+<!-- ══════════════ STAGED VOICE COMMAND ══════════════ -->
+<div id="sheet-voice" role="dialog" aria-modal="true" aria-label="Staged voice command">
+  <div class="voice-panel">
+    <div class="voice-head">
+      <div class="voice-label">Voice · staged action · awaiting confirm</div>
+      <div class="voice-transcript">"Open the checkout agent, show its preview at iPhone width, record the payment failure, attach it with a note."</div>
+    </div>
+    <div class="voice-steps">
+      <div class="vstep"><span class="vstep-num">1</span><span class="vstep-body">Open <code>checkout-flow · claude</code> @ home-mac</span></div>
+      <div class="vstep"><span class="vstep-num">2</span><span class="vstep-body">Set browser viewport to <code>iPhone 15 · 393×852</code></span></div>
+      <div class="vstep"><span class="vstep-num">3</span><span class="vstep-body">Record interaction at <code>localhost:5173/checkout</code> until payment fails</span></div>
+      <div class="vstep"><span class="vstep-num">4</span><span class="vstep-body">Attach recording to <code>claude</code> with a note</span></div>
+    </div>
+    <div class="voice-foot">
+      <button class="btn-voice-cancel sheet-close-voice">CANCEL</button>
+      <button class="btn-voice-confirm">CONFIRM — RUN 4 STEPS</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ SEND SHEET ══════════════ -->
+<div id="sheet-send" role="dialog" aria-modal="true" aria-label="Send evidence to agent">
+  <div class="sheet-panel">
+    <div class="sheet-head">
+      <span class="sheet-title">Send → agent</span>
+      <button class="sheet-close" aria-label="Close">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div>
+        <span class="sheet-row-label">Target</span>
+        <div class="sheet-target">checkout-flow · claude @ home-mac</div>
+      </div>
+      <div>
+        <span class="sheet-row-label">Attachment</span>
+        <div class="sheet-attach">
+          <div class="sheet-thumb" aria-hidden="true"></div>
+          <div class="sheet-attach-meta">
+            2026-07-12-0912.png<br>
+            localhost:5173/checkout · 393×852
+          </div>
+        </div>
+      </div>
+      <div class="sheet-note">
+        <span class="sheet-row-label">Note</span>
+        <textarea placeholder="e.g. the CTA still clips at 320px — check small viewports"></textarea>
+      </div>
+      <div>
+        <span class="sheet-row-label">Payload preview — YAML v1</span>
+        <pre class="yaml-block"><span class="yk">chromux_capture:</span> <span class="yv">v1</span>
+<span class="yk">session:</span> <span class="yv">checkout-flow</span>
+<span class="yk">agent:</span> <span class="yv">claude</span>
+<span class="yk">host:</span> <span class="yv">home-mac</span>
+<span class="yk">url:</span> <span class="yv">http://localhost:5173/checkout</span>
+<span class="yk">viewport:</span> <span class="yv">393x852</span>
+<span class="yk">note:</span> <span class="yv">CTA verified after fix</span>
+<span class="yk">screenshot:</span> <span class="yv">~/.chromux/captures/2026-07-12-0912.png</span>
+<span class="yk">console_errors:</span> <span class="yh">[]</span>
+<span class="yk">network_failures:</span>
+<span class="yh">  - POST /api/telemetry (503)</span></pre>
+      </div>
+    </div>
+    <div class="sheet-foot">
+      <button class="btn-cancel sheet-close">CANCEL</button>
+      <button class="btn-send-final">SEND — claude</button>
+    </div>
+  </div>
+</div>
+
+<div id="corner-tag">#06 · COMMAND LENS</div>
+
+<script>
+(function(){
+  "use strict";
+
+  function showScreen(id){
+    document.querySelectorAll('.screen').forEach(function(s){ s.classList.toggle('active', s.id === id); });
+  }
+  document.querySelectorAll('[data-nav]').forEach(function(b){
+    b.addEventListener('click', function(){ showScreen(b.dataset.nav); });
+  });
+
+  /* ---------- mode tabs (tool call / reply / shell) ---------- */
+  document.querySelectorAll('.mode-tab').forEach(function(t){
+    t.addEventListener('click', function(){
+      document.querySelectorAll('.mode-tab').forEach(function(x){ x.classList.remove('active'); });
+      t.classList.add('active');
+      var mode = t.dataset.mode;
+      document.querySelectorAll('.mode-panel').forEach(function(p){
+        p.classList.toggle('active', p.dataset.panel === mode);
+      });
+    });
+  });
+
+  /* ---------- approve → confirm step ---------- */
+  var btnApprove = document.getElementById('btnApprove');
+  var confirmRow = document.getElementById('confirmRow');
+  if (btnApprove) btnApprove.addEventListener('click', function(){ confirmRow.classList.add('show'); });
+  document.querySelectorAll('.btn-confirm-cancel').forEach(function(b){
+    b.addEventListener('click', function(){ confirmRow.classList.remove('show'); });
+  });
+
+  /* ---------- send sheet ---------- */
+  var sheet = document.getElementById('sheet-send');
+  function openSheet(){ sheet.classList.add('open'); }
+  function closeSheet(){ sheet.classList.remove('open'); }
+  document.querySelectorAll('.btn-open-sheet').forEach(function(b){ b.addEventListener('click', openSheet); });
+  document.querySelectorAll('.sheet-close').forEach(function(b){ b.addEventListener('click', closeSheet); });
+  sheet.addEventListener('click', function(e){ if (e.target === sheet) closeSheet(); });
+
+  /* ---------- staged voice command ---------- */
+  var voiceSheet = document.getElementById('sheet-voice');
+  function openVoice(){ voiceSheet.classList.add('open'); }
+  function closeVoice(){ voiceSheet.classList.remove('open'); }
+  document.getElementById('btnVoiceFab').addEventListener('click', openVoice);
+  document.getElementById('btnHoldSpeakHome').addEventListener('click', openVoice);
+  document.querySelectorAll('.sheet-close-voice').forEach(function(b){ b.addEventListener('click', closeVoice); });
+  voiceSheet.addEventListener('click', function(e){ if (e.target === voiceSheet) closeVoice(); });
+  document.querySelector('.btn-voice-confirm').addEventListener('click', closeVoice);
+
+  /* ---------- global escape closes any open sheet ---------- */
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape'){ closeSheet(); closeVoice(); }
+  });
+})();
+</script>
+</body>
+</html>

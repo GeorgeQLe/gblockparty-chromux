@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Chromux Mobile — Mission Control</title>
+<style>
+/* ═══════════════════════════════════════════════════════════════════
+   CHROMUX MOBILE — Nº 01 "MISSION CONTROL"
+   Compact flight deck: graphite hull, warm amber caution, pale cyan
+   telemetry, thin instrument rules, condensed labels, restrained
+   status lights. A mobile descendant of the desktop cockpit — built
+   for scanning a fleet at arm's length, not typing.
+   ═══════════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root{
+  --hull:        #1a1d21;
+  --hull-deep:   #121417;
+  --panel:       #202429;
+  --panel-raise: #262b31;
+  --panel-sunk:  #16181c;
+  --rule:        rgba(255,255,255,.08);
+  --rule-lit:    rgba(255,255,255,.14);
+
+  --ink:         #eef1f3;
+  --ink-mid:     rgba(238,241,243,.68);
+  --ink-dim:     rgba(238,241,243,.44);
+  --ink-faint:   rgba(238,241,243,.26);
+
+  --amber:       #ffb454;
+  --amber-deep:  #e8983a;
+  --amber-dim:   rgba(255,180,84,.16);
+  --cyan:        #9fe0ea;
+  --cyan-deep:   #6bc3d1;
+  --cyan-dim:    rgba(159,224,234,.14);
+  --green:       #7cd992;
+  --green-dim:   rgba(124,217,146,.14);
+  --red:         #ff7d6e;
+  --red-dim:     rgba(255,125,110,.14);
+  --violet:      #b6a6e8;
+
+  --display: "Oswald", "Futura", "Avenir Next Condensed", "Helvetica Neue", Arial, sans-serif;
+  --body:    "Avenir Next", "Helvetica Neue", Arial, sans-serif;
+  --mono:    "JetBrains Mono", "SF Mono", Menlo, Monaco, "Courier New", monospace;
+}
+
+html, body{ height: 100%; }
+body{
+  min-height: 100vh;
+  background:
+    radial-gradient(1100px 720px at 30% -10%, #23272d 0%, #101215 62%),
+    var(--hull-deep);
+  color: var(--ink);
+  font-family: var(--body);
+  -webkit-font-smoothing: antialiased;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  overflow-x: hidden;
+}
+
+button{ font-family: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visible{
+  outline: 1.5px solid var(--cyan); outline-offset: 2px;
+}
+[aria-hidden="true"]{ pointer-events: none; }
+
+.microlabel{
+  font-family: var(--display);
+  font-size: 9.5px; font-weight: 600; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--ink-dim);
+}
+.hairline{ height: 1px; background: var(--rule); border: none; }
+
+/* ══════════════════════ PHONE FRAME ══════════════════════ */
+.backdrop{
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+  width: 100%;
+}
+.phone{
+  position: relative;
+  width: 393px; height: 852px;
+  border-radius: 55px;
+  padding: 14px;
+  background: linear-gradient(155deg, #35393f 0%, #1c1e22 42%, #0d0e10 100%);
+  box-shadow:
+    0 2px 0 rgba(255,255,255,.06) inset,
+    0 60px 120px -30px rgba(0,0,0,.75),
+    0 20px 50px -20px rgba(0,0,0,.6);
+  flex: 0 0 auto;
+}
+.phone::before{ /* side buttons */
+  content: ""; position: absolute; left: -3px; top: 128px; width: 3px; height: 64px;
+  background: #0d0e10; border-radius: 2px 0 0 2px;
+}
+.phone::after{
+  content: ""; position: absolute; right: -3px; top: 168px; width: 3px; height: 100px;
+  background: #0d0e10; border-radius: 0 2px 2px 0;
+}
+.screen-shell{
+  position: relative;
+  width: 100%; height: 100%;
+  border-radius: 42px;
+  overflow: hidden;
+  background: var(--hull);
+  display: flex; flex-direction: column;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.6) inset;
+}
+.notch{
+  position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  width: 118px; height: 30px; background: #0d0e10;
+  border-radius: 0 0 18px 18px; z-index: 50;
+}
+
+/* ── iOS-style status bar ── */
+.iosbar{
+  flex: 0 0 47px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 26px 0 30px;
+  font-family: var(--body); font-weight: 600; font-size: 15px;
+  color: var(--ink);
+  position: relative; z-index: 40;
+}
+.iosbar .lead{ font-variant-numeric: tabular-nums; }
+.iosbar .glyphs{ display: flex; align-items: center; gap: 6px; }
+.sig-bars{ display: flex; align-items: flex-end; gap: 1.5px; height: 10px; }
+.sig-bars i{ width: 2.5px; background: var(--ink); border-radius: .5px; }
+.sig-bars i:nth-child(1){ height: 4px; } .sig-bars i:nth-child(2){ height: 6px; }
+.sig-bars i:nth-child(3){ height: 8px; } .sig-bars i:nth-child(4){ height: 10px; }
+.wifi-glyph{ font-size: 12px; }
+.batt{ width: 23px; height: 11px; border: 1.2px solid var(--ink); border-radius: 3px; position: relative; padding: 1.5px; }
+.batt::after{ content: ""; position: absolute; right: -3px; top: 3px; width: 1.5px; height: 5px; background: var(--ink-mid); border-radius: 0 1px 1px 0; }
+.batt i{ display: block; height: 100%; width: 76%; background: var(--ink); border-radius: 1px; }
+
+/* ── app status strip (connection / host / agent state / in-flight) ── */
+#status-strip{
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 16px 9px;
+  border-bottom: 1px solid var(--rule);
+  background: linear-gradient(180deg, var(--panel), var(--hull));
+}
+.brand-chip{
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--display); font-weight: 600; font-size: 11px;
+  letter-spacing: .1em; color: var(--ink);
+}
+.brand-chip svg{ display: block; }
+.strip-sep{ width: 1px; height: 11px; background: var(--rule-lit); }
+.strip-item{
+  display: flex; align-items: center; gap: 5px;
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .02em; color: var(--ink-mid);
+  white-space: nowrap;
+}
+.strip-dot{ width: 5px; height: 5px; border-radius: 50%; flex: none; }
+.dot-online{ background: var(--green); box-shadow: 0 0 6px rgba(124,217,146,.7); }
+.dot-flight{ background: var(--cyan); box-shadow: 0 0 6px rgba(159,224,234,.8); animation: pulse-dot 1.4s ease-in-out infinite; }
+@keyframes pulse-dot{ 0%,100%{ opacity: 1; transform: scale(1); } 50%{ opacity: .4; transform: scale(.7); } }
+#status-strip .push{ margin-left: auto; }
+.durable-badge{
+  font-family: var(--display); font-size: 8px; font-weight: 600; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--cyan);
+  border: 1px solid rgba(159,224,234,.35); border-radius: 3px;
+  padding: 2.5px 6px;
+}
+
+/* ══════════════════════ SCREENS ══════════════════════ */
+#screens{ flex: 1; min-height: 0; position: relative; }
+.screen{
+  position: absolute; inset: 0;
+  display: none;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+.screen.active{ display: flex; }
+@keyframes riseline{ from{ opacity: 0; transform: translateY(8px); } to{ opacity: 1; transform: none; } }
+.screen.active > *{ animation: riseline .38s cubic-bezier(.22,.8,.3,1) both; }
+
+.screen-pad{ padding: 14px 15px 90px; }
+
+/* ── section headers ── */
+.instr-head{
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin: 18px 0 9px;
+}
+.instr-head:first-child{ margin-top: 2px; }
+.instr-title{
+  font-family: var(--display); font-size: 10.5px; font-weight: 600;
+  letter-spacing: .18em; text-transform: uppercase; color: var(--ink-mid);
+}
+.instr-count{ font-family: var(--mono); font-size: 10px; color: var(--ink-faint); }
+
+/* ── gauge row ── */
+.gauge-row{
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px;
+  margin-bottom: 6px;
+}
+.gauge-tile{
+  border: 1px solid var(--rule); border-radius: 8px;
+  background: var(--panel);
+  padding: 9px 6px 8px;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  position: relative; overflow: hidden;
+}
+.gauge-tile::before{
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+}
+.gauge-tile.g-need::before{ background: var(--amber); box-shadow: 0 0 8px rgba(255,180,84,.7); }
+.gauge-tile.g-work::before{ background: var(--cyan); }
+.gauge-tile.g-done::before{ background: var(--green); }
+.gauge-tile.g-off::before { background: var(--red); }
+.gauge-num{ font-family: var(--display); font-size: 22px; font-weight: 700; line-height: 1; }
+.g-need .gauge-num{ color: var(--amber); }
+.g-work .gauge-num{ color: var(--cyan); }
+.g-done .gauge-num{ color: var(--green); }
+.g-off  .gauge-num{ color: var(--red); }
+.gauge-cap{
+  font-family: var(--display); font-size: 7.7px; font-weight: 600; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--ink-dim); text-align: center; line-height: 1.25;
+}
+
+/* ── attention cards ── */
+#attention-list{ display: flex; flex-direction: column; gap: 9px; }
+.att-card{
+  position: relative;
+  display: flex; align-items: stretch;
+  border-radius: 9px;
+  overflow: hidden;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+}
+.att-edge{
+  flex: 0 0 25px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px;
+  writing-mode: vertical-rl;
+  font-family: var(--display); font-size: 8px; font-weight: 700; letter-spacing: .14em;
+  text-transform: uppercase;
+}
+.att-edge.edge-inspect{ background: rgba(159,224,234,.10); color: var(--cyan); border-right: 1px solid rgba(159,224,234,.22); }
+.att-edge.edge-approve{ background: rgba(124,217,146,.10); color: var(--green); border-left: 1px solid rgba(124,217,146,.22); }
+.att-edge span{ transform: rotate(180deg); }
+.att-edge .chevron{ writing-mode: horizontal-tb; font-size: 10px; }
+.att-body{ flex: 1; min-width: 0; padding: 10px 11px 11px; }
+.att-top{ display: flex; align-items: center; gap: 7px; margin-bottom: 5px; }
+.att-tag{
+  font-family: var(--display); font-size: 8px; font-weight: 700; letter-spacing: .13em;
+  padding: 2.5px 6px; border-radius: 3px; text-transform: uppercase; flex: none;
+}
+.tag-urgent{ background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(255,180,84,.35); }
+.tag-info{ background: var(--cyan-dim); color: var(--cyan); border: 1px solid rgba(159,224,234,.32); }
+.tag-danger{ background: var(--red-dim); color: var(--red); border: 1px solid rgba(255,125,110,.3); }
+.att-host{ margin-left: auto; font-family: var(--mono); font-size: 8.5px; color: var(--ink-faint); }
+.att-name{ font-family: var(--display); font-size: 14.5px; font-weight: 600; letter-spacing: .01em; margin-bottom: 3px; }
+.att-name .agent{ color: var(--ink-dim); font-weight: 400; font-size: 11.5px; }
+.att-desc{ font-family: var(--mono); font-size: 10.5px; line-height: 1.5; color: var(--ink-mid); }
+.att-desc code{ color: var(--amber); }
+.att-meta{ margin-top: 6px; display: flex; gap: 10px; }
+.att-meta span{ font-family: var(--mono); font-size: 9px; color: var(--ink-faint); }
+.att-hold{
+  position: absolute; right: 8px; bottom: 8px;
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,.05); border: 1px solid var(--rule-lit);
+  font-size: 12px; color: var(--ink-dim);
+}
+.att-hold:hover{ color: var(--cyan); border-color: var(--cyan); }
+.pulse-ring{
+  position: absolute; inset: 0; border-radius: 9px; pointer-events: none;
+  box-shadow: 0 0 0 0 rgba(255,180,84,.5);
+  animation: att-pulse 2.6s ease-out infinite;
+}
+@keyframes att-pulse{
+  0%{ box-shadow: 0 0 0 0 rgba(255,180,84,.35); }
+  70%{ box-shadow: 0 0 0 7px rgba(255,180,84,0); }
+  100%{ box-shadow: 0 0 0 0 rgba(255,180,84,0); }
+}
+
+/* ── instrument cards (working / completed / offline) ── */
+#instrument-list{ display: flex; flex-direction: column; gap: 7px; }
+.inst-card{
+  border: 1px solid var(--rule); border-radius: 8px;
+  background: var(--panel-sunk);
+  padding: 8px 11px 9px;
+  display: flex; flex-direction: column; gap: 3px;
+}
+.inst-top{ display: flex; align-items: center; gap: 6px; }
+.inst-dot{ width: 6px; height: 6px; border-radius: 50%; flex: none; }
+.dot-working{ background: var(--cyan); box-shadow: 0 0 5px rgba(159,224,234,.6); }
+.dot-working.slow{ background: var(--amber); box-shadow: 0 0 5px rgba(255,180,84,.6); }
+.dot-done{ background: var(--green); }
+.dot-offline{ background: var(--red); opacity: .8; }
+.inst-name{ font-family: var(--display); font-size: 12.5px; font-weight: 600; }
+.inst-name .agent{ color: var(--ink-dim); font-weight: 400; font-size: 10.5px; }
+.inst-host{ margin-left: auto; font-family: var(--mono); font-size: 8.5px; color: var(--ink-faint); }
+.inst-repo{ font-family: var(--mono); font-size: 9px; color: var(--ink-faint); }
+.inst-task{ font-family: var(--body); font-size: 10.5px; color: var(--ink-mid); }
+.inst-foot{ display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+.inst-foot span{ font-family: var(--mono); font-size: 8.7px; color: var(--ink-faint); }
+.inst-card.offline{ opacity: .68; }
+.inst-card.offline .inst-task{ color: var(--red); }
+.inst-card.silent .inst-task{ color: var(--amber); }
+
+/* ══════════════ SESSION SCREEN ══════════════ */
+.sess-header{
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 15px 10px;
+  border-bottom: 1px solid var(--rule);
+}
+.back-btn{
+  font-family: var(--display); font-size: 11px; font-weight: 600; letter-spacing: .04em;
+  color: var(--cyan); display: flex; align-items: center; gap: 3px;
+}
+.sess-title-wrap{ display: flex; flex-direction: column; gap: 1px; }
+.sess-title{ font-family: var(--display); font-size: 13.5px; font-weight: 600; }
+.sess-title .agent{ color: var(--ink-dim); font-weight: 400; }
+.sess-sub{ font-family: var(--mono); font-size: 8.7px; color: var(--ink-faint); }
+.sess-header .push{ margin-left: auto; }
+
+.summary-box{
+  margin: 14px 15px 4px;
+  border: 1px solid var(--rule); border-radius: 9px;
+  background: var(--panel);
+  padding: 12px 13px 13px;
+}
+.summary-box ul{ list-style: none; display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.summary-box li{
+  display: flex; gap: 8px; font-family: var(--body); font-size: 12px; line-height: 1.45; color: var(--ink-mid);
+}
+.summary-box li::before{ content: "✔"; color: var(--green); font-size: 10px; flex: none; margin-top: 2px; }
+.summary-box li.pending::before{ content: "◆"; color: var(--amber); }
+.summary-box li b{ color: var(--ink); font-weight: 600; }
+.summary-box li code{ font-family: var(--mono); font-size: 11px; color: var(--amber); }
+
+.intervene-wrap{ margin: 16px 15px 10px; display: flex; flex-direction: column; gap: 10px; }
+.mode-card{
+  border-radius: 9px; padding: 11px 12px 12px;
+  border: 1px solid var(--rule);
+  background: var(--panel);
+}
+.mode-head{ display: flex; align-items: center; gap: 7px; margin-bottom: 8px; }
+.mode-num{
+  width: 16px; height: 16px; border-radius: 50%; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 9px; font-weight: 700;
+}
+.mode-1 .mode-num{ background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(255,180,84,.4); }
+.mode-2 .mode-num{ background: var(--cyan-dim); color: var(--cyan); border: 1px solid rgba(159,224,234,.4); }
+.mode-3 .mode-num{ background: var(--red-dim); color: var(--red); border: 1px solid rgba(255,125,110,.4); }
+.mode-name{ font-family: var(--display); font-size: 10.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
+.mode-1 .mode-name{ color: var(--amber); }
+.mode-2 .mode-name{ color: var(--cyan); }
+.mode-3 .mode-name{ color: var(--red); }
+.mode-desc{ font-family: var(--body); font-size: 10.5px; color: var(--ink-dim); margin-bottom: 9px; }
+
+.mode-1 .cmd-line{
+  font-family: var(--mono); font-size: 11.5px; color: var(--ink);
+  background: var(--panel-sunk); border: 1px solid var(--rule);
+  border-radius: 6px; padding: 8px 10px; margin-bottom: 10px;
+}
+.approve-row{ display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+.approve-row button{
+  font-family: var(--display); font-size: 9.5px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; padding: 9px 4px; border-radius: 6px;
+  border: 1px solid var(--rule-lit);
+}
+.btn-approve{ background: var(--green-dim); color: var(--green); border-color: rgba(124,217,146,.4); }
+.btn-deny{ background: var(--red-dim); color: var(--red); border-color: rgba(255,125,110,.4); }
+.btn-always{ background: transparent; color: var(--ink-dim); }
+
+.confirm-panel{
+  margin-top: 10px; padding: 10px; border-radius: 7px;
+  background: rgba(255,125,110,.08); border: 1px solid rgba(255,125,110,.3);
+  display: none;
+}
+.confirm-panel.open{ display: block; }
+.confirm-panel p{ font-family: var(--body); font-size: 11px; color: var(--ink-mid); margin-bottom: 8px; line-height: 1.4; }
+.confirm-panel p b{ color: var(--red); }
+.confirm-actions{ display: flex; gap: 7px; }
+.confirm-actions button{
+  flex: 1; padding: 7px; border-radius: 5px; font-family: var(--display);
+  font-size: 9.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+}
+.confirm-cancel{ background: transparent; border: 1px solid var(--rule-lit); color: var(--ink-mid); }
+.confirm-run{ background: var(--red); color: #2a0d09; }
+
+.mode-2 textarea{
+  width: 100%; resize: none; border-radius: 6px;
+  background: var(--panel-sunk); border: 1px solid var(--rule);
+  font-family: var(--body); font-size: 11.5px; color: var(--ink);
+  padding: 9px 10px; margin-bottom: 8px;
+}
+.mode-2 textarea::placeholder{ color: var(--ink-faint); }
+.btn-reply{
+  width: 100%; padding: 9px; border-radius: 6px; background: var(--cyan-dim);
+  color: var(--cyan); border: 1px solid rgba(159,224,234,.4);
+  font-family: var(--display); font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+}
+
+.mode-3 .shell-line{
+  display: flex; align-items: center; gap: 7px;
+  background: var(--panel-sunk); border: 1px solid rgba(255,125,110,.3);
+  border-radius: 6px; padding: 8px 10px;
+}
+.shell-line .prompt{ font-family: var(--mono); color: var(--red); font-size: 12px; }
+.shell-line input{
+  flex: 1; background: none; border: none; color: var(--ink); font-family: var(--mono); font-size: 11.5px;
+}
+.shell-line input::placeholder{ color: var(--ink-faint); }
+.shell-warn{ font-family: var(--mono); font-size: 8.5px; color: var(--red); margin-top: 6px; }
+
+.jump-row{ display: flex; gap: 8px; margin: 4px 15px 16px; }
+.jump-btn{
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 10px 4px; border-radius: 8px; background: var(--panel); border: 1px solid var(--rule);
+  font-family: var(--display); font-size: 9px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--ink-mid);
+}
+.jump-btn .ic{ font-size: 15px; }
+.jump-btn:hover{ border-color: var(--cyan); color: var(--cyan); }
+
+/* ══════════════ TERMINAL SCREEN ══════════════ */
+.term-head{
+  padding: 12px 15px 9px; border-bottom: 1px solid var(--rule);
+  display: flex; align-items: center; gap: 8px;
+}
+.term-head .push{ margin-left: auto; }
+.term-body{
+  flex: 1; padding: 14px 15px; background: var(--panel-sunk);
+  font-family: var(--mono); font-size: 11px; line-height: 1.85; color: var(--ink-mid);
+  overflow-y: auto;
+}
+.tl{ white-space: pre-wrap; }
+.tl .pfx{ color: var(--ink-faint); margin-right: 4px; }
+.tl-welcome{ color: var(--cyan); display: block; margin-bottom: 6px; }
+.tl-welcome .path{ display: block; color: var(--ink-faint); font-size: 9.5px; margin-top: 1px; }
+.tl-user{ color: var(--ink); font-weight: 600; margin: 6px 0 3px; }
+.tl-user .pfx{ color: var(--amber); }
+.tl-agent .pfx{ color: var(--cyan); }
+.tl-dim{ color: var(--ink-faint); }
+.tl-diff{ display: block; padding-left: 16px; border-radius: 4px; margin: 1px 0; }
+.tl-del{ color: #ffb3a8; background: rgba(255,125,110,.08); }
+.tl-add{ color: #b7ecc4; background: rgba(124,217,146,.08); }
+.tl-ok{ color: var(--green); margin-top: 3px; }
+.tl-await{ color: var(--amber); margin-top: 9px; font-weight: 600; }
+.caret{
+  display: inline-block; width: 6px; height: 12px; margin-right: 6px; vertical-align: -2px;
+  background: var(--amber); animation: caretblink 1.1s step-end infinite;
+}
+@keyframes caretblink{ 0%,54%{ opacity: 1; } 55%,100%{ opacity: 0; } }
+.term-shell-row{
+  flex: 0 0 auto; display: flex; align-items: center; gap: 7px;
+  padding: 10px 15px; border-top: 1px solid var(--rule);
+  background: var(--panel);
+}
+.term-shell-row .prompt{ font-family: var(--mono); color: var(--red); font-size: 12px; }
+.term-shell-row input{
+  flex: 1; background: var(--panel-sunk); border: 1px solid rgba(255,125,110,.3); border-radius: 6px;
+  padding: 7px 9px; color: var(--ink); font-family: var(--mono); font-size: 11px;
+}
+.term-shell-row input::placeholder{ color: var(--ink-faint); }
+.term-shell-label{ font-family: var(--display); font-size: 7.5px; font-weight: 700; letter-spacing: .1em; color: var(--red); text-transform: uppercase; }
+
+/* ══════════════ BROWSER SCREEN ══════════════ */
+.brow-bar{
+  flex: 0 0 auto; display: flex; align-items: center; gap: 6px;
+  padding: 9px 12px; border-bottom: 1px solid var(--rule);
+}
+.nav-btn{
+  width: 22px; height: 22px; border-radius: 5px; display: flex; align-items: center; justify-content: center;
+  background: var(--panel); border: 1px solid var(--rule); font-size: 11px; color: var(--ink-dim); flex: none;
+}
+.urlbar{
+  flex: 1; min-width: 0; height: 24px; border-radius: 999px; background: var(--panel-sunk);
+  border: 1px solid var(--rule); display: flex; align-items: center; gap: 5px; padding: 0 9px;
+  font-family: var(--mono); font-size: 9px; color: var(--ink-mid); overflow: hidden; white-space: nowrap;
+}
+.urlbar .proto{ color: var(--ink-faint); }
+.urlbar .lockdot{ width: 4px; height: 4px; border-radius: 50%; background: var(--green); flex: none; }
+.brow-chiprow{
+  flex: 0 0 auto; display: flex; align-items: center; gap: 6px; padding: 0 12px 8px; flex-wrap: wrap;
+}
+.chip{
+  font-family: var(--mono); font-size: 8.5px; color: var(--ink-dim);
+  background: var(--panel); border: 1px solid var(--rule); border-radius: 999px; padding: 3px 8px;
+  display: flex; align-items: center; gap: 4px;
+}
+.chip.chip-fail{ color: var(--red); border-color: rgba(255,125,110,.35); background: var(--red-dim); }
+.chip.chip-ok::before{ content: ""; width: 4px; height: 4px; border-radius: 50%; background: var(--green); }
+.brow-stage{ flex: 1; padding: 4px 12px 12px; position: relative; }
+.brow-plate{
+  height: 100%; border-radius: 12px; overflow: hidden; background: #f4f6f8; color: #16181c;
+  border: 1px solid rgba(255,255,255,.12); display: flex; flex-direction: column; position: relative;
+  font-family: var(--body);
+}
+.web-nav{ display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #e7e9ec; }
+.web-logo{ font-weight: 800; font-size: 12.5px; letter-spacing: -.01em; color: #16181c; }
+.web-cart{ font-size: 10px; color: #6b7280; }
+.web-main{ flex: 1; padding: 16px; display: flex; align-items: center; justify-content: center; }
+.order-card{ width: 100%; background: #fff; border: 1px solid #e7e9ec; border-radius: 10px; padding: 14px 16px; box-shadow: 0 6px 18px -8px rgba(0,0,0,.15); }
+.order-card h3{ font-size: 11.5px; font-weight: 700; margin-bottom: 9px; color: #16181c; }
+.order-line{ display: flex; justify-content: space-between; font-size: 11px; color: #4b5563; padding: 3.5px 0; }
+.order-line.total{ border-top: 1px solid #e7e9ec; margin-top: 6px; padding-top: 8px; font-weight: 700; color: #16181c; font-size: 12px; }
+.pay-btn{
+  position: relative; width: 100%; margin-top: 11px; height: 38px; border-radius: 8px;
+  background: #16181c; color: #fff; font-size: 12px; font-weight: 700;
+}
+.pay-btn.selected{ outline: 2.5px solid var(--cyan-deep); outline-offset: 3px; }
+.select-tag{
+  position: absolute; left: 50%; transform: translateX(-50%); top: -20px;
+  font-family: var(--mono); font-size: 7.5px; color: var(--cyan-deep); background: #0d0e10cc;
+  padding: 2px 6px; border-radius: 3px; white-space: nowrap;
+}
+.tool-dock{
+  flex: 0 0 auto; display: flex; gap: 6px; padding: 0 12px 12px; overflow-x: auto;
+}
+.tool-btn{
+  flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  min-width: 52px; padding: 8px 4px; border-radius: 8px; background: var(--panel); border: 1px solid var(--rule);
+  font-family: var(--display); font-size: 8px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-dim);
+}
+.tool-btn .ic{ font-size: 14px; }
+.tool-btn.primary{ background: var(--cyan-dim); color: var(--cyan); border-color: rgba(159,224,234,.4); }
+
+/* ══════════════ EVIDENCE SCREEN ══════════════ */
+.evid-head{ padding: 12px 15px 9px; border-bottom: 1px solid var(--rule); }
+#evidence-list{ padding: 13px 15px 90px; display: flex; flex-direction: column; gap: 9px; }
+.evid-card{
+  display: flex; gap: 10px; border: 1px solid var(--rule); border-radius: 9px; background: var(--panel); padding: 9px;
+}
+.evid-thumb{
+  flex: 0 0 62px; height: 62px; border-radius: 6px; background: var(--panel-sunk);
+  display: flex; align-items: center; justify-content: center; font-size: 18px; color: var(--ink-faint);
+  border: 1px solid var(--rule); position: relative; overflow: hidden;
+}
+.evid-thumb.rec::after{ content: "0:14"; position: absolute; bottom: 2px; right: 3px; font-family: var(--mono); font-size: 7px; color: var(--ink); background: rgba(0,0,0,.5); padding: 1px 3px; border-radius: 3px; }
+.evid-body{ flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.evid-kind{ font-family: var(--display); font-size: 8.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--cyan); }
+.evid-name{ font-family: var(--mono); font-size: 10.5px; color: var(--ink); word-break: break-all; }
+.evid-meta{ font-family: var(--body); font-size: 9.5px; color: var(--ink-dim); }
+.evid-age{ font-family: var(--mono); font-size: 8.5px; color: var(--ink-faint); }
+.evid-send{
+  align-self: flex-start; margin-top: 3px; font-family: var(--display); font-size: 8.5px; font-weight: 700;
+  letter-spacing: .07em; text-transform: uppercase; color: var(--amber); border: 1px solid rgba(255,180,84,.4);
+  border-radius: 5px; padding: 4px 8px; background: var(--amber-dim);
+}
+
+/* ══════════════ BOTTOM DOCK ══════════════ */
+#dock{
+  flex: 0 0 auto; display: flex; align-items: stretch;
+  padding: 6px 10px calc(6px + env(safe-area-inset-bottom, 10px));
+  border-top: 1px solid var(--rule);
+  background: linear-gradient(0deg, var(--hull) 60%, rgba(26,29,33,.9));
+  position: relative; z-index: 30;
+}
+.dock-item{
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 7px 2px 5px;
+  color: var(--ink-faint); position: relative;
+}
+.dock-item .ic{ font-size: 17px; line-height: 1; }
+.dock-item .lbl{ font-family: var(--display); font-size: 8px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; }
+.dock-item.active{ color: var(--cyan); }
+.dock-item.active .ic{ text-shadow: 0 0 10px rgba(159,224,234,.6); }
+.dock-item.active::before{
+  content: ""; position: absolute; top: -1px; left: 50%; transform: translateX(-50%);
+  width: 22px; height: 2px; background: var(--cyan); border-radius: 2px; box-shadow: 0 0 8px rgba(159,224,234,.8);
+}
+.dock-item .badge{
+  position: absolute; top: 3px; right: calc(50% - 18px);
+  min-width: 13px; height: 13px; border-radius: 999px; background: var(--amber); color: #2a1400;
+  font-family: var(--mono); font-size: 8px; font-weight: 700; display: flex; align-items: center; justify-content: center; padding: 0 3px;
+}
+
+/* ══════════════ SHEETS (send / quick commands) ══════════════ */
+.sheet-overlay{
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(6,7,9,.6);
+  display: flex; align-items: flex-end; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity .25s ease;
+}
+.sheet-overlay.open{ opacity: 1; pointer-events: auto; }
+.sheet-panel{
+  width: 393px; max-width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--rule-lit); border-bottom: none;
+  border-radius: 20px 20px 0 0;
+  padding: 10px 0 max(18px, env(safe-area-inset-bottom, 18px));
+  transform: translateY(24px); transition: transform .3s cubic-bezier(.22,1,.36,1);
+  max-height: 82vh; overflow-y: auto;
+  box-shadow: 0 -20px 60px -20px rgba(0,0,0,.8);
+}
+.sheet-overlay.open .sheet-panel{ transform: translateY(0); }
+.sheet-grabber{ width: 36px; height: 4px; border-radius: 999px; background: var(--rule-lit); margin: 0 auto 12px; }
+.sheet-title-row{ display: flex; align-items: center; justify-content: space-between; padding: 0 16px 12px; border-bottom: 1px solid var(--rule); }
+.sheet-title{ font-family: var(--display); font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ink); }
+.sheet-x{ width: 24px; height: 24px; border-radius: 50%; background: var(--panel-sunk); display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--ink-dim); }
+.sheet-body{ padding: 14px 16px 4px; }
+
+.send-target{
+  display: flex; align-items: center; gap: 8px; padding: 10px 11px; border-radius: 8px;
+  background: var(--panel-sunk); border: 1px solid var(--rule); margin-bottom: 12px;
+}
+.send-target .tgt-dot{ width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex: none; }
+.send-target b{ font-family: var(--display); font-size: 12px; }
+.send-target span{ font-family: var(--mono); font-size: 9.5px; color: var(--ink-faint); }
+.send-target .push{ margin-left: auto; }
+
+.attach-row{ display: flex; gap: 9px; margin-bottom: 12px; }
+.attach-thumb{
+  flex: 0 0 58px; height: 58px; border-radius: 7px; background: var(--panel-sunk); border: 1px solid var(--rule);
+  display: flex; align-items: center; justify-content: center; font-size: 16px; color: var(--ink-faint);
+}
+.attach-meta{ display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+.attach-meta .u{ font-family: var(--mono); font-size: 10px; color: var(--ink-mid); }
+.attach-meta .v{ font-family: var(--mono); font-size: 9px; color: var(--ink-faint); }
+
+.send-note textarea{
+  width: 100%; resize: none; border-radius: 8px; background: var(--panel-sunk); border: 1px solid var(--rule);
+  padding: 9px 10px; font-family: var(--body); font-size: 11.5px; color: var(--ink); margin-bottom: 12px;
+}
+.send-note textarea::placeholder{ color: var(--ink-faint); }
+
+.yaml-box{
+  border-radius: 8px; background: var(--panel-sunk); border: 1px solid var(--rule);
+  padding: 11px 12px; font-family: var(--mono); font-size: 9.7px; line-height: 1.75; color: var(--ink-mid);
+  white-space: pre; overflow-x: auto; margin-bottom: 14px;
+}
+.yaml-box .yk{ color: var(--cyan); }
+.yaml-box .ys{ color: var(--amber); }
+
+.sheet-foot-row{ display: flex; gap: 9px; padding: 0 16px 4px; }
+.sheet-foot-row button{ flex: 1; padding: 12px; border-radius: 9px; font-family: var(--display); font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.btn-cancel{ background: transparent; border: 1px solid var(--rule-lit); color: var(--ink-mid); }
+.btn-send{ background: var(--amber); color: #2a1400; border: 1px solid var(--amber-deep); }
+
+/* quick command sheet */
+.quick-grid{ display: grid; grid-template-columns: 1fr 1fr; gap: 9px; padding: 0 16px 14px; }
+.quick-btn{
+  display: flex; flex-direction: column; align-items: flex-start; gap: 5px;
+  border-radius: 9px; background: var(--panel-sunk); border: 1px solid var(--rule); padding: 12px 12px 13px;
+}
+.quick-btn .ic{ font-size: 16px; }
+.quick-btn .lbl{ font-family: var(--display); font-size: 10.5px; font-weight: 600; }
+.quick-btn .sub{ font-family: var(--body); font-size: 9px; color: var(--ink-faint); }
+.quick-btn.danger{ border-color: rgba(255,125,110,.32); }
+.quick-btn.danger .lbl{ color: var(--red); }
+
+/* ══════════════ BACKDROP CORNER TAG ══════════════ */
+#corner-tag{
+  position: fixed; right: 16px; bottom: 16px; z-index: 5;
+  font-family: var(--mono); font-size: 9px; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--ink-dim); background: rgba(20,22,26,.7); backdrop-filter: blur(8px);
+  border: 1px solid var(--rule-lit); border-radius: 999px; padding: 5px 12px;
+}
+#corner-tag b{ color: var(--amber); }
+
+/* ══════════════ RESPONSIVE COLLAPSE ══════════════ */
+@media (max-width: 430px){
+  html{ overflow-x: hidden; }
+  body{ padding: 0; align-items: stretch; overflow-x: hidden; }
+  .backdrop{ width: 100%; height: 100vh; }
+  .phone{ width: 100%; height: 100vh; border-radius: 0; padding: 0; box-shadow: none; }
+  .screen-shell{ border-radius: 0; height: 100vh; }
+  .notch{ display: none; }
+  #corner-tag{ display: none; }
+}
+
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{ animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="backdrop">
+  <div class="phone">
+    <div class="notch" aria-hidden="true"></div>
+    <div class="screen-shell">
+
+      <!-- iOS status bar -->
+      <div class="iosbar" aria-hidden="true">
+        <span class="lead">9:41</span>
+        <span class="glyphs">
+          <span class="sig-bars"><i></i><i></i><i></i><i></i></span>
+          <span class="wifi-glyph">▲</span>
+          <span class="batt"><i></i></span>
+        </span>
+      </div>
+
+      <!-- persistent status strip -->
+      <div id="status-strip">
+        <span class="brand-chip">
+          <svg width="12" height="12" viewBox="0 0 64 64" aria-hidden="true">
+            <path d="M22 18 L44 32 L22 46" fill="none" stroke="rgba(238,241,243,.35)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="22" cy="18" r="6.5" fill="#ffb454"/>
+            <circle cx="44" cy="32" r="6.5" fill="#9fe0ea"/>
+            <circle cx="22" cy="46" r="6.5" fill="#7cd992"/>
+          </svg>
+          CHROMUX
+        </span>
+        <span class="strip-sep"></span>
+        <span class="strip-item"><i class="strip-dot dot-online"></i>home-mac · SSH 42ms</span>
+        <span class="push"></span>
+        <span class="strip-item"><i class="strip-dot dot-flight"></i>1 in-flight</span>
+      </div>
+
+      <!-- ═══════ SCREENS ═══════ -->
+      <div id="screens">
+
+        <!-- ───── HOME ───── -->
+        <section id="screen-home" class="screen active">
+          <div class="screen-pad">
+
+            <div class="gauge-row">
+              <div class="gauge-tile g-need"><span class="gauge-num">3</span><span class="gauge-cap">Need&nbsp;You</span></div>
+              <div class="gauge-tile g-work"><span class="gauge-num">5</span><span class="gauge-cap">Working</span></div>
+              <div class="gauge-tile g-done"><span class="gauge-num">2</span><span class="gauge-cap">Completed</span></div>
+              <div class="gauge-tile g-off"><span class="gauge-num">1</span><span class="gauge-cap">Host&nbsp;Offline</span></div>
+            </div>
+
+            <div class="instr-head">
+              <span class="instr-title">Needs You</span>
+              <span class="instr-count">3 · swipe to act</span>
+            </div>
+            <div id="attention-list">
+
+              <article class="att-card" data-open="session">
+                <span class="pulse-ring" aria-hidden="true"></span>
+                <div class="att-edge edge-inspect" aria-hidden="true"><span>INSPECT<span class="chevron">◀</span></span></div>
+                <div class="att-body">
+                  <div class="att-top">
+                    <span class="att-tag tag-urgent">Approval</span>
+                    <span class="att-host">home-mac</span>
+                  </div>
+                  <div class="att-name">checkout-flow <span class="agent">· claude</span></div>
+                  <div class="att-desc">wants to run <code>npm run db:migrate</code></div>
+                  <div class="att-meta"><span>fix/cta-overflow</span><span>elapsed 18m</span></div>
+                  <button class="att-hold" data-open-sheet="sheet-quick" title="Hold for quick commands" aria-label="Quick commands">⋯</button>
+                </div>
+                <div class="att-edge edge-approve" aria-hidden="true"><span>APPROVE<span class="chevron">▶</span></span></div>
+              </article>
+
+              <article class="att-card" data-open="browser">
+                <div class="att-edge edge-inspect" aria-hidden="true"><span>INSPECT<span class="chevron">◀</span></span></div>
+                <div class="att-body">
+                  <div class="att-top">
+                    <span class="att-tag tag-info">Review</span>
+                    <span class="att-host">home-mac</span>
+                  </div>
+                  <div class="att-name">landing-page <span class="agent">· grok</span></div>
+                  <div class="att-desc">localhost:5173 changed — preview ready · 4 files changed</div>
+                  <div class="att-meta"><span>main</span><span>2m ago</span></div>
+                  <button class="att-hold" data-open-sheet="sheet-quick" title="Hold for quick commands" aria-label="Quick commands">⋯</button>
+                </div>
+                <div class="att-edge edge-approve" aria-hidden="true"><span>REVIEW<span class="chevron">▶</span></span></div>
+              </article>
+
+              <article class="att-card" data-open="terminal">
+                <div class="att-edge edge-inspect" aria-hidden="true"><span>INSPECT<span class="chevron">◀</span></span></div>
+                <div class="att-body">
+                  <div class="att-top">
+                    <span class="att-tag tag-danger">Exited</span>
+                    <span class="att-host">staging-2</span>
+                  </div>
+                  <div class="att-name">api-server <span class="agent">· codex</span></div>
+                  <div class="att-desc">codex exited (code 0) · 12m ago</div>
+                  <div class="att-meta"><span>main</span><span>run 6m</span></div>
+                  <button class="att-hold" data-open-sheet="sheet-quick" title="Hold for quick commands" aria-label="Quick commands">⋯</button>
+                </div>
+                <div class="att-edge edge-approve" aria-hidden="true"><span>DISMISS<span class="chevron">▶</span></span></div>
+              </article>
+            </div>
+
+            <div class="instr-head">
+              <span class="instr-title">Working</span>
+              <span class="instr-count">5</span>
+            </div>
+            <div id="instrument-list">
+              <div class="inst-card">
+                <div class="inst-top">
+                  <i class="inst-dot dot-working"></i>
+                  <span class="inst-name">worker-queue <span class="agent">· claude</span></span>
+                  <span class="inst-host">staging-2</span>
+                </div>
+                <div class="inst-repo">~/services/queue/worker-queue · refactor/retry-backoff</div>
+                <div class="inst-task">Refactoring retry logic</div>
+                <div class="inst-foot"><span>elapsed 4m</span><span>editing src/retry.ts</span></div>
+              </div>
+              <div class="inst-card">
+                <div class="inst-top">
+                  <i class="inst-dot dot-working"></i>
+                  <span class="inst-name">docs-site <span class="agent">· codex</span></span>
+                  <span class="inst-host">home-mac</span>
+                </div>
+                <div class="inst-repo">~/projects/docs/docs-site · docs/changelog-2026-07</div>
+                <div class="inst-task">Writing changelog</div>
+                <div class="inst-foot"><span>elapsed 12m</span><span>drafting CHANGELOG.md</span></div>
+              </div>
+              <div class="inst-card">
+                <div class="inst-top">
+                  <i class="inst-dot dot-working"></i>
+                  <span class="inst-name">auth-service <span class="agent">· claude</span></span>
+                  <span class="inst-host">staging-2</span>
+                </div>
+                <div class="inst-repo">~/services/auth/auth-service · test/full-suite</div>
+                <div class="inst-task">Running test suite</div>
+                <div class="inst-foot"><span>elapsed 1m</span><span>142/210 tests passed</span></div>
+              </div>
+              <div class="inst-card">
+                <div class="inst-top">
+                  <i class="inst-dot dot-working"></i>
+                  <span class="inst-name">mobile-app <span class="agent">· grok</span></span>
+                  <span class="inst-host">home-mac</span>
+                </div>
+                <div class="inst-repo">~/projects/mobile/mobile-app · fix/lint-warnings</div>
+                <div class="inst-task">Fixing lint errors</div>
+                <div class="inst-foot"><span>elapsed 8m</span><span>fixed 6 of 14 warnings</span></div>
+              </div>
+              <div class="inst-card silent">
+                <div class="inst-top">
+                  <i class="inst-dot dot-working slow"></i>
+                  <span class="inst-name">analytics <span class="agent">· codex</span></span>
+                  <span class="inst-host">home-mac</span>
+                </div>
+                <div class="inst-repo">~/projects/data/analytics · chore/event-schema</div>
+                <div class="inst-task">Silent 22m — no output</div>
+                <div class="inst-foot"><span>elapsed 22m</span><span>last: reading schema.sql</span></div>
+              </div>
+            </div>
+
+            <div class="instr-head">
+              <span class="instr-title">Completed</span>
+              <span class="instr-count">2</span>
+            </div>
+            <div id="instrument-list-done">
+              <div class="inst-card">
+                <div class="inst-top">
+                  <i class="inst-dot dot-done"></i>
+                  <span class="inst-name">payments-api <span class="agent">· claude</span></span>
+                  <span class="inst-host">staging-2</span>
+                </div>
+                <div class="inst-repo">~/services/payments/payments-api · fix/webhook-retry</div>
+                <div class="inst-task">Finished · 3 files changed</div>
+                <div class="inst-foot"><span>18m ago</span></div>
+              </div>
+              <div class="inst-card">
+                <div class="inst-top">
+                  <i class="inst-dot dot-done"></i>
+                  <span class="inst-name">search-index <span class="agent">· codex</span></span>
+                  <span class="inst-host">home-mac</span>
+                </div>
+                <div class="inst-repo">~/projects/search/search-index · feat/reindex-batching</div>
+                <div class="inst-task">Finished · tests pass</div>
+                <div class="inst-foot"><span>1h ago</span></div>
+              </div>
+            </div>
+
+            <div class="instr-head">
+              <span class="instr-title">Host Offline</span>
+              <span class="instr-count">1</span>
+            </div>
+            <div id="instrument-list-off">
+              <div class="inst-card offline">
+                <div class="inst-top">
+                  <i class="inst-dot dot-offline"></i>
+                  <span class="inst-name">ci-runner <span class="agent">· claude</span></span>
+                  <span class="inst-host">build-server</span>
+                </div>
+                <div class="inst-repo">~/infra/ci/ci-runner · relay · offline 26m</div>
+                <div class="inst-task">Disconnected — session persists on disconnect</div>
+                <div class="inst-foot"><span class="durable-badge" style="margin-left:0;">Durable</span></div>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- ───── SESSION (Agent view: plain-language summary) ───── -->
+        <section id="screen-session" class="screen">
+          <div class="sess-header">
+            <button class="back-btn" data-open="home" aria-label="Back to fleet">‹ Fleet</button>
+            <div class="sess-title-wrap">
+              <span class="sess-title">checkout-flow <span class="agent">· claude</span></span>
+              <span class="sess-sub">home-mac · ~/projects/shop/checkout-flow · fix/cta-overflow</span>
+            </div>
+            <span class="push"></span>
+            <span class="durable-badge">Durable</span>
+          </div>
+
+          <div class="screen-pad" style="padding-top:0;">
+            <div class="summary-box">
+              <div class="microlabel">Plain-language summary</div>
+              <ul>
+                <li>Fixed CTA overflow in <code>checkout.css</code></li>
+                <li>Dev server reloaded — preview updated</li>
+                <li class="pending">Wants to run <code>npm run db:migrate</code> — waiting <b>6m</b></li>
+              </ul>
+            </div>
+
+            <div class="instr-head" style="margin: 20px 15px 2px;">
+              <span class="instr-title">Intervention — choose your mode</span>
+            </div>
+
+            <div class="intervene-wrap">
+              <div class="mode-card mode-1">
+                <div class="mode-head"><span class="mode-num">1</span><span class="mode-name">Approve tool call</span></div>
+                <div class="mode-desc">Grant or refuse a specific command the agent is asking to run.</div>
+                <div class="cmd-line">$ npm run db:migrate</div>
+                <div class="approve-row">
+                  <button class="btn-approve" id="btn-approve">Approve</button>
+                  <button class="btn-deny" id="btn-deny">Deny</button>
+                  <button class="btn-always">Always Allow</button>
+                </div>
+                <div class="confirm-panel" id="confirm-approve">
+                  <p>This runs a database migration against <b>home-mac</b>. Confirm before it executes.</p>
+                  <div class="confirm-actions">
+                    <button class="confirm-cancel" id="confirm-cancel">Cancel</button>
+                    <button class="confirm-run" id="confirm-run">Confirm &amp; Run</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mode-card mode-2">
+                <div class="mode-head"><span class="mode-num">2</span><span class="mode-name">Reply to agent</span></div>
+                <div class="mode-desc">Send a plain-language message — the agent decides what to do next.</div>
+                <textarea rows="2" placeholder="e.g. hold off on the migration until I check staging"></textarea>
+                <button class="btn-reply">Send Reply</button>
+              </div>
+
+              <div class="mode-card mode-3">
+                <div class="mode-head"><span class="mode-num">3</span><span class="mode-name">Type into the shell</span></div>
+                <div class="mode-desc">Raw terminal input — bypasses the agent entirely. Use with care.</div>
+                <div class="shell-line">
+                  <span class="prompt">$</span>
+                  <input type="text" placeholder="type a raw shell command…" />
+                </div>
+                <div class="shell-warn">⚠ direct shell access — no approval gate</div>
+              </div>
+            </div>
+
+            <div class="jump-row">
+              <button class="jump-btn" data-open="terminal"><span class="ic">▤</span>Terminal</button>
+              <button class="jump-btn" data-open="browser"><span class="ic">◧</span>Browser</button>
+              <button class="jump-btn" data-open="evidence"><span class="ic">▣</span>Evidence</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ───── TERMINAL ───── -->
+        <section id="screen-terminal" class="screen">
+          <div class="term-head">
+            <button class="back-btn" data-open="session" aria-label="Back to session">‹ Agent</button>
+            <span class="sess-sub">checkout-flow · claude · live scrollback</span>
+            <span class="push"></span>
+            <i class="strip-dot dot-flight" title="streaming"></i>
+          </div>
+          <div class="term-body">
+<div class="tl tl-welcome">✻ Welcome to Claude Code!<span class="path">~/projects/shop/checkout-flow</span></div>
+<div class="tl tl-user"><span class="pfx">&gt;</span>fix the CTA overflow on the checkout page</div>
+<div class="tl tl-agent"><span class="pfx">●</span>I'll look at the checkout component styles.</div>
+<div class="tl tl-agent tl-dim"><span class="pfx">●</span>Read src/components/CheckoutCTA.tsx (84 lines)</div>
+<div class="tl tl-agent tl-dim"><span class="pfx">●</span>Edit src/styles/checkout.css</div>
+<div class="tl tl-diff tl-del">− .cta-row { width: 120%; }</div>
+<div class="tl tl-diff tl-add">+ .cta-row { width: 100%; max-width: 480px; }</div>
+<div class="tl tl-ok"><span class="pfx">✔</span>Change applied — dev server reloaded</div>
+<div class="tl tl-agent"><span class="pfx">●</span>The button no longer overflows. Preview updated.</div>
+<div class="tl tl-agent"><span class="pfx">●</span>Next I need the new orders table locally.</div>
+<div class="tl tl-await">⚠ APPROVAL REQUIRED<br>&nbsp;&nbsp;npm run db:migrate</div>
+<div class="tl tl-dim"><span class="caret"></span>waiting for your decision…</div>
+          </div>
+          <div class="term-shell-row">
+            <span class="term-shell-label">Raw</span>
+            <span class="prompt">$</span>
+            <input type="text" placeholder="type into the shell directly…" />
+          </div>
+        </section>
+
+        <!-- ───── BROWSER ───── -->
+        <section id="screen-browser" class="screen">
+          <div class="brow-bar">
+            <button class="back-btn" data-open="session" aria-label="Back to session">‹</button>
+            <button class="nav-btn">←</button>
+            <button class="nav-btn">→</button>
+            <button class="nav-btn">↻</button>
+            <div class="urlbar"><span class="lockdot"></span><span class="proto">http://</span>localhost:5173/checkout</div>
+          </div>
+          <div class="brow-chiprow">
+            <span class="chip">iPhone 15 · 393×852</span>
+            <span class="chip chip-ok">console: 0</span>
+            <span class="chip chip-fail">net: 1 failed</span>
+          </div>
+          <div class="brow-stage">
+            <div class="brow-plate">
+              <div class="web-nav"><span class="web-logo">shopflow</span><span class="web-cart">Cart · 1</span></div>
+              <div class="web-main">
+                <div class="order-card">
+                  <h3>Order summary</h3>
+                  <div class="order-line"><span>Canvas Tote × 1</span><span>$38.00</span></div>
+                  <div class="order-line"><span>Shipping</span><span>$10.00</span></div>
+                  <div class="order-line total"><span>Total</span><span>$48.00</span></div>
+                  <button class="pay-btn selected">
+                    <span class="select-tag">button.cta-pay · 412×88</span>
+                    Pay $48.00
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="tool-dock">
+            <button class="tool-btn primary"><span class="ic">◎</span>Inspect</button>
+            <button class="tool-btn"><span class="ic">☞</span>Tap</button>
+            <button class="tool-btn"><span class="ic">⌨</span>Type</button>
+            <button class="tool-btn"><span class="ic">↕</span>Scroll</button>
+            <button class="tool-btn"><span class="ic">▭</span>Viewport</button>
+            <button class="tool-btn"><span class="ic">◧</span>Back</button>
+            <button class="tool-btn"><span class="ic">◨</span>Fwd</button>
+            <button class="tool-btn"><span class="ic">↻</span>Reload</button>
+            <button class="tool-btn" data-open-sheet="sheet-send"><span class="ic">⎙</span>Screenshot</button>
+            <button class="tool-btn"><span class="ic">●</span>Record</button>
+          </div>
+        </section>
+
+        <!-- ───── EVIDENCE ───── -->
+        <section id="screen-evidence" class="screen">
+          <div class="evid-head">
+            <button class="back-btn" data-open="session" aria-label="Back to session">‹ Agent</button>
+            <div class="instr-head" style="margin: 8px 0 0;"><span class="instr-title">Evidence reel</span><span class="instr-count">3</span></div>
+          </div>
+          <div id="evidence-list">
+            <div class="evid-card">
+              <div class="evid-thumb">⎙</div>
+              <div class="evid-body">
+                <span class="evid-kind">Screenshot</span>
+                <span class="evid-name">2026-07-12-0912.png</span>
+                <span class="evid-meta">checkout CTA after fix</span>
+                <span class="evid-age">2m ago</span>
+                <button class="evid-send" data-open-sheet="sheet-send">Send to agent →</button>
+              </div>
+            </div>
+            <div class="evid-card">
+              <div class="evid-thumb rec">●</div>
+              <div class="evid-body">
+                <span class="evid-kind">Recording</span>
+                <span class="evid-name">checkout-tap-flow.webm</span>
+                <span class="evid-meta">3 taps · 1 console error · iPhone 15</span>
+                <span class="evid-age">9m ago</span>
+                <button class="evid-send" data-open-sheet="sheet-send">Send to agent →</button>
+              </div>
+            </div>
+            <div class="evid-card">
+              <div class="evid-thumb">◎</div>
+              <div class="evid-body">
+                <span class="evid-kind">Element capture</span>
+                <span class="evid-name">button.cta-pay</span>
+                <span class="evid-meta">"Pay $48.00" · 412×88</span>
+                <span class="evid-age">11m ago</span>
+                <button class="evid-send" data-open-sheet="sheet-send">Send to agent →</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- ═══════ BOTTOM DOCK ═══════ -->
+      <nav id="dock" aria-label="Session switcher">
+        <button class="dock-item" data-open="session"><span class="ic">◆</span><span class="lbl">Agent</span></button>
+        <button class="dock-item" data-open="terminal"><span class="ic">▤</span><span class="lbl">Terminal</span></button>
+        <button class="dock-item" data-open="browser"><span class="ic">◧</span><span class="lbl">Browser</span></button>
+        <button class="dock-item" data-open="evidence"><span class="ic">▣</span><span class="lbl">Evidence</span><span class="badge">3</span></button>
+      </nav>
+
+    </div>
+  </div>
+
+  <div id="corner-tag"><b>№ 01</b> · Mission Control</div>
+</div>
+
+<!-- ═══════ SEND SHEET ═══════ -->
+<div class="sheet-overlay" id="overlay-send" data-overlay-for="sheet-send">
+  <div class="sheet-panel" id="sheet-send" role="dialog" aria-modal="true" aria-label="Send evidence to agent">
+    <div class="sheet-grabber" aria-hidden="true"></div>
+    <div class="sheet-title-row">
+      <span class="sheet-title">Send to Agent</span>
+      <button class="sheet-x" data-close-sheet aria-label="Close">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="send-target">
+        <i class="tgt-dot"></i>
+        <div>
+          <b>checkout-flow · claude</b><br />
+          <span>home-mac</span>
+        </div>
+        <span class="push"></span>
+        <span class="microlabel">Target</span>
+      </div>
+
+      <div class="attach-row">
+        <div class="attach-thumb">⎙</div>
+        <div class="attach-meta">
+          <span class="u">localhost:5173/checkout</span>
+          <span class="v">viewport 393×852</span>
+          <span class="v">2026-07-12-0912.png</span>
+        </div>
+      </div>
+
+      <label class="send-note">
+        <span class="microlabel">Note to agent</span>
+        <textarea rows="2" spellcheck="false" placeholder="e.g. the CTA still clips at 320px — check small viewports"></textarea>
+      </label>
+
+      <span class="microlabel">Payload preview</span>
+<pre class="yaml-box"><span class="yk">chromux_capture:</span> <span class="ys">v1</span>
+<span class="yk">session:</span> checkout-flow
+<span class="yk">agent:</span> claude
+<span class="yk">host:</span> home-mac
+<span class="yk">url:</span> <span class="ys">http://localhost:5173/checkout</span>
+<span class="yk">viewport:</span> 393x852
+<span class="yk">note:</span> CTA verified after fix
+<span class="yk">screenshot:</span> <span class="ys">~/.chromux/captures/2026-07-12-0912.png</span>
+<span class="yk">console_errors:</span> []
+<span class="yk">network_failures:</span>
+  - POST /api/telemetry (503)</pre>
+    </div>
+    <div class="sheet-foot-row">
+      <button class="btn-cancel" data-close-sheet>Cancel</button>
+      <button class="btn-send">Send — claude</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ QUICK COMMAND SHEET (long-press mock) ═══════ -->
+<div class="sheet-overlay" id="overlay-quick" data-overlay-for="sheet-quick">
+  <div class="sheet-panel" id="sheet-quick" role="dialog" aria-modal="true" aria-label="Quick commands">
+    <div class="sheet-grabber" aria-hidden="true"></div>
+    <div class="sheet-title-row">
+      <span class="sheet-title">Quick Commands — checkout-flow</span>
+      <button class="sheet-x" data-close-sheet aria-label="Close">✕</button>
+    </div>
+    <div class="quick-grid">
+      <button class="quick-btn"><span class="ic">▶</span><span class="lbl">Continue</span><span class="sub">Let the agent proceed</span></button>
+      <button class="quick-btn danger"><span class="ic">■</span><span class="lbl">Stop</span><span class="sub">Halt the session now</span></button>
+      <button class="quick-btn" data-open-sheet="sheet-send"><span class="ic">⎙</span><span class="lbl">Send Screenshot</span><span class="sub">Attach current preview</span></button>
+      <button class="quick-btn" data-open="browser"><span class="ic">◧</span><span class="lbl">Open Browser</span><span class="sub">Jump to paired preview</span></button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var screens = document.querySelectorAll('.screen');
+  var dockItems = document.querySelectorAll('.dock-item');
+
+  function showScreen(name){
+    var targetId = 'screen-' + name;
+    screens.forEach(function(s){ s.classList.toggle('active', s.id === targetId); });
+    dockItems.forEach(function(d){ d.classList.toggle('active', d.getAttribute('data-open') === name); });
+    var shell = document.querySelector('.screen-shell');
+    if (shell) shell.scrollTop = 0;
+    var active = document.getElementById(targetId);
+    if (active) active.scrollTop = 0;
+  }
+
+  document.querySelectorAll('[data-open]').forEach(function(el){
+    el.addEventListener('click', function(){
+      showScreen(el.getAttribute('data-open'));
+    });
+  });
+
+  function openSheet(id){
+    var overlay = document.querySelector('[data-overlay-for="' + id + '"]');
+    if (overlay) overlay.classList.add('open');
+  }
+  function closeSheets(){
+    document.querySelectorAll('.sheet-overlay').forEach(function(o){ o.classList.remove('open'); });
+  }
+
+  document.querySelectorAll('[data-open-sheet]').forEach(function(el){
+    el.addEventListener('click', function(e){
+      e.stopPropagation();
+      openSheet(el.getAttribute('data-open-sheet'));
+    });
+  });
+  document.querySelectorAll('[data-close-sheet]').forEach(function(el){
+    el.addEventListener('click', closeSheets);
+  });
+  document.querySelectorAll('.sheet-overlay').forEach(function(overlay){
+    overlay.addEventListener('click', function(e){
+      if (e.target === overlay) closeSheets();
+    });
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') closeSheets();
+  });
+
+  // destructive confirm step for approve
+  var approveBtn = document.getElementById('btn-approve');
+  var confirmPanel = document.getElementById('confirm-approve');
+  var confirmCancel = document.getElementById('confirm-cancel');
+  var confirmRun = document.getElementById('confirm-run');
+  if (approveBtn && confirmPanel){
+    approveBtn.addEventListener('click', function(){ confirmPanel.classList.add('open'); });
+    confirmCancel.addEventListener('click', function(){ confirmPanel.classList.remove('open'); });
+    confirmRun.addEventListener('click', function(){ confirmPanel.classList.remove('open'); });
+  }
+})();
+</script>
+</body>
+</html>

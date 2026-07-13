@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chromux Mobile — Prototype Gallery</title>
+<style>
+  :root {
+    --bg: #0b0d12;
+    --panel: #12151d;
+    --line: #232936;
+    --text: #d3dae4;
+    --dim-solid: #788394;
+    --accent: #ffb454;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+    min-height: 100vh;
+    padding: 56px 32px 80px;
+  }
+  header { max-width: 1080px; margin: 0 auto 40px; }
+  h1 {
+    font-size: 15px; font-weight: 700;
+    letter-spacing: 0.32em; text-transform: uppercase;
+  }
+  h1 span { color: var(--accent); }
+  .sub {
+    margin-top: 10px; color: var(--dim-solid);
+    font-size: 13px; line-height: 1.6; max-width: 680px;
+  }
+  .sub a { color: var(--text); }
+  .loop {
+    max-width: 1080px; margin: 0 auto 36px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px; letter-spacing: 0.06em; line-height: 1.8;
+    color: var(--dim-solid);
+    border: 1px solid var(--line); background: var(--panel);
+    padding: 14px 18px;
+  }
+  .loop b { color: var(--accent); font-weight: 600; }
+  .grid {
+    max-width: 1080px; margin: 0 auto;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 18px;
+  }
+  a.card {
+    display: block; text-decoration: none; color: inherit;
+    border: 1px solid var(--line); background: var(--panel);
+    padding: 0; overflow: hidden;
+    transition: border-color .15s, transform .15s;
+  }
+  a.card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .swatch { height: 128px; position: relative; }
+  .swatch .tag {
+    position: absolute; left: 14px; bottom: 12px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10px; letter-spacing: 0.14em;
+    padding: 3px 7px;
+  }
+  .meta { padding: 14px 16px 16px; border-top: 1px solid var(--line); }
+  .num {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10px; color: var(--dim-solid); letter-spacing: 0.2em;
+  }
+  .name {
+    margin-top: 4px; font-size: 16px; font-weight: 700; letter-spacing: 0.04em;
+  }
+  .desc { margin-top: 6px; font-size: 12px; line-height: 1.55; color: var(--dim-solid); }
+
+  /* swatches */
+  .s-mission {
+    background:
+      radial-gradient(4px 4px at 22% 32%, #ffb454 98%, transparent),
+      radial-gradient(4px 4px at 34% 32%, #7cd6ff 98%, transparent),
+      radial-gradient(4px 4px at 46% 32%, #6fdc8c 98%, transparent),
+      linear-gradient(0deg, transparent 0 62%, rgba(255,180,84,.35) 62.5%, transparent 63.5%),
+      linear-gradient(0deg, transparent 0 44%, rgba(255,180,84,.20) 44.5%, transparent 45.5%),
+      repeating-linear-gradient(0deg, rgba(211,218,228,.05) 0 1px, transparent 1px 18px),
+      radial-gradient(90% 90% at 20% 10%, rgba(124,214,255,.14), transparent 60%),
+      linear-gradient(170deg, #181b22, #0c0e13);
+  }
+  .s-mission .tag { color: #ffb454; border: 1px solid #ffb45466; background: #14161c; }
+  .s-inbox { background: linear-gradient(165deg, #faf6ee 60%, #f1ebdd 100%); }
+  .s-inbox .tag { color: #d5341f; border: 1px solid #d5341f; background: #faf6ee; }
+  .s-fieldkit {
+    background:
+      linear-gradient(0deg, rgba(255,255,255,.10) 0 26%, transparent 26%),
+      radial-gradient(70% 90% at 80% 15%, rgba(120,180,255,.30), transparent 60%),
+      radial-gradient(60% 70% at 30% 30%, rgba(255,170,90,.16), transparent 55%),
+      radial-gradient(80% 70% at 15% 90%, rgba(110,110,150,.45), transparent 65%),
+      #0b0c12;
+  }
+  .s-fieldkit .tag {
+    color: #cfe2ff; border: 1px solid rgba(255,255,255,.22);
+    background: rgba(255,255,255,.08); border-radius: 99px; backdrop-filter: blur(4px);
+  }
+  .s-timeline {
+    background:
+      radial-gradient(2px 2px at 18% 46%, #57d4ff 98%, transparent),
+      radial-gradient(2px 2px at 38% 46%, #57d4ff 98%, transparent),
+      radial-gradient(2.5px 2.5px at 56% 46%, #e6c887 98%, transparent),
+      radial-gradient(2px 2px at 76% 46%, #ff7a6e 98%, transparent),
+      linear-gradient(0deg, transparent 49%, rgba(255,255,255,.14) 50%, transparent 51%),
+      #0a1024;
+  }
+  .s-timeline .tag { color: #e6c887; border: 1px solid #e6c88755; background: transparent; }
+  .s-deck {
+    background:
+      linear-gradient(105deg, #ff5f4d 0 30%, transparent 30%),
+      linear-gradient(255deg, #37c0f0 0 24%, transparent 24%),
+      #ffd23f;
+  }
+  .s-deck .tag { color: #000; background: #fff; border: 3px solid #000; box-shadow: 4px 4px 0 #000; font-weight: 700; }
+  .s-lens {
+    background:
+      linear-gradient(0deg, transparent 0 58%, rgba(53,226,255,.9) 58.5%, rgba(53,226,255,.9) 59.5%, transparent 60%, transparent 66%, rgba(53,226,255,.22) 66.5%, rgba(53,226,255,.22) 71%, transparent 71.5%),
+      radial-gradient(80% 100% at 50% 100%, rgba(0,229,255,.14), transparent 60%),
+      #05060a;
+  }
+  .s-lens .tag { color: #35e2ff; border: 1px solid #35e2ff55; background: transparent; text-shadow: 0 0 9px #35e2ff66; }
+  .s-workbench { background: linear-gradient(180deg, #3d434b 0 68%, #2b3036 68%); }
+  .s-workbench .tag { color: #1c1c1a; background: #ff7a1a; border: none; font-weight: 700; }
+
+  footer {
+    max-width: 1080px; margin: 44px auto 0;
+    color: var(--dim-solid); font-size: 11.5px; line-height: 1.7;
+    border-top: 1px solid var(--line); padding-top: 18px;
+  }
+  footer code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    color: var(--text); font-size: 11px;
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Chromux Mobile <span>—</span> Prototype Gallery</h1>
+    <p class="sub">Seven interaction directions for a phone-native Chromux: a remote
+    agent command center for supervision, correction, approval, browser QA, and
+    emergency intervention — not a miniature desktop IDE. Every prototype renders
+    the same fabricated fleet so the directions are directly comparable.
+    The desktop explorations live in the <a href="/designs/">design gallery</a>.</p>
+  </header>
+
+  <div class="loop">
+    THE LOOP · <b>see which agents need attention</b> → inspect their latest work →
+    intervene through SSH → operate the paired browser → capture evidence →
+    <b>return it to the correct agent</b>
+  </div>
+
+  <div class="grid">
+    <a class="card" href="/mobile/01-mission-control">
+      <div class="swatch s-mission"><span class="tag">PROTO A</span></div>
+      <div class="meta">
+        <div class="num">01 · A · DARK</div>
+        <div class="name">Mission Control</div>
+        <div class="desc">Compact flight deck — graphite, warm amber, pale cyan instrument rules. Attention-first fleet dashboard, persistent Agent · Terminal · Browser · Evidence switcher, swipeable attention cards.</div>
+      </div>
+    </a>
+    <a class="card" href="/mobile/02-agent-inbox">
+      <div class="swatch s-inbox"><span class="tag">PROTO B</span></div>
+      <div class="meta">
+        <div class="num">02 · B · LIGHT</div>
+        <div class="name">Agent Inbox</div>
+        <div class="desc">Warm editorial paper — sessions as an inbox, conversational summaries with expandable activity blocks, a reply composer that previews exactly what is sent and to whom.</div>
+      </div>
+    </a>
+    <a class="card" href="/mobile/03-browser-field-kit">
+      <div class="swatch s-fieldkit"><span class="tag">PROTO C</span></div>
+      <div class="meta">
+        <div class="num">03 · C · DARK</div>
+        <div class="name">Browser Field Kit</div>
+        <div class="desc">Browser-first visual QA — full-bleed remote page, summonable translucent tool trays, radial capture tool, hold-to-inspect DOM overlay, terminal as a bottom sheet.</div>
+      </div>
+    </a>
+    <a class="card" href="/mobile/04-timeline">
+      <div class="swatch s-timeline"><span class="tag">PROTO D</span></div>
+      <div class="meta">
+        <div class="num">04 · D · DARK</div>
+        <div class="name">Timeline / Black Box</div>
+        <div class="desc">Event-sourced observatory — every session a replayable timeline of agent actions, human interventions, and failures; scrub back and branch a correction from history.</div>
+      </div>
+    </a>
+    <a class="card" href="/mobile/05-deck-of-agents">
+      <div class="swatch s-deck"><span class="tag">PROTO E</span></div>
+      <div class="meta">
+        <div class="num">05 · E · BOLD</div>
+        <div class="name">Deck of Agents</div>
+        <div class="desc">Tactile neubrutalist cards — one full-screen session at a time, horizontal deck, vertical layers, huge one-handed controls, flick a screenshot upward to attach it.</div>
+      </div>
+    </a>
+    <a class="card" href="/mobile/06-command-lens">
+      <div class="swatch s-lens"><span class="tag">PROTO F</span></div>
+      <div class="meta">
+        <div class="num">06 · F · OLED</div>
+        <div class="name">Command Lens</div>
+        <div class="desc">Expert OLED minimalism — one universal command field over everything, structured shortcuts and natural language, staged multi-step voice actions awaiting confirmation.</div>
+      </div>
+    </a>
+    <a class="card" href="/mobile/07-remote-workbench">
+      <div class="swatch s-workbench"><span class="tag">PROTO G</span></div>
+      <div class="meta">
+        <div class="num">07 · G · TABLET-FIRST</div>
+        <div class="name">Remote Workbench</div>
+        <div class="desc">Calm industrial workspace — a genuine multi-pane tablet workbench with drag-and-drop evidence delivery, collapsing gracefully to a stacked phone layout with a mode rail.</div>
+      </div>
+    </a>
+  </div>
+
+  <footer>
+    Static prototypes only — no build step, no dependencies, fonts fall back to
+    macOS-installed families. Every file renders the same fabricated fleet state
+    and the same layered contexts (<code>screen-home</code>,
+    <code>screen-session</code>, <code>screen-terminal</code>,
+    <code>screen-browser</code>, <code>screen-evidence</code>,
+    <code>sheet-send</code>) so directions can be compared and later ported.
+    See <code>SPEC.md</code>.
+  </footer>
+</body>
+</html>

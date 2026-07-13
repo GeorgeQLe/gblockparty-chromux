@@ -1,0 +1,1257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Chromux Mobile — Remote Workbench</title>
+<style>
+/* ============================================================
+   CHROMUX MOBILE — PROTOTYPE G — "REMOTE WORKBENCH"
+   Calm industrial workspace. Slate surfaces, safety-orange
+   intervention states, large durable controls, clear pane
+   boundaries. Tablet-first; collapses to a stacked phone rail.
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root{
+  --slate-950:#11151a;
+  --slate-900:#181e24;
+  --slate-850:#1d242b;
+  --slate-800:#232b33;
+  --slate-750:#28313a;
+  --slate-700:#2e3843;
+  --slate-650:#35404b;
+  --slate-600:#3d4954;
+  --slate-500:#57646f;
+  --slate-400:#7e8b96;
+  --slate-300:#a6b2bb;
+  --slate-200:#c8d1d8;
+  --slate-100:#e7ecef;
+  --paper:#eef1f0;
+  --ink:#eaeef0;
+  --ink-dim:#94a2ac;
+  --orange:#ff6a1f;
+  --orange-hi:#ff8c4d;
+  --orange-lo:#c94c11;
+  --orange-glow:rgba(255,106,31,.38);
+  --green:#3fae6b;
+  --green-lit:#6bdb98;
+  --amber:#dba31a;
+  --amber-lit:#ffcf52;
+  --red:#dd4a41;
+  --red-lit:#ff756b;
+  --cyan:#4aa7c9;
+  --cyan-lit:#82d3ef;
+  --mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,Monaco,Consolas,monospace;
+  --sans:'Barlow Semi Condensed','Avenir Next Condensed','Futura','Arial Narrow',sans-serif;
+  --sans-wide:'Barlow Semi Condensed','Avenir Next','Helvetica Neue',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  min-height:100vh;
+  background:
+    radial-gradient(120% 70% at 18% -10%, rgba(255,106,31,.05), transparent 55%),
+    radial-gradient(90% 60% at 100% 110%, rgba(74,167,201,.06), transparent 55%),
+    repeating-linear-gradient(135deg, rgba(255,255,255,.012) 0 2px, transparent 2px 5px),
+    linear-gradient(175deg, #1c2229 0%, var(--slate-900) 55%, var(--slate-950) 100%);
+  background-color:var(--slate-950);
+  color:var(--ink);
+  font-family:var(--sans);
+  -webkit-font-smoothing:antialiased;
+  padding:56px 28px 140px;
+  display:flex;flex-direction:column;align-items:center;gap:40px;
+}
+button{font-family:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--orange-hi);outline-offset:2px}
+img,svg{display:block}
+[aria-hidden="true"]{pointer-events:none}
+
+/* ---------- page heading ---------- */
+.page-head{max-width:1194px;width:100%;display:flex;align-items:baseline;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.page-head h1{
+  font-size:13px;font-weight:800;letter-spacing:.34em;text-transform:uppercase;color:var(--slate-200);
+}
+.page-head h1 b{color:var(--orange-hi)}
+.page-head p{font-size:12px;color:var(--ink-dim);max-width:520px;line-height:1.6;font-family:var(--sans-wide)}
+
+.frame-label{
+  font-family:var(--mono);font-size:10px;letter-spacing:.22em;color:var(--slate-400);
+  text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:10px;
+}
+.frame-label::before{content:"";width:22px;height:1px;background:var(--slate-500)}
+.frame-label b{color:var(--slate-200)}
+
+/* ============================================================
+   SHARED WORKBENCH COMPONENTS (used inside both frames)
+   ============================================================ */
+.lamp{
+  display:inline-block;width:8px;height:8px;border-radius:50%;flex:none;
+  box-shadow:inset 0 -1px 2px rgba(0,0,0,.5), inset 0 1px 1px rgba(255,255,255,.3);
+  background:radial-gradient(circle at 35% 30%,#8b97a1,#57646f 70%);
+}
+.lamp-green{background:radial-gradient(circle at 35% 30%,#a9f2c4,var(--green-lit) 35%,var(--green) 78%)}
+.lamp-amber{background:radial-gradient(circle at 35% 30%,#ffe6a3,var(--amber-lit) 35%,var(--amber) 78%)}
+.lamp-red{background:radial-gradient(circle at 35% 30%,#ffb3ac,var(--red-lit) 35%,var(--red) 78%)}
+.lamp-cyan{background:radial-gradient(circle at 35% 30%,#c9edf9,var(--cyan-lit) 35%,var(--cyan) 78%)}
+.lamp-orange{background:radial-gradient(circle at 35% 30%,#ffcda3,var(--orange-hi) 35%,var(--orange) 78%)}
+.lamp-pulse{animation:lamppulse 1.8s ease-in-out infinite}
+@keyframes lamppulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.5)}}
+
+.btn{
+  font-family:var(--sans);font-weight:700;font-size:11px;letter-spacing:.06em;
+  background:linear-gradient(180deg,var(--slate-650),var(--slate-750));
+  color:var(--slate-100);border:1px solid var(--slate-900);border-radius:6px;
+  padding:8px 13px;cursor:pointer;box-shadow:0 2px 0 rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.06);
+  display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
+}
+.btn:hover{background:linear-gradient(180deg,var(--slate-600),var(--slate-700))}
+.btn:active{transform:translateY(1px);box-shadow:0 1px 0 rgba(0,0,0,.4)}
+.btn-sm{padding:5px 9px;font-size:10px;border-radius:5px}
+.btn-orange{
+  background:linear-gradient(180deg,var(--orange-hi),var(--orange-lo));
+  color:#1c0d02;border-color:#3d1602;
+  box-shadow:0 2px 0 #672705, inset 0 1px 0 rgba(255,255,255,.35), 0 0 0 3px var(--orange-glow);
+}
+.btn-orange:hover{background:linear-gradient(180deg,#ff8a4c,var(--orange))}
+.btn-ghost{background:transparent;border:1px solid var(--slate-600);box-shadow:none;color:var(--slate-300)}
+.btn-ghost:hover{border-color:var(--slate-400);background:rgba(255,255,255,.03)}
+.btn-icon{padding:6px 8px;border-radius:5px;font-size:12px}
+.btn[disabled]{opacity:.4;cursor:not-allowed}
+
+.chip{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.03em;
+  background:var(--slate-800);border:1px solid var(--slate-650);border-radius:4px;
+  padding:3px 7px;color:var(--slate-200);white-space:nowrap;display:inline-flex;align-items:center;gap:4px;
+}
+.chip b{color:var(--ink);font-weight:600}
+.chip-danger{border-color:rgba(221,74,65,.5);color:#ffb3ac;background:rgba(221,74,65,.1)}
+.chip-durable{border-color:rgba(74,167,201,.45);color:var(--cyan-lit);background:rgba(74,167,201,.08)}
+
+.tag{
+  font-size:8.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;
+  padding:2px 6px;border-radius:3px;flex:none;
+}
+.tag-approval{background:var(--orange);color:#1c0d02}
+.tag-review{background:var(--cyan);color:#04222c}
+.tag-exited{background:var(--slate-650);color:var(--red-lit);border:1px solid rgba(221,74,65,.5)}
+.tag-done{background:rgba(63,174,107,.18);color:var(--green-lit);border:1px solid rgba(63,174,107,.4)}
+.tag-offline{background:transparent;color:var(--slate-400);border:1px dashed var(--slate-500)}
+
+/* rail / stacked session card (shared skeleton) */
+.rcard{
+  display:flex;gap:0;border-radius:7px;overflow:hidden;cursor:pointer;
+  background:var(--slate-800);border:1px solid var(--slate-700);
+  box-shadow:0 1px 0 rgba(255,255,255,.03) inset;position:relative;
+}
+.rcard:hover{border-color:var(--slate-500)}
+.rcard-bar{width:4px;flex:none;background:var(--slate-600)}
+.rcard.k-approval .rcard-bar{background:repeating-linear-gradient(45deg,var(--orange) 0 5px,var(--orange-lo) 5px 10px)}
+.rcard.k-review .rcard-bar{background:var(--cyan)}
+.rcard.k-exited .rcard-bar{background:var(--red)}
+.rcard.k-working .rcard-bar{background:var(--slate-500)}
+.rcard.k-done .rcard-bar{background:var(--green)}
+.rcard.k-offline .rcard-bar{background:repeating-linear-gradient(180deg,var(--slate-500) 0 4px,transparent 4px 8px)}
+.rcard.k-offline{opacity:.62}
+.rcard-body{padding:8px 10px 9px;min-width:0;flex:1;display:flex;flex-direction:column;gap:4px}
+.rcard-top{display:flex;align-items:center;gap:7px}
+.rcard-sess{font-family:var(--mono);font-weight:600;font-size:11px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rcard-sess i{color:var(--slate-400);font-style:normal;font-weight:400}
+.rcard-msg{font-size:11.5px;color:var(--slate-200);line-height:1.4;font-family:var(--sans-wide)}
+.rcard-msg code{font-family:var(--mono);font-size:10px;background:var(--slate-750);border:1px solid var(--slate-650);border-radius:3px;padding:0 4px;color:var(--orange-hi)}
+.rcard-meta{font-family:var(--mono);font-size:9.5px;color:var(--slate-400);letter-spacing:.02em}
+.rcard.drop-active{
+  outline:2px dashed var(--orange-hi);outline-offset:2px;
+  box-shadow:0 0 0 5px var(--orange-glow);
+  animation:dropwelcome 1.4s ease-in-out infinite;
+}
+@keyframes dropwelcome{0%,100%{outline-offset:2px}50%{outline-offset:4px}}
+.drop-flag{
+  position:absolute;top:-9px;right:8px;background:var(--orange);color:#1c0d02;
+  font-family:var(--mono);font-size:8px;font-weight:800;letter-spacing:.14em;
+  padding:2px 6px;border-radius:3px;box-shadow:0 2px 4px rgba(0,0,0,.4);
+}
+
+.host-head{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:0 2px;margin:2px 0 7px;
+}
+.host-name{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.18em;color:var(--slate-300);text-transform:uppercase}
+.host-chip{font-family:var(--mono);font-size:9px;color:var(--slate-400);display:inline-flex;align-items:center;gap:5px}
+.host-chip.offline{color:var(--red-lit)}
+
+.section-head{
+  font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.2em;color:var(--slate-400);
+  text-transform:uppercase;margin:14px 2px 8px;display:flex;align-items:center;justify-content:space-between;
+}
+.section-head:first-child{margin-top:2px}
+.section-head .count{color:var(--orange-hi)}
+
+/* fake webpage checkout mock (shared) */
+.webpage{
+  position:absolute;inset:0;overflow:hidden;background:var(--paper);color:#232323;
+  font-family:var(--sans-wide);
+}
+.wp-head{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid #e0ddd4;background:#fbfaf7}
+.wp-logo{font-weight:800;font-size:14px;color:#1f1f1f}
+.wp-logo span{color:#9a958a;font-weight:500}
+.wp-steps{font-size:10.5px;color:#8d887c}
+.wp-steps b{color:#232323}
+.wp-body{display:flex;justify-content:center;padding:22px 20px}
+.wp-card{width:280px;background:#fff;border:1px solid #e3e0d7;border-radius:10px;box-shadow:0 8px 20px rgba(40,36,28,.1);padding:16px 18px;position:relative}
+.wp-card h3{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8d887c;margin-bottom:11px;font-weight:700}
+.wp-row{display:flex;justify-content:space-between;font-size:12.5px;padding:5px 0;color:#33322e}
+.wp-row .muted{color:#8d887c}
+.wp-row.total{border-top:1px solid #eceade;margin-top:6px;padding-top:9px;font-weight:800;font-size:13.5px}
+.wp-cta{display:block;width:100%;margin-top:14px;padding:11px 0;background:#1f6f4f;color:#fff;border:none;border-radius:7px;font-family:var(--sans-wide);font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 3px 10px rgba(31,111,79,.35);position:relative}
+.wp-cta.inspected{outline:2px solid var(--orange);outline-offset:3px;box-shadow:0 0 0 5px var(--orange-glow)}
+.wp-fine{margin-top:10px;font-size:9.5px;color:#a49f92;text-align:center}
+.inspect-badge{
+  position:absolute;left:0;right:0;bottom:-24px;text-align:center;
+  font-family:var(--mono);font-size:8.5px;color:var(--orange-hi);letter-spacing:.05em;
+}
+
+/* terminal transcript (shared) */
+.term-well{background:var(--slate-950);border-radius:6px;position:relative;overflow:hidden;box-shadow:inset 0 2px 8px rgba(0,0,0,.6)}
+.term-scroll{padding:12px 14px;font-family:var(--mono);font-size:11.5px;line-height:1.68;color:#dfe6e1;letter-spacing:0}
+.t-dim{color:#7b8790}
+.t-orange{color:var(--orange-hi)}
+.t-user{color:#fff;font-weight:600}
+.t-user .t-caret{color:var(--orange-hi)}
+.t-bullet .t-dot{color:var(--cyan-lit)}
+.t-del{color:#ff8f86}
+.t-add{color:#7fe092}
+.t-ok{color:#7fe092;font-weight:700}
+.t-warn{color:var(--orange-hi);font-weight:700}
+.t-await{color:#b9c2ca}
+.blockcaret{display:inline-block;width:7px;height:13px;vertical-align:-2px;margin-right:6px;background:var(--orange);animation:caretblink 1.05s steps(1,end) infinite}
+@keyframes caretblink{0%,49%{opacity:1}50%,100%{opacity:0}}
+.approval-line{
+  margin-top:6px;padding:6px 9px;border-left:3px solid var(--orange);
+  background:rgba(255,106,31,.08);border-radius:0 4px 4px 0;
+}
+
+/* ============================================================
+   PAGE STAGE — holds both device frames
+   ============================================================ */
+.stage{display:flex;flex-direction:column;align-items:center;gap:52px;width:100%}
+
+/* ============================================================
+   TABLET FRAME  — 1194×834, scaled to fit
+   ============================================================ */
+.tablet-scale-box{--tscale:.6;width:calc(1194px * var(--tscale));height:calc(834px * var(--tscale));position:relative}
+@media (max-width:1180px){.tablet-scale-box{--tscale:.46}}
+@media (max-width:760px){.tablet-scale-box{--tscale:.34}}
+@media (max-width:520px){.tablet-scale-box{--tscale:.27}}
+
+.tablet-frame{
+  width:1194px;height:834px;position:absolute;left:0;top:0;
+  transform:scale(var(--tscale));transform-origin:top left;
+  background:#08090b;border-radius:22px;padding:14px;
+  box-shadow:0 30px 70px rgba(0,0,0,.55), 0 2px 0 rgba(255,255,255,.04) inset, 0 0 0 1px #000;
+}
+.tablet-cam{position:absolute;top:6px;left:50%;transform:translateX(-50%);width:8px;height:8px;border-radius:50%;background:#1a1e22;box-shadow:inset 0 0 0 1px #333, 0 0 3px rgba(120,180,220,.5)}
+.tablet-screen{
+  width:100%;height:100%;border-radius:10px;overflow:hidden;position:relative;
+  background:var(--slate-900);display:flex;flex-direction:column;
+  border:1px solid #000;
+}
+
+/* -- tablet topbar -- */
+.tb-topbar{
+  flex:none;height:52px;display:flex;align-items:center;gap:16px;padding:0 18px;
+  background:linear-gradient(180deg,var(--slate-850),var(--slate-900));
+  border-bottom:1px solid var(--slate-700);
+}
+.tb-brand{display:flex;align-items:center;gap:9px;flex:none}
+.tb-brandmark{
+  width:22px;height:22px;border-radius:5px;background:var(--slate-750);
+  border:1px solid var(--slate-600);display:grid;place-items:center;
+}
+.tb-brandname{font-weight:800;font-size:14px;letter-spacing:.12em;color:var(--ink)}
+.tb-brandname b{color:var(--orange-hi)}
+.tb-gauges{display:flex;align-items:center;gap:8px;margin-left:6px}
+.tb-gauge{
+  display:inline-flex;align-items:center;gap:5px;background:var(--slate-800);
+  border:1px solid var(--slate-650);border-radius:5px;padding:4px 9px;
+  font-family:var(--mono);font-size:10px;color:var(--slate-300);
+}
+.tb-gauge b{color:var(--ink);font-weight:700}
+.tb-gauge.urgent b{color:var(--orange-hi)}
+.tb-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.tb-conn{
+  display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;color:var(--slate-300);
+  background:var(--slate-800);border:1px solid var(--slate-650);border-radius:5px;padding:4px 10px;
+}
+.tb-conn b{color:var(--ink)}
+
+/* -- tablet body: rail + main -- */
+.tb-body{flex:1;min-height:0;display:flex}
+.tb-rail{
+  width:302px;flex:none;display:flex;flex-direction:column;min-height:0;
+  background:var(--slate-850);border-right:1px solid var(--slate-700);
+  padding:12px 12px 10px;position:relative;
+}
+.tb-rail-scroll{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column}
+.tb-rail-grip{
+  position:absolute;top:0;bottom:0;right:-7px;width:14px;cursor:col-resize;
+  display:flex;align-items:center;justify-content:center;z-index:5;
+}
+.tb-rail-grip::before{
+  content:"";width:3px;height:46px;border-radius:3px;
+  background:repeating-linear-gradient(180deg,var(--slate-600) 0 3px,transparent 3px 6px);
+}
+.rail-attention .rcard{margin-bottom:8px}
+.rail-attention .rcard:last-child{margin-bottom:0}
+.rail-host{margin-top:2px}
+.rail-host .rcard{margin-bottom:7px}
+.rail-host .rcard:last-child{margin-bottom:0}
+.rail-host.offline{margin-bottom:0}
+
+.tb-main{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0;position:relative}
+.pane{display:flex;flex-direction:column;min-height:0;min-width:0}
+.pane-browser{flex:1.18}
+.pane-terminal{flex:1}
+.pane-head{
+  flex:none;display:flex;align-items:center;gap:8px;padding:8px 12px;
+  background:var(--slate-800);border-bottom:1px solid var(--slate-700);min-height:38px;
+}
+.pane-title{font-weight:700;font-size:11.5px;letter-spacing:.05em;color:var(--ink);display:flex;align-items:center;gap:6px}
+.pane-cwd{font-family:var(--mono);font-size:10px;color:var(--slate-400);margin-left:auto}
+.pane-body{flex:1;min-height:0;padding:10px;position:relative}
+.expand-btn{
+  width:22px;height:22px;border-radius:5px;flex:none;display:grid;place-items:center;
+  background:var(--slate-750);border:1px solid var(--slate-600);color:var(--slate-300);
+  font-size:11px;cursor:pointer;
+}
+.expand-btn:hover{color:var(--ink);border-color:var(--slate-400)}
+
+.tb-grip-h{
+  height:13px;flex:none;display:flex;align-items:center;justify-content:center;
+  cursor:row-resize;background:var(--slate-850);border-top:1px solid var(--slate-750);border-bottom:1px solid var(--slate-750);
+}
+.tb-grip-h::before{
+  content:"";width:52px;height:3px;border-radius:3px;
+  background:repeating-linear-gradient(90deg,var(--slate-600) 0 3px,transparent 3px 6px);
+}
+
+/* browser pane specifics */
+.btoolbar{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;overflow:hidden}
+.btoolbar .btn-icon{font-size:11px}
+.urlbar{
+  flex:1;min-width:100px;display:flex;align-items:center;gap:7px;
+  background:var(--slate-950);border:1px solid var(--slate-650);border-radius:6px;
+  padding:6px 10px;font-family:var(--mono);font-size:11px;color:var(--slate-100);
+  overflow:hidden;white-space:nowrap;
+}
+.pin-btn{
+  background:var(--slate-750);border:1px solid var(--slate-600);color:var(--slate-300);
+  border-radius:5px;padding:5px 9px;font-size:11px;cursor:pointer;display:inline-flex;gap:5px;align-items:center;
+}
+.pin-btn.pinned{background:rgba(255,106,31,.14);border-color:var(--orange);color:var(--orange-hi)}
+.tb-caption{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:6px 12px;font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;color:var(--slate-400);
+  text-transform:uppercase;border-bottom:1px solid var(--slate-750);
+}
+.tb-caption b{color:var(--cyan-lit)}
+.browser-stage{flex:1;min-height:0;position:relative;margin:0;background:var(--slate-950)}
+
+/* terminal pane specifics */
+.tb-activity{
+  flex:none;display:flex;align-items:center;gap:8px;padding:7px 12px;
+  border-top:1px solid var(--slate-750);background:var(--slate-850);overflow:hidden;
+}
+.act-label{font-family:var(--mono);font-size:9px;letter-spacing:.16em;color:var(--slate-500);flex:none}
+.act-item{
+  display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:9.5px;
+  color:var(--slate-300);background:var(--slate-800);border:1px solid var(--slate-700);
+  border-radius:10px;padding:3px 8px 3px 6px;flex:none;
+}
+
+/* -- drag ghost + delivery popover (static mid-flight composition) -- */
+.drag-ghost{
+  position:absolute;z-index:40;top:210px;left:330px;
+  transform:rotate(-4deg);
+  width:150px;background:var(--slate-800);border:1px solid var(--orange);border-radius:7px;
+  box-shadow:0 18px 34px rgba(0,0,0,.5), 0 0 0 4px var(--orange-glow);
+  padding:7px;pointer-events:none;
+}
+.drag-ghost .thumb{
+  height:64px;border-radius:4px;margin-bottom:6px;
+  background:
+    linear-gradient(160deg, rgba(255,255,255,.06), transparent 60%),
+    repeating-linear-gradient(115deg, #3a4650 0 6px, #333e47 6px 12px);
+  border:1px solid var(--slate-650);
+}
+.drag-ghost .fname{font-family:var(--mono);font-size:9px;color:var(--slate-200);word-break:break-all}
+.drag-ghost .trail{
+  position:absolute;left:50%;bottom:-9px;width:2px;height:70px;
+  background:linear-gradient(180deg,var(--orange),transparent);transform:translateX(-50%) rotate(28deg);
+  opacity:.5;
+}
+.delivery-popover{
+  position:absolute;z-index:41;top:196px;left:112px;width:186px;
+  background:var(--slate-800);border:1px solid var(--orange);border-radius:8px;
+  box-shadow:0 16px 30px rgba(0,0,0,.5);padding:10px 11px;
+}
+.delivery-popover::after{
+  content:"";position:absolute;right:-7px;top:38px;width:12px;height:12px;
+  background:var(--slate-800);border-right:1px solid var(--orange);border-bottom:1px solid var(--orange);
+  transform:rotate(-45deg);
+}
+.dp-label{font-family:var(--mono);font-size:8px;letter-spacing:.16em;color:var(--slate-400);text-transform:uppercase}
+.dp-val{font-size:11.5px;color:var(--ink);font-weight:600;margin-bottom:6px;font-family:var(--sans-wide)}
+.dp-hint{
+  margin-top:4px;font-family:var(--mono);font-size:9px;color:var(--orange-hi);
+  display:flex;align-items:center;gap:5px;
+}
+
+/* ============================================================
+   PHONE FRAME — 393×852
+   ============================================================ */
+.phone-scale-box{--pscale:1;width:calc(393px * var(--pscale));height:calc(852px * var(--pscale));position:relative}
+@media (max-width:460px){.phone-scale-box{--pscale:.86}}
+@media (max-width:380px){.phone-scale-box{--pscale:.74}}
+
+.phone-frame{
+  width:393px;height:852px;position:absolute;left:0;top:0;
+  transform:scale(var(--pscale));transform-origin:top left;
+  background:#050607;border-radius:52px;padding:13px;
+  box-shadow:0 26px 60px rgba(0,0,0,.55), 0 0 0 1px #000;
+}
+.phone-screen{
+  width:100%;height:100%;border-radius:40px;overflow:hidden;position:relative;
+  background:var(--slate-900);display:flex;flex-direction:column;
+}
+.phone-notch{
+  position:absolute;top:0;left:50%;transform:translateX(-50%);
+  width:118px;height:26px;background:#050607;border-radius:0 0 16px 16px;z-index:30;
+}
+
+.statusbar-mobile{
+  flex:none;height:44px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 26px;font-family:var(--sans);font-weight:700;font-size:13px;color:var(--ink);
+  position:relative;z-index:10;
+}
+.sb-icons{display:flex;align-items:center;gap:5px}
+.sb-icons svg{display:block}
+
+.ph-conn{
+  flex:none;display:flex;align-items:center;gap:7px;padding:5px 16px 8px;
+  font-family:var(--mono);font-size:9.5px;color:var(--slate-300);
+}
+.ph-conn .durable-dot{width:5px;height:5px;border-radius:50%;background:var(--cyan-lit);box-shadow:0 0 5px var(--cyan-lit)}
+
+.ph-body{flex:1;min-height:0;display:flex}
+
+/* -- mode rail (persistent) -- */
+.mode-rail{
+  width:60px;flex:none;display:flex;flex-direction:column;align-items:center;
+  gap:6px;padding:10px 0;background:var(--slate-850);border-right:1px solid var(--slate-750);
+}
+.mode-btn{
+  width:48px;height:52px;border-radius:9px;border:1px solid transparent;background:transparent;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  color:var(--slate-400);cursor:pointer;
+}
+.mode-btn .glyph{font-size:16px;line-height:1}
+.mode-btn .lbl{font-family:var(--mono);font-size:7.5px;letter-spacing:.08em;text-transform:uppercase}
+.mode-btn:hover{background:var(--slate-800);color:var(--slate-200)}
+.mode-btn.active{
+  background:rgba(255,106,31,.14);border-color:var(--orange);color:var(--orange-hi);
+  box-shadow:0 0 0 3px var(--orange-glow);
+}
+.mode-btn .dot-badge{
+  position:absolute;margin-top:-32px;margin-left:24px;width:8px;height:8px;border-radius:50%;
+  background:var(--orange);border:1.5px solid var(--slate-850);
+}
+
+/* -- phone content / screens -- */
+.phone-content{flex:1;min-width:0;position:relative;overflow:hidden}
+.phone-screen-panel{
+  position:absolute;inset:0;overflow-y:auto;padding:14px 14px 20px;
+  display:none;
+}
+.phone-screen-panel.active{display:block}
+.ph-h1{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.ph-h1 .t{font-weight:800;font-size:15px;letter-spacing:.02em}
+.back-btn{
+  background:var(--slate-800);border:1px solid var(--slate-650);color:var(--slate-200);
+  width:30px;height:30px;border-radius:8px;font-size:14px;cursor:pointer;
+}
+
+/* home screen */
+.ph-fleet-strip{display:flex;gap:6px;margin:10px 0 4px;flex-wrap:wrap}
+.ph-fleet-strip .chip{font-size:9px}
+.toast-durable{
+  display:flex;align-items:center;gap:7px;margin:10px 0;padding:7px 10px;
+  background:rgba(74,167,201,.09);border:1px solid rgba(74,167,201,.35);border-radius:7px;
+  font-family:var(--mono);font-size:9.5px;color:var(--cyan-lit);
+}
+
+/* session screen */
+.sum-list{list-style:none;display:flex;flex-direction:column;gap:7px;margin:10px 0 16px;padding:0}
+.sum-list li{
+  display:flex;gap:8px;font-size:12px;color:var(--slate-200);line-height:1.45;font-family:var(--sans-wide);
+}
+.sum-list li::before{content:"–";color:var(--slate-500);flex:none}
+.sum-list li b{color:var(--ink)}
+.sum-list li code{font-family:var(--mono);font-size:10.5px;background:var(--slate-800);border:1px solid var(--slate-650);border-radius:3px;padding:0 4px;color:var(--orange-hi)}
+
+.switcher{display:flex;gap:8px;margin-bottom:14px}
+.switcher .btn{flex:1;justify-content:center}
+
+.mode-card{
+  border-radius:9px;margin-bottom:10px;overflow:hidden;border:1px solid var(--slate-700);background:var(--slate-800);
+}
+.mode-card-head{
+  display:flex;align-items:center;gap:7px;padding:8px 11px;font-family:var(--mono);
+  font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+}
+.mode-card.approve .mode-card-head{background:repeating-linear-gradient(45deg,var(--orange) 0 8px,var(--orange-lo) 8px 16px);color:#1c0d02}
+.mode-card.reply .mode-card-head{background:var(--slate-750);color:var(--cyan-lit)}
+.mode-card.shell .mode-card-head{background:var(--slate-950);color:var(--slate-300)}
+.mode-card-body{padding:10px 11px 12px}
+.mode-card-hint{font-size:10.5px;color:var(--slate-400);margin-bottom:9px;line-height:1.5;font-family:var(--sans-wide)}
+.mode-card-hint code{font-family:var(--mono);color:var(--orange-hi);background:var(--slate-950);border-radius:3px;padding:0 4px}
+.approve-row{display:flex;gap:7px}
+.approve-row .btn{flex:1;justify-content:center;font-size:10.5px;padding:9px 4px}
+.btn-deny{background:var(--slate-750);border-color:var(--slate-600);color:var(--red-lit)}
+.btn-always{background:var(--slate-750);border-color:var(--slate-600);color:var(--slate-200)}
+.confirm-strip{
+  margin-top:9px;padding:8px 9px;border-radius:6px;background:rgba(221,74,65,.1);
+  border:1px solid rgba(221,74,65,.4);font-size:10.5px;color:#ffcbc6;display:none;
+  align-items:center;gap:8px;font-family:var(--sans-wide);
+}
+.confirm-strip.shown{display:flex}
+.confirm-strip .btn{font-size:10px;padding:5px 9px}
+.composer{
+  width:100%;background:var(--slate-950);border:1px solid var(--slate-650);border-radius:6px;
+  padding:8px 9px;color:var(--ink);font-family:var(--sans-wide);font-size:11.5px;resize:none;min-height:52px;
+}
+.composer::placeholder{color:var(--slate-500)}
+.shell-line{
+  display:flex;align-items:center;gap:7px;background:var(--slate-950);border:1px solid var(--slate-700);
+  border-radius:6px;padding:8px 10px;font-family:var(--mono);font-size:11px;color:var(--slate-200);
+}
+.shell-line .prompt{color:var(--orange-hi)}
+.shell-warn{font-family:var(--mono);font-size:9px;color:var(--slate-500);margin-top:6px}
+
+/* terminal screen */
+.term-well.phone{margin-top:8px}
+.term-well.phone .term-scroll{font-size:11px;line-height:1.62}
+
+/* browser screen */
+.pb-toolbar{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}
+.pb-urlbar{
+  flex:1;min-width:140px;background:var(--slate-950);border:1px solid var(--slate-650);border-radius:6px;
+  padding:7px 10px;font-family:var(--mono);font-size:10.5px;color:var(--slate-100);display:flex;align-items:center;gap:6px;
+}
+.pb-frame{
+  margin-top:10px;height:280px;border-radius:8px;overflow:hidden;position:relative;
+  border:1px solid var(--slate-700);background:var(--slate-950);
+}
+.pb-chips{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap}
+.pb-inspect{
+  margin-top:10px;padding:9px 10px;border-radius:7px;background:var(--slate-800);border:1px solid var(--slate-650);
+  font-family:var(--mono);font-size:10px;color:var(--slate-300);line-height:1.7;
+}
+.pb-inspect b{color:var(--ink)}
+
+/* evidence screen */
+.evi-item{
+  display:flex;gap:10px;padding:9px;border-radius:8px;background:var(--slate-800);
+  border:1px solid var(--slate-700);margin-bottom:9px;align-items:center;
+}
+.evi-thumb{
+  width:52px;height:44px;flex:none;border-radius:5px;
+  background:repeating-linear-gradient(115deg,#3a4650 0 6px,#333e47 6px 12px);
+  border:1px solid var(--slate-650);
+}
+.evi-body{flex:1;min-width:0}
+.evi-name{font-family:var(--mono);font-size:10.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.evi-meta{font-size:10px;color:var(--slate-400);margin-top:2px;font-family:var(--sans-wide)}
+
+/* rotation note + landscape split thumb */
+.rotation-note{
+  margin-top:16px;display:flex;align-items:center;gap:14px;
+  background:var(--slate-850);border:1px solid var(--slate-700);border-radius:10px;
+  padding:12px 16px;max-width:393px;width:100%;
+}
+.rot-icon{font-size:20px;flex:none;color:var(--slate-400)}
+.rot-text{font-size:11px;color:var(--slate-300);line-height:1.5;font-family:var(--sans-wide)}
+.rot-text b{color:var(--ink)}
+.split-thumb{
+  flex:none;width:96px;height:58px;border-radius:6px;border:1px solid var(--slate-600);
+  overflow:hidden;display:flex;background:var(--slate-950);
+}
+.split-thumb .st-browser{flex:1.15;background:linear-gradient(160deg,#e9ede9,#d8ddd6);position:relative}
+.split-thumb .st-browser::after{content:"";position:absolute;left:10%;top:22%;width:60%;height:38%;background:#1f6f4f;border-radius:2px;opacity:.85}
+.split-thumb .st-term{flex:1;background:var(--slate-950);position:relative}
+.split-thumb .st-term::after{content:"";position:absolute;left:12%;top:20%;width:64%;height:2px;background:var(--orange-hi)}
+.split-thumb .st-term::before{content:"";position:absolute;left:12%;top:36%;width:44%;height:2px;background:var(--slate-500)}
+.split-divider{width:2px;background:var(--slate-700)}
+
+/* corner tag */
+#corner-tag{
+  position:fixed;right:16px;bottom:16px;z-index:60;
+  background:var(--slate-850);border:1px solid var(--slate-650);border-radius:6px;
+  padding:6px 12px;box-shadow:0 6px 16px rgba(0,0,0,.4);
+  font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.18em;color:var(--slate-300);
+}
+#corner-tag b{color:var(--orange-hi)}
+
+/* ============================================================
+   SEND SHEET — page level, shared by both frames
+   ============================================================ */
+.sheet-overlay{
+  position:fixed;inset:0;z-index:100;display:flex;align-items:flex-end;justify-content:center;
+  background:rgba(8,10,12,.66);backdrop-filter:blur(2px);
+}
+.sheet-overlay.hidden{display:none}
+#sheet-send{
+  width:min(430px,100vw);max-height:88vh;overflow-y:auto;
+  background:var(--slate-850);border:1px solid var(--slate-650);border-top-left-radius:18px;border-top-right-radius:18px;
+  box-shadow:0 -20px 50px rgba(0,0,0,.5);padding:8px 0 0;
+}
+.sheet-grabber{width:44px;height:4px;border-radius:3px;background:var(--slate-600);margin:0 auto 10px}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;padding:0 18px 12px;border-bottom:1px solid var(--slate-750)}
+.sheet-head .t{font-weight:800;font-size:14px;letter-spacing:.04em}
+.sheet-x{
+  width:28px;height:28px;border-radius:8px;background:var(--slate-800);border:1px solid var(--slate-650);
+  color:var(--slate-300);font-size:13px;cursor:pointer;
+}
+.sheet-body{padding:14px 18px 6px}
+.sheet-row{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--slate-800)}
+.sheet-row .k{width:88px;flex:none;font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;color:var(--slate-400);text-transform:uppercase;padding-top:2px}
+.sheet-row .v{font-size:12px;color:var(--ink);font-family:var(--sans-wide);line-height:1.5}
+.sheet-thumb{width:64px;height:48px;border-radius:5px;flex:none;background:repeating-linear-gradient(115deg,#3a4650 0 6px,#333e47 6px 12px);border:1px solid var(--slate-650)}
+.sheet-note{
+  width:100%;background:var(--slate-950);border:1px solid var(--slate-650);border-radius:7px;
+  padding:9px 10px;color:var(--ink);font-family:var(--sans-wide);font-size:12px;min-height:56px;resize:none;
+}
+.sheet-note::placeholder{color:var(--slate-500)}
+.yaml-block{
+  margin-top:12px;background:var(--slate-950);border:1px solid var(--slate-700);border-radius:8px;
+  padding:11px 13px;overflow-x:auto;
+}
+.yaml-block pre{font-family:var(--mono);font-size:10.5px;line-height:1.65;color:#d9dfd0;white-space:pre}
+.yaml-block .yk{color:var(--orange-hi)}
+.yaml-block .yc{color:var(--slate-500)}
+.sheet-foot{
+  display:flex;gap:10px;padding:14px 18px 22px;position:sticky;bottom:0;
+  background:linear-gradient(180deg,transparent,var(--slate-850) 30%);
+}
+.sheet-foot .btn{flex:1;justify-content:center;padding:12px 0;font-size:12px}
+
+@media (prefers-reduced-motion:reduce){
+  .lamp-pulse,.blockcaret,.rcard.drop-active{animation:none !important}
+}
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <h1>Chromux Mobile — <b>Prototype G · Remote Workbench</b></h1>
+  <p>Tablet-first supervision desk for remote coding agents — durable SSH panes, safety-orange
+  interventions, evidence dragged straight into the agent that needs it. Collapses to a
+  phone-native stacked workspace below.</p>
+</div>
+
+<div class="stage">
+
+  <!-- ══════════════════════════ TABLET FRAME ══════════════════════════ -->
+  <section>
+    <div class="frame-label"><b>Tablet</b> — genuine workbench · 1194×834 · scaled to fit</div>
+    <div class="tablet-scale-box">
+      <div class="tablet-frame">
+        <span class="tablet-cam" aria-hidden="true"></span>
+        <div class="tablet-screen">
+
+          <!-- topbar -->
+          <header class="tb-topbar">
+            <div class="tb-brand">
+              <span class="tb-brandmark" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="13" height="13"><path d="M5 5 L19 12 L5 19" fill="none" stroke="#ff8c4d" stroke-width="2.6" stroke-linecap="square"/></svg>
+              </span>
+              <span class="tb-brandname">CHROM<b>UX</b></span>
+            </div>
+            <div class="tb-gauges">
+              <span class="tb-gauge urgent"><i class="lamp lamp-orange lamp-pulse"></i><b>3</b>&nbsp;need you</span>
+              <span class="tb-gauge"><i class="lamp lamp-cyan"></i><b>5</b>&nbsp;working</span>
+              <span class="tb-gauge"><i class="lamp lamp-green"></i><b>2</b>&nbsp;done</span>
+              <span class="tb-gauge"><i class="lamp lamp-red"></i><b>1</b>&nbsp;offline host</span>
+            </div>
+            <div class="tb-right">
+              <span class="tb-conn"><i class="lamp lamp-green"></i>home-mac · <b>SSH · 42ms</b></span>
+              <span class="chip chip-durable">⏻ durable — persists on disconnect</span>
+              <button class="btn btn-sm btn-ghost">⟳ Detect</button>
+            </div>
+          </header>
+
+          <!-- body: rail + main -->
+          <div class="tb-body">
+
+            <!-- left rail -->
+            <aside class="tb-rail">
+              <div class="tb-rail-scroll">
+                <div class="rail-attention">
+                  <div class="section-head">Needs you <span class="count">· 3</span></div>
+
+                  <div class="rcard k-approval drop-active" data-agent="checkout-flow">
+                    <span class="drop-flag">DROP HERE</span>
+                    <div class="rcard-bar"></div>
+                    <div class="rcard-body">
+                      <div class="rcard-top"><span class="tag tag-approval">Approval</span><span class="rcard-sess">checkout-flow <i>· claude</i></span></div>
+                      <div class="rcard-msg">wants to run <code>npm run db:migrate</code></div>
+                      <div class="rcard-meta">home-mac · fix/cta-overflow · 18m</div>
+                    </div>
+                  </div>
+
+                  <div class="rcard k-review">
+                    <div class="rcard-bar"></div>
+                    <div class="rcard-body">
+                      <div class="rcard-top"><span class="tag tag-review">Review</span><span class="rcard-sess">landing-page <i>· grok</i></span></div>
+                      <div class="rcard-msg">localhost:5173 changed — preview ready</div>
+                      <div class="rcard-meta">home-mac · 4 files changed · 2m ago</div>
+                    </div>
+                  </div>
+
+                  <div class="rcard k-exited">
+                    <div class="rcard-bar"></div>
+                    <div class="rcard-body">
+                      <div class="rcard-top"><span class="tag tag-exited">Exited</span><span class="rcard-sess">api-server <i>· codex</i></span></div>
+                      <div class="rcard-msg">exited (code 0)</div>
+                      <div class="rcard-meta">staging-2 · 12m ago</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="rail-host" data-host="home-mac">
+                  <div class="host-head">
+                    <span class="host-name">home-mac</span>
+                    <span class="host-chip"><i class="lamp lamp-green"></i>SSH · 42ms</span>
+                  </div>
+                  <div class="rcard k-working">
+                    <div class="rcard-bar"></div>
+                    <div class="rcard-body"><div class="rcard-top"><span class="rcard-sess">docs-site <i>· codex</i></span></div><div class="rcard-meta">writing changelog · 12m</div></div>
+                  </div>
+                  <div class="rcard k-working">
+                    <div class="rcard-bar"></div>
+                    <div class="rcard-body"><div class="rcard-top"><span class="rcard-sess">mobile-app <i>· grok</i></span></div><div class="rcard-meta">fixing lint errors · 8m</div></div>
+                  </div>
+                  <div class="rcard k-working">
+                    <div class="rcard-bar"></div>
+                    <div class="rcard-body"><div class="rcard-top"><span class="rcard-sess">analytics <i>· codex</i></span></div><div class="rcard-meta">silent 22m — long quiet period</div></div>
+                  </div>
+                  <div class="rcard k-done">
+                    <div class="rcard-bar"></div>
+                    <div class="rcard-body"><div class="rcard-top"><span class="tag tag-done">Done</span><span class="rcard-sess">search-index <i>· codex</i></span></div><div class="rcard-meta">tests pass · 1h ago</div></div>
+                  </div>
+                </div>
+
+                <div class="rail-host" data-host="staging-2">
+                  <div class="host-head">
+                    <span class="host-name">staging-2</span>
+                    <span class="host-chip"><i class="lamp lamp-green"></i>SSH · 118ms</span>
+                  </div>
+                  <div class="rcard k-working">
+                    <div class="rcard-bar"></div>
+                    <div class="rcard-body"><div class="rcard-top"><span class="rcard-sess">worker-queue <i>· claude</i></span></div><div class="rcard-meta">refactoring retry logic · 4m</div></div>
+                  </div>
+                  <div class="rcard k-working">
+                    <div class="rcard-bar"></div>
+                    <div class="rcard-body"><div class="rcard-top"><span class="rcard-sess">auth-service <i>· claude</i></span></div><div class="rcard-meta">running test suite · 1m</div></div>
+                  </div>
+                  <div class="rcard k-done">
+                    <div class="rcard-bar"></div>
+                    <div class="rcard-body"><div class="rcard-top"><span class="tag tag-done">Done</span><span class="rcard-sess">payments-api <i>· claude</i></span></div><div class="rcard-meta">3 files changed · 18m ago</div></div>
+                  </div>
+                </div>
+
+                <div class="rail-host offline" data-host="build-server">
+                  <div class="host-head">
+                    <span class="host-name">build-server</span>
+                    <span class="host-chip offline"><i class="lamp lamp-red"></i>relay · offline 26m</span>
+                  </div>
+                  <div class="rcard k-offline">
+                    <div class="rcard-bar"></div>
+                    <div class="rcard-body"><div class="rcard-top"><span class="tag tag-offline">Disconnected</span><span class="rcard-sess">ci-runner <i>· claude</i></span></div><div class="rcard-meta">host unreachable — session held</div></div>
+                  </div>
+                </div>
+              </div>
+              <span class="tb-rail-grip" title="Drag to resize"></span>
+            </aside>
+
+            <!-- main: browser (top) + terminal (bottom) -->
+            <div class="tb-main">
+
+              <section class="pane pane-browser">
+                <div class="pane-head">
+                  <span class="pane-title">◧ Browser — paired</span>
+                  <button class="expand-btn" title="Expand pane">⤢</button>
+                </div>
+                <div class="tb-caption"><span>inspection window — <b>element selected</b></span><span>auto-reload on</span></div>
+                <div class="pane-body" style="padding:8px 10px">
+                  <div class="btoolbar" style="margin-bottom:8px">
+                    <button class="btn btn-icon btn-ghost">◀</button>
+                    <button class="btn btn-icon btn-ghost">▶</button>
+                    <button class="btn btn-icon btn-ghost">⟳</button>
+                    <div class="urlbar"><i class="lamp lamp-green"></i>http://localhost:5173/checkout</div>
+                    <button class="pin-btn pinned" title="Pinned browser — stays paired to checkout-flow">📌 Pinned</button>
+                    <span class="chip">iPhone 15 · 393×852</span>
+                    <span class="chip">console: 0</span>
+                    <span class="chip chip-danger">net: 1 failed</span>
+                  </div>
+                  <div class="browser-stage" style="border-radius:7px;overflow:hidden;height:calc(100% - 42px)">
+                    <div class="webpage">
+                      <div class="wp-head"><div class="wp-logo">shop<span>/checkout</span></div><div class="wp-steps">cart &rsaquo; <b>payment</b> &rsaquo; done</div></div>
+                      <div class="wp-body">
+                        <div class="wp-card">
+                          <h3>Order summary</h3>
+                          <div class="wp-row"><span>Canvas Tote × 1</span><span>$38.00</span></div>
+                          <div class="wp-row muted"><span class="muted">Shipping</span><span class="muted">$10.00</span></div>
+                          <div class="wp-row total"><span>Total</span><span>$48.00</span></div>
+                          <button class="wp-cta inspected">Pay $48.00</button>
+                          <div class="inspect-badge">button.cta-pay · 412×88 · selected</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <div class="tb-grip-h" title="Drag to resize"></div>
+
+              <section class="pane pane-terminal">
+                <div class="pane-head">
+                  <span class="pane-title">▤ Terminal — claude</span>
+                  <span class="pane-cwd">~/projects/shop/checkout-flow</span>
+                  <button class="expand-btn" title="Expand pane">⤢</button>
+                </div>
+                <div class="pane-body">
+                  <div class="term-well" style="height:100%">
+                    <div class="term-scroll">
+                      <div><span class="t-orange">✻</span> <span class="t-dim">Welcome to Claude Code!</span>&nbsp;&nbsp;&nbsp;<span class="t-dim">~/projects/shop/checkout-flow</span></div>
+                      <div>&nbsp;</div>
+                      <div class="t-user"><span class="t-caret">&gt;</span> fix the CTA overflow on the checkout page</div>
+                      <div>&nbsp;</div>
+                      <div class="t-bullet"><span class="t-dot">●</span> I'll look at the checkout component styles.</div>
+                      <div class="t-bullet"><span class="t-dot">●</span> Read <span style="color:#fff">src/components/CheckoutCTA.tsx</span> <span class="t-dim">(84 lines)</span></div>
+                      <div class="t-bullet"><span class="t-dot">●</span> Edit <span style="color:#fff">src/styles/checkout.css</span></div>
+                      <div class="t-del">&nbsp;&nbsp;- .cta-row { width: 120%; }</div>
+                      <div class="t-add">&nbsp;&nbsp;+ .cta-row { width: 100%; max-width: 480px; }</div>
+                      <div class="t-ok">✔ Change applied — dev server reloaded</div>
+                      <div class="t-bullet"><span class="t-dot">●</span> The button no longer overflows. Preview updated.</div>
+                      <div class="t-bullet"><span class="t-dot">●</span> Next I need the new orders table locally.</div>
+                      <div class="approval-line">
+                        <div class="t-warn">⚠ APPROVAL REQUIRED</div>
+                        <div>&nbsp;&nbsp;npm run db:migrate</div>
+                        <div class="t-await"><span class="blockcaret"></span>waiting for your decision…</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="tb-activity">
+                  <span class="act-label">ACTIVITY</span>
+                  <span class="act-item"><i class="lamp lamp-cyan lamp-pulse"></i>worker-queue · retry logic</span>
+                  <span class="act-item"><i class="lamp lamp-cyan lamp-pulse"></i>auth-service · tests</span>
+                  <span class="act-item"><i class="lamp lamp-cyan lamp-pulse"></i>docs-site · changelog</span>
+                  <span class="act-item"><i class="lamp lamp-amber"></i>analytics · silent 22m</span>
+                </div>
+              </section>
+            </div>
+
+            <!-- signature interaction: evidence dragged toward rail -->
+            <div class="drag-ghost" aria-hidden="true">
+              <span class="trail"></span>
+              <div class="thumb"></div>
+              <div class="fname">2026-07-12-0912.png</div>
+            </div>
+            <div class="delivery-popover" role="status">
+              <div class="dp-label">Target</div>
+              <div class="dp-val">checkout-flow · claude</div>
+              <div class="dp-label">Attach</div>
+              <div class="dp-val">screenshot · 2026-07-12-0912.png</div>
+              <div class="dp-hint">↳ release to attach evidence</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════ PHONE FRAME ══════════════════════════ -->
+  <section>
+    <div class="frame-label"><b>Phone</b> — collapsed stacked workspace · 393×852</div>
+    <div class="phone-scale-box">
+      <div class="phone-frame">
+        <div class="phone-screen">
+          <span class="phone-notch" aria-hidden="true"></span>
+
+          <div class="statusbar-mobile">
+            <span>9:41</span>
+            <span class="sb-icons" aria-hidden="true">
+              <svg width="16" height="10" viewBox="0 0 16 10"><rect x="0" y="6" width="3" height="4" fill="#eaeef0"/><rect x="4.5" y="4" width="3" height="6" fill="#eaeef0"/><rect x="9" y="2" width="3" height="8" fill="#eaeef0"/><rect x="13.5" y="0" width="3" height="10" fill="#eaeef0"/></svg>
+              <svg width="14" height="10" viewBox="0 0 14 10"><path d="M7 9.4C3.5 9.4 1 7.2 0 5.6 1.9 2.4 4.3.6 7 .6s5.1 1.8 7 5C13 7.2 10.5 9.4 7 9.4Z" fill="#eaeef0"/></svg>
+              <svg width="23" height="11" viewBox="0 0 23 11"><rect x="0.5" y="0.5" width="19" height="10" rx="2.4" stroke="#eaeef0" fill="none"/><rect x="2" y="2" width="15" height="7" rx="1.2" fill="#eaeef0"/><rect x="20.5" y="3.2" width="2" height="4.5" rx="1" fill="#eaeef0"/></svg>
+            </span>
+          </div>
+
+          <div class="ph-conn">
+            <i class="lamp lamp-green"></i>
+            <span>home-mac · <b style="color:var(--ink)">SSH · 42ms</b></span>
+            <span class="durable-dot" title="Session persists on disconnect"></span>
+            <span>durable</span>
+          </div>
+
+          <div class="ph-body">
+
+            <!-- persistent mode rail -->
+            <nav class="mode-rail" aria-label="Workbench modes">
+              <button class="mode-btn active" data-mode="home" onclick="chromux.show('screen-home')">
+                <span class="glyph">🗂</span><span class="lbl">Agents</span>
+              </button>
+              <button class="mode-btn" data-mode="browser" onclick="chromux.show('screen-browser')">
+                <span class="glyph">◧</span><span class="lbl">Browser</span>
+              </button>
+              <button class="mode-btn" data-mode="terminal" onclick="chromux.show('screen-terminal')">
+                <span class="glyph">▤</span><span class="lbl">Term</span>
+              </button>
+              <button class="mode-btn" data-mode="evidence" onclick="chromux.show('screen-evidence')">
+                <span class="glyph">📸</span><span class="lbl">Evid</span>
+              </button>
+            </nav>
+
+            <!-- screens -->
+            <div class="phone-content">
+
+              <!-- HOME -->
+              <section id="screen-home" class="phone-screen-panel active">
+                <div class="ph-h1"><span class="t">Fleet</span></div>
+                <div class="ph-fleet-strip">
+                  <span class="chip"><i class="lamp lamp-orange"></i><b>3</b>&nbsp;need you</span>
+                  <span class="chip"><i class="lamp lamp-cyan"></i><b>5</b>&nbsp;working</span>
+                  <span class="chip"><i class="lamp lamp-green"></i><b>2</b>&nbsp;done</span>
+                  <span class="chip"><i class="lamp lamp-red"></i><b>1</b>&nbsp;offline</span>
+                </div>
+                <div class="toast-durable">⏻ durable sessions — checkout-flow keeps running if this phone disconnects</div>
+
+                <div class="section-head">Needs you <span class="count">· 3</span></div>
+                <div class="rcard k-approval" style="margin-bottom:8px" onclick="chromux.show('screen-session')">
+                  <div class="rcard-bar"></div>
+                  <div class="rcard-body">
+                    <div class="rcard-top"><span class="tag tag-approval">Approval</span><span class="rcard-sess">checkout-flow <i>· claude</i></span></div>
+                    <div class="rcard-msg">wants to run <code>npm run db:migrate</code></div>
+                    <div class="rcard-meta">home-mac · fix/cta-overflow · 18m</div>
+                  </div>
+                </div>
+                <div class="rcard k-review" style="margin-bottom:8px">
+                  <div class="rcard-bar"></div>
+                  <div class="rcard-body">
+                    <div class="rcard-top"><span class="tag tag-review">Review</span><span class="rcard-sess">landing-page <i>· grok</i></span></div>
+                    <div class="rcard-msg">localhost:5173 changed — preview ready</div>
+                    <div class="rcard-meta">home-mac · 4 files changed · 2m ago</div>
+                  </div>
+                </div>
+                <div class="rcard k-exited" style="margin-bottom:4px">
+                  <div class="rcard-bar"></div>
+                  <div class="rcard-body">
+                    <div class="rcard-top"><span class="tag tag-exited">Exited</span><span class="rcard-sess">api-server <i>· codex</i></span></div>
+                    <div class="rcard-msg">exited (code 0)</div>
+                    <div class="rcard-meta">staging-2 · 12m ago</div>
+                  </div>
+                </div>
+
+                <div class="section-head">Working <span class="count">· 5</span></div>
+                <div class="rcard k-working" style="margin-bottom:7px"><div class="rcard-bar"></div><div class="rcard-body"><div class="rcard-top"><span class="rcard-sess">worker-queue <i>· claude</i></span></div><div class="rcard-meta">staging-2 · refactoring retry logic · 4m</div></div></div>
+                <div class="rcard k-working" style="margin-bottom:7px"><div class="rcard-bar"></div><div class="rcard-body"><div class="rcard-top"><span class="rcard-sess">docs-site <i>· codex</i></span></div><div class="rcard-meta">home-mac · writing changelog · 12m</div></div></div>
+                <div class="rcard k-working" style="margin-bottom:7px"><div class="rcard-bar"></div><div class="rcard-body"><div class="rcard-top"><span class="rcard-sess">auth-service <i>· claude</i></span></div><div class="rcard-meta">staging-2 · running test suite · 1m</div></div></div>
+                <div class="rcard k-working" style="margin-bottom:7px"><div class="rcard-bar"></div><div class="rcard-body"><div class="rcard-top"><span class="rcard-sess">mobile-app <i>· grok</i></span></div><div class="rcard-meta">home-mac · fixing lint errors · 8m</div></div></div>
+                <div class="rcard k-working" style="margin-bottom:4px"><div class="rcard-bar"></div><div class="rcard-body"><div class="rcard-top"><span class="rcard-sess">analytics <i>· codex</i></span></div><div class="rcard-meta">home-mac · silent 22m — long quiet period</div></div></div>
+
+                <div class="section-head">Completed <span class="count">· 2</span></div>
+                <div class="rcard k-done" style="margin-bottom:7px"><div class="rcard-bar"></div><div class="rcard-body"><div class="rcard-top"><span class="tag tag-done">Done</span><span class="rcard-sess">payments-api <i>· claude</i></span></div><div class="rcard-meta">staging-2 · 3 files changed · 18m ago</div></div></div>
+                <div class="rcard k-done" style="margin-bottom:4px"><div class="rcard-bar"></div><div class="rcard-body"><div class="rcard-top"><span class="tag tag-done">Done</span><span class="rcard-sess">search-index <i>· codex</i></span></div><div class="rcard-meta">home-mac · tests pass · 1h ago</div></div></div>
+
+                <div class="section-head">Offline host <span class="count">· 1</span></div>
+                <div class="rcard k-offline"><div class="rcard-bar"></div><div class="rcard-body"><div class="rcard-top"><span class="tag tag-offline">Disconnected</span><span class="rcard-sess">ci-runner <i>· claude</i></span></div><div class="rcard-meta">build-server · relay offline 26m</div></div></div>
+              </section>
+
+              <!-- SESSION -->
+              <section id="screen-session" class="phone-screen-panel">
+                <div class="ph-h1">
+                  <button class="back-btn" onclick="chromux.show('screen-home')" aria-label="Back to fleet">←</button>
+                  <span class="t">checkout-flow</span>
+                  <span style="width:30px"></span>
+                </div>
+                <div class="rcard-meta" style="margin:2px 0 12px">claude · home-mac · SSH · 42ms · branch fix/cta-overflow · elapsed 18m</div>
+
+                <ul class="sum-list">
+                  <li>Fixed CTA overflow in <code>checkout.css</code></li>
+                  <li>Dev server reloaded — preview updated</li>
+                  <li><b>Wants to run <code>npm run db:migrate</code></b> — waiting 6m</li>
+                </ul>
+
+                <div class="switcher">
+                  <button class="btn btn-ghost" onclick="chromux.show('screen-terminal')">▤ View terminal</button>
+                  <button class="btn btn-ghost" onclick="chromux.show('screen-browser')">◧ View browser</button>
+                </div>
+
+                <div class="mode-card approve">
+                  <div class="mode-card-head">⚠ Tool call approval</div>
+                  <div class="mode-card-body">
+                    <div class="mode-card-hint">claude wants to run <code>npm run db:migrate</code> on home-mac. This modifies the database.</div>
+                    <div class="approve-row">
+                      <button class="btn btn-orange" onclick="chromux.confirmApprove()">Approve</button>
+                      <button class="btn btn-deny">Deny</button>
+                      <button class="btn btn-always">Always allow</button>
+                    </div>
+                    <div class="confirm-strip" id="approve-confirm">
+                      <span>Confirm — run migration on home-mac now?</span>
+                      <button class="btn btn-orange btn-sm" onclick="chromux.hideConfirm()">Confirm run</button>
+                      <button class="btn btn-ghost btn-sm" onclick="chromux.hideConfirm()">Back</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="mode-card reply">
+                  <div class="mode-card-head">💬 Message to agent</div>
+                  <div class="mode-card-body">
+                    <div class="mode-card-hint">Reply in plain language — claude reasons about it, does not execute it directly.</div>
+                    <textarea class="composer" placeholder="e.g. hold off on the migration until I check staging"></textarea>
+                  </div>
+                </div>
+
+                <div class="mode-card shell">
+                  <div class="mode-card-head">&gt;_ Raw shell</div>
+                  <div class="mode-card-body">
+                    <div class="mode-card-hint">Types directly into the remote shell on home-mac — bypasses the agent entirely.</div>
+                    <div class="shell-line"><span class="prompt">home-mac&gt;</span><span style="color:var(--slate-500)">type a command…</span></div>
+                    <div class="shell-warn">Destructive commands ask for confirmation before they run.</div>
+                  </div>
+                </div>
+              </section>
+
+              <!-- TERMINAL -->
+              <section id="screen-terminal" class="phone-screen-panel">
+                <div class="ph-h1">
+                  <button class="back-btn" onclick="chromux.show('screen-session')" aria-label="Back to session">←</button>
+                  <span class="t">Terminal</span>
+                  <span style="width:30px"></span>
+                </div>
+                <div class="rcard-meta" style="margin:2px 0 4px">claude · ~/projects/shop/checkout-flow</div>
+                <div class="term-well phone">
+                  <div class="term-scroll">
+                    <div><span class="t-orange">✻</span> <span class="t-dim">Welcome to Claude Code!</span></div>
+                    <div class="t-dim">~/projects/shop/checkout-flow</div>
+                    <div>&nbsp;</div>
+                    <div class="t-user"><span class="t-caret">&gt;</span> fix the CTA overflow on the checkout page</div>
+                    <div>&nbsp;</div>
+                    <div class="t-bullet"><span class="t-dot">●</span> I'll look at the checkout component styles.</div>
+                    <div class="t-bullet"><span class="t-dot">●</span> Read CheckoutCTA.tsx <span class="t-dim">(84 lines)</span></div>
+                    <div class="t-bullet"><span class="t-dot">●</span> Edit src/styles/checkout.css</div>
+                    <div class="t-del">&nbsp;- .cta-row { width: 120%; }</div>
+                    <div class="t-add">&nbsp;+ .cta-row { width: 100%; max-width: 480px; }</div>
+                    <div class="t-ok">✔ Change applied — dev server reloaded</div>
+                    <div class="t-bullet"><span class="t-dot">●</span> The button no longer overflows.</div>
+                    <div class="t-bullet"><span class="t-dot">●</span> Next I need the new orders table locally.</div>
+                    <div class="approval-line">
+                      <div class="t-warn">⚠ APPROVAL REQUIRED</div>
+                      <div>&nbsp;npm run db:migrate</div>
+                      <div class="t-await"><span class="blockcaret"></span>waiting for your decision…</div>
+                    </div>
+                  </div>
+                </div>
+                <div class="shell-line" style="margin-top:10px"><span class="prompt">home-mac&gt;</span><span style="color:var(--slate-500)">type into shell…</span></div>
+              </section>
+
+              <!-- BROWSER -->
+              <section id="screen-browser" class="phone-screen-panel">
+                <div class="ph-h1">
+                  <button class="back-btn" onclick="chromux.show('screen-session')" aria-label="Back to session">←</button>
+                  <span class="t">Browser</span>
+                  <span style="width:30px"></span>
+                </div>
+                <div class="pb-toolbar">
+                  <button class="btn btn-icon btn-ghost">◀</button>
+                  <button class="btn btn-icon btn-ghost">▶</button>
+                  <button class="btn btn-icon btn-ghost">⟳</button>
+                  <div class="pb-urlbar"><i class="lamp lamp-green"></i>localhost:5173/checkout</div>
+                  <button class="pin-btn pinned">📌</button>
+                </div>
+                <div class="pb-frame">
+                  <div class="webpage">
+                    <div class="wp-head"><div class="wp-logo">shop<span>/checkout</span></div><div class="wp-steps">cart &rsaquo; <b>payment</b></div></div>
+                    <div class="wp-body">
+                      <div class="wp-card" style="width:230px">
+                        <h3>Order summary</h3>
+                        <div class="wp-row"><span>Canvas Tote × 1</span><span>$38.00</span></div>
+                        <div class="wp-row muted"><span class="muted">Shipping</span><span class="muted">$10.00</span></div>
+                        <div class="wp-row total"><span>Total</span><span>$48.00</span></div>
+                        <button class="wp-cta inspected">Pay $48.00</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="pb-chips">
+                  <span class="chip">iPhone 15 · 393×852</span>
+                  <span class="chip">console: 0</span>
+                  <span class="chip chip-danger">net: 1 failed</span>
+                </div>
+                <div class="pb-inspect">
+                  <b>Selected</b> button.cta-pay<br>
+                  <b>Name</b> "Pay $48.00"<br>
+                  <b>Box</b> 412×88<br>
+                  <b>Error</b> POST /api/telemetry · 503
+                </div>
+                <div class="switcher" style="margin-top:12px">
+                  <button class="btn btn-ghost">Tap</button>
+                  <button class="btn btn-ghost">Type</button>
+                  <button class="btn btn-ghost">Screenshot</button>
+                  <button class="btn btn-orange" onclick="chromux.openSheet()">Send</button>
+                </div>
+              </section>
+
+              <!-- EVIDENCE -->
+              <section id="screen-evidence" class="phone-screen-panel">
+                <div class="ph-h1">
+                  <button class="back-btn" onclick="chromux.show('screen-home')" aria-label="Back to fleet">←</button>
+                  <span class="t">Evidence</span>
+                  <span style="width:30px"></span>
+                </div>
+                <div class="rcard-meta" style="margin:2px 0 12px">3 items · newest first · checkout-flow</div>
+
+                <div class="evi-item">
+                  <div class="evi-thumb"></div>
+                  <div class="evi-body">
+                    <div class="evi-name">2026-07-12-0912.png</div>
+                    <div class="evi-meta">Screenshot · checkout CTA after fix · 2m ago</div>
+                  </div>
+                  <button class="btn btn-orange btn-sm" onclick="chromux.openSheet()">Send</button>
+                </div>
+                <div class="evi-item">
+                  <div class="evi-thumb"></div>
+                  <div class="evi-body">
+                    <div class="evi-name">checkout-tap-flow.webm</div>
+                    <div class="evi-meta">Recording · 0:14 · 3 taps · 1 console error · iPhone 15</div>
+                  </div>
+                  <button class="btn btn-ghost btn-sm" onclick="chromux.openSheet()">Send</button>
+                </div>
+                <div class="evi-item">
+                  <div class="evi-thumb"></div>
+                  <div class="evi-body">
+                    <div class="evi-name">button.cta-pay</div>
+                    <div class="evi-meta">Element capture · "Pay $48.00" · 412×88 · 11m ago</div>
+                  </div>
+                  <button class="btn btn-ghost btn-sm" onclick="chromux.openSheet()">Send</button>
+                </div>
+              </section>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rotation-note">
+      <span class="rot-icon" aria-hidden="true">⤾</span>
+      <div class="rot-text"><b>Rotate to landscape</b> — the terminal and browser modes temporarily split side-by-side, like the tablet workbench, until you rotate back.</div>
+      <div class="split-thumb" aria-hidden="true">
+        <div class="st-browser"></div>
+        <div class="split-divider"></div>
+        <div class="st-term"></div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<div id="corner-tag">PROTOTYPE <b>G</b> — REMOTE WORKBENCH</div>
+
+<!-- ══════════════════════════ SEND SHEET ══════════════════════════ -->
+<div class="sheet-overlay hidden" id="sheet-send-overlay">
+  <div id="sheet-send" role="dialog" aria-modal="true" aria-label="Send evidence to agent">
+    <div class="sheet-grabber" aria-hidden="true"></div>
+    <div class="sheet-head">
+      <span class="t">Send to agent</span>
+      <button class="sheet-x" onclick="chromux.closeSheet()" aria-label="Close">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="sheet-row"><span class="k">Target</span><span class="v"><b>checkout-flow</b> · claude @ home-mac</span></div>
+      <div class="sheet-row">
+        <span class="k">Attach</span>
+        <span class="v" style="display:flex;gap:10px;align-items:center">
+          <span class="sheet-thumb" aria-hidden="true"></span>
+          <span>2026-07-12-0912.png<br><span style="color:var(--slate-400);font-family:var(--mono);font-size:10px">localhost:5173/checkout · 393×852</span></span>
+        </span>
+      </div>
+      <div class="sheet-row" style="flex-direction:column;align-items:stretch;gap:7px">
+        <span class="k">Note</span>
+        <textarea class="sheet-note" placeholder="e.g. the CTA still clips at 320px — check small viewports"></textarea>
+      </div>
+      <div class="yaml-block">
+        <pre><span class="yk">chromux_capture:</span> v1
+<span class="yk">session:</span> checkout-flow
+<span class="yk">agent:</span> claude
+<span class="yk">host:</span> home-mac
+<span class="yk">url:</span> http://localhost:5173/checkout
+<span class="yk">viewport:</span> 393x852
+<span class="yk">note:</span> CTA verified after fix
+<span class="yk">screenshot:</span> ~/.chromux/captures/2026-07-12-0912.png
+<span class="yk">console_errors:</span> []
+<span class="yk">network_failures:</span>
+  <span class="yc">-</span> POST /api/telemetry (503)</pre>
+      </div>
+    </div>
+    <div class="sheet-foot">
+      <button class="btn btn-ghost" onclick="chromux.closeSheet()">Cancel</button>
+      <button class="btn btn-orange" onclick="chromux.closeSheet()">Send — claude</button>
+    </div>
+  </div>
+</div>
+
+<script>
+window.chromux = (function(){
+  var panels = null, modeBtns = null, overlay = null, confirmStrip = null;
+
+  function init(){
+    panels = document.querySelectorAll('.phone-screen-panel');
+    modeBtns = document.querySelectorAll('.mode-btn');
+    overlay = document.getElementById('sheet-send-overlay');
+    confirmStrip = document.getElementById('approve-confirm');
+    document.addEventListener('keydown', function(e){
+      if (e.key === 'Escape') closeSheet();
+    });
+    overlay.addEventListener('click', function(e){
+      if (e.target === overlay) closeSheet();
+    });
+  }
+
+  var modeForScreen = {
+    'screen-home':'home', 'screen-session':'home',
+    'screen-terminal':'terminal', 'screen-browser':'browser',
+    'screen-evidence':'evidence'
+  };
+
+  function show(id){
+    panels.forEach(function(p){ p.classList.toggle('active', p.id === id); });
+    var mode = modeForScreen[id] || 'home';
+    modeBtns.forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-mode') === mode); });
+    var content = document.querySelector('.phone-content');
+    if (content) content.scrollTop = 0;
+  }
+
+  function openSheet(){ overlay.classList.remove('hidden'); }
+  function closeSheet(){ overlay.classList.add('hidden'); }
+
+  function confirmApprove(){ confirmStrip.classList.add('shown'); }
+  function hideConfirm(){ confirmStrip.classList.remove('shown'); }
+
+  init();
+  return { show:show, openSheet:openSheet, closeSheet:closeSheet, confirmApprove:confirmApprove, hideConfirm:hideConfirm };
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Chromux Mobile — Deck of Agents</title>
+<style>
+/* ================================================================
+   CHROMUX MOBILE — PROTOTYPE E — DECK OF AGENTS
+   tactile one-handed neubrutalism: dark outlines, saturated
+   per-session colors, large state labels, hard offset shadows,
+   minimal tiny text.
+   ================================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+:root{
+  --ink:#14110D;
+  --paper:#FFF8EC;
+  --paper-dim:#F3EAD8;
+  --bg-outer:#F0E2C4;
+  --red:#FF4433;
+  --blue:#2F6FFF;
+  --gray:#8A8074;
+  --violet:#7C4DFF;
+  --teal:#00B4A2;
+  --pink:#FF3D9A;
+  --amber:#FFB300;
+  --lime:#8DC63F;
+  --green:#16C172;
+  --slate:#565A63;
+  --disp:'Anton','Futura','Avenir Next Condensed','Impact',sans-serif;
+  --grot:'Space Grotesk','Avenir Next','Futura',system-ui,sans-serif;
+  --mono:'SF Mono',Menlo,Monaco,Consolas,monospace;
+}
+
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;}
+body{
+  min-height:100vh;
+  background:
+    radial-gradient(rgba(20,17,13,.10) 1.4px, transparent 1.5px) 0 0/24px 24px,
+    var(--bg-outer);
+  color:var(--ink);
+  font-family:var(--grot);
+  display:flex;align-items:center;justify-content:center;
+  padding:44px 20px;
+  overflow-x:hidden;
+}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;-webkit-appearance:none;}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--blue);outline-offset:2px;}
+::selection{background:var(--ink);color:var(--paper);}
+
+/* ---------- state color tokens ---------- */
+.st-approval{--c:var(--red);}
+.st-review{--c:var(--blue);}
+.st-exited{--c:var(--gray);}
+.st-work1{--c:var(--violet);}
+.st-work2{--c:var(--teal);}
+.st-work3{--c:var(--pink);}
+.st-work4{--c:var(--amber);}
+.st-work5{--c:var(--lime);}
+.st-done{--c:var(--green);}
+.st-offline{--c:var(--slate);}
+
+/* ================= PHONE FRAME ================= */
+.phone{
+  position:relative;
+  width:393px;height:852px;flex:0 0 auto;
+  background:var(--paper);
+  border:10px solid var(--ink);
+  border-radius:56px;
+  box-shadow:14px 14px 0 rgba(20,17,13,.85), 0 40px 70px rgba(0,0,0,.35);
+  overflow:hidden;
+  display:flex;flex-direction:column;
+}
+.dynamic-island{
+  position:absolute;top:14px;left:50%;transform:translateX(-50%);
+  width:110px;height:28px;background:var(--ink);border-radius:20px;z-index:80;
+}
+
+/* ---------- status bar ---------- */
+.statusbar{
+  flex:0 0 46px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 28px 0 30px;font-weight:700;font-size:15px;letter-spacing:.01em;
+  position:relative;z-index:60;
+}
+.statusbar .icons{display:flex;align-items:center;gap:5px;}
+.icon-battery{display:flex;align-items:center;gap:2px;}
+.icon-battery .shell{width:23px;height:12px;border:1.6px solid var(--ink);border-radius:3px;position:relative;padding:1.5px;}
+.icon-battery .shell::after{content:'';position:absolute;right:-4px;top:3.5px;width:2.5px;height:5px;background:var(--ink);border-radius:0 2px 2px 0;}
+.icon-battery .fill{background:var(--ink);height:100%;width:80%;border-radius:1px;}
+
+/* ================= SCREENS ================= */
+.screens{flex:1;position:relative;min-height:0;}
+.screen{position:absolute;inset:0;display:none;flex-direction:column;background:var(--paper);}
+.screen.active{display:flex;}
+
+/* ---------- home / deck header ---------- */
+.home-header{flex:0 0 auto;padding:6px 18px 10px;display:flex;flex-direction:column;gap:10px;}
+.home-brand{display:flex;align-items:center;justify-content:space-between;}
+.home-wordmark{font-family:var(--disp);font-size:20px;letter-spacing:.02em;}
+.home-wordmark small{display:block;font-family:var(--mono);font-size:8px;font-weight:700;letter-spacing:.18em;opacity:.6;margin-top:-2px;}
+.durable-badge{
+  display:flex;align-items:center;gap:5px;
+  border:2.5px solid var(--ink);border-radius:20px;
+  padding:4px 9px;font-family:var(--mono);font-size:8.5px;font-weight:800;
+  background:var(--ink);color:var(--paper);letter-spacing:.04em;
+}
+.durable-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--lime);animation:pulse 1.8s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.4;transform:scale(1.4);}}
+
+.fleet-chips{display:flex;gap:6px;flex-wrap:wrap;}
+.fleet-chip{
+  border:2.5px solid var(--ink);border-radius:20px;
+  padding:3px 10px 3px 8px;font-family:var(--mono);font-size:9.5px;font-weight:800;
+  box-shadow:3px 3px 0 var(--ink);background:var(--paper);display:flex;align-items:center;gap:4px;
+}
+.fleet-chip b{font-family:var(--disp);font-size:13px;}
+.fleet-chip.attn{background:var(--red);color:#fff;}
+.fleet-chip.done{background:var(--green);}
+.fleet-chip.off{background:var(--slate);color:#fff;}
+
+/* ---------- deck stage ---------- */
+.deck-stage{
+  flex:1;position:relative;display:flex;align-items:center;justify-content:center;
+  overflow:hidden;padding:0 6px;min-height:0;
+}
+.deck-cards{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;}
+.card{
+  position:absolute;width:236px;min-height:330px;
+  background:var(--paper);border:4px solid var(--ink);border-radius:20px;
+  padding:20px 17px 16px;display:flex;flex-direction:column;gap:10px;
+}
+.card.peek{width:210px;min-height:320px;opacity:.5;filter:saturate(.65);pointer-events:none;box-shadow:6px 6px 0 var(--ink);}
+.peek-left{transform:translateX(-158px) scale(.85) rotate(-6deg);}
+.peek-right{transform:translateX(158px) scale(.85) rotate(6deg);}
+.card.center{
+  width:258px;min-height:392px;z-index:10;box-shadow:11px 11px 0 var(--ink);
+  cursor:pointer;transition:transform .1s ease, box-shadow .1s ease;
+}
+.card.center:hover{transform:translate(-2px,-2px);box-shadow:13px 13px 0 var(--ink);}
+.card.center:active{transform:translate(5px,5px);box-shadow:4px 4px 0 var(--ink);}
+.card .card-edge{display:none;}
+.card.attn .card-edge{
+  display:block;position:absolute;top:-16px;left:16px;right:16px;height:22px;
+  background:var(--c);border:4px solid var(--ink);border-bottom:none;
+  border-radius:10px 10px 0 0;
+}
+.card-top{display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:9.5px;font-weight:800;text-transform:uppercase;opacity:.65;}
+.card-state{
+  align-self:flex-start;background:var(--c);color:var(--ink);
+  border:3px solid var(--ink);box-shadow:5px 5px 0 var(--ink);
+  padding:5px 11px;font-family:var(--disp);font-size:29px;line-height:.92;
+  text-transform:uppercase;letter-spacing:.01em;
+}
+.card.peek .card-state{font-size:18px;padding:3px 8px;box-shadow:3px 3px 0 var(--ink);}
+.card-name{font-family:var(--grot);font-weight:700;font-size:16px;}
+.card-meta{font-family:var(--mono);font-size:10.5px;opacity:.75;line-height:1.4;}
+.card-acts{margin-top:auto;display:flex;flex-direction:column;gap:9px;}
+.card-acts .ca{
+  border:3px solid var(--ink);border-radius:11px;padding:11px 13px;
+  font-family:var(--disp);font-size:16px;text-transform:uppercase;letter-spacing:.02em;
+  background:var(--paper);box-shadow:4px 4px 0 var(--ink);color:var(--ink);
+  display:flex;justify-content:space-between;align-items:center;text-align:left;cursor:pointer;
+}
+.card-acts .ca small{font-family:var(--mono);font-size:7.5px;font-weight:800;letter-spacing:.08em;opacity:.6;}
+.card-acts .ca.primary{background:var(--c);}
+.card-acts .ca:active{transform:translate(2px,2px);box-shadow:2px 2px 0 var(--ink);}
+.card-tap{margin-top:2px;font-family:var(--mono);font-size:9px;font-weight:800;letter-spacing:.1em;text-align:right;opacity:.55;}
+
+.deck-nav{
+  position:absolute;top:50%;transform:translateY(-50%);
+  width:36px;height:36px;border:3px solid var(--ink);border-radius:50%;
+  background:var(--paper);font-size:16px;font-weight:900;box-shadow:3px 3px 0 var(--ink);
+  z-index:20;display:flex;align-items:center;justify-content:center;
+}
+.deck-nav:active{transform:translateY(-50%) translate(2px,2px);box-shadow:1px 1px 0 var(--ink);}
+.deck-nav.prev{left:0;}
+.deck-nav.next{right:0;}
+
+.deck-indicator{
+  flex:0 0 auto;display:flex;justify-content:center;align-items:center;gap:4px;
+  padding:8px 20px 18px;flex-wrap:wrap;
+}
+.tick{width:8px;height:8px;border:2px solid var(--ink);border-radius:2px;background:var(--paper);}
+.tick.active{background:var(--c);width:20px;border-radius:4px;}
+
+/* ================= SESSION / TERMINAL / BROWSER / EVIDENCE SHELL ================= */
+.chromux-strip{
+  flex:0 0 36px;display:flex;align-items:center;gap:8px;padding:0 12px;
+  border-bottom:3px solid var(--ink);font-family:var(--mono);font-size:9.5px;
+  font-weight:800;overflow-x:auto;white-space:nowrap;
+}
+.back-deck{
+  border:2.5px solid var(--ink);border-radius:7px;padding:3px 8px;
+  font-family:var(--mono);font-size:9.5px;font-weight:800;background:var(--paper);
+  box-shadow:2px 2px 0 var(--ink);flex:0 0 auto;
+}
+.back-deck:active{transform:translate(1px,1px);box-shadow:0 0 0 var(--ink);}
+.strip-sep{width:2px;height:12px;background:var(--ink);opacity:.25;flex:0 0 auto;}
+.strip-host{opacity:.85;}
+.strip-live{display:flex;align-items:center;gap:4px;color:var(--violet);}
+.strip-live .dot{width:6px;height:6px;border-radius:50%;background:var(--violet);animation:pulse 1.4s ease-in-out infinite;}
+.strip-durable{margin-left:auto;background:var(--ink);color:var(--paper);padding:2px 8px;border-radius:12px;flex:0 0 auto;letter-spacing:.03em;}
+
+.body-row{flex:1;display:flex;min-height:0;}
+.body-scroll{flex:1;min-width:0;overflow-y:auto;padding:14px 14px 12px;}
+.rail{
+  flex:0 0 46px;display:flex;flex-direction:column;align-items:center;gap:9px;
+  padding:14px 4px;border-left:3px solid var(--ink);background:var(--paper-dim);
+}
+.rail-btn{
+  width:36px;height:36px;border:2.5px solid var(--ink);border-radius:9px;
+  background:var(--paper);display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:1px;font-family:var(--disp);font-size:12px;box-shadow:3px 3px 0 var(--ink);
+}
+.rail-btn span{font-family:var(--mono);font-size:5.6px;font-weight:800;letter-spacing:.04em;}
+.rail-btn.active{background:var(--ink);color:var(--paper);}
+.rail-btn:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--ink);}
+
+.control-third{
+  flex:0 0 auto;min-height:246px;border-top:4px solid var(--ink);
+  padding:12px 14px 18px;display:flex;flex-direction:column;gap:9px;background:var(--paper);
+}
+.ct-label{font-family:var(--mono);font-size:8.5px;font-weight:800;letter-spacing:.14em;opacity:.55;text-transform:uppercase;}
+
+/* ---------- session summary body ---------- */
+.session-head{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;}
+.session-state-chip{
+  align-self:flex-start;font-family:var(--disp);font-size:12px;letter-spacing:.03em;
+  background:var(--red);color:#fff;border:2.5px solid var(--ink);border-radius:6px;
+  padding:3px 9px;box-shadow:3px 3px 0 var(--ink);
+}
+.session-name{font-family:var(--grot);font-weight:700;font-size:19px;}
+.session-name .agent-tag{font-family:var(--mono);font-size:11px;font-weight:600;opacity:.6;}
+.session-sub{font-family:var(--mono);font-size:9.5px;opacity:.65;line-height:1.5;}
+.summary-list{display:flex;flex-direction:column;gap:8px;}
+.sum-item{
+  border:2.5px solid var(--ink);border-radius:10px;padding:9px 11px;font-size:12.5px;line-height:1.4;
+  background:var(--paper);box-shadow:3px 3px 0 var(--ink);
+}
+.sum-item code{font-family:var(--mono);font-size:11px;background:var(--paper-dim);border:1.5px solid var(--ink);border-radius:4px;padding:0 4px;}
+.sum-item.urgent{background:#FFE7E2;border-width:3px;}
+
+/* ---------- mode tabs (intervention safety) ---------- */
+.mode-tabs{display:flex;gap:6px;}
+.mode-tab{
+  flex:1;padding:8px 4px;border:3px solid var(--ink);border-radius:9px;
+  font-family:var(--mono);font-weight:800;font-size:10px;letter-spacing:.03em;
+  background:var(--paper);box-shadow:3px 3px 0 var(--ink);text-transform:uppercase;
+}
+.mode-tab:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--ink);}
+.mode-tab[data-mode="tool"].active{background:var(--red);color:#fff;}
+.mode-tab[data-mode="reply"].active{background:var(--blue);color:#fff;}
+.mode-tab[data-mode="shell"].active{background:var(--ink);color:var(--paper);}
+
+.mode-panel{display:none;flex-direction:column;gap:8px;flex:1;min-height:0;}
+.mode-panel.active{display:flex;}
+
+.tool-call-box{border:3px dashed var(--ink);border-radius:10px;padding:9px 11px;background:#FFF0E0;}
+.tool-call-label{font-family:var(--mono);font-size:8.5px;font-weight:800;text-transform:uppercase;opacity:.65;}
+.tool-call-cmd{display:block;margin-top:3px;font-family:var(--mono);font-size:14px;font-weight:800;}
+.tool-btns{display:flex;gap:9px;}
+.btn-approve,.btn-deny{
+  flex:1;padding:14px 0;border:4px solid var(--ink);border-radius:12px;
+  font-family:var(--disp);font-size:16px;letter-spacing:.02em;box-shadow:5px 5px 0 var(--ink);
+}
+.btn-approve{background:var(--green);color:#06331d;}
+.btn-deny{background:var(--red);color:#fff;}
+.btn-approve:active,.btn-deny:active{transform:translate(3px,3px);box-shadow:2px 2px 0 var(--ink);}
+.btn-always{
+  padding:8px;border:2.5px solid var(--ink);border-radius:8px;background:var(--paper);
+  font-family:var(--mono);font-size:9.5px;font-weight:800;text-align:center;
+}
+.confirm-row{
+  display:none;flex-direction:column;gap:7px;border:3px solid var(--ink);border-radius:10px;
+  padding:9px;background:#FFE1D4;
+}
+.confirm-row.show{display:flex;}
+.confirm-row .cr-txt{font-family:var(--mono);font-size:10px;font-weight:800;}
+.confirm-row .cr-btns{display:flex;gap:8px;}
+.btn-confirm-yes,.btn-confirm-cancel{
+  flex:1;padding:8px;border:3px solid var(--ink);border-radius:8px;font-weight:800;
+  font-family:var(--mono);font-size:10px;
+}
+.btn-confirm-yes{background:var(--red);color:#fff;}
+.btn-confirm-cancel{background:var(--paper);}
+
+.reply-textarea{
+  flex:1;min-height:66px;border:3px solid var(--ink);border-radius:10px;padding:9px;
+  font-family:var(--grot);font-size:12px;resize:none;background:var(--paper);
+}
+.reply-row{display:flex;gap:8px;}
+.btn-hold-speak,.btn-send-reply{
+  flex:1;padding:11px;border:3px solid var(--ink);border-radius:10px;
+  font-family:var(--mono);font-weight:800;font-size:9.5px;box-shadow:4px 4px 0 var(--ink);
+  display:flex;align-items:center;justify-content:center;gap:5px;
+}
+.btn-hold-speak{background:var(--violet);color:#fff;}
+.btn-send-reply{background:var(--ink);color:var(--paper);}
+.btn-hold-speak:active,.btn-send-reply:active{transform:translate(2px,2px);box-shadow:2px 2px 0 var(--ink);}
+.mic-ring{width:8px;height:8px;border-radius:50%;background:#fff;flex:0 0 auto;}
+
+.shell-input{
+  display:flex;align-items:center;gap:6px;border:3px solid var(--ink);border-radius:9px;
+  background:#151412;color:#8ff0c0;padding:10px;font-family:var(--mono);font-size:10.5px;
+}
+.shell-input .prompt{opacity:.8;white-space:nowrap;}
+.shell-input input{flex:1;min-width:0;background:transparent;border:0;color:#fff;font-family:var(--mono);font-size:11px;outline:none;}
+.shell-warning{font-family:var(--mono);font-size:9px;font-weight:800;color:var(--red);}
+
+/* ---------- terminal ---------- */
+.term-scroll{
+  background:#151311;color:#F4EEDF;border:3px solid var(--ink);border-radius:10px;
+  padding:13px 12px;font-family:var(--mono);font-size:10.8px;line-height:1.75;
+  white-space:pre-wrap;word-break:break-word;
+}
+.t-hello{color:var(--amber);}
+.t-user{color:#fff;font-weight:700;}
+.t-user::before{content:'> ';color:var(--pink);}
+.t-dot{color:var(--teal);}
+.t-del{color:#FF8B83;}
+.t-add{color:#8ff0c0;}
+.t-ok{color:#8ff0c0;font-weight:700;}
+.t-warn{color:#FF9E6B;font-weight:800;}
+.t-dim{color:#8d8399;}
+.t-cursor{display:inline-block;width:7px;height:12px;background:var(--amber);vertical-align:-1px;animation:blink 1.1s steps(2,start) infinite;}
+@keyframes blink{to{visibility:hidden;}}
+
+.macro-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;flex:1;}
+.macro-key{
+  border:4px solid var(--ink);border-radius:14px;background:var(--paper);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  font-family:var(--disp);font-size:20px;box-shadow:6px 6px 0 var(--ink);
+}
+.macro-key span{font-family:var(--mono);font-size:9px;font-weight:800;letter-spacing:.05em;}
+.macro-key.stop{background:var(--red);color:#fff;}
+.macro-key:active{transform:translate(4px,4px);box-shadow:2px 2px 0 var(--ink);}
+
+/* ---------- browser ---------- */
+.browser-meta{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
+.chip-sm{
+  border:2.5px solid var(--ink);border-radius:20px;padding:3px 9px;
+  font-family:var(--mono);font-size:9px;font-weight:800;background:var(--paper);
+  box-shadow:2px 2px 0 var(--ink);
+}
+.chip-sm.warn{background:var(--red);color:#fff;}
+.chip-sm.hint{background:var(--amber);}
+.chip-sm.url{max-width:100%;overflow:hidden;text-overflow:ellipsis;}
+
+.wp-mock{
+  border:3px solid var(--ink);border-radius:12px;overflow:hidden;background:#fff;color:#1c2330;
+  font-family:var(--grot);box-shadow:5px 5px 0 var(--ink);position:relative;
+}
+.wp-nav-mock{padding:10px 14px;border-bottom:1px solid #e4e7ec;font-size:11px;font-weight:700;display:flex;justify-content:space-between;}
+.wp-nav-mock em{font-style:normal;color:#2F6FFF;}
+.wp-body-mock{padding:16px;}
+.wp-h{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;opacity:.6;margin-bottom:8px;}
+.wp-line{display:flex;justify-content:space-between;font-size:12px;padding:6px 0;}
+.wp-line.total{border-top:1px solid #e4e7ec;margin-top:6px;padding-top:10px;font-weight:800;font-size:13.5px;}
+.wp-cta{
+  width:100%;margin-top:14px;padding:13px;background:#2F6FFF;color:#fff;border:none;
+  border-radius:8px;font-weight:800;font-size:13.5px;position:relative;font-family:var(--grot);
+}
+.wp-cta.selected{outline:3px dashed var(--red);outline-offset:3px;}
+.inspector-tag{
+  margin-top:10px;font-family:var(--mono);font-size:9.5px;font-weight:700;
+  background:var(--ink);color:var(--paper);border-radius:6px;padding:5px 8px;display:inline-block;
+}
+
+.touch-dock{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;flex:1;}
+.touch-key{
+  border:3px solid var(--ink);border-radius:10px;background:var(--paper);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--disp);font-size:10.5px;box-shadow:3px 3px 0 var(--ink);padding:8px 2px;text-align:center;
+}
+.touch-key:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink);}
+
+/* ---------- evidence ---------- */
+.evidence-reel{display:flex;flex-direction:column;gap:9px;}
+.eitem{
+  border:3px solid var(--ink);border-radius:12px;padding:9px 10px;display:flex;gap:9px;align-items:center;
+  box-shadow:4px 4px 0 var(--ink);background:var(--paper);
+}
+.eitem-thumb{
+  width:44px;height:44px;border:2.5px solid var(--ink);border-radius:8px;flex:0 0 auto;
+  background:repeating-linear-gradient(45deg,#eee,#eee 4px,#ddd 4px,#ddd 8px);
+}
+.eitem-thumb.rec{background:var(--red);display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--disp);font-size:9px;}
+.eitem-body{flex:1;min-width:0;}
+.eitem-title{font-family:var(--mono);font-weight:800;font-size:10.5px;}
+.eitem-meta{font-family:var(--mono);font-size:9px;opacity:.65;margin-top:2px;}
+.eitem-send{
+  flex:0 0 auto;border:2.5px solid var(--ink);border-radius:8px;padding:7px 10px;
+  font-family:var(--mono);font-weight:800;font-size:9px;background:var(--ink);color:var(--paper);
+}
+.eitem-send:active{transform:translate(1px,1px);}
+
+.flick-third{align-items:center;justify-content:center;}
+.flick-demo{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;width:100%;}
+.target-zone{
+  border:3px dashed var(--ink);border-radius:12px;padding:8px 18px;
+  font-family:var(--disp);font-size:13px;background:var(--amber);letter-spacing:.02em;
+}
+.screenshot-card.flick{
+  width:118px;height:78px;border:3px solid var(--ink);border-radius:10px;background:#fff;
+  box-shadow:5px 5px 0 var(--ink);display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:8px;font-weight:700;color:#999;
+  animation:flickup 2.8s ease-in-out infinite;
+}
+@keyframes flickup{
+  0%,100%{transform:translateY(26px) rotate(-5deg);opacity:1;}
+  55%{transform:translateY(-34px) rotate(3deg);opacity:.55;}
+  70%{transform:translateY(-30px) rotate(3deg);opacity:.85;}
+}
+.flick-hint,.annotate-hint{font-family:var(--mono);font-size:9.5px;font-weight:800;text-align:center;opacity:.75;}
+
+/* ================= SEND SHEET ================= */
+#sheet-send{
+  position:fixed;inset:0;z-index:100;display:none;align-items:flex-end;justify-content:center;
+  background:rgba(20,17,13,.55);
+}
+#sheet-send.open{display:flex;}
+.sheet-panel{
+  width:393px;max-width:100%;max-height:84vh;background:var(--paper);
+  border:4px solid var(--ink);border-bottom:none;border-radius:26px 26px 0 0;
+  display:flex;flex-direction:column;overflow:hidden;box-shadow:0 -8px 0 rgba(20,17,13,.12);
+}
+.sheet-head{padding:14px 18px;border-bottom:3px solid var(--ink);display:flex;justify-content:space-between;align-items:center;}
+.sheet-title{font-family:var(--disp);font-size:16px;letter-spacing:.02em;}
+.sheet-close{width:30px;height:30px;border:2.5px solid var(--ink);border-radius:8px;font-weight:900;background:var(--paper);box-shadow:2px 2px 0 var(--ink);}
+.sheet-close:active{transform:translate(1px,1px);box-shadow:0 0 0 var(--ink);}
+.sheet-body{flex:1;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:12px;}
+.sheet-row-label{font-family:var(--mono);font-size:8.5px;font-weight:800;letter-spacing:.12em;opacity:.55;text-transform:uppercase;}
+.sheet-target{border:3px solid var(--ink);border-radius:10px;padding:10px;font-family:var(--mono);font-size:11px;font-weight:800;background:#FFF0E0;box-shadow:3px 3px 0 var(--ink);}
+.sheet-attach{display:flex;gap:10px;align-items:center;border:2.5px dashed var(--ink);border-radius:10px;padding:8px;}
+.sheet-thumb{width:44px;height:44px;border:2.5px solid var(--ink);border-radius:8px;flex:0 0 auto;background:repeating-linear-gradient(45deg,#eee,#eee 4px,#ddd 4px,#ddd 8px);}
+.sheet-attach-meta{font-family:var(--mono);font-size:10px;line-height:1.5;}
+.sheet-note textarea{
+  width:100%;min-height:58px;border:3px solid var(--ink);border-radius:10px;padding:9px;
+  font-family:var(--grot);font-size:12px;resize:none;background:var(--paper);
+}
+.yaml-block{
+  background:#151311;color:#F4EEDF;border:3px solid var(--ink);border-radius:10px;
+  padding:12px;font-family:var(--mono);font-size:10px;line-height:1.7;white-space:pre;overflow-x:auto;
+}
+.yaml-block .yk{color:#FF9E6B;}
+.yaml-block .yv{color:#8ff0c0;}
+.yaml-block .yh{color:#8d8399;}
+.sheet-foot{border-top:3px solid var(--ink);padding:12px 18px;display:flex;gap:10px;}
+.btn-cancel,.btn-send-final{
+  padding:12px;border:3px solid var(--ink);border-radius:10px;font-weight:800;
+  font-family:var(--mono);font-size:11px;box-shadow:3px 3px 0 var(--ink);
+}
+.btn-cancel{flex:1;background:var(--paper);}
+.btn-send-final{flex:2;background:var(--ink);color:var(--paper);}
+.btn-cancel:active,.btn-send-final:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink);}
+
+/* ================= CORNER TAG ================= */
+#corner-tag{
+  position:fixed;right:18px;bottom:18px;z-index:200;
+  font-family:var(--disp);font-size:10px;letter-spacing:.1em;
+  background:var(--ink);color:var(--paper);border-radius:7px;
+  padding:6px 11px;transform:rotate(-2deg);box-shadow:4px 4px 0 rgba(20,17,13,.35);
+  pointer-events:none;
+}
+
+/* ================= RESPONSIVE COLLAPSE ================= */
+@media (max-width:430px){
+  body{padding:0;align-items:stretch;}
+  .phone{
+    width:100vw;height:100dvh;border:0;border-radius:0;box-shadow:none;
+  }
+  #corner-tag{bottom:10px;right:10px;transform:rotate(0);font-size:9px;}
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none !important;transition:none !important;}
+}
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <div class="dynamic-island" aria-hidden="true"></div>
+
+  <div class="statusbar">
+    <span class="time">9:41</span>
+    <span class="icons">
+      <svg width="18" height="12" viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" fill="var(--ink)"/><rect x="5" y="6" width="3" height="6" fill="var(--ink)"/><rect x="10" y="3" width="3" height="9" fill="var(--ink)"/><rect x="15" y="0" width="3" height="12" fill="var(--ink)"/></svg>
+      <svg width="16" height="12" viewBox="0 0 16 12" aria-hidden="true"><path d="M8 10.5a1.4 1.4 0 100 2.8 1.4 1.4 0 000-2.8z" fill="var(--ink)"/><path d="M2.5 6.2a8 8 0 0111 0l-1.7 1.8a5.6 5.6 0 00-7.6 0z" fill="var(--ink)"/><path d="M0 2.9a12 12 0 0116 0l-1.7 1.8a9.6 9.6 0 00-12.6 0z" fill="var(--ink)"/></svg>
+      <span class="icon-battery"><span class="shell"><span class="fill"></span></span></span>
+    </span>
+  </div>
+
+  <main class="screens">
+
+    <!-- ══════════════ HOME — DECK ══════════════ -->
+    <section id="screen-home" class="screen active">
+      <div class="home-header">
+        <div class="home-brand">
+          <span class="home-wordmark">CHROMUX<small>REMOTE AGENT DECK</small></span>
+          <span class="durable-badge"><span class="dot"></span>DURABLE</span>
+        </div>
+        <div class="fleet-chips">
+          <span class="fleet-chip attn"><b>3</b>NEED YOU</span>
+          <span class="fleet-chip"><b>5</b>WORKING</span>
+          <span class="fleet-chip done"><b>2</b>DONE</span>
+          <span class="fleet-chip off"><b>1</b>OFFLINE</span>
+        </div>
+      </div>
+
+      <div class="deck-stage">
+        <button class="deck-nav prev" id="deckPrev" aria-label="Previous session">‹</button>
+        <div class="deck-cards">
+          <div class="card peek peek-left" id="peekLeft" aria-hidden="true"></div>
+          <div class="card center" id="deckCenter" role="button" tabindex="0" aria-label="Open focused session"></div>
+          <div class="card peek peek-right" id="peekRight" aria-hidden="true"></div>
+        </div>
+        <button class="deck-nav next" id="deckNext" aria-label="Next session">›</button>
+      </div>
+
+      <div class="deck-indicator" id="deckIndicator" aria-hidden="true"></div>
+    </section>
+
+    <!-- ══════════════ SESSION — SUMMARY LAYER ══════════════ -->
+    <section id="screen-session" class="screen">
+      <div class="chromux-strip">
+        <button class="back-deck" data-nav="screen-home">‹ DECK</button>
+        <span class="strip-sep"></span>
+        <span class="strip-host">home-mac · SSH 42ms</span>
+        <span class="strip-sep"></span>
+        <span class="strip-live"><span class="dot"></span>claude busy</span>
+        <span class="strip-durable">DURABLE</span>
+      </div>
+      <div class="body-row">
+        <div class="body-scroll">
+          <div class="session-head">
+            <span class="session-state-chip">NEEDS APPROVAL</span>
+            <div class="session-name">checkout-flow <span class="agent-tag">· claude</span></div>
+            <div class="session-sub">home-mac · ~/projects/shop/checkout-flow · branch fix/cta-overflow · elapsed 18m</div>
+          </div>
+          <div class="summary-list">
+            <div class="sum-item">Fixed CTA overflow in <code>checkout.css</code></div>
+            <div class="sum-item">Dev server reloaded — preview updated</div>
+            <div class="sum-item urgent">Wants to run <code>npm run db:migrate</code> — waiting 6m</div>
+          </div>
+        </div>
+        <nav class="rail" aria-label="Layer switcher">
+          <button class="rail-btn active" data-target="screen-session" title="Summary">S<span>SUM</span></button>
+          <button class="rail-btn" data-target="screen-terminal" title="Live output">O<span>OUT</span></button>
+          <button class="rail-btn" data-target="screen-browser" title="Browser preview">W<span>WEB</span></button>
+          <button class="rail-btn" data-target="screen-evidence" title="Evidence">E<span>EVD</span></button>
+        </nav>
+      </div>
+
+      <div class="control-third">
+        <span class="ct-label">Intervention — choose input mode</span>
+        <div class="mode-tabs">
+          <button class="mode-tab active" data-mode="tool">Tool call</button>
+          <button class="mode-tab" data-mode="reply">Reply</button>
+          <button class="mode-tab" data-mode="shell">Shell</button>
+        </div>
+
+        <div class="mode-panel active" data-panel="tool">
+          <div class="tool-call-box">
+            <span class="tool-call-label">claude wants to run</span>
+            <code class="tool-call-cmd">npm run db:migrate</code>
+          </div>
+          <div class="tool-btns">
+            <button class="btn-approve" id="btnApprove">APPROVE</button>
+            <button class="btn-deny">DENY</button>
+          </div>
+          <button class="btn-always">ALWAYS ALLOW db:migrate</button>
+          <div class="confirm-row" id="confirmRow">
+            <span class="cr-txt">Confirm — run migration against home-mac now?</span>
+            <div class="cr-btns">
+              <button class="btn-confirm-yes">YES, RUN</button>
+              <button class="btn-confirm-cancel">CANCEL</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="mode-panel" data-panel="reply">
+          <textarea class="reply-textarea" placeholder="Reply to claude — plain-language instruction…"></textarea>
+          <div class="reply-row">
+            <button class="btn-hold-speak"><span class="mic-ring"></span>HOLD TO SPEAK</button>
+            <button class="btn-send-reply">SEND REPLY</button>
+          </div>
+        </div>
+
+        <div class="mode-panel" data-panel="shell">
+          <div class="shell-input">
+            <span class="prompt">~/projects/shop/checkout-flow&nbsp;$</span>
+            <input type="text" placeholder="type raw shell command…" spellcheck="false"/>
+          </div>
+          <span class="shell-warning">⚠ RAW SHELL — bypasses the agent, runs directly on home-mac</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════ TERMINAL — LIVE OUTPUT LAYER ══════════════ -->
+    <section id="screen-terminal" class="screen">
+      <div class="chromux-strip">
+        <button class="back-deck" data-nav="screen-home">‹ DECK</button>
+        <span class="strip-sep"></span>
+        <span class="strip-host">home-mac · SSH 42ms</span>
+        <span class="strip-sep"></span>
+        <span class="strip-live"><span class="dot"></span>streaming</span>
+        <span class="strip-durable">DURABLE</span>
+      </div>
+      <div class="body-row">
+        <div class="body-scroll">
+          <pre class="term-scroll"><span class="t-hello">✻ Welcome to Claude Code!</span>          ~/projects/shop/checkout-flow
+<span class="t-user">fix the CTA overflow on the checkout page</span>
+<span class="t-dot">●</span> I'll look at the checkout component styles.
+<span class="t-dot">●</span> Read src/components/CheckoutCTA.tsx <span class="t-dim">(84 lines)</span>
+<span class="t-dot">●</span> Edit src/styles/checkout.css
+<span class="t-del">  - .cta-row { width: 120%; }</span>
+<span class="t-add">  + .cta-row { width: 100%; max-width: 480px; }</span>
+<span class="t-ok">✔ Change applied — dev server reloaded</span>
+<span class="t-dot">●</span> The button no longer overflows. Preview updated.
+<span class="t-dot">●</span> Next I need the new orders table locally.
+<span class="t-warn">⚠ APPROVAL REQUIRED</span>
+  npm run db:migrate
+<span class="t-dim">▌waiting for your decision…</span><span class="t-cursor"></span></pre>
+        </div>
+        <nav class="rail" aria-label="Layer switcher">
+          <button class="rail-btn" data-target="screen-session" title="Summary">S<span>SUM</span></button>
+          <button class="rail-btn active" data-target="screen-terminal" title="Live output">O<span>OUT</span></button>
+          <button class="rail-btn" data-target="screen-browser" title="Browser preview">W<span>WEB</span></button>
+          <button class="rail-btn" data-target="screen-evidence" title="Evidence">E<span>EVD</span></button>
+        </nav>
+      </div>
+
+      <div class="control-third">
+        <span class="ct-label">Macro keys — configurable</span>
+        <div class="macro-grid">
+          <button class="macro-key">⏎<span>CONTINUE</span></button>
+          <button class="macro-key stop">^C<span>STOP</span></button>
+          <button class="macro-key">▤<span>TESTS</span></button>
+          <button class="macro-key">▥<span>LOGS</span></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════ BROWSER — PREVIEW LAYER ══════════════ -->
+    <section id="screen-browser" class="screen">
+      <div class="chromux-strip">
+        <button class="back-deck" data-nav="screen-home">‹ DECK</button>
+        <span class="strip-sep"></span>
+        <span class="strip-host">home-mac · tunneled</span>
+        <span class="strip-durable">DURABLE</span>
+      </div>
+      <div class="body-row">
+        <div class="body-scroll">
+          <div class="browser-meta">
+            <span class="chip-sm url">http://localhost:5173/checkout</span>
+            <span class="chip-sm">iPhone 15 · 393×852</span>
+            <span class="chip-sm">console: 0</span>
+            <span class="chip-sm warn">net: 1 failed</span>
+            <span class="chip-sm hint">✌ two-finger drag resizes viewport</span>
+          </div>
+          <div class="wp-mock">
+            <div class="wp-nav-mock"><span>shop<em>ly</em></span><span>Step 3 of 3</span></div>
+            <div class="wp-body-mock">
+              <div class="wp-h">Order summary</div>
+              <div class="wp-line"><span>Canvas Tote ×1</span><span>$38.00</span></div>
+              <div class="wp-line"><span>Shipping</span><span>$10.00</span></div>
+              <div class="wp-line total"><span>Total</span><span>$48.00</span></div>
+              <button class="wp-cta selected">Pay $48.00</button>
+              <span class="inspector-tag">button.cta-pay · "Pay $48.00" · 412×88</span>
+            </div>
+          </div>
+        </div>
+        <nav class="rail" aria-label="Layer switcher">
+          <button class="rail-btn" data-target="screen-session" title="Summary">S<span>SUM</span></button>
+          <button class="rail-btn" data-target="screen-terminal" title="Live output">O<span>OUT</span></button>
+          <button class="rail-btn active" data-target="screen-browser" title="Browser preview">W<span>WEB</span></button>
+          <button class="rail-btn" data-target="screen-evidence" title="Evidence">E<span>EVD</span></button>
+        </nav>
+      </div>
+
+      <div class="control-third">
+        <span class="ct-label">Touch controls</span>
+        <div class="touch-dock">
+          <button class="touch-key">TAP</button>
+          <button class="touch-key">HOLD</button>
+          <button class="touch-key">TYPE</button>
+          <button class="touch-key">SCRL</button>
+          <button class="touch-key">VIEW</button>
+          <button class="touch-key">BACK</button>
+          <button class="touch-key">FWD</button>
+          <button class="touch-key">RLD</button>
+          <button class="touch-key">SHOT</button>
+          <button class="touch-key btn-open-sheet">REC</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════ EVIDENCE — CAPTURE REEL LAYER ══════════════ -->
+    <section id="screen-evidence" class="screen">
+      <div class="chromux-strip">
+        <button class="back-deck" data-nav="screen-home">‹ DECK</button>
+        <span class="strip-sep"></span>
+        <span class="strip-host">3 captures · checkout-flow</span>
+        <span class="strip-durable">DURABLE</span>
+      </div>
+      <div class="body-row">
+        <div class="body-scroll">
+          <div class="evidence-reel">
+            <div class="eitem">
+              <div class="eitem-thumb" aria-hidden="true"></div>
+              <div class="eitem-body">
+                <div class="eitem-title">2026-07-12-0912.png</div>
+                <div class="eitem-meta">Screenshot · checkout CTA after fix · 2m ago</div>
+              </div>
+              <button class="eitem-send btn-open-sheet">SEND</button>
+            </div>
+            <div class="eitem">
+              <div class="eitem-thumb rec" aria-hidden="true">0:14</div>
+              <div class="eitem-body">
+                <div class="eitem-title">checkout-tap-flow.webm</div>
+                <div class="eitem-meta">Recording · 3 taps · 1 console error · iPhone 15 · 9m ago</div>
+              </div>
+              <button class="eitem-send btn-open-sheet">SEND</button>
+            </div>
+            <div class="eitem">
+              <div class="eitem-thumb" aria-hidden="true"></div>
+              <div class="eitem-body">
+                <div class="eitem-title">button.cta-pay</div>
+                <div class="eitem-meta">Element capture · "Pay $48.00" · 412×88 · 11m ago</div>
+              </div>
+              <button class="eitem-send btn-open-sheet">SEND</button>
+            </div>
+          </div>
+        </div>
+        <nav class="rail" aria-label="Layer switcher">
+          <button class="rail-btn" data-target="screen-session" title="Summary">S<span>SUM</span></button>
+          <button class="rail-btn" data-target="screen-terminal" title="Live output">O<span>OUT</span></button>
+          <button class="rail-btn" data-target="screen-browser" title="Browser preview">W<span>WEB</span></button>
+          <button class="rail-btn active" data-target="screen-evidence" title="Evidence">E<span>EVD</span></button>
+        </nav>
+      </div>
+
+      <div class="control-third flick-third">
+        <span class="ct-label">Signature gesture</span>
+        <div class="flick-demo">
+          <div class="target-zone">ATTACH → CLAUDE</div>
+          <div class="screenshot-card flick">2026-07-12-0912.png</div>
+          <span class="flick-hint">↑ FLICK SCREENSHOT UP TO ATTACH</span>
+          <span class="annotate-hint">⇣ PULL DOWN TO ANNOTATE FIRST</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ══════════════ SEND SHEET ══════════════ -->
+<div id="sheet-send" role="dialog" aria-modal="true" aria-label="Send evidence to agent">
+  <div class="sheet-panel">
+    <div class="sheet-head">
+      <span class="sheet-title">SEND → AGENT</span>
+      <button class="sheet-close" aria-label="Close">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div>
+        <span class="sheet-row-label">Target</span>
+        <div class="sheet-target">checkout-flow · claude @ home-mac</div>
+      </div>
+      <div>
+        <span class="sheet-row-label">Attachment</span>
+        <div class="sheet-attach">
+          <div class="sheet-thumb" aria-hidden="true"></div>
+          <div class="sheet-attach-meta">
+            2026-07-12-0912.png<br>
+            localhost:5173/checkout · 393×852
+          </div>
+        </div>
+      </div>
+      <div class="sheet-note">
+        <span class="sheet-row-label">Note</span>
+        <textarea placeholder="e.g. the CTA still clips at 320px — check small viewports"></textarea>
+      </div>
+      <div>
+        <span class="sheet-row-label">Payload preview — YAML v1</span>
+        <pre class="yaml-block"><span class="yk">chromux_capture:</span> <span class="yv">v1</span>
+<span class="yk">session:</span> <span class="yv">checkout-flow</span>
+<span class="yk">agent:</span> <span class="yv">claude</span>
+<span class="yk">host:</span> <span class="yv">home-mac</span>
+<span class="yk">url:</span> <span class="yv">http://localhost:5173/checkout</span>
+<span class="yk">viewport:</span> <span class="yv">393x852</span>
+<span class="yk">note:</span> <span class="yv">CTA verified after fix</span>
+<span class="yk">screenshot:</span> <span class="yv">~/.chromux/captures/2026-07-12-0912.png</span>
+<span class="yk">console_errors:</span> <span class="yh">[]</span>
+<span class="yk">network_failures:</span>
+<span class="yh">  - POST /api/telemetry (503)</span></pre>
+      </div>
+    </div>
+    <div class="sheet-foot">
+      <button class="btn-cancel sheet-close">CANCEL</button>
+      <button class="btn-send-final">SEND — claude</button>
+    </div>
+  </div>
+</div>
+
+<div id="corner-tag">#05 · DECK OF AGENTS</div>
+
+<script>
+(function(){
+  "use strict";
+
+  function showScreen(id){
+    document.querySelectorAll('.screen').forEach(function(s){ s.classList.toggle('active', s.id === id); });
+    document.querySelectorAll('.rail-btn').forEach(function(b){ b.classList.toggle('active', b.dataset.target === id); });
+  }
+  document.querySelectorAll('[data-nav]').forEach(function(b){
+    b.addEventListener('click', function(){ showScreen(b.dataset.nav); });
+  });
+  document.querySelectorAll('.rail-btn').forEach(function(b){
+    b.addEventListener('click', function(){ showScreen(b.dataset.target); });
+  });
+
+  /* ---------- deck of agents (home) ---------- */
+  var sessions = [
+    { name:'checkout-flow', agent:'claude',  host:'home-mac',     cls:'st-approval', label:'NEEDS\nAPPROVAL',    meta:'npm run db:migrate · 18m elapsed', attn:true,
+      acts:[['APPROVE','OPENS CONFIRM','screen-session',true],['DENY','TOOL CALL','screen-session']] },
+    { name:'landing-page',  agent:'grok',    host:'home-mac',     cls:'st-review',   label:'READY FOR\nREVIEW',  meta:'4 files changed · 2m ago',         attn:true,
+      acts:[['OPEN PREVIEW','LOCALHOST:5173','screen-browser',true],['VIEW DIFF','4 FILES','screen-session']] },
+    { name:'api-server',    agent:'codex',   host:'staging-2',    cls:'st-exited',   label:'EXITED',             meta:'exit code 0 · 12m ago',            attn:true,
+      acts:[['RESTART','CODEX','screen-session',true],['LOGS','SCROLLBACK','screen-terminal']] },
+    { name:'worker-queue',  agent:'claude',  host:'staging-2',    cls:'st-work1',    label:'WORKING',            meta:'refactoring retry logic · 4m',
+      acts:[['⏎ CONTINUE','SEND','screen-terminal',true],['^C STOP','INTERRUPT','screen-terminal']] },
+    { name:'docs-site',     agent:'codex',   host:'home-mac',     cls:'st-work2',    label:'WORKING',            meta:'writing changelog · 12m',
+      acts:[['⏎ CONTINUE','SEND','screen-terminal',true],['^C STOP','INTERRUPT','screen-terminal']] },
+    { name:'auth-service',  agent:'claude',  host:'staging-2',    cls:'st-work3',    label:'WORKING',            meta:'running test suite · 1m',
+      acts:[['⏎ CONTINUE','SEND','screen-terminal',true],['^C STOP','INTERRUPT','screen-terminal']] },
+    { name:'mobile-app',    agent:'grok',    host:'home-mac',     cls:'st-work4',    label:'WORKING',            meta:'fixing lint errors · 8m',
+      acts:[['⏎ CONTINUE','SEND','screen-terminal',true],['^C STOP','INTERRUPT','screen-terminal']] },
+    { name:'analytics',     agent:'codex',   host:'home-mac',     cls:'st-work5',    label:'WORKING',            meta:'silent 22m — long quiet period',
+      acts:[['NUDGE','STATUS CHECK','screen-terminal',true],['TAIL OUTPUT','LIVE','screen-terminal']] },
+    { name:'payments-api',  agent:'claude',  host:'staging-2',    cls:'st-done',     label:'DONE',               meta:'3 files changed · 18m ago',
+      acts:[['SUMMARY','WHAT CHANGED','screen-session',true],['DISMISS','CLEAR','screen-home']] },
+    { name:'search-index',  agent:'codex',   host:'home-mac',     cls:'st-done',     label:'DONE',               meta:'tests pass · 1h ago',
+      acts:[['SUMMARY','WHAT CHANGED','screen-session',true],['DISMISS','CLEAR','screen-home']] },
+    { name:'ci-runner',     agent:'claude',  host:'build-server', cls:'st-offline',  label:'OFFLINE',            meta:'host unreachable · 26m',
+      acts:[['RECONNECT','RELAY','screen-home',true],['DETAILS','HOST','screen-session']] }
+  ];
+  var idx = 0;
+
+  function stateLines(s){ return s.label.split('\n').join('<br>'); }
+
+  function centerHTML(s){
+    return '<div class="card-edge" aria-hidden="true"></div>' +
+      '<div class="card-top"><span>' + s.host + '</span><span>' + s.agent + '</span></div>' +
+      '<div class="card-state">' + stateLines(s) + '</div>' +
+      '<div class="card-name">' + s.name + '</div>' +
+      '<div class="card-meta">' + s.meta + '</div>' +
+      '<div class="card-acts">' + s.acts.map(function(a){
+        return '<button class="ca' + (a[3] ? ' primary' : '') + '" data-go="' + a[2] + '">' +
+          a[0] + '<small>' + a[1] + '</small></button>';
+      }).join('') + '</div>' +
+      '<div class="card-tap">TAP TO OPEN ↳</div>';
+  }
+  function peekHTML(s){
+    return '<div class="card-top"><span>' + s.host + '</span></div>' +
+      '<div class="card-state">' + stateLines(s) + '</div>' +
+      '<div class="card-name">' + s.name + '</div>';
+  }
+
+  function renderDeck(){
+    var n = sessions.length;
+    var left = sessions[(idx - 1 + n) % n];
+    var right = sessions[(idx + 1) % n];
+    var center = sessions[idx];
+
+    var centerEl = document.getElementById('deckCenter');
+    centerEl.className = 'card center ' + center.cls + (center.attn ? ' attn' : '');
+    centerEl.innerHTML = centerHTML(center);
+
+    var leftEl = document.getElementById('peekLeft');
+    leftEl.className = 'card peek peek-left ' + left.cls;
+    leftEl.innerHTML = peekHTML(left);
+
+    var rightEl = document.getElementById('peekRight');
+    rightEl.className = 'card peek peek-right ' + right.cls;
+    rightEl.innerHTML = peekHTML(right);
+
+    var ind = document.getElementById('deckIndicator');
+    ind.innerHTML = '';
+    sessions.forEach(function(s, i){
+      var t = document.createElement('span');
+      t.className = 'tick ' + s.cls + (i === idx ? ' active' : '');
+      ind.appendChild(t);
+    });
+  }
+
+  document.getElementById('deckPrev').addEventListener('click', function(){
+    idx = (idx - 1 + sessions.length) % sessions.length; renderDeck();
+  });
+  document.getElementById('deckNext').addEventListener('click', function(){
+    idx = (idx + 1) % sessions.length; renderDeck();
+  });
+  document.getElementById('deckCenter').addEventListener('click', function(e){
+    var ca = e.target.closest('.ca');
+    if (ca){
+      e.stopPropagation();
+      if (ca.dataset.go && ca.dataset.go !== 'screen-home') showScreen(ca.dataset.go);
+      return;
+    }
+    showScreen('screen-session');
+  });
+  document.getElementById('deckCenter').addEventListener('keydown', function(e){
+    if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); showScreen('screen-session'); }
+  });
+  renderDeck();
+
+  /* ---------- mode tabs (tool call / reply / shell) ---------- */
+  document.querySelectorAll('.mode-tab').forEach(function(t){
+    t.addEventListener('click', function(){
+      document.querySelectorAll('.mode-tab').forEach(function(x){ x.classList.remove('active'); });
+      t.classList.add('active');
+      var mode = t.dataset.mode;
+      document.querySelectorAll('.mode-panel').forEach(function(p){
+        p.classList.toggle('active', p.dataset.panel === mode);
+      });
+    });
+  });
+
+  /* ---------- approve → confirm step ---------- */
+  var btnApprove = document.getElementById('btnApprove');
+  var confirmRow = document.getElementById('confirmRow');
+  if (btnApprove) btnApprove.addEventListener('click', function(){ confirmRow.classList.add('show'); });
+  document.querySelectorAll('.btn-confirm-cancel').forEach(function(b){
+    b.addEventListener('click', function(){ confirmRow.classList.remove('show'); });
+  });
+
+  /* ---------- send sheet ---------- */
+  var sheet = document.getElementById('sheet-send');
+  function openSheet(){ sheet.classList.add('open'); }
+  function closeSheet(){ sheet.classList.remove('open'); }
+  document.querySelectorAll('.btn-open-sheet').forEach(function(b){ b.addEventListener('click', openSheet); });
+  document.querySelectorAll('.sheet-close').forEach(function(b){ b.addEventListener('click', closeSheet); });
+  sheet.addEventListener('click', function(e){ if (e.target === sheet) closeSheet(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeSheet(); });
+})();
+</script>
+</body>
+</html>

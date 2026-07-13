@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Chromux Mobile — Agent Inbox</title>
+<style>
+/* ═══════════════════════════════════════════════════════════════════
+   CHROMUX MOBILE — Nº 02 "AGENT INBOX"
+   Warm editorial light: off-white paper, charcoal text, one vermilion
+   attention mark, generous whitespace, quiet monospaced metadata.
+   Agents write you letters, not logs. Terminal & browser are deep
+   inspection modes you visit on purpose, not the default view.
+   ═══════════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root{
+  --paper:      #faf6ee;
+  --paper-deep: #f2ead9;
+  --card:       #fffdf8;
+  --ink:        #211c16;
+  --ink-80:     rgba(33,28,22,.82);
+  --ink-65:     rgba(33,28,22,.65);
+  --ink-45:     rgba(33,28,22,.45);
+  --ink-30:     rgba(33,28,22,.30);
+  --rule:       #e4d9c3;
+  --rule-mid:   #d3c4a4;
+  --verm:       #c23b1e;
+  --verm-deep:  #9f2f16;
+  --verm-tint:  rgba(194,59,30,.09);
+  --verm-tint2: rgba(194,59,30,.15);
+  --olive:      #5c6b3f;
+  --olive-tint: rgba(92,107,63,.12);
+  --slate:      #46586b;
+  --slate-tint: rgba(70,88,107,.10);
+
+  --serif: "Source Serif 4", "Iowan Old Style", Charter, Georgia, "Times New Roman", serif;
+  --body:  "Charter", "Iowan Old Style", Georgia, serif;
+  --mono:  "IBM Plex Mono", "SF Mono", Menlo, Monaco, "Courier New", monospace;
+}
+
+html, body{ height: 100%; }
+body{
+  min-height: 100vh;
+  background: var(--paper-deep);
+  color: var(--ink);
+  font-family: var(--body);
+  -webkit-font-smoothing: antialiased;
+  display: flex; align-items: center; justify-content: center;
+  padding: 40px 20px;
+  overflow-x: hidden;
+}
+
+button{ font-family: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visible, summary:focus-visible{
+  outline: 1.5px solid var(--verm); outline-offset: 2px;
+}
+[aria-hidden="true"]{ pointer-events: none; }
+
+.microlabel{
+  font-family: var(--mono); font-size: 9px; font-weight: 500; letter-spacing: .13em;
+  text-transform: uppercase; color: var(--ink-45);
+}
+
+/* ══════════════════════ PHONE FRAME ══════════════════════ */
+.backdrop{ position: relative; display: flex; align-items: center; justify-content: center; width: 100%; }
+.phone{
+  position: relative; width: 393px; height: 852px; border-radius: 55px; padding: 14px;
+  background: linear-gradient(160deg, #d9cdb2 0%, #c7b998 45%, #a99a76 100%);
+  box-shadow: 0 2px 0 rgba(255,255,255,.4) inset, 0 60px 120px -30px rgba(60,45,20,.45), 0 20px 50px -20px rgba(60,45,20,.35);
+  flex: 0 0 auto;
+}
+.phone::before{ content:""; position:absolute; left:-3px; top:128px; width:3px; height:64px; background:#8c7c5c; border-radius:2px 0 0 2px; }
+.phone::after{ content:""; position:absolute; right:-3px; top:168px; width:3px; height:100px; background:#8c7c5c; border-radius:0 2px 2px 0; }
+.screen-shell{
+  position: relative; width: 100%; height: 100%; border-radius: 42px; overflow: hidden;
+  background: var(--paper); display: flex; flex-direction: column;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.08) inset;
+}
+.notch{ position:absolute; top:0; left:50%; transform:translateX(-50%); width:118px; height:30px; background:#211c16; border-radius:0 0 18px 18px; z-index:50; }
+
+/* ── iOS-style status bar ── */
+.iosbar{
+  flex: 0 0 47px; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 26px 0 30px; font-family: var(--serif); font-weight: 600; font-size: 15px; color: var(--ink);
+  position: relative; z-index: 40;
+}
+.iosbar .lead{ font-variant-numeric: tabular-nums; }
+.iosbar .glyphs{ display: flex; align-items: center; gap: 6px; }
+.sig-bars{ display: flex; align-items: flex-end; gap: 1.5px; height: 10px; }
+.sig-bars i{ width: 2.5px; background: var(--ink); border-radius: .5px; }
+.sig-bars i:nth-child(1){ height: 4px; } .sig-bars i:nth-child(2){ height: 6px; }
+.sig-bars i:nth-child(3){ height: 8px; } .sig-bars i:nth-child(4){ height: 10px; }
+.wifi-glyph{ font-size: 12px; }
+.batt{ width: 23px; height: 11px; border: 1.2px solid var(--ink); border-radius: 3px; position: relative; padding: 1.5px; }
+.batt::after{ content:""; position:absolute; right:-3px; top:3px; width:1.5px; height:5px; background:var(--ink-65); border-radius:0 1px 1px 0; }
+.batt i{ display:block; height:100%; width:76%; background:var(--ink); border-radius:1px; }
+
+/* ── status strip ── */
+#status-strip{
+  flex: 0 0 auto; display: flex; align-items: center; gap: 9px; padding: 5px 17px 11px;
+  border-bottom: 1px solid var(--rule);
+}
+.brand-chip{ display: flex; align-items: baseline; gap: 7px; }
+.brand-name{ font-family: var(--serif); font-weight: 700; font-size: 14px; letter-spacing: -.005em; color: var(--ink); }
+.brand-sub{ font-family: var(--mono); font-size: 8px; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-45); }
+.strip-sep{ width: 1px; height: 11px; background: var(--rule-mid); }
+.strip-item{ display: flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 9px; color: var(--ink-65); white-space: nowrap; }
+.strip-dot{ width: 5px; height: 5px; border-radius: 50%; flex: none; }
+.dot-online{ background: var(--olive); }
+.dot-flight{ background: var(--verm); animation: pulse-dot 1.4s ease-in-out infinite; }
+@keyframes pulse-dot{ 0%,100%{ opacity:1; transform:scale(1);} 50%{ opacity:.35; transform:scale(.65);} }
+#status-strip .push{ margin-left: auto; }
+.durable-badge{
+  font-family: var(--mono); font-size: 7.7px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--slate); border: 1px solid rgba(70,88,107,.35); border-radius: 3px; padding: 2.5px 6px; background: var(--slate-tint);
+}
+
+/* ══════════════════════ SCREENS ══════════════════════ */
+#screens{ flex: 1; min-height: 0; position: relative; }
+.screen{ position: absolute; inset: 0; display: none; flex-direction: column; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+.screen.active{ display: flex; }
+@keyframes riseline{ from{ opacity:0; transform:translateY(7px);} to{ opacity:1; transform:none;} }
+.screen.active > *{ animation: riseline .4s cubic-bezier(.22,.8,.3,1) both; }
+
+.screen-pad{ padding: 16px 18px 92px; }
+
+/* totals strip (shared fleet state) */
+.totals-strip{
+  display: flex; align-items: center; gap: 0; margin-bottom: 20px;
+  border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; background: var(--card);
+}
+.totals-cell{ flex: 1; padding: 10px 6px 9px; text-align: center; border-right: 1px solid var(--rule); }
+.totals-cell:last-child{ border-right: none; }
+.totals-num{ font-family: var(--serif); font-weight: 700; font-size: 19px; line-height: 1; display: block; }
+.totals-cell.t-need .totals-num{ color: var(--verm); }
+.totals-cell.t-work .totals-num{ color: var(--slate); }
+.totals-cell.t-done .totals-num{ color: var(--olive); }
+.totals-cell.t-off .totals-num{ color: var(--ink-45); }
+.totals-cap{ font-family: var(--mono); font-size: 7px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-45); display: block; margin-top: 2px; }
+
+/* group headers */
+.group-head{ display: flex; align-items: baseline; gap: 9px; margin: 22px 0 10px; }
+.group-head:first-of-type{ margin-top: 0; }
+.group-mark{ width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.group-mark.m-need{ background: var(--verm); }
+.group-mark.m-review{ background: var(--slate); }
+.group-mark.m-running{ background: var(--olive); }
+.group-mark.m-done{ background: var(--ink-30); border: none; }
+.group-mark.m-problem{ background: none; border: 1.5px solid var(--verm); }
+.group-title{ font-family: var(--serif); font-size: 13.5px; font-weight: 700; letter-spacing: -.005em; }
+.group-count{ margin-left: auto; font-family: var(--mono); font-size: 10px; color: var(--ink-45); }
+
+/* inbox items */
+.inbox-list{ display: flex; flex-direction: column; }
+.inbox-item{
+  display: block; width: 100%; text-align: left;
+  padding: 12px 3px 13px; border-bottom: 1px solid var(--rule);
+  position: relative;
+}
+.inbox-list .inbox-item:first-child{ border-top: 1px solid var(--rule); }
+.inbox-item.urgent{ background: linear-gradient(90deg, var(--verm-tint), transparent 60%); }
+.inbox-item.urgent::before{
+  content: ""; position: absolute; left: -18px; top: 0; bottom: 0; width: 3px; background: var(--verm);
+}
+.inbox-top{ display: flex; align-items: baseline; gap: 7px; margin-bottom: 3px; }
+.inbox-agent{ font-family: var(--serif); font-weight: 700; font-size: 13.5px; color: var(--ink); }
+.inbox-session{ font-family: var(--mono); font-size: 10px; color: var(--ink-45); }
+.inbox-time{ margin-left: auto; font-family: var(--mono); font-size: 9.5px; color: var(--ink-45); white-space: nowrap; flex: none; }
+.inbox-line{ font-family: var(--body); font-size: 12.5px; line-height: 1.5; color: var(--ink-80); }
+.inbox-line b{ font-weight: 700; color: var(--verm); }
+.inbox-meta-row{ display: flex; gap: 10px; margin-top: 5px; flex-wrap: wrap; }
+.inbox-meta-row span{ font-family: var(--mono); font-size: 9.5px; color: var(--ink-45); }
+.inbox-host{ font-family: var(--mono); font-size: 9.5px; color: var(--ink-30); }
+.durable-inline{
+  display: inline-flex; align-items: center; gap: 4px; font-family: var(--mono); font-size: 8.5px;
+  color: var(--slate); margin-top: 5px;
+}
+.durable-inline::before{ content: "⟲"; }
+
+/* ══════════════ SESSION SCREEN (conversational) ══════════════ */
+.sess-header{
+  display: flex; align-items: center; gap: 10px; padding: 13px 18px 11px; border-bottom: 1px solid var(--rule);
+}
+.back-btn{
+  font-family: var(--mono); font-size: 10.5px; font-weight: 500; letter-spacing: .04em; color: var(--verm);
+  display: flex; align-items: center; gap: 3px;
+}
+.sess-title-wrap{ display: flex; flex-direction: column; gap: 1px; }
+.sess-title{ font-family: var(--serif); font-size: 14.5px; font-weight: 700; }
+.sess-title .agent{ color: var(--ink-45); font-weight: 400; font-size: 12px; }
+.sess-sub{ font-family: var(--mono); font-size: 8.5px; color: var(--ink-45); }
+.sess-header .push{ margin-left: auto; }
+
+.letterhead{
+  margin: 16px 18px 4px; padding: 14px 15px 15px; border: 1px solid var(--rule); border-radius: 3px;
+  background: var(--card); position: relative;
+}
+.letterhead::before{ content:""; position:absolute; top:0; left:0; right:0; height:2px; background: var(--verm); }
+.letterhead-open{ font-family: var(--serif); font-size: 13px; font-style: italic; color: var(--ink-65); margin-bottom: 8px; }
+.letterhead p{ font-family: var(--body); font-size: 13px; line-height: 1.6; color: var(--ink-80); }
+.letterhead p + p{ margin-top: 8px; }
+
+/* activity blocks — native details/summary, zero JS */
+.activity-list{ margin: 16px 18px 6px; display: flex; flex-direction: column; gap: 8px; }
+.activity{
+  border: 1px solid var(--rule); border-radius: 8px; background: var(--card); overflow: hidden;
+}
+.activity[open]{ box-shadow: 0 1px 0 rgba(33,28,22,.03); }
+.activity summary{
+  list-style: none; cursor: pointer; display: flex; align-items: center; gap: 9px;
+  padding: 11px 13px; user-select: none;
+}
+.activity summary::-webkit-details-marker{ display: none; }
+.act-icon{
+  width: 24px; height: 24px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center;
+  font-size: 11px; background: var(--olive-tint); color: var(--olive);
+}
+.activity.act-approval .act-icon{ background: var(--verm-tint2); color: var(--verm); }
+.act-title{ font-family: var(--serif); font-weight: 600; font-size: 12.5px; flex: 1; }
+.act-sub{ font-family: var(--mono); font-size: 9px; color: var(--ink-45); }
+.act-caret{ font-size: 10px; color: var(--ink-30); transition: transform .2s ease; flex: none; }
+.activity[open] .act-caret{ transform: rotate(90deg); }
+.act-body{ padding: 0 15px 14px 46px; font-family: var(--body); font-size: 12px; line-height: 1.55; color: var(--ink-65); }
+.diff-block{
+  font-family: var(--mono); font-size: 10.5px; line-height: 1.7; background: var(--paper-deep);
+  border: 1px solid var(--rule); border-radius: 6px; padding: 8px 10px; margin-top: 7px;
+}
+.diff-del{ display: block; color: var(--verm-deep); text-decoration: line-through; opacity: .75; }
+.diff-add{ display: block; color: var(--olive); }
+
+/* approval block gets the full 3-mode intervention */
+.activity.act-approval{ border-color: rgba(194,59,30,.3); }
+.intervene-wrap{ display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.mode-card{ border: 1px solid var(--rule); border-radius: 7px; padding: 10px 11px 11px; background: var(--paper); }
+.mode-head{ display: flex; align-items: center; gap: 7px; margin-bottom: 6px; }
+.mode-num{
+  width: 16px; height: 16px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 9px; font-weight: 700;
+}
+.mode-1 .mode-num{ background: var(--verm-tint2); color: var(--verm); }
+.mode-2 .mode-num{ background: var(--slate-tint); color: var(--slate); }
+.mode-3 .mode-num{ background: rgba(33,28,22,.08); color: var(--ink-65); }
+.mode-name{ font-family: var(--serif); font-size: 11.5px; font-weight: 700; }
+.mode-1 .mode-name{ color: var(--verm); }
+.mode-2 .mode-name{ color: var(--slate); }
+.mode-desc{ font-family: var(--body); font-size: 10.5px; color: var(--ink-45); margin-bottom: 8px; }
+.mode-1 .cmd-line{
+  font-family: var(--mono); font-size: 11px; color: var(--ink); background: var(--paper-deep);
+  border: 1px solid var(--rule); border-radius: 5px; padding: 7px 9px; margin-bottom: 9px;
+}
+.approve-row{ display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+.approve-row button{
+  font-family: var(--mono); font-size: 9.5px; font-weight: 600; letter-spacing: .03em; padding: 8px 4px; border-radius: 5px;
+  border: 1px solid var(--rule-mid);
+}
+.btn-approve{ background: var(--olive-tint); color: var(--olive); border-color: rgba(92,107,63,.35); }
+.btn-deny{ background: var(--verm-tint2); color: var(--verm); border-color: rgba(194,59,30,.35); }
+.btn-always{ background: transparent; color: var(--ink-45); }
+
+.confirm-panel{ margin-top: 9px; padding: 9px 10px; border-radius: 6px; background: var(--verm-tint); border: 1px solid rgba(194,59,30,.28); display: none; }
+.confirm-panel.open{ display: block; }
+.confirm-panel p{ font-family: var(--body); font-size: 11px; color: var(--ink-65); margin-bottom: 8px; line-height: 1.4; }
+.confirm-panel p b{ color: var(--verm-deep); }
+.confirm-actions{ display: flex; gap: 7px; }
+.confirm-actions button{ flex: 1; padding: 7px; border-radius: 5px; font-family: var(--mono); font-size: 9.5px; font-weight: 600; }
+.confirm-cancel{ background: transparent; border: 1px solid var(--rule-mid); color: var(--ink-65); }
+.confirm-run{ background: var(--verm); color: #fff5ef; }
+
+.mode-2 textarea{
+  width: 100%; resize: none; border-radius: 6px; background: var(--paper-deep); border: 1px solid var(--rule);
+  font-family: var(--body); font-size: 11.5px; color: var(--ink); padding: 8px 9px; margin-bottom: 7px;
+}
+.mode-2 textarea::placeholder{ color: var(--ink-30); }
+.btn-reply-mini{
+  width: 100%; padding: 8px; border-radius: 6px; background: var(--slate-tint); color: var(--slate);
+  border: 1px solid rgba(70,88,107,.35); font-family: var(--mono); font-size: 9.5px; font-weight: 600; letter-spacing: .04em;
+}
+.mode-3 .escape-line{
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  background: var(--paper-deep); border: 1px solid var(--rule-mid); border-radius: 6px; padding: 8px 10px;
+}
+.escape-line span{ font-family: var(--mono); font-size: 10px; color: var(--ink-65); }
+.escape-line button{ font-family: var(--mono); font-size: 9.5px; font-weight: 600; color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+
+/* deep-inspection escape hatches */
+.deep-row{ margin: 6px 18px 18px; display: flex; gap: 9px; }
+.deep-btn{
+  flex: 1; display: flex; flex-direction: column; gap: 3px; padding: 12px 12px 13px; border-radius: 8px;
+  background: var(--card); border: 1px solid var(--rule); text-align: left;
+}
+.deep-btn .dk{ font-family: var(--mono); font-size: 8px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-45); }
+.deep-btn .dt{ font-family: var(--serif); font-weight: 700; font-size: 12.5px; }
+.deep-btn .dd{ font-family: var(--body); font-size: 10px; color: var(--ink-45); }
+.deep-btn:hover{ border-color: var(--verm); }
+
+/* ══════════════ COMPOSER ══════════════ */
+.composer{ margin: 4px 18px 20px; border: 1px solid var(--rule); border-radius: 10px; background: var(--card); padding: 13px 14px 14px; }
+.composer-head{ display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 9px; }
+.composer-title{ font-family: var(--serif); font-weight: 700; font-size: 12.5px; }
+.mode-chips{ display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 10px; }
+.mode-chips input[type="radio"]{ position: absolute; opacity: 0; width: 0; height: 0; }
+.mode-chip{
+  font-family: var(--mono); font-size: 9px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase;
+  padding: 5px 9px; border-radius: 999px; border: 1px solid var(--rule-mid); color: var(--ink-45); cursor: pointer;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.mode-chips input:checked + .mode-chip{ background: var(--verm); color: #fff8f3; border-color: var(--verm); }
+.mode-chips input:focus-visible + .mode-chip{ outline: 1.5px solid var(--verm); outline-offset: 2px; }
+
+.compose-target{
+  display: flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 10px; color: var(--ink-65);
+  background: var(--paper-deep); border: 1px solid var(--rule); border-radius: 6px; padding: 7px 10px; margin-bottom: 9px;
+}
+.compose-target b{ color: var(--ink); font-weight: 700; }
+.compose-target .arrow{ color: var(--verm); }
+
+.compose-previews{ position: relative; }
+.preview{ display: none; }
+#mode-instruction:checked ~ .compose-previews .preview-instruction{ display: block; }
+#mode-command:checked     ~ .compose-previews .preview-command{ display: block; }
+#mode-approval:checked    ~ .compose-previews .preview-approval{ display: block; }
+#mode-screenshot:checked  ~ .compose-previews .preview-screenshot{ display: block; }
+#mode-recording:checked   ~ .compose-previews .preview-recording{ display: block; }
+#mode-element:checked     ~ .compose-previews .preview-element{ display: block; }
+
+.preview textarea{
+  width: 100%; resize: none; border-radius: 7px; background: var(--paper-deep); border: 1px solid var(--rule);
+  font-family: var(--body); font-size: 12px; color: var(--ink); padding: 9px 10px; margin-bottom: 8px;
+}
+.preview textarea::placeholder{ color: var(--ink-30); }
+.preview-what{
+  display: flex; gap: 8px; align-items: flex-start; padding: 9px 10px; border-radius: 7px;
+  background: var(--slate-tint); border: 1px dashed rgba(70,88,107,.3); margin-bottom: 9px;
+}
+.preview-what .pw-ic{ font-size: 13px; flex: none; }
+.preview-what .pw-txt{ font-family: var(--body); font-size: 10.5px; line-height: 1.4; color: var(--ink-65); }
+.preview-what .pw-txt b{ color: var(--ink); }
+.preview-approval .preview-what{ background: var(--verm-tint); border-color: rgba(194,59,30,.3); }
+
+.compose-foot{ display: flex; align-items: center; gap: 9px; margin-top: 4px; }
+.compose-foot .push{ margin-left: auto; }
+.compose-send{
+  padding: 9px 16px; border-radius: 999px; background: var(--verm); color: #fff8f3;
+  font-family: var(--mono); font-size: 10.5px; font-weight: 600; letter-spacing: .04em;
+}
+.compose-to{ font-family: var(--mono); font-size: 9.5px; color: var(--ink-45); }
+.compose-to b{ color: var(--ink); }
+
+/* ══════════════ TERMINAL (deep inspection) ══════════════ */
+.term-head{ padding: 13px 18px 10px; border-bottom: 1px solid var(--rule); display: flex; align-items: center; gap: 8px; }
+.term-head .push{ margin-left: auto; }
+.deep-label{
+  font-family: var(--mono); font-size: 8px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-45);
+  border: 1px solid var(--rule-mid); border-radius: 3px; padding: 2px 6px;
+}
+.term-body{
+  flex: 1; padding: 15px 18px; background: #22201b; color: #e7ddc9;
+  font-family: var(--mono); font-size: 10.8px; line-height: 1.85; overflow-y: auto;
+}
+.tl{ white-space: pre-wrap; }
+.tl .pfx{ color: rgba(231,221,201,.4); margin-right: 4px; }
+.tl-welcome{ color: #e2b06a; display: block; margin-bottom: 6px; }
+.tl-welcome .path{ display: block; color: rgba(231,221,201,.4); font-size: 9.3px; margin-top: 1px; }
+.tl-user{ color: #fff; font-weight: 600; margin: 6px 0 3px; }
+.tl-user .pfx{ color: #d9724a; }
+.tl-agent .pfx{ color: #7fae7c; }
+.tl-dim{ color: rgba(231,221,201,.45); }
+.tl-diff{ display: block; padding-left: 16px; border-radius: 4px; margin: 1px 0; }
+.tl-del{ color: #e79f8c; background: rgba(217,63,30,.12); }
+.tl-add{ color: #a9d6a3; background: rgba(127,174,124,.12); }
+.tl-ok{ color: #a9d6a3; margin-top: 3px; }
+.tl-await{ color: #e2b06a; margin-top: 9px; font-weight: 600; }
+.caret{ display:inline-block; width:6px; height:12px; margin-right:6px; vertical-align:-2px; background:#e2b06a; animation: caretblink 1.1s step-end infinite; }
+@keyframes caretblink{ 0%,54%{opacity:1;} 55%,100%{opacity:0;} }
+.term-shell-row{ flex: 0 0 auto; display: flex; align-items: center; gap: 7px; padding: 10px 18px; border-top: 1px solid var(--rule); background: var(--card); }
+.term-shell-row .prompt{ font-family: var(--mono); color: var(--verm); font-size: 12px; }
+.term-shell-row input{ flex: 1; background: var(--paper-deep); border: 1px solid rgba(194,59,30,.3); border-radius: 6px; padding: 7px 9px; color: var(--ink); font-family: var(--mono); font-size: 11px; }
+.term-shell-row input::placeholder{ color: var(--ink-30); }
+.shell-warn-mini{ font-family: var(--mono); font-size: 8px; color: var(--verm); padding: 0 18px 10px; }
+
+/* ══════════════ BROWSER (deep inspection) ══════════════ */
+.brow-bar{ flex: 0 0 auto; display: flex; align-items: center; gap: 6px; padding: 10px 14px; border-bottom: 1px solid var(--rule); }
+.nav-btn{ width: 22px; height: 22px; border-radius: 5px; display: flex; align-items: center; justify-content: center; background: var(--card); border: 1px solid var(--rule); font-size: 11px; color: var(--ink-45); flex: none; }
+.urlbar{ flex: 1; min-width: 0; height: 24px; border-radius: 999px; background: var(--card); border: 1px solid var(--rule); display: flex; align-items: center; gap: 5px; padding: 0 9px; font-family: var(--mono); font-size: 9px; color: var(--ink-65); overflow: hidden; white-space: nowrap; }
+.urlbar .proto{ color: var(--ink-30); }
+.urlbar .lockdot{ width: 4px; height: 4px; border-radius: 50%; background: var(--olive); flex: none; }
+.brow-chiprow{ flex: 0 0 auto; display: flex; align-items: center; gap: 6px; padding: 9px 14px 8px; flex-wrap: wrap; }
+.chip{ font-family: var(--mono); font-size: 8.5px; color: var(--ink-65); background: var(--card); border: 1px solid var(--rule); border-radius: 999px; padding: 3px 8px; display: flex; align-items: center; gap: 4px; }
+.chip.chip-fail{ color: var(--verm); border-color: rgba(194,59,30,.35); background: var(--verm-tint); }
+.chip.chip-ok::before{ content:""; width:4px; height:4px; border-radius:50%; background: var(--olive); }
+.brow-stage{ flex: 1; padding: 4px 14px 14px; position: relative; }
+.brow-plate{ height: 100%; border-radius: 12px; overflow: hidden; background: #fff; color: #16181c; border: 1px solid var(--rule); display: flex; flex-direction: column; position: relative; font-family: var(--body); }
+.web-nav{ display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #eee; }
+.web-logo{ font-weight: 800; font-size: 12.5px; letter-spacing: -.01em; color: #16181c; font-family: var(--serif); }
+.web-cart{ font-size: 10px; color: #6b7280; }
+.web-main{ flex: 1; padding: 16px; display: flex; align-items: center; justify-content: center; }
+.order-card{ width: 100%; background: #fff; border: 1px solid #eee; border-radius: 10px; padding: 14px 16px; box-shadow: 0 6px 18px -8px rgba(0,0,0,.12); }
+.order-card h3{ font-size: 11.5px; font-weight: 700; margin-bottom: 9px; color: #16181c; }
+.order-line{ display: flex; justify-content: space-between; font-size: 11px; color: #4b5563; padding: 3.5px 0; }
+.order-line.total{ border-top: 1px solid #eee; margin-top: 6px; padding-top: 8px; font-weight: 700; color: #16181c; font-size: 12px; }
+.pay-btn{ position: relative; width: 100%; margin-top: 11px; height: 38px; border-radius: 8px; background: #16181c; color: #fff; font-size: 12px; font-weight: 700; }
+.pay-btn.selected{ outline: 2.5px solid var(--verm); outline-offset: 3px; }
+.select-tag{ position: absolute; left: 50%; transform: translateX(-50%); top: -20px; font-family: var(--mono); font-size: 7.5px; color: var(--verm); background: #211c16dd; padding: 2px 6px; border-radius: 3px; white-space: nowrap; }
+.tool-dock{ flex: 0 0 auto; display: flex; gap: 6px; padding: 0 14px 14px; overflow-x: auto; }
+.tool-btn{ flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 52px; padding: 8px 4px; border-radius: 8px; background: var(--card); border: 1px solid var(--rule); font-family: var(--mono); font-size: 8px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; color: var(--ink-45); }
+.tool-btn .ic{ font-size: 14px; }
+.tool-btn.primary{ background: var(--verm-tint2); color: var(--verm); border-color: rgba(194,59,30,.4); }
+
+/* ══════════════ EVIDENCE ══════════════ */
+.evid-head{ padding: 13px 18px 10px; border-bottom: 1px solid var(--rule); }
+#evidence-list{ padding: 14px 18px 92px; display: flex; flex-direction: column; gap: 10px; }
+.evid-card{ display: flex; gap: 11px; border: 1px solid var(--rule); border-radius: 9px; background: var(--card); padding: 10px; }
+.evid-thumb{ flex: 0 0 62px; height: 62px; border-radius: 6px; background: var(--paper-deep); display: flex; align-items: center; justify-content: center; font-size: 18px; color: var(--ink-30); border: 1px solid var(--rule); position: relative; overflow: hidden; }
+.evid-thumb.rec::after{ content:"0:14"; position:absolute; bottom:2px; right:3px; font-family:var(--mono); font-size:7px; color:#fff; background:rgba(33,28,22,.65); padding:1px 3px; border-radius:3px; }
+.evid-body{ flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.evid-kind{ font-family: var(--mono); font-size: 8.5px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--slate); }
+.evid-name{ font-family: var(--mono); font-size: 10.5px; color: var(--ink); word-break: break-all; }
+.evid-meta{ font-family: var(--body); font-size: 10px; color: var(--ink-45); }
+.evid-age{ font-family: var(--mono); font-size: 8.5px; color: var(--ink-30); }
+.evid-send{ align-self: flex-start; margin-top: 3px; font-family: var(--mono); font-size: 8.5px; font-weight: 600; letter-spacing: .04em; color: var(--verm); border: 1px solid rgba(194,59,30,.35); border-radius: 5px; padding: 4px 8px; background: var(--verm-tint); }
+
+/* ══════════════ BOTTOM SWITCHER ══════════════ */
+#dock{
+  flex: 0 0 auto; display: flex; align-items: center; gap: 6px;
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 10px));
+  border-top: 1px solid var(--rule); background: var(--card); position: relative; z-index: 30;
+}
+.dock-item{
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 4px;
+  border-radius: 999px; font-family: var(--serif); font-size: 11.5px; font-weight: 600; color: var(--ink-45);
+}
+.dock-item.active{ background: var(--verm-tint2); color: var(--verm); }
+.dock-item .ic{ font-size: 13px; }
+
+/* ══════════════ SHEETS ══════════════ */
+.sheet-overlay{
+  position: fixed; inset: 0; z-index: 200; background: rgba(33,28,22,.42);
+  display: flex; align-items: flex-end; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity .25s ease;
+}
+.sheet-overlay.open{ opacity: 1; pointer-events: auto; }
+.sheet-panel{
+  width: 393px; max-width: 100%; background: var(--paper); border: 1px solid var(--rule-mid); border-bottom: none;
+  border-radius: 20px 20px 0 0; padding: 10px 0 max(18px, env(safe-area-inset-bottom, 18px));
+  transform: translateY(24px); transition: transform .3s cubic-bezier(.22,1,.36,1);
+  max-height: 84vh; overflow-y: auto; box-shadow: 0 -20px 60px -20px rgba(33,28,22,.4);
+}
+.sheet-overlay.open .sheet-panel{ transform: translateY(0); }
+.sheet-grabber{ width: 36px; height: 4px; border-radius: 999px; background: var(--rule-mid); margin: 0 auto 12px; }
+.sheet-title-row{ display: flex; align-items: center; justify-content: space-between; padding: 0 16px 12px; border-bottom: 1px solid var(--rule); }
+.sheet-title{ font-family: var(--serif); font-size: 13px; font-weight: 700; }
+.sheet-x{ width: 24px; height: 24px; border-radius: 50%; background: var(--paper-deep); display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--ink-45); }
+.sheet-body{ padding: 14px 16px 4px; }
+
+.send-target{ display: flex; align-items: center; gap: 8px; padding: 10px 11px; border-radius: 8px; background: var(--paper-deep); border: 1px solid var(--rule); margin-bottom: 12px; }
+.send-target .tgt-dot{ width: 7px; height: 7px; border-radius: 50%; background: var(--olive); flex: none; }
+.send-target b{ font-family: var(--serif); font-size: 12.5px; }
+.send-target span{ font-family: var(--mono); font-size: 9.5px; color: var(--ink-30); }
+.send-target .push{ margin-left: auto; }
+
+.attach-row{ display: flex; gap: 9px; margin-bottom: 12px; }
+.attach-thumb{ flex: 0 0 58px; height: 58px; border-radius: 7px; background: var(--paper-deep); border: 1px solid var(--rule); display: flex; align-items: center; justify-content: center; font-size: 16px; color: var(--ink-30); }
+.attach-meta{ display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+.attach-meta .u{ font-family: var(--mono); font-size: 10px; color: var(--ink-65); }
+.attach-meta .v{ font-family: var(--mono); font-size: 9px; color: var(--ink-30); }
+
+.send-note textarea{ width: 100%; resize: none; border-radius: 8px; background: var(--paper-deep); border: 1px solid var(--rule); padding: 9px 10px; font-family: var(--body); font-size: 11.5px; color: var(--ink); margin-bottom: 12px; }
+.send-note textarea::placeholder{ color: var(--ink-30); }
+
+.yaml-box{ border-radius: 8px; background: #211c16; color: #e7ddc9; border: 1px solid var(--rule); padding: 11px 12px; font-family: var(--mono); font-size: 9.5px; line-height: 1.75; white-space: pre; overflow-x: auto; margin-bottom: 14px; }
+.yaml-box .yk{ color: #e2b06a; }
+.yaml-box .ys{ color: #a9d6a3; }
+
+.sheet-foot-row{ display: flex; gap: 9px; padding: 0 16px 4px; }
+.sheet-foot-row button{ flex: 1; padding: 12px; border-radius: 9px; font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .05em; }
+.btn-cancel{ background: transparent; border: 1px solid var(--rule-mid); color: var(--ink-65); }
+.btn-send{ background: var(--verm); color: #fff8f3; border: 1px solid var(--verm-deep); }
+
+/* ══════════════ CORNER TAG ══════════════ */
+#corner-tag{
+  position: fixed; right: 16px; bottom: 16px; z-index: 5;
+  font-family: var(--mono); font-size: 9px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-65);
+  background: rgba(255,253,248,.85); backdrop-filter: blur(8px);
+  border: 1px solid var(--rule-mid); border-radius: 999px; padding: 5px 12px;
+}
+#corner-tag b{ color: var(--verm); }
+
+/* ══════════════ RESPONSIVE COLLAPSE ══════════════ */
+@media (max-width: 430px){
+  html{ overflow-x: hidden; }
+  body{ padding: 0; align-items: stretch; overflow-x: hidden; }
+  .backdrop{ width: 100%; height: 100vh; }
+  .phone{ width: 100%; height: 100vh; border-radius: 0; padding: 0; box-shadow: none; }
+  .screen-shell{ border-radius: 0; height: 100vh; }
+  .notch{ display: none; }
+  #corner-tag{ display: none; }
+}
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{ animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="backdrop">
+  <div class="phone">
+    <div class="notch" aria-hidden="true"></div>
+    <div class="screen-shell">
+
+      <div class="iosbar" aria-hidden="true">
+        <span class="lead">9:41</span>
+        <span class="glyphs">
+          <span class="sig-bars"><i></i><i></i><i></i><i></i></span>
+          <span class="wifi-glyph">▲</span>
+          <span class="batt"><i></i></span>
+        </span>
+      </div>
+
+      <div id="status-strip">
+        <span class="brand-chip"><span class="brand-name">Chromux</span><span class="brand-sub">Agent Inbox</span></span>
+        <span class="strip-sep"></span>
+        <span class="strip-item"><i class="strip-dot dot-online"></i>home-mac · SSH 42ms</span>
+        <span class="push"></span>
+        <span class="strip-item"><i class="strip-dot dot-flight"></i>1 in-flight</span>
+      </div>
+
+      <div id="screens">
+
+        <!-- ───── HOME (inbox) ───── -->
+        <section id="screen-home" class="screen active">
+          <div class="screen-pad">
+
+            <div class="totals-strip">
+              <div class="totals-cell t-need"><span class="totals-num">3</span><span class="totals-cap">Need You</span></div>
+              <div class="totals-cell t-work"><span class="totals-num">5</span><span class="totals-cap">Working</span></div>
+              <div class="totals-cell t-done"><span class="totals-num">2</span><span class="totals-cap">Completed</span></div>
+              <div class="totals-cell t-off"><span class="totals-num">1</span><span class="totals-cap">Offline</span></div>
+            </div>
+
+            <!-- Needs response -->
+            <div class="group-head"><span class="group-mark m-need"></span><span class="group-title">Needs response</span><span class="group-count">1</span></div>
+            <div class="inbox-list">
+              <button class="inbox-item urgent" data-open="session">
+                <div class="inbox-top">
+                  <span class="inbox-agent">Claude</span>
+                  <span class="inbox-session">checkout-flow</span>
+                  <span class="inbox-time">6m ago</span>
+                </div>
+                <div class="inbox-line">Fixed the CTA overflow — <b>wants to run a database migration</b> before continuing.</div>
+                <div class="inbox-meta-row"><span class="inbox-host">home-mac</span><span>fix/cta-overflow</span><span>elapsed 18m</span></div>
+              </button>
+            </div>
+
+            <!-- Ready for review -->
+            <div class="group-head"><span class="group-mark m-review"></span><span class="group-title">Ready for review</span><span class="group-count">1</span></div>
+            <div class="inbox-list">
+              <button class="inbox-item" data-open="browser">
+                <div class="inbox-top">
+                  <span class="inbox-agent">Grok</span>
+                  <span class="inbox-session">landing-page</span>
+                  <span class="inbox-time">2m ago</span>
+                </div>
+                <div class="inbox-line">Updated the landing page · <b>4 files changed</b> · preview available at localhost:5173.</div>
+                <div class="inbox-meta-row"><span class="inbox-host">home-mac</span><span>main</span></div>
+              </button>
+            </div>
+
+            <!-- Running -->
+            <div class="group-head"><span class="group-mark m-running"></span><span class="group-title">Running</span><span class="group-count">5</span></div>
+            <div class="inbox-list">
+              <button class="inbox-item" data-open="session">
+                <div class="inbox-top"><span class="inbox-agent">Claude</span><span class="inbox-session">worker-queue</span><span class="inbox-time">running 4m</span></div>
+                <div class="inbox-line">Refactoring retry logic in <b>src/retry.ts</b>.</div>
+                <div class="inbox-meta-row"><span class="inbox-host">staging-2</span><span>refactor/retry-backoff</span></div>
+              </button>
+              <button class="inbox-item" data-open="session">
+                <div class="inbox-top"><span class="inbox-agent">Codex</span><span class="inbox-session">docs-site</span><span class="inbox-time">running 12m</span></div>
+                <div class="inbox-line">Writing the changelog entry for the July release.</div>
+                <div class="inbox-meta-row"><span class="inbox-host">home-mac</span><span>docs/changelog-2026-07</span></div>
+              </button>
+              <button class="inbox-item" data-open="session">
+                <div class="inbox-top"><span class="inbox-agent">Claude</span><span class="inbox-session">auth-service</span><span class="inbox-time">running 1m</span></div>
+                <div class="inbox-line">Running the test suite · 142 of 210 tests passed so far.</div>
+                <div class="inbox-meta-row"><span class="inbox-host">staging-2</span><span>test/full-suite</span></div>
+              </button>
+              <button class="inbox-item" data-open="session">
+                <div class="inbox-top"><span class="inbox-agent">Grok</span><span class="inbox-session">mobile-app</span><span class="inbox-time">running 8m</span></div>
+                <div class="inbox-line">Fixing lint errors — 6 of 14 warnings resolved.</div>
+                <div class="inbox-meta-row"><span class="inbox-host">home-mac</span><span>fix/lint-warnings</span></div>
+              </button>
+              <button class="inbox-item" data-open="session">
+                <div class="inbox-top"><span class="inbox-agent">Codex</span><span class="inbox-session">analytics</span><span class="inbox-time">silent 22m</span></div>
+                <div class="inbox-line">Has been quiet for <b>22 minutes</b> — last seen reading schema.sql. Worth a nudge.</div>
+                <div class="inbox-meta-row"><span class="inbox-host">home-mac</span><span>chore/event-schema</span></div>
+              </button>
+            </div>
+
+            <!-- Recently completed -->
+            <div class="group-head"><span class="group-mark m-done"></span><span class="group-title">Recently completed</span><span class="group-count">2</span></div>
+            <div class="inbox-list">
+              <button class="inbox-item" data-open="session">
+                <div class="inbox-top"><span class="inbox-agent">Claude</span><span class="inbox-session">payments-api</span><span class="inbox-time">18m ago</span></div>
+                <div class="inbox-line">Finished payments-api · 3 files changed.</div>
+                <div class="inbox-meta-row"><span class="inbox-host">staging-2</span><span>fix/webhook-retry</span></div>
+              </button>
+              <button class="inbox-item" data-open="session">
+                <div class="inbox-top"><span class="inbox-agent">Codex</span><span class="inbox-session">search-index</span><span class="inbox-time">1h ago</span></div>
+                <div class="inbox-line">Finished search-index — tests pass.</div>
+                <div class="inbox-meta-row"><span class="inbox-host">home-mac</span><span>feat/reindex-batching</span></div>
+              </button>
+            </div>
+
+            <!-- Connection problems -->
+            <div class="group-head"><span class="group-mark m-problem"></span><span class="group-title">Connection problems</span><span class="group-count">2</span></div>
+            <div class="inbox-list">
+              <button class="inbox-item" data-open="session">
+                <div class="inbox-top"><span class="inbox-agent">Codex</span><span class="inbox-session">api-server</span><span class="inbox-time">12m ago</span></div>
+                <div class="inbox-line">Exited unexpectedly (code 0) — nothing pending, but the session ended without a handoff.</div>
+                <div class="inbox-meta-row"><span class="inbox-host">staging-2</span><span>main</span></div>
+              </button>
+              <button class="inbox-item" data-open="session">
+                <div class="inbox-top"><span class="inbox-agent">Claude</span><span class="inbox-session">ci-runner</span><span class="inbox-time">26m ago</span></div>
+                <div class="inbox-line">Lost connection to <b>build-server</b> — the host has been offline for 26 minutes.</div>
+                <div class="inbox-meta-row"><span class="inbox-host">build-server</span><span>relay</span></div>
+                <div class="durable-inline">session persists on disconnect — nothing is lost</div>
+              </button>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- ───── SESSION (conversational, checkout-flow) ───── -->
+        <section id="screen-session" class="screen">
+          <div class="sess-header">
+            <button class="back-btn" data-open="home" aria-label="Back to inbox">‹ Inbox</button>
+            <div class="sess-title-wrap">
+              <span class="sess-title">checkout-flow <span class="agent">· claude</span></span>
+              <span class="sess-sub">home-mac · ~/projects/shop/checkout-flow · fix/cta-overflow</span>
+            </div>
+            <span class="push"></span>
+            <span class="durable-badge">Durable</span>
+          </div>
+
+          <div class="screen-pad" style="padding-top:0;">
+
+            <div class="letterhead">
+              <div class="letterhead-open">From Claude, 6 minutes ago —</div>
+              <p>I fixed the checkout CTA overflow and the dev server has already reloaded with the change. Before I go further I need to run a database migration for the new orders table, and I'd rather you take a look first.</p>
+            </div>
+
+            <div class="activity-list">
+              <details class="activity" open>
+                <summary>
+                  <span class="act-icon">✎</span>
+                  <span class="act-title">Modified files</span>
+                  <span class="act-sub">1 file</span>
+                  <span class="act-caret">▸</span>
+                </summary>
+                <div class="act-body">
+                  Edited <code>src/styles/checkout.css</code> to stop the CTA row from overflowing its container.
+                  <div class="diff-block">
+                    <span class="diff-del">− .cta-row { width: 120%; }</span>
+                    <span class="diff-add">+ .cta-row { width: 100%; max-width: 480px; }</span>
+                  </div>
+                </div>
+              </details>
+
+              <details class="activity">
+                <summary>
+                  <span class="act-icon">▶</span>
+                  <span class="act-title">Started preview</span>
+                  <span class="act-sub">reloaded</span>
+                  <span class="act-caret">▸</span>
+                </summary>
+                <div class="act-body">
+                  Dev server reloaded automatically after the edit. The button no longer overflows — preview is live at <code>localhost:5173/checkout</code>.
+                </div>
+              </details>
+
+              <details class="activity act-approval" open>
+                <summary>
+                  <span class="act-icon">◆</span>
+                  <span class="act-title">Requested approval</span>
+                  <span class="act-sub">waiting 6m</span>
+                  <span class="act-caret">▸</span>
+                </summary>
+                <div class="act-body">
+                  Needs the new orders table locally, which means running a migration. This is the moment that needs you — three different ways to respond, clearly separated so there's no mistaking one for another.
+
+                  <div class="intervene-wrap">
+                    <div class="mode-card mode-1">
+                      <div class="mode-head"><span class="mode-num">1</span><span class="mode-name">Approve the tool call</span></div>
+                      <div class="mode-desc">Grant or refuse this exact command.</div>
+                      <div class="cmd-line">$ npm run db:migrate</div>
+                      <div class="approve-row">
+                        <button class="btn-approve" id="btn-approve">Approve</button>
+                        <button class="btn-deny" id="btn-deny">Deny</button>
+                        <button class="btn-always">Always Allow</button>
+                      </div>
+                      <div class="confirm-panel" id="confirm-approve">
+                        <p>This runs a database migration against <b>home-mac</b>. Confirm before it executes.</p>
+                        <div class="confirm-actions">
+                          <button class="confirm-cancel" id="confirm-cancel">Cancel</button>
+                          <button class="confirm-run" id="confirm-run">Confirm &amp; Run</button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="mode-card mode-2">
+                      <div class="mode-head"><span class="mode-num">2</span><span class="mode-name">Reply to Claude</span></div>
+                      <div class="mode-desc">Send a plain-language message — Claude decides what to do next.</div>
+                      <textarea rows="2" placeholder="e.g. hold off until I check staging first"></textarea>
+                      <button class="btn-reply-mini">Send Reply</button>
+                    </div>
+
+                    <div class="mode-card mode-3">
+                      <div class="mode-head"><span class="mode-num">3</span><span class="mode-name">Type into the shell</span></div>
+                      <div class="mode-desc">Raw terminal input bypasses Claude entirely — a deep-inspection action, not a reply.</div>
+                      <div class="escape-line">
+                        <span>$ — direct shell access</span>
+                        <button data-open="terminal">Open terminal ›</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </details>
+            </div>
+
+            <!-- reply composer -->
+            <div class="composer">
+              <div class="composer-head">
+                <span class="composer-title">Compose</span>
+                <span class="microlabel">previews before it sends</span>
+              </div>
+
+              <div class="mode-chips">
+                <input type="radio" name="mode" id="mode-instruction" checked>
+                <label for="mode-instruction" class="mode-chip">Instruction</label>
+                <input type="radio" name="mode" id="mode-command">
+                <label for="mode-command" class="mode-chip">Command</label>
+                <input type="radio" name="mode" id="mode-approval">
+                <label for="mode-approval" class="mode-chip">Approval</label>
+                <input type="radio" name="mode" id="mode-screenshot">
+                <label for="mode-screenshot" class="mode-chip">Screenshot</label>
+                <input type="radio" name="mode" id="mode-recording">
+                <label for="mode-recording" class="mode-chip">Recording</label>
+                <input type="radio" name="mode" id="mode-element">
+                <label for="mode-element" class="mode-chip">Element</label>
+
+                <div class="compose-previews">
+                  <div class="preview preview-instruction">
+                    <textarea rows="2" placeholder="e.g. hold off on the migration until I check staging"></textarea>
+                    <div class="preview-what"><span class="pw-ic">✎</span><span class="pw-txt">Sends a <b>plain-language instruction</b> — claude reads it and decides what to do. Not a shell command.</span></div>
+                  </div>
+                  <div class="preview preview-command">
+                    <textarea rows="2" placeholder="e.g. npm run db:migrate -- --dry-run"></textarea>
+                    <div class="preview-what"><span class="pw-ic">$</span><span class="pw-txt">Sends a <b>literal command</b> for claude to execute as written — no interpretation.</span></div>
+                  </div>
+                  <div class="preview preview-approval">
+                    <div class="preview-what"><span class="pw-ic">◆</span><span class="pw-txt">Sends an <b>approval decision</b> for the pending <code style="font-family:var(--mono)">npm run db:migrate</code> request — use the approval block above instead of typing this.</span></div>
+                  </div>
+                  <div class="preview preview-screenshot">
+                    <div class="preview-what"><span class="pw-ic">⎙</span><span class="pw-txt">Attaches the latest screenshot — <b>2026-07-12-0912.png</b> — with a note field for context.</span></div>
+                  </div>
+                  <div class="preview preview-recording">
+                    <div class="preview-what"><span class="pw-ic">●</span><span class="pw-txt">Attaches <b>checkout-tap-flow.webm</b> — 0:14, 3 taps, 1 console error.</span></div>
+                  </div>
+                  <div class="preview preview-element">
+                    <div class="preview-what"><span class="pw-ic">◎</span><span class="pw-txt">Attaches the selected element — <b>button.cta-pay</b> "Pay $48.00" · 412×88.</span></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="compose-foot">
+                <span class="compose-to">to <b>checkout-flow · claude</b> @ home-mac</span>
+                <span class="push"></span>
+                <button class="compose-send" data-open-sheet="sheet-send">Preview &amp; Send</button>
+              </div>
+            </div>
+
+            <div class="microlabel" style="margin: 4px 18px 8px;">Deep inspection — leave the conversation</div>
+            <div class="deep-row">
+              <button class="deep-btn" data-open="terminal"><span class="dk">Escape hatch</span><span class="dt">Terminal ›</span><span class="dd">Raw scrollback, direct shell</span></button>
+              <button class="deep-btn" data-open="browser"><span class="dk">Escape hatch</span><span class="dt">Browser ›</span><span class="dd">Paired remote preview</span></button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ───── TERMINAL ───── -->
+        <section id="screen-terminal" class="screen">
+          <div class="term-head">
+            <button class="back-btn" data-open="session" aria-label="Back to conversation">‹ checkout-flow</button>
+            <span class="deep-label">Deep inspection</span>
+            <span class="push"></span>
+            <i class="strip-dot dot-flight" title="streaming"></i>
+          </div>
+          <div class="term-body">
+<div class="tl tl-welcome">✻ Welcome to Claude Code!<span class="path">~/projects/shop/checkout-flow</span></div>
+<div class="tl tl-user"><span class="pfx">&gt;</span>fix the CTA overflow on the checkout page</div>
+<div class="tl tl-agent"><span class="pfx">●</span>I'll look at the checkout component styles.</div>
+<div class="tl tl-agent tl-dim"><span class="pfx">●</span>Read src/components/CheckoutCTA.tsx (84 lines)</div>
+<div class="tl tl-agent tl-dim"><span class="pfx">●</span>Edit src/styles/checkout.css</div>
+<div class="tl tl-diff tl-del">− .cta-row { width: 120%; }</div>
+<div class="tl tl-diff tl-add">+ .cta-row { width: 100%; max-width: 480px; }</div>
+<div class="tl tl-ok"><span class="pfx">✔</span>Change applied — dev server reloaded</div>
+<div class="tl tl-agent"><span class="pfx">●</span>The button no longer overflows. Preview updated.</div>
+<div class="tl tl-agent"><span class="pfx">●</span>Next I need the new orders table locally.</div>
+<div class="tl tl-await">⚠ APPROVAL REQUIRED<br>&nbsp;&nbsp;npm run db:migrate</div>
+<div class="tl tl-dim"><span class="caret"></span>waiting for your decision…</div>
+          </div>
+          <div class="term-shell-row">
+            <span class="prompt">$</span>
+            <input type="text" placeholder="type into the shell directly…" />
+          </div>
+          <div class="shell-warn-mini">⚠ raw shell input bypasses claude — not the same as replying above</div>
+        </section>
+
+        <!-- ───── BROWSER ───── -->
+        <section id="screen-browser" class="screen">
+          <div class="brow-bar">
+            <button class="back-btn" data-open="session" aria-label="Back">‹</button>
+            <button class="nav-btn">←</button>
+            <button class="nav-btn">→</button>
+            <button class="nav-btn">↻</button>
+            <div class="urlbar"><span class="lockdot"></span><span class="proto">http://</span>localhost:5173/checkout</div>
+          </div>
+          <div class="brow-chiprow">
+            <span class="deep-label">Deep inspection</span>
+            <span class="chip">iPhone 15 · 393×852</span>
+            <span class="chip chip-ok">console: 0</span>
+            <span class="chip chip-fail">net: 1 failed</span>
+          </div>
+          <div class="brow-stage">
+            <div class="brow-plate">
+              <div class="web-nav"><span class="web-logo">shopflow</span><span class="web-cart">Cart · 1</span></div>
+              <div class="web-main">
+                <div class="order-card">
+                  <h3>Order summary</h3>
+                  <div class="order-line"><span>Canvas Tote × 1</span><span>$38.00</span></div>
+                  <div class="order-line"><span>Shipping</span><span>$10.00</span></div>
+                  <div class="order-line total"><span>Total</span><span>$48.00</span></div>
+                  <button class="pay-btn selected">
+                    <span class="select-tag">button.cta-pay · 412×88</span>
+                    Pay $48.00
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="tool-dock">
+            <button class="tool-btn primary"><span class="ic">◎</span>Inspect</button>
+            <button class="tool-btn"><span class="ic">☞</span>Tap</button>
+            <button class="tool-btn"><span class="ic">⌨</span>Type</button>
+            <button class="tool-btn"><span class="ic">↕</span>Scroll</button>
+            <button class="tool-btn"><span class="ic">▭</span>Viewport</button>
+            <button class="tool-btn"><span class="ic">◧</span>Back</button>
+            <button class="tool-btn"><span class="ic">◨</span>Fwd</button>
+            <button class="tool-btn"><span class="ic">↻</span>Reload</button>
+            <button class="tool-btn" data-open-sheet="sheet-send"><span class="ic">⎙</span>Screenshot</button>
+            <button class="tool-btn"><span class="ic">●</span>Record</button>
+          </div>
+        </section>
+
+        <!-- ───── EVIDENCE ───── -->
+        <section id="screen-evidence" class="screen">
+          <div class="evid-head">
+            <button class="back-btn" data-open="session" aria-label="Back">‹ checkout-flow</button>
+            <div class="group-head" style="margin: 8px 0 0;"><span class="group-title">Evidence reel</span><span class="group-count">3</span></div>
+          </div>
+          <div id="evidence-list">
+            <div class="evid-card">
+              <div class="evid-thumb">⎙</div>
+              <div class="evid-body">
+                <span class="evid-kind">Screenshot</span>
+                <span class="evid-name">2026-07-12-0912.png</span>
+                <span class="evid-meta">checkout CTA after fix</span>
+                <span class="evid-age">2m ago</span>
+                <button class="evid-send" data-open-sheet="sheet-send">Send to agent →</button>
+              </div>
+            </div>
+            <div class="evid-card">
+              <div class="evid-thumb rec">●</div>
+              <div class="evid-body">
+                <span class="evid-kind">Recording</span>
+                <span class="evid-name">checkout-tap-flow.webm</span>
+                <span class="evid-meta">3 taps · 1 console error · iPhone 15</span>
+                <span class="evid-age">9m ago</span>
+                <button class="evid-send" data-open-sheet="sheet-send">Send to agent →</button>
+              </div>
+            </div>
+            <div class="evid-card">
+              <div class="evid-thumb">◎</div>
+              <div class="evid-body">
+                <span class="evid-kind">Element capture</span>
+                <span class="evid-name">button.cta-pay</span>
+                <span class="evid-meta">"Pay $48.00" · 412×88</span>
+                <span class="evid-age">11m ago</span>
+                <button class="evid-send" data-open-sheet="sheet-send">Send to agent →</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- ═══════ BOTTOM SWITCHER ═══════ -->
+      <nav id="dock" aria-label="Session switcher">
+        <button class="dock-item" data-open="session"><span class="ic">✉</span>Agent</button>
+        <button class="dock-item" data-open="terminal"><span class="ic">▤</span>Terminal</button>
+        <button class="dock-item" data-open="browser"><span class="ic">◧</span>Browser</button>
+        <button class="dock-item" data-open="evidence"><span class="ic">▣</span>Evidence</button>
+      </nav>
+
+    </div>
+  </div>
+
+  <div id="corner-tag"><b>№ 02</b> · Agent Inbox</div>
+</div>
+
+<!-- ═══════ SEND SHEET ═══════ -->
+<div class="sheet-overlay" id="overlay-send" data-overlay-for="sheet-send">
+  <div class="sheet-panel" id="sheet-send" role="dialog" aria-modal="true" aria-label="Send evidence to agent">
+    <div class="sheet-grabber" aria-hidden="true"></div>
+    <div class="sheet-title-row">
+      <span class="sheet-title">Send to Agent</span>
+      <button class="sheet-x" data-close-sheet aria-label="Close">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="send-target">
+        <i class="tgt-dot"></i>
+        <div><b>checkout-flow · claude</b><br /><span>home-mac</span></div>
+        <span class="push"></span>
+        <span class="microlabel">Target</span>
+      </div>
+
+      <div class="attach-row">
+        <div class="attach-thumb">⎙</div>
+        <div class="attach-meta">
+          <span class="u">localhost:5173/checkout</span>
+          <span class="v">viewport 393×852</span>
+          <span class="v">2026-07-12-0912.png</span>
+        </div>
+      </div>
+
+      <label class="send-note">
+        <span class="microlabel">Note to agent</span>
+        <textarea rows="2" spellcheck="false" placeholder="e.g. the CTA still clips at 320px — check small viewports"></textarea>
+      </label>
+
+      <span class="microlabel">Payload preview</span>
+<pre class="yaml-box"><span class="yk">chromux_capture:</span> <span class="ys">v1</span>
+<span class="yk">session:</span> checkout-flow
+<span class="yk">agent:</span> claude
+<span class="yk">host:</span> home-mac
+<span class="yk">url:</span> <span class="ys">http://localhost:5173/checkout</span>
+<span class="yk">viewport:</span> 393x852
+<span class="yk">note:</span> CTA verified after fix
+<span class="yk">screenshot:</span> <span class="ys">~/.chromux/captures/2026-07-12-0912.png</span>
+<span class="yk">console_errors:</span> []
+<span class="yk">network_failures:</span>
+  - POST /api/telemetry (503)</pre>
+    </div>
+    <div class="sheet-foot-row">
+      <button class="btn-cancel" data-close-sheet>Cancel</button>
+      <button class="btn-send">Send — claude</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var screens = document.querySelectorAll('.screen');
+  var dockItems = document.querySelectorAll('.dock-item');
+
+  function showScreen(name){
+    var targetId = 'screen-' + name;
+    screens.forEach(function(s){ s.classList.toggle('active', s.id === targetId); });
+    dockItems.forEach(function(d){ d.classList.toggle('active', d.getAttribute('data-open') === name); });
+    var active = document.getElementById(targetId);
+    if (active) active.scrollTop = 0;
+  }
+
+  document.querySelectorAll('[data-open]').forEach(function(el){
+    el.addEventListener('click', function(){
+      showScreen(el.getAttribute('data-open'));
+    });
+  });
+
+  function openSheet(id){
+    var overlay = document.querySelector('[data-overlay-for="' + id + '"]');
+    if (overlay) overlay.classList.add('open');
+  }
+  function closeSheets(){
+    document.querySelectorAll('.sheet-overlay').forEach(function(o){ o.classList.remove('open'); });
+  }
+
+  document.querySelectorAll('[data-open-sheet]').forEach(function(el){
+    el.addEventListener('click', function(e){
+      e.stopPropagation();
+      openSheet(el.getAttribute('data-open-sheet'));
+    });
+  });
+  document.querySelectorAll('[data-close-sheet]').forEach(function(el){
+    el.addEventListener('click', closeSheets);
+  });
+  document.querySelectorAll('.sheet-overlay').forEach(function(overlay){
+    overlay.addEventListener('click', function(e){
+      if (e.target === overlay) closeSheets();
+    });
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') closeSheets();
+  });
+
+  // destructive confirm step for approve
+  var approveBtn = document.getElementById('btn-approve');
+  var confirmPanel = document.getElementById('confirm-approve');
+  var confirmCancel = document.getElementById('confirm-cancel');
+  var confirmRun = document.getElementById('confirm-run');
+  if (approveBtn && confirmPanel){
+    approveBtn.addEventListener('click', function(e){ e.preventDefault(); confirmPanel.classList.add('open'); });
+    confirmCancel.addEventListener('click', function(){ confirmPanel.classList.remove('open'); });
+    confirmRun.addEventListener('click', function(){ confirmPanel.classList.remove('open'); });
+  }
+})();
+</script>
+</body>
+</html>

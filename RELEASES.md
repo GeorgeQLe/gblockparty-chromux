@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.23.0
+
+Tag: `chromux-v0.23.0`
+
+- Add seven mobile Chromux interaction prototypes (Mission Control, Agent Inbox, Browser Field Kit, Timeline / Black Box, Deck of Agents, Command Lens, Remote Workbench) under `mobile-prototypes/`, exploring the phone as a remote agent command center rather than a miniature desktop IDE.
+- Share one fabricated fleet state, layered-context structure (`screen-home` → `screen-session` → `screen-terminal`/`screen-browser` → `screen-evidence` → `sheet-send`), and intervention-safety contract across all seven prototypes via `mobile-prototypes/SPEC.md` so the directions are directly comparable.
+- Publish the mobile gallery at `/mobile/` on the static site, link it from the landing page, and extend the website route regression test to verify both the 16 design routes and the 7 mobile routes.
+
 ## GBlockParty Chromux v0.22.1
 
 Tag: `chromux-v0.22.1`
