@@ -1,5 +1,10 @@
 # Chromux Design Refresh Prototypes
 
+Open `index.html` to browse the desktop concepts. Gallery cards route through
+`viewer.html`, which validates the selected filename and scales the unchanged
+1440×900 prototype to fit the available viewport. The numbered HTML files stay
+self-contained and are used as the viewer's iframe sources.
+
 Thirty-six self-contained visual design explorations for the Chromux desktop app.
 These are **static HTML mockups only** — they do not replace or modify the
 shipping app in `prototype/`. Each file mocks the full main window (titlebar,

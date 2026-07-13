@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.25.0
+
+Tag: `chromux-v0.25.0`
+
+- Present all thirty-six fixed 1440×900 desktop concepts through a shared scale-to-fit viewer that centers the complete design at narrower viewport sizes without document overflow.
+- Preserve every clean `/designs/<slug>` route and page title while moving unchanged iframe sources to the internal `/designs/raw/` build directory.
+- Route the local desktop gallery through the same allowlisted viewer, retain unchanged mobile gallery routing, and add route, viewport, overflow, focus, modal, and visual regression coverage.
+
 ## GBlockParty Chromux v0.24.2
 
 Tag: `chromux-v0.24.2`

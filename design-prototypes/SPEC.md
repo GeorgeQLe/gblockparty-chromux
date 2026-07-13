@@ -6,9 +6,14 @@ progressive enhancement but MUST have strong locally-installed macOS fallbacks,
 e.g. Avenir Next, Futura, Optima, Charter, Iowan Old Style, Didot, American
 Typewriter, Menlo, SF Mono, Monaco).
 
-The file mocks the FULL Chromux main window at a fixed desktop viewport
-(min-width ~1280px, fills 100vh, `overflow: hidden` on body). It is a static
-visual prototype: no real terminal or webview — fabricate believable content.
+The file mocks the FULL Chromux main window on a canonical fixed 1440×900
+desktop canvas (`overflow: hidden` on body). The concept itself does not reflow:
+responsive presentation is handled by `viewer.html`, which proportionally
+scales and centers the complete canvas whenever the available viewport is
+smaller than 1440×900. Future desktop concepts must be linked and published
+through that viewer rather than exposed directly with clipped overflow. It is a
+static visual prototype: no real terminal or webview — fabricate believable
+content.
 
 ## Required regions (must all be present, restyled in your design language)
 
