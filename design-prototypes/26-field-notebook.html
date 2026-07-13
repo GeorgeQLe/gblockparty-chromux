@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Chromux — Field Notebook</title>
+<style>
+/* ============================================================
+   CHROMUX · FIELD NOTEBOOK — weatherproof expedition gear
+   olive canvas chrome · graph-paper panels · stamped stencil
+   labels · grease-pencil marks · rivets, straps & photo tabs
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Permanent+Marker&display=swap');
+
+:root{
+  /* the kit */
+  --canvas:        #4d4b38;   /* olive drab shell */
+  --canvas-deep:   #3e3d2d;   /* shadowed webbing */
+  --canvas-lite:   #5a5842;   /* raised strap */
+  --khaki:         #b3a985;   /* worn khaki trim */
+  --khaki-dim:     #8d8666;
+  --paper:         #f0ecd8;   /* rite-in-the-rain page */
+  --paper-shade:   #e4dfc6;
+  --grid-line:     rgba(122,150,116,.35);  /* graph rules */
+  --grid-bold:     rgba(122,150,116,.55);
+  --ink:           #2c2a1f;   /* field ink */
+  --ink-soft:      #565239;
+  --ink-faint:     #85805f;
+  --stamp:         #a8402c;   /* rubber-stamp red */
+  --stamp-soft:    rgba(168,64,44,.12);
+  --blaze:         #d4702a;   /* safety-orange primary */
+  --blaze-deep:    #b4581a;
+  --pine:          #6d8a4a;   /* live / go */
+  --pine-deep:     #55703a;
+  --signal:        #c9971f;   /* attention amber */
+  --creek:         #56808f;   /* info blue */
+  --grease:        #35311f;   /* grease pencil black */
+  --scope:         #171a12;   /* device screen */
+  --scope-bezel:   #23261a;
+  --scope-green:   #cfe3ae;   /* phosphor readout */
+  --scope-dim:     #7c8f63;
+  --brass:         #c8a557;
+
+  --font-stencil:'Oswald','Avenir Next Condensed','Futura',
+                 'Arial Narrow',sans-serif;
+  --font-mono:'Courier Prime','American Typewriter','Courier New',
+              Menlo,monospace;
+  --font-grease:'Permanent Marker','Marker Felt','Comic Sans MS',cursive;
+
+  --stitch:1px dashed rgba(240,236,216,.38);
+  --shadow-kit: 0 2px 3px rgba(20,20,10,.35), 0 10px 22px rgba(20,20,10,.28);
+  --shadow-page: 0 1px 2px rgba(44,42,31,.18), 0 7px 16px rgba(44,42,31,.22);
+}
+
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  min-width:1280px; height:100vh; overflow:hidden;
+  display:flex; flex-direction:column;
+  background:var(--canvas); color:var(--paper);
+  font-family:var(--font-stencil); font-size:13px; line-height:1.45;
+  -webkit-font-smoothing:antialiased; position:relative;
+}
+/* canvas weave — coarse duck-cloth twill */
+body::before{
+  content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background:
+    repeating-linear-gradient(63deg,  rgba(0,0,0,.10) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(-63deg, rgba(240,236,216,.05) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(0deg,   rgba(0,0,0,.05) 0 2px, transparent 2px 5px);
+}
+body::after{
+  content:''; position:fixed; inset:0; z-index:0; pointer-events:none; opacity:.09;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+button{font-family:inherit; color:inherit; background:none; border:none; cursor:pointer;}
+.hidden{display:none !important;}
+
+/* thump-in on load — gear dropped on the table */
+@keyframes thump{from{opacity:0; transform:translateY(-7px);} to{opacity:1; transform:none;}}
+.thump{animation:thump .4s cubic-bezier(.2,.9,.3,1.15) both; animation-delay:var(--d,0s);}
+
+/* graph paper sheet — reusable */
+.graph{
+  background:
+    linear-gradient(var(--grid-bold) 1px, transparent 1px) 0 0/100% 96px,
+    linear-gradient(90deg, var(--grid-bold) 1px, transparent 1px) 0 0/96px 100%,
+    linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0/100% 16px,
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0/16px 100%,
+    var(--paper);
+}
+/* brass rivet — reusable dot */
+.rivet{
+  position:absolute; width:9px; height:9px; border-radius:50%; z-index:4;
+  background:radial-gradient(circle at 34% 30%, #e5cc8a, var(--brass) 46%, #7d6430 88%);
+  box-shadow:0 1px 2px rgba(0,0,0,.5), inset 0 -1px 1px rgba(0,0,0,.35);
+  pointer-events:none;
+}
+/* ============================================================
+   1 · TITLEBAR — the top webbing strap
+   ============================================================ */
+#titlebar{
+  position:relative; z-index:6; flex:none; height:46px;
+  display:flex; align-items:center; gap:16px;
+  padding:0 16px 0 84px;                       /* traffic-light gutter */
+  background:linear-gradient(to bottom, var(--canvas-lite), var(--canvas-deep));
+  border-bottom:1px solid #2c2b1e;
+  box-shadow:0 2px 5px rgba(15,15,8,.35);
+  -webkit-app-region:drag;
+}
+#titlebar::before, #titlebar::after{  /* stitching along the strap */
+  content:''; position:absolute; left:0; right:0; height:0; pointer-events:none;
+  border-top:var(--stitch);
+}
+#titlebar::before{top:4px;} #titlebar::after{bottom:4px;}
+#titlebar button{-webkit-app-region:no-drag;}
+
+.brand{display:flex; align-items:center; gap:10px;}
+.brand-mark{
+  display:grid; place-items:center; width:30px; height:30px;
+  background:var(--paper); border-radius:4px;
+  border:1px solid var(--khaki-dim);
+  box-shadow:0 1px 2px rgba(0,0,0,.4), inset 0 0 0 2px var(--paper), inset 0 0 0 3px var(--khaki);
+  transform:rotate(-2deg);
+}
+.brand-name{
+  font-size:17px; font-weight:700; letter-spacing:.3em; text-transform:uppercase;
+  color:var(--paper); text-shadow:0 1px 0 rgba(0,0,0,.45);
+}
+.brand-sub{
+  font-size:9.5px; font-weight:600; letter-spacing:.22em; text-transform:uppercase;
+  color:var(--khaki); padding:1px 7px 2px;
+  border:1px solid rgba(179,169,133,.55); border-radius:2px;
+}
+.titlebar-spacer{flex:1;}
+
+/* gauges — stamped metal ID tags on a chain */
+.gauges{display:flex; gap:9px; align-items:center;}
+.gauge{
+  position:relative; display:flex; align-items:center; gap:6px;
+  padding:4px 11px 4px 16px;
+  background:linear-gradient(to bottom, #c6bd9c, #a89f7c);
+  border:1px solid #6f6849; border-radius:3px 10px 10px 3px;
+  box-shadow:0 1.5px 2px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.35);
+  color:var(--ink); font-size:11px; font-weight:600;
+  letter-spacing:.12em; text-transform:uppercase;
+}
+.gauge::before{  /* punched chain hole */
+  content:''; position:absolute; left:5px; top:50%; transform:translateY(-50%);
+  width:5px; height:5px; border-radius:50%;
+  background:var(--canvas-deep); box-shadow:inset 0 1px 1px rgba(0,0,0,.7), 0 1px 0 rgba(255,255,255,.4);
+}
+.gauge b{font-weight:700; font-variant-numeric:tabular-nums; font-size:12px;}
+.gdot{width:8px; height:8px; border-radius:50%; flex:none; border:1px solid rgba(0,0,0,.3);
+  box-shadow:inset 0 -1px 1px rgba(0,0,0,.35);}
+.g-go{background:var(--pine);}
+.g-hold{background:var(--signal);}
+.g-sent{background:var(--creek);}
+
+/* top buttons — chunky snap buttons */
+.top-btn{
+  padding:6px 14px 7px; font-size:11px; font-weight:700;
+  letter-spacing:.16em; text-transform:uppercase; color:var(--paper);
+  background:linear-gradient(to bottom, var(--canvas-lite), var(--canvas-deep));
+  border:1px solid #2c2b1e; border-radius:4px;
+  box-shadow:0 2px 0 #26251a, inset 0 1px 0 rgba(240,236,216,.15);
+  transition:transform .12s ease, box-shadow .12s ease;
+}
+.top-btn:hover{filter:brightness(1.12);}
+.top-btn:active{transform:translateY(2px); box-shadow:0 0 0 #26251a, inset 0 1px 0 rgba(240,236,216,.15);}
+.top-btn.update{
+  background:linear-gradient(to bottom, #e0813a, var(--blaze-deep));
+  border-color:#8a3f0e; color:#fff6e8;
+  box-shadow:0 2px 0 #7c380c, inset 0 1px 0 rgba(255,246,232,.35);
+  animation:blink 2.6s ease-in-out infinite;
+}
+@keyframes blink{0%,100%{filter:brightness(1);} 50%{filter:brightness(1.16);}}
+.top-btn.update:active{box-shadow:0 0 0 #7c380c, inset 0 1px 0 rgba(255,246,232,.35);}
+
+/* ============================================================
+   2 · APP FRAME
+   ============================================================ */
+#app{position:relative; z-index:1; flex:1; display:flex; min-height:0;}
+
+/* ============================================================
+   3 · LEFT RAIL — the canvas pocket with elastic band
+   ============================================================ */
+#rail{
+  position:relative; flex:none; width:234px;
+  display:flex; flex-direction:column; min-height:0;
+  padding:14px 12px 10px 22px;
+  background:linear-gradient(to right, var(--canvas-deep), var(--canvas) 60%);
+  border-right:1px solid #2c2b1e;
+}
+#rail::before{  /* vertical elastic band down the pocket edge */
+  content:''; position:absolute; left:6px; top:0; bottom:0; width:9px;
+  background:
+    repeating-linear-gradient(0deg, rgba(0,0,0,.3) 0 2px, transparent 2px 6px),
+    linear-gradient(to right, #6a6247, #8d8666 45%, #6a6247);
+  border-left:1px solid #2c2b1e; border-right:1px solid #2c2b1e;
+  box-shadow:2px 0 4px rgba(15,15,8,.3);
+}
+.rail-head{display:flex; align-items:center; justify-content:space-between; margin:0 0 12px;}
+.rail-title{
+  font-size:12px; font-weight:700; letter-spacing:.2em; text-transform:uppercase;
+  color:var(--khaki);
+}
+.btn-detect{
+  font-size:10px; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--khaki); padding:3px 9px 4px;
+  border:1px solid var(--khaki-dim); border-radius:3px;
+  background:rgba(0,0,0,.15);
+  transition:all .15s ease;
+}
+.btn-detect:hover{color:var(--paper); border-color:var(--khaki); background:rgba(0,0,0,.3);}
+
+#attention-list{flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column; gap:12px;}
+
+/* queue cards — field tags clipped into the pocket */
+.tag-card{
+  --edge:var(--khaki-dim); --stampc:var(--ink-faint);
+  position:relative; text-align:left; cursor:pointer;
+  background:
+    linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0/100% 14px,
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0/14px 100%,
+    var(--paper);
+  border:1px solid #9a9273; border-left:5px solid var(--edge);
+  border-radius:2px; padding:9px 11px 9px 12px;
+  color:var(--ink); box-shadow:var(--shadow-page);
+  transform:rotate(var(--tilt,0deg));
+  transition:transform .18s ease, box-shadow .18s ease;
+}
+.tag-card:hover{transform:rotate(0deg) translateX(3px); box-shadow:0 3px 6px rgba(20,20,10,.3), 0 12px 24px rgba(20,20,10,.32);}
+.tag-card::after{  /* binder clip on top edge */
+  content:''; position:absolute; top:-7px; left:50%; transform:translateX(-50%) rotate(.5deg);
+  width:34px; height:11px; border-radius:2px 2px 4px 4px;
+  background:linear-gradient(to bottom, #d7d3c2, #96917b);
+  border:1px solid #5c5744;
+  box-shadow:0 2px 3px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.5);
+}
+.tag-kind{
+  font-size:9.5px; font-weight:700; letter-spacing:.2em; text-transform:uppercase;
+  color:var(--stampc); border:1.5px solid var(--stampc); border-radius:2px;
+  display:inline-block; padding:0 5px 1px; margin-bottom:5px;
+  transform:rotate(-1.6deg); opacity:.9;
+}
+.tag-card.k-approval{--edge:var(--signal); --stampc:#9a7415; --tilt:-.7deg;}
+.tag-card.k-preview {--edge:var(--creek);  --stampc:#3f6472; --tilt:.6deg;}
+.tag-card.k-exited  {--edge:var(--stamp);  --stampc:var(--stamp); --tilt:-.5deg; opacity:.88;}
+.tag-session{
+  font-family:var(--font-mono); font-weight:700; font-size:12.5px;
+  color:var(--ink); margin-bottom:2px;
+}
+.tag-body{font-family:var(--font-mono); font-size:10.5px; color:var(--ink-soft); line-height:1.5;}
+.tag-body code{
+  font-family:inherit; background:var(--stamp-soft); color:#8a3624;
+  padding:0 3px; border-radius:2px;
+}
+/* grease-pencil circle around the urgent card's kind */
+.tag-card.k-approval .tag-kind{position:relative;}
+.tag-card.k-approval .tag-kind::after{
+  content:''; position:absolute; inset:-7px -12px -8px -10px; pointer-events:none;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 40' preserveAspectRatio='none'%3E%3Cpath d='M14 21 C16 8 55 3 84 6 C108 9 116 16 113 24 C109 34 68 39 36 36 C13 33 5 27 12 17' fill='none' stroke='%23c23b22' stroke-width='3.2' stroke-linecap='round' opacity='.75'/%3E%3C/svg%3E") no-repeat center/100% 100%;
+}
+
+.rail-foot{
+  flex:none; margin-top:12px; padding:9px 2px 2px;
+  border-top:var(--stitch);
+}
+.rail-foot-label{font-size:9.5px; letter-spacing:.2em; text-transform:uppercase; color:var(--khaki-dim); font-weight:700;}
+.pathlink{
+  display:block; margin-top:3px; font-family:var(--font-mono); font-size:11px;
+  color:var(--khaki); text-align:left; padding:0;
+  text-decoration:underline dotted rgba(179,169,133,.5); text-underline-offset:3px;
+}
+.pathlink:hover{color:var(--paper); text-decoration-style:solid;}
+
+/* ============================================================
+   4 · WORKSPACE + SESSION TAB STRIP — gear tags on webbing
+   ============================================================ */
+#workspace{flex:1; display:flex; flex-direction:column; min-width:0; min-height:0;}
+#session-tabs{
+  position:relative; flex:none; display:flex; align-items:center; gap:10px;
+  margin:12px 16px 0; padding:7px 10px;
+  background:linear-gradient(to bottom, var(--canvas-deep), #37361f);
+  border:1px solid #2c2b1e; border-radius:5px;
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.45);
+}
+#session-tabs::before, #session-tabs::after{
+  content:''; position:absolute; top:3px; bottom:3px; width:0;
+  border-left:var(--stitch); pointer-events:none;
+}
+#session-tabs::before{left:4px;} #session-tabs::after{right:4px;}
+.session-tab{
+  position:relative; display:flex; align-items:center; gap:8px;
+  padding:6px 14px 7px; border-radius:3px;
+  font-family:var(--font-mono); font-size:12px; font-weight:700;
+  color:var(--khaki); border:1px solid transparent;
+  transition:all .15s ease;
+}
+.session-tab:hover{color:var(--paper); background:rgba(240,236,216,.07);}
+.session-tab.active{
+  background:var(--paper); color:var(--ink); border-color:#9a9273;
+  box-shadow:0 2px 0 #6f6849, 0 3px 6px rgba(0,0,0,.4);
+}
+.session-tab .agent{font-weight:400; color:var(--khaki-dim); font-style:italic;}
+.session-tab.active .agent{color:var(--blaze-deep);}
+/* grease-pencil check on the active tab */
+.session-tab.active::before{
+  content:''; position:absolute; left:-3px; top:-9px; width:16px; height:14px;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 14'%3E%3Cpath d='M2 8 L6 12 L14 2' fill='none' stroke='%23c23b22' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' opacity='.85'/%3E%3C/svg%3E") no-repeat center/contain;
+}
+.tdot{width:8px; height:8px; border-radius:50%; flex:none; border:1px solid rgba(0,0,0,.35);
+  box-shadow:inset 0 -1px 1px rgba(0,0,0,.3);}
+.tdot.live{background:var(--pine); animation:pulse 2.4s ease-in-out infinite;}
+@keyframes pulse{0%,100%{box-shadow:inset 0 -1px 1px rgba(0,0,0,.3), 0 0 0 0 rgba(109,138,74,.5);} 55%{box-shadow:inset 0 -1px 1px rgba(0,0,0,.3), 0 0 0 5px rgba(109,138,74,0);}}
+.tdot.dead{background:var(--stamp);}
+.tab-badge{
+  min-width:17px; height:17px; padding:0 4px; border-radius:2px;
+  display:grid; place-items:center;
+  background:var(--signal); color:#3d2e05;
+  font-family:var(--font-stencil); font-size:10.5px; font-weight:700;
+  border:1px solid #8a6a12; box-shadow:0 1px 1px rgba(0,0,0,.35);
+}
+.add-tab{
+  width:27px; height:27px; padding:0; border-radius:3px; margin-left:2px;
+  display:grid; place-items:center; font-size:15px; font-weight:700;
+  color:var(--khaki); border:1px dashed var(--khaki-dim);
+  transition:all .15s ease;
+}
+.add-tab:hover{color:var(--paper); border-style:solid; border-color:var(--khaki); background:rgba(240,236,216,.08);}
+
+/* ============================================================
+   5 · STAGE — the open kit
+   ============================================================ */
+#stage{flex:1; display:flex; min-height:0; padding:14px 16px 12px;}
+
+/* ── terminal pane — the rugged field unit ── */
+#terminal-pane{
+  position:relative; flex:0 0 46%; min-width:0;
+  display:flex; flex-direction:column;
+  background:linear-gradient(145deg, #2b2e1e, var(--scope-bezel));
+  border:1px solid #14160d; border-radius:8px;
+  box-shadow:var(--shadow-kit), inset 0 1px 0 rgba(207,227,174,.08);
+  padding:10px 12px 12px;
+}
+#terminal-pane .rivet.tl{top:5px; left:5px;} #terminal-pane .rivet.tr{top:5px; right:5px;}
+#terminal-pane .rivet.bl{bottom:5px; left:5px;} #terminal-pane .rivet.br{bottom:5px; right:5px;}
+.term-head{
+  flex:none; display:flex; align-items:baseline; gap:10px;
+  padding:2px 6px 9px;
+}
+.term-title{
+  font-size:11px; font-weight:700; letter-spacing:.22em; text-transform:uppercase;
+  color:var(--khaki);
+}
+.term-title em{font-style:normal; color:var(--scope-green);}
+.term-cwd{margin-left:auto; font-family:var(--font-mono); font-size:10px; color:var(--khaki-dim);}
+.term-screen{
+  flex:1; min-height:0; overflow:hidden; position:relative;
+  background:
+    radial-gradient(120% 90% at 50% 8%, rgba(207,227,174,.06), transparent 55%),
+    var(--scope);
+  border:1px solid #0c0e08; border-radius:5px;
+  box-shadow:inset 0 0 26px rgba(0,0,0,.75), inset 0 0 3px rgba(207,227,174,.12);
+  padding:13px 16px; font-family:var(--font-mono); font-size:12px; line-height:1.72;
+  color:var(--scope-green);
+}
+.term-screen::after{  /* faint scan texture on the readout */
+  content:''; position:absolute; inset:0; pointer-events:none; border-radius:5px;
+  background:repeating-linear-gradient(0deg, rgba(0,0,0,.16) 0 1px, transparent 1px 3px);
+}
+.t-line{white-space:pre-wrap;}
+.t-welcome .spark{color:var(--signal);}
+.t-welcome .path{float:right; color:var(--scope-dim); font-size:10px;}
+.t-user{color:#eef4dc; font-weight:700;}
+.t-user .caret{color:var(--blaze);}
+.t-agent{color:#a9bd88;}
+.t-agent .bullet{color:var(--blaze);}
+.t-agent .file{color:var(--scope-green);}
+.t-agent .meta{color:var(--scope-dim);}
+.t-del{color:#e09a83; background:rgba(168,64,44,.22); border-radius:2px;}
+.t-add{color:#c3e097; background:rgba(109,138,74,.25); border-radius:2px;}
+.t-ok{color:#9fc47e;}
+.t-ok .check{color:var(--pine);}
+.t-await{color:var(--scope-dim); font-style:italic;}
+.cursor{
+  display:inline-block; width:8px; height:14px; margin-right:7px;
+  vertical-align:text-bottom; border-radius:1px;
+  background:var(--scope-green);
+  animation:blip 1.4s steps(2,start) infinite;
+}
+@keyframes blip{to{visibility:hidden;}}
+
+/* ── divider — a buckled strap ── */
+#divider{
+  flex:none; width:12px; margin:18px 4px; cursor:col-resize; position:relative;
+  background:
+    repeating-linear-gradient(0deg, rgba(0,0,0,.28) 0 2px, transparent 2px 7px),
+    linear-gradient(to right, #575340, #7c7659 45%, #575340);
+  border:1px solid #2c2b1e; border-radius:3px;
+  box-shadow:0 2px 4px rgba(15,15,8,.35);
+  transition:filter .15s ease;
+}
+#divider::after{  /* buckle */
+  content:''; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+  width:18px; height:30px; border-radius:3px;
+  background:linear-gradient(to bottom, #d9c185, var(--brass) 55%, #8a7038);
+  border:1px solid #5c4a1e;
+  box-shadow:0 1px 3px rgba(0,0,0,.5), inset 0 0 0 3px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.4);
+}
+#divider:hover{filter:brightness(1.15);}
+
+/* ── browser pane — graph-paper clipboard with a clipped photo ── */
+#browser-pane{
+  position:relative; flex:1; min-width:0; display:flex; flex-direction:column;
+  border:1px solid #8f8768; border-radius:3px;
+  box-shadow:var(--shadow-kit);
+  color:var(--ink);
+}
+#browser-pane .rivet.tl{top:-4px; left:-4px;} #browser-pane .rivet.tr{top:-4px; right:-4px;}
+.browser-toolbar{
+  flex:none; display:flex; align-items:center; gap:6px;
+  padding:9px 11px;
+  background:
+    linear-gradient(rgba(240,236,216,.55), rgba(240,236,216,.55)),
+    linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0/100% 16px,
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0/16px 100%,
+    var(--paper-shade);
+  border-bottom:2px solid var(--khaki-dim);
+}
+.nav-btn{
+  width:26px; height:26px; border-radius:3px; display:grid; place-items:center;
+  font-size:12px; font-weight:700; color:var(--ink-soft);
+  background:linear-gradient(to bottom, #f6f2e0, #ddd7bd);
+  border:1px solid #9a9273; box-shadow:0 2px 0 #9a9273;
+  transition:all .12s ease;
+}
+.nav-btn:hover{color:var(--ink); filter:brightness(1.04);}
+.nav-btn:active{transform:translateY(2px); box-shadow:0 0 0 #9a9273;}
+.nav-btn:disabled{opacity:.4; cursor:default;}
+.url-bar{
+  flex:1; min-width:170px; display:flex; align-items:center; gap:6px;
+  padding:5px 10px 6px; border-radius:3px;
+  background:#fbf8ea; border:1px solid #9a9273;
+  box-shadow:inset 0 1px 3px rgba(44,42,31,.18);
+  font-family:var(--font-mono); font-size:11px; color:var(--ink-soft);
+  overflow:hidden; white-space:nowrap;
+}
+.url-bar .lock{color:var(--pine-deep); font-size:10px;}
+.url-bar .addr{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis;}
+.url-bar .scheme{color:var(--ink-faint); display:none;}
+@media (min-width:1560px){ .url-bar .scheme{display:inline;} }
+.url-bar .host{color:var(--ink); font-weight:700;}
+.chip{
+  flex:none; padding:5px 10px 6px; border-radius:3px;
+  font-size:10.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--ink-soft); display:flex; align-items:center; gap:6px;
+  background:linear-gradient(to bottom, #f6f2e0, #ddd7bd);
+  border:1px solid #9a9273; box-shadow:0 2px 0 #9a9273;
+  transition:all .12s ease;
+}
+.chip:hover{color:var(--ink); filter:brightness(1.04);}
+.chip:active{transform:translateY(2px); box-shadow:0 0 0 #9a9273;}
+.chip.primary{
+  background:linear-gradient(to bottom, #e0813a, var(--blaze-deep));
+  border-color:#8a3f0e; color:#fff6e8;
+  box-shadow:0 2px 0 #7c380c, inset 0 1px 0 rgba(255,246,232,.35);
+}
+.chip.primary:active{box-shadow:0 0 0 #7c380c;}
+.chip .badge{
+  min-width:16px; height:16px; padding:0 4px; border-radius:2px;
+  display:grid; place-items:center;
+  background:var(--signal); color:#3d2e05; font-size:10px; font-weight:700;
+  border:1px solid #8a6a12;
+}
+.chip.console-ok{color:var(--pine-deep); cursor:default; box-shadow:none;
+  background:rgba(109,138,74,.14); border-color:#93a877; border-style:dashed;}
+.chip.console-ok:active{transform:none;}
+@media (max-width:1380px){
+  .chip .opt{display:none;}
+  .chip{padding:5px 8px 6px; font-size:10px;}
+  .url-bar{font-size:10px;}
+}
+
+/* graph-paper deck under the clipped photograph */
+.webview-deck{
+  flex:1; min-height:0; position:relative; overflow:hidden;
+  padding:20px 24px 22px;
+}
+/* the rendered page — a photograph clipped on with corner tabs */
+.photo{
+  position:relative; height:100%;
+  background:#fdfdf8; border:1px solid #c9c4ae;
+  box-shadow:0 3px 6px rgba(44,42,31,.25), 0 14px 30px rgba(44,42,31,.3);
+  transform:rotate(-.5deg);
+}
+.photo-corner{
+  position:absolute; width:0; height:0; z-index:5; pointer-events:none;
+  border-style:solid;
+  filter:drop-shadow(0 1px 1px rgba(44,42,31,.35));
+}
+.photo-corner.tl{top:-6px; left:-6px;   border-width:26px 26px 0 0; border-color:#c7bd97 transparent transparent transparent;}
+.photo-corner.tr{top:-6px; right:-6px;  border-width:0 26px 26px 0; border-color:transparent #c7bd97 transparent transparent;}
+.photo-corner.bl{bottom:-6px; left:-6px;border-width:26px 0 0 26px; border-color:transparent transparent transparent #c7bd97;}
+.photo-corner.br{bottom:-6px; right:-6px;border-width:0 0 26px 26px;border-color:transparent transparent #c7bd97 transparent;}
+/* grease-pencil caption on the graph paper below the photo */
+.photo-caption{
+  position:absolute; left:28px; bottom:3px; z-index:4;
+  font-family:var(--font-grease); font-size:13px; color:#c23b22;
+  transform:rotate(-1.3deg); opacity:.85; pointer-events:none;
+}
+
+/* ── the fake site inside the photo ── */
+.site{height:100%; display:flex; flex-direction:column; overflow:hidden;
+  font-family:'Avenir Next','Helvetica Neue',Helvetica,Arial,sans-serif; color:#26282e;}
+.site-nav{
+  flex:none; display:flex; align-items:center; gap:22px;
+  padding:12px 28px; border-bottom:1px solid #ebebee; background:#fff;
+}
+.site-logo{font-weight:800; font-size:14px; letter-spacing:-.01em; color:#1f2129;}
+.site-logo span{color:#5661f0;}
+.site-steps{display:flex; gap:15px; font-size:11.5px; color:#9a9ca6; margin-left:auto;}
+.site-steps .on{color:#5661f0; font-weight:700;}
+.site-main{flex:1; display:flex; align-items:flex-start; justify-content:center; gap:24px; padding:28px 26px;}
+.order-card{
+  width:308px; background:#fff; border:1px solid #e8e8ec; border-radius:9px;
+  box-shadow:0 4px 14px rgba(30,32,44,.06); padding:20px 22px;
+}
+.order-card h3{font-size:14.5px; font-weight:700; margin-bottom:12px; color:#1f2129;}
+.order-row{display:flex; justify-content:space-between; font-size:12.5px; color:#4c4f58; padding:6px 0;}
+.order-row .qty{color:#9a9ca6; font-size:11px; margin-left:5px;}
+.order-row.total{border-top:1px solid #ececf0; margin-top:7px; padding-top:11px;
+  font-weight:800; font-size:14px; color:#1f2129;}
+.pay-panel{width:262px; display:flex; flex-direction:column; gap:11px;}
+.pay-field{display:flex; flex-direction:column; gap:4px;}
+.pay-field label{font-size:10.5px; font-weight:700; color:#71747e; letter-spacing:.02em;}
+.pay-field .fake-input{
+  height:32px; border:1px solid #dcdde3; border-radius:6px; background:#fbfbfd;
+  display:flex; align-items:center; padding:0 10px; font-size:12px; color:#585b64;
+}
+.pay-cta{
+  margin-top:5px; height:42px; border-radius:8px; border:none;
+  background:#5661f0; color:#fff; font-size:14px; font-weight:700;
+  font-family:inherit; box-shadow:0 4px 12px rgba(86,97,240,.32);
+  transition:transform .15s ease;
+}
+.pay-cta:hover{transform:translateY(-1px);}
+.pay-note{font-size:10px; color:#a4a6af; text-align:center;}
+/* auto-reload flash — a rubber stamp thumped on the photo */
+.refreshed{
+  position:absolute; right:16px; top:14px; z-index:6;
+  padding:2px 10px 3px; transform:rotate(6deg);
+  font-family:var(--font-stencil); font-size:11px; font-weight:700;
+  letter-spacing:.2em; text-transform:uppercase;
+  color:var(--pine-deep); border:2.5px solid var(--pine-deep); border-radius:3px;
+  background:rgba(240,236,216,.5);
+  animation:stampIn .35s cubic-bezier(.2,1.6,.4,1) .3s both;
+}
+@keyframes stampIn{from{opacity:0; transform:rotate(6deg) scale(2.1);} to{opacity:.9; transform:rotate(6deg) scale(1);}}
+
+/* ============================================================
+   6 · STATUS BAR — the bottom hem
+   ============================================================ */
+#statusbar{
+  position:relative; z-index:6; flex:none; height:28px;
+  display:flex; align-items:center; gap:14px; padding:0 14px;
+  background:linear-gradient(to bottom, var(--canvas-deep), #333221);
+  border-top:1px solid #2c2b1e;
+  font-size:10.5px; letter-spacing:.08em; color:var(--khaki);
+}
+#statusbar::before{
+  content:''; position:absolute; left:0; right:0; top:3px; height:0;
+  border-top:var(--stitch); pointer-events:none;
+}
+.sb-key{color:var(--khaki-dim); font-weight:700; letter-spacing:.16em; text-transform:uppercase; font-size:9.5px;}
+.sb-val{color:var(--khaki);}
+.sb-val em{font-style:normal; font-family:var(--font-mono); font-size:10.5px; color:var(--paper);}
+.sb-sep{width:4px; height:4px; background:var(--khaki-dim); transform:rotate(45deg); opacity:.7;}
+.sb-spacer{flex:1;}
+.sb-btn{
+  font-size:9.5px; font-weight:700; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--khaki); padding:2px 9px 3px;
+  border:1px solid transparent; border-radius:3px; transition:all .14s ease;
+}
+.sb-btn:hover{border-color:var(--khaki-dim); background:rgba(0,0,0,.2); color:var(--paper);}
+.sb-ver{font-family:var(--font-mono); font-size:10px; color:var(--khaki-dim);}
+
+/* corner variation tag — stamped kit label */
+.corner-tag{
+  position:fixed; right:14px; bottom:36px; z-index:70;
+  padding:3px 12px 4px; transform:rotate(-2.2deg);
+  font-size:10.5px; font-weight:700; letter-spacing:.2em; text-transform:uppercase;
+  color:var(--paper); background:var(--grease);
+  border:1.5px dashed var(--khaki); border-radius:3px; outline:3px solid var(--grease);
+  box-shadow:0 3px 8px rgba(15,15,8,.5);
+  pointer-events:none;
+}
+.corner-tag b{color:var(--blaze); font-weight:700;}
+
+/* ============================================================
+   7 · CAPTURE MODAL — a field report form on the clipboard
+   ============================================================ */
+.overlay{
+  position:fixed; inset:0; z-index:50; display:grid; place-items:center;
+  background:rgba(28,28,18,.55);
+  -webkit-backdrop-filter:blur(2px); backdrop-filter:blur(2px);
+}
+.modal{
+  position:relative; width:892px; max-width:calc(100vw - 80px); max-height:calc(100vh - 84px);
+  display:flex; flex-direction:column; color:var(--ink);
+  border:1px solid #8f8768; border-radius:3px;
+  box-shadow:0 6px 12px rgba(10,10,5,.5), 0 30px 70px rgba(10,10,5,.55);
+  animation:thump .32s cubic-bezier(.2,.9,.3,1.15) both;
+}
+.modal .rivet.tl{top:-4px; left:-4px;} .modal .rivet.tr{top:-4px; right:-4px;}
+.modal .rivet.bl{bottom:-4px; left:-4px;} .modal .rivet.br{bottom:-4px; right:-4px;}
+.modal-head{
+  flex:none; display:flex; align-items:center; justify-content:space-between;
+  padding:13px 18px 11px;
+  background:linear-gradient(to bottom, var(--canvas-lite), var(--canvas-deep));
+  border-bottom:2px solid #2c2b1e; border-radius:3px 3px 0 0;
+  color:var(--paper);
+}
+.modal-title{
+  display:flex; align-items:center; gap:11px;
+  font-size:13px; font-weight:700; letter-spacing:.24em; text-transform:uppercase;
+}
+.modal-title .form-no{
+  font-family:var(--font-mono); font-size:9.5px; letter-spacing:.1em;
+  color:var(--khaki-dim); border:1px solid var(--khaki-dim); border-radius:2px;
+  padding:1px 6px 2px; text-transform:none;
+}
+.modal-x{
+  width:26px; height:26px; border-radius:3px; display:grid; place-items:center;
+  font-size:12px; color:var(--khaki); border:1px solid var(--khaki-dim);
+  transition:all .14s ease;
+}
+.modal-x:hover{color:#f3c9b8; border-color:var(--stamp); background:rgba(168,64,44,.2);}
+.cap-grid{
+  flex:1; min-height:0; display:grid; grid-template-columns:1fr 1fr; gap:20px;
+  padding:18px 20px 18px; overflow:auto;
+}
+.cap-col{display:flex; flex-direction:column; gap:12px; min-width:0;}
+.cap-summary{
+  display:grid; grid-template-columns:max-content 1fr; gap:7px 14px;
+  padding:12px 14px; background:rgba(240,236,216,.5);
+  border:1px solid #9a9273; border-radius:2px;
+  font-size:12px;
+}
+.cap-summary dt{
+  color:var(--ink-faint); font-weight:700; font-size:9.5px;
+  letter-spacing:.2em; text-transform:uppercase; padding-top:2px;
+}
+.cap-summary dd{color:var(--ink); font-family:var(--font-mono); font-size:11.5px;
+  border-bottom:1px dotted var(--khaki-dim); padding-bottom:2px;}
+.field-label{
+  font-size:9.5px; font-weight:700; letter-spacing:.2em; text-transform:uppercase;
+  color:var(--ink-soft); margin-bottom:5px; display:block;
+}
+textarea,select{
+  width:100%; font-family:var(--font-mono); font-size:12px; color:var(--ink);
+  background:#fbf8ea; border:1px solid #9a9273; border-radius:2px;
+  padding:9px 11px; resize:none; outline:none;
+  box-shadow:inset 0 1px 3px rgba(44,42,31,.15);
+}
+textarea:focus,select:focus{border-color:var(--blaze-deep); box-shadow:0 0 0 3px rgba(212,112,42,.25);}
+textarea::placeholder{color:var(--ink-faint); font-style:italic;}
+select{appearance:none; -webkit-appearance:none; cursor:pointer;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23565239' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 12px center;}
+.cap-shot{
+  position:relative; height:106px; border-radius:2px;
+  border:1.5px dashed var(--khaki-dim); background:rgba(240,236,216,.4);
+  display:grid; place-items:center;
+}
+.cap-shot .shot-frame{
+  position:relative; width:212px; height:76px; background:#fdfdf8;
+  border:1px solid #c9c4ae; box-shadow:0 2px 5px rgba(44,42,31,.3);
+  display:grid; place-items:center; transform:rotate(-1deg);
+  color:#8d90a0; font-family:var(--font-mono); font-size:10px;
+}
+.cap-shot .shot-frame::before, .cap-shot .shot-frame::after{
+  content:''; position:absolute; width:0; height:0; border-style:solid;
+  filter:drop-shadow(0 1px 1px rgba(44,42,31,.3));
+}
+.cap-shot .shot-frame::before{top:-5px; left:-5px; border-width:16px 16px 0 0; border-color:#c7bd97 transparent transparent;}
+.cap-shot .shot-frame::after{bottom:-5px; right:-5px; border-width:0 0 16px 16px; border-color:transparent transparent #c7bd97;}
+.yaml-view{
+  flex:1; min-height:226px; overflow:auto; position:relative;
+  background:var(--scope); color:var(--scope-green);
+  border-radius:4px; border:1px solid #0c0e08;
+  padding:14px 16px; font-family:var(--font-mono); font-size:11.5px; line-height:1.8;
+  box-shadow:inset 0 0 20px rgba(0,0,0,.7);
+}
+.yaml-view .yk{color:var(--blaze);}
+.yaml-view .yv{color:var(--scope-green);}
+.yaml-view .ys{color:#e3cf7e;}
+.yaml-view .yc{color:var(--scope-dim);}
+/* VERIFIED stamp across the payload */
+.yaml-stamp{
+  position:absolute; right:14px; bottom:12px; transform:rotate(-8deg);
+  font-family:var(--font-stencil); font-size:12px; font-weight:700;
+  letter-spacing:.28em; text-transform:uppercase;
+  color:var(--stamp); border:2.5px solid var(--stamp); border-radius:3px;
+  padding:2px 10px 3px; opacity:.68; pointer-events:none;
+}
+.modal-foot{
+  flex:none; display:flex; align-items:center; gap:10px;
+  padding:13px 18px 15px; border-top:2px solid var(--khaki-dim);
+  background:rgba(228,223,198,.55); border-radius:0 0 3px 3px;
+}
+.foot-spacer{flex:1;}
+.btn{
+  padding:8px 17px 9px; border-radius:3px;
+  font-size:11px; font-weight:700; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--ink-soft);
+  background:linear-gradient(to bottom, #f6f2e0, #ddd7bd);
+  border:1px solid #9a9273; box-shadow:0 2px 0 #9a9273;
+  transition:all .12s ease;
+}
+.btn:hover{color:var(--ink); filter:brightness(1.04);}
+.btn:active{transform:translateY(2px); box-shadow:0 0 0 #9a9273;}
+.btn.primary{
+  background:linear-gradient(to bottom, #e0813a, var(--blaze-deep));
+  border-color:#8a3f0e; color:#fff6e8;
+  box-shadow:0 2px 0 #7c380c, inset 0 1px 0 rgba(255,246,232,.35);
+}
+.btn.primary:active{box-shadow:0 0 0 #7c380c;}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation:none !important; transition:none !important;}
+}
+</style>
+</head>
+<body>
+
+<!-- ══ titlebar — top webbing strap ══ -->
+<header id="titlebar" class="thump" style="--d:0s">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 64 64" width="20" height="20">
+        <path d="M22 18 L44 32 L22 46" fill="none" stroke="#85805f" stroke-width="3"
+              stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4 5"/>
+        <circle cx="22" cy="18" r="7" fill="#d4702a" stroke="#2c2a1f" stroke-width="1.6"/>
+        <circle cx="44" cy="32" r="7" fill="#7a6a94" stroke="#2c2a1f" stroke-width="1.6"/>
+        <circle cx="22" cy="46" r="7" fill="#6d8a4a" stroke="#2c2a1f" stroke-width="1.6"/>
+      </svg>
+    </span>
+    <span class="brand-name">Chromux</span>
+    <span class="brand-sub">Agent Cockpit</span>
+  </div>
+  <div class="titlebar-spacer"></div>
+  <div class="gauges" aria-label="Workspace gauges">
+    <span class="gauge"><i class="gdot g-go"></i><b>3</b>&nbsp;sessions</span>
+    <span class="gauge"><i class="gdot g-hold"></i><b>2</b>&nbsp;queued</span>
+    <span class="gauge"><i class="gdot g-sent"></i><b>14</b>&nbsp;sent</span>
+  </div>
+  <button class="top-btn update" title="A new version is ready to install">▲ Update Ready</button>
+  <button class="top-btn" title="Settings">Settings</button>
+</header>
+
+<!-- ══ main frame ══ -->
+<div id="app">
+
+  <!-- ── left rail · the canvas pocket ── -->
+  <aside id="rail" class="thump" style="--d:.05s">
+    <div class="rail-head">
+      <span class="rail-title">Attention Queue</span>
+      <button class="btn-detect" title="Detect open terminal tabs and agent sessions (⌘D)">⛶ Detect</button>
+    </div>
+    <div id="attention-list">
+      <button class="tag-card k-approval thump" style="--d:.14s">
+        <span class="tag-kind">Approval</span>
+        <div class="tag-session">checkout-flow</div>
+        <div class="tag-body">claude wants to run <code>npm run db:migrate</code></div>
+      </button>
+      <button class="tag-card k-preview thump" style="--d:.22s">
+        <span class="tag-kind">Preview</span>
+        <div class="tag-session">landing-page</div>
+        <div class="tag-body">localhost:5173 changed — review ready</div>
+      </button>
+      <button class="tag-card k-exited thump" style="--d:.3s">
+        <span class="tag-kind">Exited</span>
+        <div class="tag-session">api-server</div>
+        <div class="tag-body">codex exited (code 0) · 12m ago</div>
+      </button>
+    </div>
+    <div class="rail-foot">
+      <div class="rail-foot-label">Local Storage</div>
+      <button class="pathlink" title="Reveal in Finder">~/.chromux/captures</button>
+    </div>
+  </aside>
+
+  <!-- ── workspace ── -->
+  <div id="workspace">
+
+    <nav id="session-tabs" class="thump" style="--d:.09s" aria-label="Session tabs">
+      <button class="session-tab active">
+        <i class="tdot live"></i>
+        <span class="tab-label">checkout-flow <span class="agent">· claude</span></span>
+        <span class="tab-badge">2</span>
+      </button>
+      <button class="session-tab">
+        <i class="tdot live"></i>
+        <span class="tab-label">landing-page <span class="agent">· grok</span></span>
+      </button>
+      <button class="session-tab">
+        <i class="tdot dead"></i>
+        <span class="tab-label">api-server <span class="agent">· codex</span></span>
+      </button>
+      <button class="add-tab" title="New session (⌘T)" aria-label="New session">+</button>
+    </nav>
+
+    <main id="stage">
+
+      <!-- terminal pane — the rugged field unit -->
+      <section id="terminal-pane" class="thump" style="--d:.16s">
+        <span class="rivet tl"></span><span class="rivet tr"></span>
+        <span class="rivet bl"></span><span class="rivet br"></span>
+        <div class="term-head">
+          <span class="term-title">Terminal — <em>claude</em></span>
+          <span class="term-cwd">~/projects/shop/checkout-flow</span>
+        </div>
+        <div class="term-screen">
+<div class="t-line t-welcome"><span class="spark">✻</span> Welcome to Claude Code!<span class="path">/projects/shop/checkout-flow</span></div>
+<div class="t-line">&nbsp;</div>
+<div class="t-line t-user"><span class="caret">&gt;</span> fix the CTA overflow on the checkout page</div>
+<div class="t-line">&nbsp;</div>
+<div class="t-line t-agent"><span class="bullet">●</span> I'll look at the checkout component styles.</div>
+<div class="t-line t-agent"><span class="bullet">●</span> Read <span class="file">src/components/CheckoutCTA.tsx</span> <span class="meta">(84 lines)</span></div>
+<div class="t-line t-agent"><span class="bullet">●</span> Edit <span class="file">src/styles/checkout.css</span></div>
+<div class="t-line">  <span class="t-del">- .cta-row { width: 120%; }</span></div>
+<div class="t-line">  <span class="t-add">+ .cta-row { width: 100%; max-width: 480px; }</span></div>
+<div class="t-line t-ok"><span class="check">✔</span> Change applied — dev server reloaded</div>
+<div class="t-line t-agent"><span class="bullet">●</span> The button no longer overflows. Preview updated on the right.</div>
+<div class="t-line">&nbsp;</div>
+<div class="t-line t-await"><span class="cursor"></span>awaiting your next instruction…</div>
+        </div>
+      </section>
+
+      <div id="divider" title="Drag to resize" aria-hidden="true"></div>
+
+      <!-- browser pane — graph-paper clipboard with a clipped photo -->
+      <section id="browser-pane" class="graph thump" style="--d:.24s">
+        <span class="rivet tl"></span><span class="rivet tr"></span>
+        <div class="browser-toolbar">
+          <button class="nav-btn" title="Back">←</button>
+          <button class="nav-btn" title="Forward" disabled>→</button>
+          <button class="nav-btn" title="Reload">↻</button>
+          <div class="url-bar"><span class="lock">●</span><span class="addr"><span class="scheme">http://</span><span class="host">localhost:5173</span>/checkout</span></div>
+          <button id="btn-capture" class="chip primary">⛶ Capture</button>
+          <button class="chip">Queue <span class="badge">2</span></button>
+          <span class="chip console-ok">console: 0</span>
+          <button class="chip" title="Collapse pane">⌄<span class="opt">&nbsp;Collapse</span></button>
+        </div>
+        <div class="webview-deck">
+          <div class="photo">
+            <span class="photo-corner tl"></span><span class="photo-corner tr"></span>
+            <span class="photo-corner bl"></span><span class="photo-corner br"></span>
+            <span class="refreshed">Refreshed</span>
+            <div class="site">
+              <div class="site-nav">
+                <span class="site-logo">shop<span>mark</span></span>
+                <div class="site-steps"><span>Cart</span><span class="on">Checkout</span><span>Done</span></div>
+              </div>
+              <div class="site-main">
+                <div class="order-card">
+                  <h3>Order summary</h3>
+                  <div class="order-row"><span>Enamel camp mug<span class="qty">×1</span></span><span>$32.00</span></div>
+                  <div class="order-row"><span>Waxed canvas pouch<span class="qty">×2</span></span><span>$10.00</span></div>
+                  <div class="order-row"><span>Shipping</span><span>$6.00</span></div>
+                  <div class="order-row total"><span>Total</span><span>$48.00</span></div>
+                </div>
+                <div class="pay-panel">
+                  <div class="pay-field"><label>EMAIL</label><div class="fake-input">mara@basecamp.example</div></div>
+                  <div class="pay-field"><label>CARD</label><div class="fake-input">•••• •••• •••• 4242</div></div>
+                  <button class="pay-cta">Pay $48.00</button>
+                  <div class="pay-note">Payments are encrypted and secure.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <span class="photo-caption">obs. 07-11 — CTA fixed, verify in field ↑</span>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- ══ status bar — the bottom hem ══ -->
+<footer id="statusbar" class="thump" style="--d:.32s">
+  <span><span class="sb-key">Adapter</span> <span class="sb-val"><em>claude -p</em> · one-off</span></span>
+  <span class="sb-sep"></span>
+  <span><span class="sb-key">Pairing</span> <span class="sb-val">1:1 session ↔ pane</span></span>
+  <span class="sb-spacer"></span>
+  <button class="sb-btn">Delivery Log</button>
+  <span class="sb-ver">chromux 0.17.0 — field notebook concept</span>
+</footer>
+
+<div class="corner-tag"><b>26</b> · Field Notebook</div>
+
+<!-- ══ capture modal — field report form ══ -->
+<div id="modal-capture" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Capture to agent">
+  <div class="modal graph">
+    <span class="rivet tl"></span><span class="rivet tr"></span>
+    <span class="rivet bl"></span><span class="rivet br"></span>
+    <div class="modal-head">
+      <span class="modal-title">Field Capture → Agent <span class="form-no">form CX-26 · rev 1</span></span>
+      <button class="modal-x" data-close aria-label="Close">✕</button>
+    </div>
+    <div class="cap-grid">
+      <div class="cap-col">
+        <dl class="cap-summary">
+          <dt>Session</dt><dd>checkout-flow · claude</dd>
+          <dt>URL</dt><dd>localhost:5173/checkout</dd>
+          <dt>Selection</dt><dd>"CTA button region 412×88"</dd>
+        </dl>
+        <label>
+          <span class="field-label">Note to agent — what's wrong / what to do</span>
+          <textarea rows="3" spellcheck="false" placeholder="e.g. the CTA button overflows its container — fix the CSS"></textarea>
+        </label>
+        <label>
+          <span class="field-label">Target</span>
+          <select><option>checkout-flow · claude -p</option><option>landing-page · grok</option></select>
+        </label>
+        <div>
+          <span class="field-label">Screenshot</span>
+          <div class="cap-shot"><div class="shot-frame">CTA button region · 412×88</div></div>
+        </div>
+      </div>
+      <div class="cap-col">
+        <span class="field-label">Payload Preview — YAML v1</span>
+        <pre class="yaml-view"><span class="yk">chromux_capture</span><span class="yv">: v1</span>
+<span class="yk">session</span><span class="yv">: checkout-flow</span>
+<span class="yk">agent</span><span class="yv">: claude</span>
+<span class="yk">url</span><span class="yv">: http://localhost:5173/checkout</span>
+<span class="yk">note</span><span class="ys">: CTA overflows container</span>
+<span class="yk">screenshot</span><span class="yv">: ~/.chromux/captures/2026-07-11-0142.png</span>
+<span class="yk">console_errors</span><span class="yc">: []</span><span class="yaml-stamp">Verified</span></pre>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" data-close>Cancel</button>
+      <span class="foot-spacer"></span>
+      <button class="btn" title="Write payload to ~/.chromux/captures only">File-Drop Only</button>
+      <button class="btn primary">Send — claude -p</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var modal = document.getElementById('modal-capture');
+  document.getElementById('btn-capture').addEventListener('click', function(){
+    modal.classList.remove('hidden');
+  });
+  modal.querySelectorAll('[data-close]').forEach(function(btn){
+    btn.addEventListener('click', function(){ modal.classList.add('hidden'); });
+  });
+  modal.addEventListener('click', function(e){
+    if (e.target === modal) modal.classList.add('hidden');
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') modal.classList.add('hidden');
+  });
+})();
+</script>
+</body>
+</html>

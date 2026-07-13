@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Chromux — Darkroom</title>
+<style>
+/* ══════════════════════════════════════════════════════════════════
+   CHROMUX — DARKROOM
+   Photographic contact-sheet. Matte warm near-black, one safelight
+   red. Film perforations, frame numbers, grease-pencil markups.
+   No neon, no glow — everything is ink, emulsion and paper.
+   ══════════════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Permanent+Marker&display=swap');
+
+:root{
+  /* emulsion blacks — warm, matte, never blue */
+  --bg0:      #0b0a08;
+  --bg1:      #11100d;
+  --panel:    #171411;
+  --raised:   #1d1915;
+  --inset:    #0e0c0a;
+  --film:     #070605;
+  --hole:     #262019;
+  --line:     #2b2520;
+  --line-soft:#211d18;
+  --line-lit: #3d352c;
+
+  /* fibre-paper inks */
+  --ink:       #ddd4c3;
+  --ink-dim:   #9a9080;
+  --ink-faint: #6b6255;
+  --ink-ghost: #464038;
+  --edge-code: #8f7c54;   /* film edge printing — muted ochre, quiet */
+
+  /* THE safelight — the only strong color in the room */
+  --red:      #e13a2b;
+  --red-hi:   #ff5b45;
+  --red-deep: #97281d;
+  --red-dust: rgba(225,58,43,.13);
+
+  /* status dots — deliberately desaturated so red stays king */
+  --dot-live: #7d8a58;
+  --dot-warn: #a8843f;
+  --dot-info: #6c8d94;
+  --dot-dead: var(--red);
+
+  --edge:   "Barlow Condensed", "Avenir Next Condensed", "Futura", "Helvetica Neue", sans-serif;
+  --mono:   "Courier Prime", "Courier New", Courier, "American Typewriter", Menlo, monospace;
+  --pencil: "Permanent Marker", "Marker Felt", "Chalkboard SE", cursive;
+}
+
+*{ margin:0; padding:0; box-sizing:border-box; }
+html,body{ height:100%; }
+body{
+  min-width:1280px; height:100vh; overflow:hidden;
+  display:grid; grid-template-rows:44px 1fr 26px;
+  background:
+    radial-gradient(1100px 640px at 84% -14%, rgba(225,58,43,.055), transparent 62%),
+    radial-gradient(900px 700px at -6% 110%, rgba(225,58,43,.03), transparent 55%),
+    linear-gradient(180deg, var(--bg1), var(--bg0) 70%);
+  color:var(--ink);
+  font-family:var(--mono);
+  font-size:13px;
+  -webkit-font-smoothing:antialiased;
+}
+/* silver-halide grain over everything */
+body::after{
+  content:""; position:fixed; inset:0; z-index:998; pointer-events:none;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='180' height='180' filter='url(%23g)'/></svg>");
+  opacity:.05; mix-blend-mode:overlay;
+}
+/* the safelight bulb itself — one soft red wash, top right, breathing */
+body::before{
+  content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background:radial-gradient(760px 420px at 92% -8%, rgba(225,58,43,.07), transparent 65%);
+  animation:safelight 9s ease-in-out infinite;
+}
+@keyframes safelight{ 0%,100%{ opacity:.75 } 50%{ opacity:1 } }
+
+button{ font-family:inherit; color:inherit; background:none; border:none; cursor:pointer; }
+::selection{ background:rgba(225,58,43,.4); color:#fff; }
+
+/* condensed film-edge lettering */
+.microlabel{
+  font-family:var(--edge); font-size:10px; font-weight:600;
+  letter-spacing:.24em; color:var(--ink-faint); text-transform:uppercase;
+}
+.edge-code{
+  font-family:var(--edge); font-weight:600; letter-spacing:.2em;
+  color:var(--edge-code); text-transform:uppercase;
+}
+.pencil{ font-family:var(--pencil); text-transform:none; letter-spacing:.01em; }
+
+/* ── film perforation machinery ───────────────────────────────── */
+.perf-y::before, .perf-y::after{
+  content:""; position:absolute; top:0; bottom:0; width:16px; z-index:1;
+  background-image:radial-gradient(3.2px 4.4px at 50% 50%, var(--hole) 96%, transparent 100%);
+  background-size:16px 17px; background-repeat:repeat-y; background-position:center 6px;
+}
+.perf-y::before{ left:3px; }
+.perf-y::after{ right:3px; }
+.perf-x::before, .perf-x::after{
+  content:""; position:absolute; left:0; right:0; height:13px; z-index:1;
+  background-image:radial-gradient(4.4px 3.2px at 50% 50%, var(--hole) 96%, transparent 100%);
+  background-size:17px 13px; background-repeat:repeat-x; background-position:8px center;
+}
+.perf-x::before{ top:2px; }
+.perf-x::after{ bottom:2px; }
+
+/* ── titlebar ─────────────────────────────────────────────────── */
+#titlebar{
+  display:flex; align-items:center; gap:18px;
+  padding:0 14px 0 84px;
+  background:linear-gradient(180deg, #14110e, #0e0c0a);
+  border-bottom:1px solid var(--line);
+  position:relative; z-index:20;
+  -webkit-app-region:drag;
+}
+/* a hairline of exposed emulsion under the bar */
+#titlebar::after{
+  content:""; position:absolute; left:0; right:0; bottom:-1px; height:1px;
+  background:linear-gradient(90deg, transparent, rgba(225,58,43,.28) 12%, transparent 30%);
+}
+.brand{ display:flex; align-items:center; gap:10px; }
+.brand-mark svg{ display:block; opacity:.92; }
+.brand-name{
+  font-family:var(--edge); font-size:16px; font-weight:700;
+  letter-spacing:.4em; color:var(--ink); transform:translateY(.5px);
+}
+.brand-sub{
+  font-family:var(--edge); font-size:9.5px; font-weight:600; letter-spacing:.3em;
+  color:var(--ink-faint); border:1px solid var(--line); padding:3px 8px 2px;
+  background:rgba(255,255,255,.02);
+}
+.brand-film{
+  font-family:var(--edge); font-size:9.5px; font-weight:600; letter-spacing:.22em;
+  color:var(--edge-code); opacity:.85;
+}
+.titlebar-spacer{ flex:1; }
+.gauges{ display:flex; align-items:center; gap:16px; margin-right:8px; }
+.gauge{
+  display:flex; align-items:center; gap:7px;
+  font-family:var(--edge); font-size:10.5px; font-weight:600;
+  letter-spacing:.18em; color:var(--ink-dim);
+}
+.gauge b{ font-family:var(--mono); font-size:12px; color:var(--ink); font-weight:700; }
+.gdot{ width:7px; height:7px; border-radius:50%; border:1px solid rgba(0,0,0,.5); }
+.gdot.g-live{ background:var(--dot-live); }
+.gdot.g-warn{ background:var(--dot-warn); animation:dot-pulse 2.4s ease-in-out infinite; }
+.gdot.g-info{ background:var(--dot-info); }
+@keyframes dot-pulse{ 0%,100%{ opacity:1 } 50%{ opacity:.4 } }
+.top-btn{
+  -webkit-app-region:no-drag;
+  font-family:var(--edge); font-size:10.5px; font-weight:700; letter-spacing:.22em;
+  padding:6px 13px 5px; border:1px solid var(--line-lit); color:var(--ink-dim);
+  background:rgba(255,255,255,.02);
+  transition:color .15s, border-color .15s, background .15s;
+}
+.top-btn:hover{ color:var(--ink); border-color:#4d4437; }
+.top-btn.update-ready{
+  color:#fff; background:var(--red); border-color:var(--red-hi);
+  box-shadow:inset 0 -2px 0 rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.5);
+}
+.top-btn.update-ready:hover{ background:var(--red-hi); }
+
+/* ── frame ────────────────────────────────────────────────────── */
+#app{ display:grid; grid-template-columns:236px 1fr; min-height:0; position:relative; z-index:5; }
+
+/* ── left rail — a vertical strip of negatives ────────────────── */
+#rail{
+  display:flex; flex-direction:column; min-height:0;
+  background:var(--bg1);
+  border-right:1px solid var(--line);
+}
+.rail-head{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:13px 12px 11px; border-bottom:1px solid var(--line-soft);
+}
+.rail-sign{
+  font-family:var(--edge); font-size:11px; font-weight:700; letter-spacing:.26em;
+  color:var(--ink);
+}
+.rail-sign i{ font-style:normal; color:var(--red); margin-right:6px; }
+.btn-detect{
+  font-family:var(--edge); font-size:9.5px; font-weight:700; letter-spacing:.18em;
+  padding:5px 9px 4px; border:1px solid var(--line-lit); color:var(--ink-dim);
+  background:rgba(255,255,255,.02); transition:color .15s, border-color .15s;
+}
+.btn-detect:hover{ color:var(--red-hi); border-color:var(--red-deep); }
+#attention-list{
+  flex:1; overflow-y:auto; position:relative;
+  padding:12px 26px 10px; display:flex; flex-direction:column; gap:12px;
+  background:linear-gradient(90deg, var(--film) 0 22px, transparent 22px calc(100% - 22px), var(--film) calc(100% - 22px) 100%), var(--bg0);
+}
+.strip-title{
+  font-family:var(--edge); font-size:8.5px; font-weight:600; letter-spacing:.3em;
+  color:var(--edge-code); text-align:center; padding-top:2px;
+}
+.q-card{
+  position:relative; display:block; width:100%; text-align:left;
+  border:1px solid var(--line); background:linear-gradient(180deg, var(--raised), #161310);
+  padding:8px 10px 10px;
+  box-shadow:0 2px 10px rgba(0,0,0,.45);
+  transition:transform .15s, border-color .15s;
+}
+.q-card:hover{ transform:translateY(-1px); border-color:var(--line-lit); }
+.q-edge{
+  display:flex; justify-content:space-between; align-items:baseline;
+  font-family:var(--edge); font-size:8.5px; font-weight:600; letter-spacing:.2em;
+  color:var(--edge-code); margin-bottom:6px;
+}
+.q-kind{
+  font-family:var(--edge); font-size:10px; font-weight:700; letter-spacing:.26em;
+  color:var(--ink-faint); margin-bottom:4px;
+}
+.q-name{ font-size:12px; font-weight:700; color:var(--ink); margin-bottom:3px; }
+.q-desc{ font-size:10.5px; line-height:1.5; color:var(--ink-dim); }
+.q-desc code{
+  font-size:10px; color:var(--ink); background:rgba(255,255,255,.05);
+  padding:0 4px; border:1px solid var(--line-soft);
+}
+/* the frame the printer chose — red grease-pencil ring */
+.q-card.urgent{ border-color:#3c2b24; }
+.q-card.urgent .q-kind{ color:var(--red-hi); }
+.grease-ring{
+  position:absolute; inset:-9px -7px -7px -9px; pointer-events:none;
+  transform:rotate(-1.6deg); opacity:.9;
+}
+.grease-ring path{ stroke:var(--red); }
+/* rejected frame — grease-pencil strike */
+.q-card.dead{ opacity:.82; }
+.q-card.dead .q-kind{ color:#9c5a4d; }
+.q-card.dead .q-name, .q-card.dead .q-desc{ color:var(--ink-faint); }
+.grease-x{
+  position:absolute; inset:4px 8px; pointer-events:none; opacity:.55;
+}
+.grease-x path{ stroke:var(--red-deep); }
+.q-card.info .q-kind{ color:var(--ink-dim); }
+.q-card.info .q-tick{
+  position:absolute; top:24px; right:10px;
+  font-family:var(--pencil); font-size:14px; color:var(--ink-dim);
+  transform:rotate(-6deg); opacity:.8;
+}
+.rail-foot{ padding:11px 12px 12px; border-top:1px solid var(--line-soft); background:var(--bg1); }
+.pathlink{
+  display:block; margin-top:5px; padding:0; text-align:left;
+  font-size:11px; color:var(--ink-dim); letter-spacing:.02em;
+  border-bottom:1px dotted var(--ink-ghost); width:fit-content;
+  transition:color .15s, border-color .15s;
+}
+.pathlink:hover{ color:var(--red-hi); border-color:var(--red-deep); }
+
+/* ── workspace + session tab strip (a filmstrip) ──────────────── */
+#workspace{ display:flex; flex-direction:column; min-width:0; min-height:0; }
+#session-tabs{
+  position:relative; display:flex; align-items:center; gap:8px;
+  padding:26px 14px 17px 20px; background:var(--film);
+  border-bottom:1px solid var(--line);
+}
+.session-tab{
+  position:relative; display:flex; align-items:center; gap:8px;
+  padding:8px 14px 8px 12px;
+  border:1px solid #241f19; background:#100e0c;
+  font-size:11.5px; color:var(--ink-dim);
+  transition:color .15s, background .15s, border-color .15s;
+}
+.session-tab:hover{ color:var(--ink); background:#161310; }
+.session-tab .fnum{
+  position:absolute; top:-14px; left:1px;
+  font-family:var(--edge); font-size:8px; font-weight:600; letter-spacing:.22em;
+  color:var(--edge-code);
+}
+.session-tab.active{
+  color:var(--ink); background:linear-gradient(180deg, #201b16, #181410);
+  border-color:var(--line-lit);
+}
+.session-tab.active .fnum{ color:var(--red-hi); }
+.session-tab.active::after{ /* grease-pencil underline */
+  content:""; position:absolute; left:-3px; right:-5px; bottom:-9px; height:5px;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 8' preserveAspectRatio='none'><path d='M2,5 C40,2 90,6.5 128,4 C160,2 186,4.5 198,3.5' fill='none' stroke='%23e13a2b' stroke-width='3.4' stroke-linecap='round' opacity='.9'/></svg>");
+  background-size:100% 100%;
+}
+.tdot{ width:7px; height:7px; border-radius:50%; flex:none; border:1px solid rgba(0,0,0,.5); }
+.tdot.live{ background:var(--dot-live); }
+.tdot.dead{ background:var(--dot-dead); }
+.tbadge{
+  font-family:var(--edge); font-size:9.5px; font-weight:700; min-width:17px; text-align:center;
+  padding:2px 4px 1px; color:#fff; background:var(--red);
+  border-radius:8px; box-shadow:inset 0 -1px 0 rgba(0,0,0,.35);
+}
+.add-tab{
+  width:27px; height:27px; border:1px dashed var(--line-lit);
+  color:var(--ink-faint); font-size:14px; line-height:1;
+  transition:color .15s, border-color .15s;
+}
+.add-tab:hover{ color:var(--red-hi); border-color:var(--red-deep); }
+
+/* ── stage — split view ───────────────────────────────────────── */
+#stage{ flex:1; display:flex; min-height:0; padding:12px 12px 10px; }
+.pane{
+  display:flex; flex-direction:column; min-width:0; min-height:0;
+  border:1px solid var(--line); overflow:hidden;
+  background:var(--panel);
+  box-shadow:0 14px 34px rgba(0,0,0,.55);
+}
+.pane-head{
+  display:flex; align-items:center; gap:10px;
+  padding:8px 12px; border-bottom:1px solid var(--line-soft);
+  background:linear-gradient(180deg, #1a1613, #14110e);
+}
+.pane-title{
+  font-family:var(--edge); font-size:10.5px; font-weight:700; letter-spacing:.24em;
+  color:var(--ink);
+}
+.pane-stamp{
+  font-family:var(--edge); font-size:8.5px; font-weight:600; letter-spacing:.2em;
+  color:var(--edge-code);
+}
+.pane-cwd{ margin-left:auto; font-size:10.5px; color:var(--ink-faint); }
+
+/* terminal — the process log */
+#pane-term{ flex:0 0 45%; }
+.term-body{
+  flex:1; overflow-y:auto; padding:15px 17px;
+  font-size:12px; line-height:1.8;
+  background:
+    radial-gradient(640px 300px at 82% -10%, rgba(225,58,43,.045), transparent 62%),
+    var(--inset);
+  color:var(--ink);
+}
+.t-line{ white-space:pre-wrap; }
+.t-welcome{ color:var(--ink); font-weight:700; }
+.t-welcome::before{ content:"✻ "; color:var(--red-hi); font-weight:400; }
+.t-welcome .t-path{ float:right; color:var(--ink-faint); font-weight:400; font-size:11px; }
+.t-user{ color:#f0e9d8; font-weight:700; }
+.t-user::before{ content:"> "; color:var(--red-hi); font-weight:400; }
+.t-agent{ color:var(--ink-dim); }
+.t-agent::before{ content:"● "; color:var(--ink-ghost); }
+.t-agent b{ color:var(--ink); font-weight:700; }
+.t-diff{ padding-left:20px; font-size:11.5px; }
+.t-diff.del{ color:#8c5548; text-decoration:line-through; text-decoration-color:rgba(225,58,43,.5); }
+.t-diff.add{ color:#e6dfcd; background:rgba(255,255,255,.035); width:fit-content; padding-right:8px; }
+.t-ok{ color:var(--ink); }
+.t-ok::before{ content:"✔ "; color:var(--dot-live); }
+.t-caret{ color:var(--ink-dim); }
+.t-caret::before{ content:"▌"; color:var(--red); animation:caret-blink 1.2s steps(1) infinite; }
+@keyframes caret-blink{ 50%{ opacity:.12 } }
+.t-gap{ height:10px; }
+
+/* divider */
+#divider{
+  flex:0 0 7px; margin:0 3px; cursor:col-resize; position:relative;
+  background:linear-gradient(180deg, transparent, var(--line) 15%, var(--line) 85%, transparent);
+  transition:background .15s;
+}
+#divider::before{
+  content:""; position:absolute; left:2.5px; top:50%; width:2px; height:36px;
+  transform:translateY(-50%);
+  background:repeating-linear-gradient(180deg, var(--ink-ghost) 0 3px, transparent 3px 7px);
+}
+#divider:hover{ background:linear-gradient(180deg, transparent, var(--red-deep) 15%, var(--red-deep) 85%, transparent); }
+
+/* browser pane — the developing tray */
+#pane-web{ flex:1; }
+.web-toolbar{
+  display:flex; align-items:center; gap:7px;
+  padding:7px 9px; border-bottom:1px solid var(--line-soft);
+  background:linear-gradient(180deg, #1a1613, #14110e);
+}
+.nav-btn{
+  flex:none; width:25px; height:25px; font-size:12px; line-height:1;
+  border:1px solid var(--line-soft); color:var(--ink-faint);
+  background:rgba(255,255,255,.015); transition:color .15s, border-color .15s;
+}
+.nav-btn:hover{ color:var(--ink); border-color:var(--line-lit); }
+.url-bar{
+  flex:1; min-width:90px; display:flex; align-items:center; gap:7px;
+  font-size:11px; color:var(--ink-dim);
+  border:1px solid var(--line); padding:5px 10px;
+  background:var(--inset); overflow:hidden;
+}
+.url-bar .url-text{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.url-bar .lock{ color:var(--ink-ghost); font-size:9px; flex:none; }
+.url-bar .url-host{ color:var(--ink); font-weight:700; }
+.chip{
+  flex:none; font-size:9.5px; padding:4px 8px 3px;
+  border:1px solid var(--line); color:var(--ink-faint);
+  background:rgba(255,255,255,.015); white-space:nowrap;
+}
+.tool-btn{
+  flex:none; font-family:var(--edge); font-size:10px; font-weight:700; letter-spacing:.18em;
+  white-space:nowrap; padding:6px 11px 5px;
+  border:1px solid var(--line-lit); color:var(--ink-dim);
+  background:rgba(255,255,255,.02); transition:color .15s, border-color .15s;
+}
+.tool-btn:hover{ color:var(--ink); border-color:#4d4437; }
+.tool-btn .tbadge{ margin-left:6px; }
+/* the safelight switch — the one solid red thing in the chrome */
+.btn-capture{
+  flex:none; white-space:nowrap;
+  font-family:var(--edge); font-size:10.5px; font-weight:700; letter-spacing:.24em;
+  padding:7px 15px 6px; color:#fff;
+  background:linear-gradient(180deg, var(--red-hi), var(--red) 55%, var(--red-deep));
+  border:1px solid var(--red-deep);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22), inset 0 -2px 0 rgba(0,0,0,.35), 0 3px 10px rgba(0,0,0,.55);
+  transition:filter .15s, transform .1s;
+}
+.btn-capture:hover{ filter:brightness(1.12); }
+.btn-capture:active{ transform:translateY(1px); }
+
+/* the tray itself */
+.web-body{
+  flex:1; position:relative; overflow:hidden;
+  background:
+    radial-gradient(120% 90% at 50% 0%, #1b1713, #100e0b 70%),
+    var(--inset);
+  box-shadow:inset 0 0 60px rgba(0,0,0,.65), inset 0 2px 0 rgba(255,255,255,.02);
+}
+.tray-scroll{ position:absolute; inset:0; overflow-y:auto; padding:24px 30px 34px; }
+/* the print — a glossy photograph floating in developer */
+.print{
+  position:relative; width:min(560px, 88%); margin:0 auto;
+  background:#f6f4ee; padding:12px 12px 14px;
+  transform:rotate(-.5deg);
+  box-shadow:0 20px 40px rgba(0,0,0,.6), 0 4px 12px rgba(0,0,0,.5);
+}
+.print::after{ /* wet sheen across the emulsion */
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background:linear-gradient(115deg, rgba(255,255,255,.14) 0%, transparent 24%, transparent 70%, rgba(255,255,255,.05) 100%);
+}
+.mockpage{
+  font-family:"Helvetica Neue", Helvetica, Arial, sans-serif; color:#1d2530;
+  background:linear-gradient(180deg, #f2f4f7, #e8ebef);
+  padding:22px 24px 26px; border:1px solid #dfe0dc;
+}
+.mp-header{ display:flex; align-items:baseline; gap:14px; margin-bottom:16px; }
+.mp-store{ font-weight:700; font-size:15px; color:#141f2c; }
+.mp-crumb{ font-size:11px; color:#8b94a3; }
+.mp-card{
+  background:#fff; border-radius:8px; border:1px solid #dde1e8;
+  box-shadow:0 6px 18px rgba(23,32,48,.08); padding:20px 22px;
+}
+.mp-h{ font-size:15.5px; font-weight:700; margin-bottom:13px; color:#141f2c; }
+.mp-row{ display:flex; justify-content:space-between; font-size:12.5px; color:#465162; padding:7px 0; border-bottom:1px solid #eef0f4; }
+.mp-row .qty{ color:#99a2b1; margin-left:6px; font-size:11px; }
+.mp-total{ display:flex; justify-content:space-between; font-size:13.5px; font-weight:700; color:#141f2c; padding:11px 0 3px; }
+.mp-cta{
+  display:block; width:100%; margin-top:15px; padding:12px 0;
+  font-size:13.5px; font-weight:700; color:#fff; background:#2453d6;
+  border-radius:6px; border:none; cursor:pointer;
+  box-shadow:0 3px 9px rgba(36,83,214,.32); transition:background .15s;
+}
+.mp-cta:hover{ background:#1b46bd; }
+.mp-fine{ text-align:center; font-size:10.5px; color:#9aa3b2; margin-top:9px; }
+/* grease-pencil caption on the print's white border */
+.print-caption{
+  font-family:var(--pencil); font-size:13px; color:#3a3f47;
+  padding:9px 4px 0; transform:rotate(-.4deg); opacity:.85;
+}
+.print-caption em{ font-style:normal; color:var(--red); }
+/* grease note scrawled on the tray beside the print */
+.tray-note{
+  position:absolute; right:26px; bottom:18px; z-index:3; pointer-events:none;
+  font-family:var(--pencil); font-size:15px; color:var(--red);
+  transform:rotate(-3deg); opacity:.85;
+}
+.refreshed-chip{
+  position:absolute; top:11px; right:13px; z-index:3;
+  font-family:var(--edge); font-size:9px; font-weight:700; letter-spacing:.22em;
+  padding:4px 9px 3px; color:var(--red-hi);
+  background:rgba(11,10,8,.9); border:1px solid var(--red-deep);
+  animation:refresh-flash 3.4s ease-in-out infinite;
+}
+@keyframes refresh-flash{ 0%,100%{ opacity:.5 } 12%{ opacity:1 } 26%{ opacity:.8 } }
+
+/* ── status bar — bottom of the contact sheet ─────────────────── */
+#statusbar{
+  display:flex; align-items:center; gap:14px; padding:0 12px;
+  background:var(--film); border-top:1px solid var(--line);
+  position:relative; z-index:20;
+}
+.sb-left, .sb-right{ display:flex; align-items:center; gap:8px; }
+.sb-right{ margin-left:auto; }
+.sb-val{ font-size:10.5px; color:var(--ink-dim); }
+.sb-sep{ width:1px; height:11px; background:var(--line-lit); margin:0 4px; }
+.sb-btn{
+  font-family:var(--edge); font-size:9.5px; font-weight:700; letter-spacing:.2em;
+  padding:3px 9px 2px; border:1px solid var(--line-lit); color:var(--ink-dim);
+  transition:color .15s, border-color .15s;
+}
+.sb-btn:hover{ color:var(--red-hi); border-color:var(--red-deep); }
+.sb-ver{ font-size:10px; color:var(--ink-faint); }
+
+/* ── corner tag ───────────────────────────────────────────────── */
+#corner-tag{
+  position:fixed; right:12px; bottom:33px; z-index:60; pointer-events:none;
+  font-family:var(--edge); font-size:9px; font-weight:700; letter-spacing:.3em;
+  padding:5px 11px 4px; color:var(--red-hi);
+  border:1px solid var(--red-deep); background:rgba(11,10,8,.9);
+}
+
+/* ── capture modal — the enlarger easel ───────────────────────── */
+#overlay-capture{
+  position:fixed; inset:0; z-index:100;
+  display:flex; align-items:center; justify-content:center;
+  background:rgba(6,5,4,.8);
+}
+#overlay-capture.hidden{ display:none; }
+.modal{
+  width:min(900px, 92vw); max-height:86vh; display:flex; flex-direction:column;
+  border:1px solid var(--line-lit); overflow:hidden;
+  background:linear-gradient(180deg, #1a1613, #12100d);
+  box-shadow:0 0 0 1px #000, 0 34px 90px rgba(0,0,0,.8);
+  animation:develop-in .28s ease-out;
+}
+@keyframes develop-in{ from{ opacity:0; filter:brightness(.25) contrast(1.3); transform:translateY(8px); } }
+.modal-head{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:11px 14px; border-bottom:1px solid var(--line);
+  background:rgba(255,255,255,.02); position:relative;
+}
+.modal-head::before{ /* safelight strip above the easel */
+  content:""; position:absolute; left:0; right:0; top:0; height:2px;
+  background:linear-gradient(90deg, var(--red-deep), var(--red) 30%, var(--red) 70%, var(--red-deep));
+}
+.modal-title{
+  font-family:var(--edge); font-size:11.5px; font-weight:700; letter-spacing:.28em;
+  color:var(--ink);
+}
+.modal-title i{ font-style:normal; color:var(--red-hi); }
+.modal-x{
+  width:25px; height:25px; font-size:12px; line-height:1;
+  color:var(--ink-faint); border:1px solid var(--line-soft);
+  transition:color .15s, border-color .15s;
+}
+.modal-x:hover{ color:var(--red-hi); border-color:var(--red-deep); }
+.modal-body{ display:grid; grid-template-columns:1fr 1fr; gap:18px; padding:16px; overflow-y:auto; }
+.cap-col{ display:flex; flex-direction:column; gap:13px; min-width:0; }
+.cap-summary{ border:1px solid var(--line); background:var(--inset); }
+.cap-srow{ display:flex; gap:10px; padding:8px 11px; border-bottom:1px solid var(--line-soft); align-items:baseline; }
+.cap-srow:last-child{ border-bottom:none; }
+.cap-srow .microlabel{ flex:0 0 82px; }
+.cap-srow .v{ font-size:11px; color:var(--ink); }
+.field{ display:flex; flex-direction:column; gap:6px; }
+textarea, select{
+  font-family:var(--mono); font-size:11.5px; color:var(--ink);
+  background:var(--inset); border:1px solid var(--line);
+  padding:8px 10px; resize:vertical; outline:none;
+  transition:border-color .15s;
+}
+textarea::placeholder{ color:var(--ink-ghost); }
+textarea:focus, select:focus{ border-color:var(--red-deep); }
+select{ appearance:none; -webkit-appearance:none; cursor:pointer;
+  background-image:linear-gradient(45deg, transparent 50%, var(--ink-faint) 50%), linear-gradient(135deg, var(--ink-faint) 50%, transparent 50%);
+  background-position:calc(100% - 16px) 55%, calc(100% - 11px) 55%;
+  background-size:5px 5px; background-repeat:no-repeat;
+}
+/* screenshot slot styled as one negative frame */
+.cap-shot{
+  position:relative; height:98px; display:flex; align-items:center; justify-content:center; gap:9px;
+  background:var(--film); border:1px solid var(--line);
+  font-size:10.5px; color:var(--ink-faint); padding:0 34px; text-align:center;
+}
+.cap-shot .shot-mark{ color:var(--ink-ghost); font-size:16px; }
+.cap-shot .shot-fnum{
+  position:absolute; top:4px; right:22px;
+  font-family:var(--edge); font-size:8.5px; font-weight:600; letter-spacing:.22em;
+  color:var(--edge-code);
+}
+.yaml-view{
+  flex:1; margin:0; overflow:auto; min-height:224px;
+  font-size:11px; line-height:1.8; white-space:pre;
+  border:1px solid var(--line); padding:12px 14px;
+  background:
+    radial-gradient(420px 200px at 88% 0%, rgba(225,58,43,.05), transparent 62%),
+    var(--inset);
+  color:var(--ink-dim);
+}
+.yaml-view .yk{ color:var(--red-hi); }
+.yaml-view .yv{ color:var(--ink); }
+.yaml-view .yq{ color:#c9b98d; }
+.modal-foot{
+  display:flex; align-items:center; gap:10px; padding:12px 14px;
+  border-top:1px solid var(--line); background:rgba(0,0,0,.3);
+}
+.foot-spacer{ flex:1; }
+.m-btn{
+  font-family:var(--edge); font-size:10px; font-weight:700; letter-spacing:.2em;
+  padding:8px 15px 7px; border:1px solid var(--line-lit); color:var(--ink-dim);
+  background:rgba(255,255,255,.02); transition:color .15s, border-color .15s, filter .15s;
+}
+.m-btn:hover{ color:var(--ink); border-color:#4d4437; }
+.m-btn.primary{
+  color:#fff; border-color:var(--red-deep);
+  background:linear-gradient(180deg, var(--red-hi), var(--red) 55%, var(--red-deep));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.2), inset 0 -2px 0 rgba(0,0,0,.35);
+}
+.m-btn.primary:hover{ filter:brightness(1.12); }
+
+/* scrollbars — dull steel */
+::-webkit-scrollbar{ width:9px; height:9px; }
+::-webkit-scrollbar-thumb{ background:#332c25; border:2px solid transparent; background-clip:content-box; border-radius:5px; }
+::-webkit-scrollbar-thumb:hover{ background:#4a4036; background-clip:content-box; }
+::-webkit-scrollbar-track{ background:transparent; }
+.tray-scroll::-webkit-scrollbar-thumb{ background:#2a241e; background-clip:content-box; }
+
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{ animation:none !important; transition:none !important; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══ titlebar ══ -->
+<header id="titlebar">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 64 64" width="19" height="19">
+        <path d="M22 18 L44 32 L22 46" fill="none" stroke="#57503f" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="22" cy="18" r="6.4" fill="none" stroke="#a5643a" stroke-width="2.6"/>
+        <circle cx="44" cy="32" r="6.4" fill="none" stroke="#77648c" stroke-width="2.6"/>
+        <circle cx="22" cy="46" r="6.4" fill="none" stroke="#6c7b52" stroke-width="2.6"/>
+        <circle cx="22" cy="18" r="1.9" fill="#c99a72"/>
+        <circle cx="44" cy="32" r="1.9" fill="#a897ba"/>
+        <circle cx="22" cy="46" r="1.9" fill="#9aa87e"/>
+      </svg>
+    </span>
+    <span class="brand-name">CHROMUX</span>
+    <span class="brand-sub">AGENT&nbsp;COCKPIT</span>
+    <span class="brand-film">►&nbsp;400TX&nbsp;·&nbsp;SHEET&nbsp;19</span>
+  </div>
+  <span class="titlebar-spacer"></span>
+  <div class="gauges">
+    <span class="gauge"><i class="gdot g-live"></i><b>3</b>&nbsp;SESSIONS</span>
+    <span class="gauge"><i class="gdot g-warn"></i><b>2</b>&nbsp;QUEUED</span>
+    <span class="gauge"><i class="gdot g-info"></i><b>14</b>&nbsp;SENT</span>
+  </div>
+  <button class="top-btn update-ready">UPDATE READY</button>
+  <button class="top-btn">SETTINGS</button>
+</header>
+
+<!-- ══ main frame ══ -->
+<div id="app">
+  <aside id="rail">
+    <div class="rail-head">
+      <span class="rail-sign"><i>●</i>ATTENTION&nbsp;QUEUE</span>
+      <button class="btn-detect">⛶ DETECT</button>
+    </div>
+    <div id="attention-list" class="perf-y">
+      <div class="strip-title">CHRMX&nbsp;·&nbsp;ATTN&nbsp;ROLL&nbsp;02&nbsp;·&nbsp;JUL&nbsp;11</div>
+
+      <button class="q-card urgent">
+        <svg class="grease-ring" viewBox="0 0 220 108" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M14,54 C14,24 62,9 112,8 C168,7 210,22 209,53 C208,86 158,101 104,100 C52,99 14,84 14,54 M22,44 C30,24 70,13 114,12"
+                fill="none" stroke-width="3.6" stroke-linecap="round" opacity=".88"/>
+        </svg>
+        <div class="q-edge"><span>FR&nbsp;07A</span><span>01:38:12</span></div>
+        <div class="q-kind">APPROVAL</div>
+        <div class="q-name">checkout-flow</div>
+        <div class="q-desc">claude wants to run <code>npm run db:migrate</code></div>
+      </button>
+
+      <button class="q-card info">
+        <span class="q-tick" aria-hidden="true">✓</span>
+        <div class="q-edge"><span>FR&nbsp;08</span><span>01:40:55</span></div>
+        <div class="q-kind">PREVIEW</div>
+        <div class="q-name">landing-page</div>
+        <div class="q-desc">localhost:5173 changed — review ready</div>
+      </button>
+
+      <button class="q-card dead">
+        <svg class="grease-x" viewBox="0 0 200 96" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M12,10 C60,36 130,66 190,88 M188,8 C136,36 66,64 10,86"
+                fill="none" stroke-width="4" stroke-linecap="round"/>
+        </svg>
+        <div class="q-edge"><span>FR&nbsp;09</span><span>01:30:02</span></div>
+        <div class="q-kind">EXITED</div>
+        <div class="q-name">api-server</div>
+        <div class="q-desc">codex exited (code 0) · 12m ago</div>
+      </button>
+    </div>
+    <div class="rail-foot">
+      <div class="microlabel">LOCAL STORAGE</div>
+      <button class="pathlink">~/.chromux/captures</button>
+    </div>
+  </aside>
+
+  <div id="workspace">
+    <nav id="session-tabs" class="perf-x" aria-label="Session tabs">
+      <button class="session-tab active">
+        <span class="fnum">22A&nbsp;·&nbsp;CHRMX&nbsp;400TX</span>
+        <i class="tdot live"></i>checkout-flow · claude<span class="tbadge">2</span>
+      </button>
+      <button class="session-tab">
+        <span class="fnum">23</span>
+        <i class="tdot live"></i>landing-page · grok
+      </button>
+      <button class="session-tab">
+        <span class="fnum">24</span>
+        <i class="tdot dead"></i>api-server · codex
+      </button>
+      <button class="add-tab" aria-label="New session">+</button>
+    </nav>
+
+    <main id="stage">
+      <!-- terminal pane -->
+      <section class="pane" id="pane-term">
+        <div class="pane-head">
+          <span class="pane-title">TERMINAL — CLAUDE</span>
+          <span class="pane-stamp">T+00:12:47</span>
+          <span class="pane-cwd">~/projects/shop/checkout-flow</span>
+        </div>
+        <div class="term-body">
+          <div class="t-line t-welcome">Welcome to Claude Code!<span class="t-path">/projects/shop/checkout-flow</span></div>
+          <div class="t-gap"></div>
+          <div class="t-line t-user">fix the CTA overflow on the checkout page</div>
+          <div class="t-gap"></div>
+          <div class="t-line t-agent">I'll look at the checkout component styles.</div>
+          <div class="t-line t-agent">Read <b>src/components/CheckoutCTA.tsx</b> (84 lines)</div>
+          <div class="t-line t-agent">Edit <b>src/styles/checkout.css</b></div>
+          <div class="t-line t-diff del">- .cta-row { width: 120%; }</div>
+          <div class="t-line t-diff add">+ .cta-row { width: 100%; max-width: 480px; }</div>
+          <div class="t-gap"></div>
+          <div class="t-line t-ok">Change applied — dev server reloaded</div>
+          <div class="t-line t-agent">The button no longer overflows. Preview updated on the right.</div>
+          <div class="t-gap"></div>
+          <div class="t-line t-caret">awaiting your next instruction…</div>
+        </div>
+      </section>
+
+      <div id="divider" role="separator" aria-orientation="vertical" title="Drag to resize"></div>
+
+      <!-- browser pane — the developing tray -->
+      <section class="pane" id="pane-web">
+        <div class="web-toolbar">
+          <button class="nav-btn" aria-label="Back">‹</button>
+          <button class="nav-btn" aria-label="Forward">›</button>
+          <button class="nav-btn" aria-label="Reload">⟳</button>
+          <div class="url-bar"><span class="lock">●</span><span class="url-text"><span class="url-host">localhost:5173</span>/checkout</span></div>
+          <button class="btn-capture" id="btn-capture">⛶ CAPTURE</button>
+          <button class="tool-btn">QUEUE<span class="tbadge">2</span></button>
+          <span class="chip">console: 0</span>
+          <button class="tool-btn">⌄ COLLAPSE</button>
+        </div>
+        <div class="web-body">
+          <span class="refreshed-chip">● REFRESHED</span>
+          <div class="tray-scroll">
+            <div class="print">
+              <div class="mockpage">
+                <div class="mp-header">
+                  <span class="mp-store">shop/</span>
+                  <span class="mp-crumb">cart → shipping → <b>payment</b></span>
+                </div>
+                <div class="mp-card">
+                  <div class="mp-h">Order summary</div>
+                  <div class="mp-row"><span>Waxed canvas tote <span class="qty">× 1</span></span><span>$38.00</span></div>
+                  <div class="mp-row"><span>Enamel pin set <span class="qty">× 2</span></span><span>$6.00</span></div>
+                  <div class="mp-row"><span>Shipping</span><span>$4.00</span></div>
+                  <div class="mp-total"><span>Total</span><span>$48.00</span></div>
+                  <button class="mp-cta">Pay $48.00</button>
+                  <div class="mp-fine">Encrypted checkout · Visa ·· 4242</div>
+                </div>
+              </div>
+              <div class="print-caption">checkout · exposure 22A — CTA fixed <em>✓ print this</em></div>
+            </div>
+          </div>
+          <div class="tray-note" aria-hidden="true">↑ dev tray · 68°F</div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<!-- ══ status bar ══ -->
+<footer id="statusbar">
+  <div class="sb-left">
+    <span class="microlabel">ADAPTER</span><span class="sb-val">claude -p · one-off</span>
+    <span class="sb-sep"></span>
+    <span class="microlabel">PAIRING</span><span class="sb-val">1:1 session ↔ pane</span>
+  </div>
+  <div class="sb-right">
+    <button class="sb-btn">DELIVERY LOG</button>
+    <span class="sb-ver">chromux 0.17.0 — darkroom concept</span>
+  </div>
+</footer>
+
+<div id="corner-tag">19 · DARKROOM</div>
+
+<!-- ══ capture modal ══ -->
+<div id="overlay-capture" class="hidden">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Capture to agent">
+    <div class="modal-head">
+      <span class="modal-title">CAPTURE <i>→</i> AGENT</span>
+      <button class="modal-x" id="modal-close" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="cap-col">
+        <div class="cap-summary">
+          <div class="cap-srow"><span class="microlabel">SESSION</span><span class="v">checkout-flow · claude</span></div>
+          <div class="cap-srow"><span class="microlabel">URL</span><span class="v">localhost:5173/checkout</span></div>
+          <div class="cap-srow"><span class="microlabel">SELECTION</span><span class="v">CTA button region 412×88</span></div>
+        </div>
+        <label class="field">
+          <span class="microlabel">NOTE TO AGENT — WHAT'S WRONG / WHAT TO DO</span>
+          <textarea rows="3" spellcheck="false" placeholder="e.g. the CTA button overflows its container — fix the CSS"></textarea>
+        </label>
+        <label class="field">
+          <span class="microlabel">TARGET</span>
+          <select><option>checkout-flow · claude -p</option></select>
+        </label>
+        <div class="field">
+          <span class="microlabel">SCREENSHOT</span>
+          <div class="cap-shot perf-y">
+            <span class="shot-fnum">NEG&nbsp;07A</span>
+            <span class="shot-mark">⛶</span> 2026-07-11-0142.png · 412×88 crop
+          </div>
+        </div>
+      </div>
+      <div class="cap-col">
+        <span class="microlabel">PAYLOAD PREVIEW — YAML v1</span>
+        <pre class="yaml-view"><span class="yk">chromux_capture:</span> <span class="yq">v1</span>
+<span class="yk">session:</span> <span class="yv">checkout-flow</span>
+<span class="yk">agent:</span> <span class="yv">claude</span>
+<span class="yk">url:</span> <span class="yv">http://localhost:5173/checkout</span>
+<span class="yk">note:</span> <span class="yq">CTA overflows container</span>
+<span class="yk">screenshot:</span> <span class="yv">~/.chromux/captures/2026-07-11-0142.png</span>
+<span class="yk">console_errors:</span> <span class="yv">[]</span></pre>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="m-btn" id="modal-cancel">CANCEL</button>
+      <span class="foot-spacer"></span>
+      <button class="m-btn">FILE-DROP ONLY</button>
+      <button class="m-btn primary">SEND — CLAUDE -P</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var overlay = document.getElementById('overlay-capture');
+  function open(){ overlay.classList.remove('hidden'); }
+  function close(){ overlay.classList.add('hidden'); }
+  document.getElementById('btn-capture').addEventListener('click', open);
+  document.getElementById('modal-close').addEventListener('click', close);
+  document.getElementById('modal-cancel').addEventListener('click', close);
+  overlay.addEventListener('click', function(e){ if(e.target === overlay) close(); });
+  document.addEventListener('keydown', function(e){ if(e.key === 'Escape') close(); });
+  if(/[?&]modal=1/.test(location.search)) open();
+})();
+</script>
+</body>
+</html>

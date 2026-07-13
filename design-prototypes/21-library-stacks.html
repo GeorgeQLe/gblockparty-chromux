@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Chromux — Library Stacks</title>
+<style>
+/* ================================================================
+   CHROMUX · 21 — LIBRARY STACKS
+   an academic research desk: card catalogues, call numbers,
+   brass label plates, ribbon bookmarks, typewriter + old-style serif.
+   scholarly apparatus — not studio craft, not broadsheet.
+   ================================================================ */
+@import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Special+Elite&family=Caveat:wght@500;600&display=swap');
+
+:root{
+  /* the reading room */
+  --linen:       #f2ecdc;   /* desk blotter */
+  --linen-dim:   #eae2cc;   /* recessed trays / drawer fronts */
+  --card:        #fdfaf0;   /* fresh index card */
+  --card-aged:   #f8f3e2;   /* older stock */
+  --rule-blue:   #b9c6cf;   /* index-card feint lines */
+  --rule-red:    #cf8a7d;   /* index-card head rule */
+  --hairline:    #d8cdb2;   /* structural hairlines */
+  --hairline-dk: #c4b795;
+  --ink:         #2c2418;   /* iron-gall ink, never pure black */
+  --ink-soft:    #5d5240;
+  --ink-faint:   #988a6d;
+  --type-ink:    #3a3226;   /* typewriter impression */
+  --oxblood:     #7c2f26;   /* ribbon / primary action */
+  --oxblood-dk:  #5e211a;
+  --oxblood-soft:#ecd8d0;
+  --brass:       #a8863c;   /* label plates */
+  --brass-hi:    #d9bc74;
+  --brass-lo:    #7d6222;
+  --brass-soft:  #efe3c2;
+  --stamp-red:   #a33d2f;   /* DATE DUE stamp */
+  --shelf-green: #45604b;   /* live sessions */
+  --shelf-green-soft:#dbe4d7;
+  --catalog-blue:#3c608a;   /* info / sent */
+  --catalog-blue-soft:#d9e1ea;
+  --amber:       #b07d28;   /* attention */
+  --amber-soft:  #f0e2bd;
+  --ledger:      #232b23;   /* microfiche reader glass */
+  --ledger-head: #2c362c;
+  --ledger-line: #3c473c;
+  --ledger-text: #e9e0c4;
+  --ledger-dim:  #9aa088;
+  --carbon:      #4d4a72;   /* carbon-copy violet */
+
+  --serif:'EB Garamond','Iowan Old Style','Hoefler Text','Palatino',Georgia,serif;
+  --type:'Special Elite','American Typewriter','Courier New',monospace;
+  --mono:'American Typewriter','Courier Prime',Menlo,Monaco,monospace;
+  --hand:'Caveat','Bradley Hand','Marker Felt',cursive;
+
+  --sh-card:0 1px 1px rgba(74,58,30,.08), 0 4px 12px rgba(74,58,30,.10);
+  --sh-lift:0 2px 3px rgba(74,58,30,.10), 0 12px 28px rgba(74,58,30,.16);
+  --sh-deep:0 4px 8px rgba(46,34,14,.18), 0 26px 60px rgba(46,34,14,.28);
+  --sh-brass:inset 0 1px 0 rgba(255,244,210,.65), inset 0 -1px 0 rgba(84,62,16,.55), 0 1px 2px rgba(60,44,14,.3);
+}
+
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  min-width:1280px; height:100vh; overflow:hidden;
+  display:flex; flex-direction:column;
+  background:var(--linen); color:var(--ink);
+  font-family:var(--serif); font-size:13.5px; line-height:1.45;
+  -webkit-font-smoothing:antialiased; position:relative;
+}
+/* aged paper: faint laid-paper lines + foxing */
+body::before{
+  content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
+  background:
+    repeating-linear-gradient(0deg, rgba(120,98,58,.030) 0 1px, transparent 1px 26px),
+    radial-gradient(ellipse 340px 220px at 12% 88%, rgba(150,110,50,.045), transparent 70%),
+    radial-gradient(ellipse 420px 260px at 88% 10%, rgba(150,110,50,.04), transparent 70%);
+}
+body::after{
+  content:''; position:fixed; inset:0; z-index:0; pointer-events:none; opacity:.045;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='260' height='260' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+button{font-family:inherit; color:inherit; background:none; border:none; cursor:pointer;}
+.hidden{display:none !important;}
+
+/* checked-in on load: cards slide onto the desk */
+@keyframes fileIn{from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:none;}}
+.file-in{animation:fileIn .5s cubic-bezier(.25,.85,.35,1) both; animation-delay:var(--d,0s);}
+
+/* small-caps utility for catalogue labels */
+.smallcaps{font-variant-caps:small-caps; letter-spacing:.09em;}
+
+/* ── brass label plate — reused across the apparatus ── */
+.plate{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:2px 11px 3px; border-radius:3px;
+  background:linear-gradient(to bottom, var(--brass-hi) 0%, var(--brass) 46%, var(--brass-lo) 100%);
+  box-shadow:var(--sh-brass);
+  color:#2e2408; font-family:var(--type); font-size:10px; letter-spacing:.14em;
+  text-shadow:0 1px 0 rgba(255,240,200,.35);
+  position:relative;
+}
+.plate::before,.plate::after{ /* screw heads */
+  content:''; position:absolute; top:50%; width:4px; height:4px; margin-top:-2px;
+  border-radius:50%;
+  background:radial-gradient(circle at 35% 30%, #e8d194, #6e5518 75%);
+  box-shadow:0 .5px 0 rgba(255,244,210,.5);
+}
+.plate::before{left:3px;} .plate::after{right:3px;}
+
+/* ================================================================
+   1 · TITLEBAR — the top of the catalogue cabinet
+   ================================================================ */
+#titlebar{
+  position:relative; z-index:6; flex:none; height:46px;
+  display:flex; align-items:center; gap:16px;
+  padding:0 14px 0 84px;                 /* traffic-light gutter */
+  background:
+    linear-gradient(to bottom, rgba(255,250,236,.5), rgba(0,0,0,0) 55%),
+    linear-gradient(to bottom, #ece4cd, #e3d9bc);
+  border-bottom:1px solid var(--hairline-dk);
+  box-shadow:0 1px 0 rgba(255,250,236,.6) inset;
+  -webkit-app-region:drag;
+}
+#titlebar button{-webkit-app-region:no-drag;}
+/* double top rule, like a catalogue card head */
+#titlebar::after{
+  content:''; position:absolute; left:0; right:0; bottom:2px; height:1px;
+  background:var(--hairline); opacity:.8;
+}
+.brand{display:flex; align-items:center; gap:10px;}
+.brand-mark{display:grid; place-items:center;}
+.brand-text{display:flex; align-items:baseline; gap:8px;}
+.brand-name{
+  font-family:var(--serif); font-weight:600; font-size:17px;
+  letter-spacing:.16em; color:var(--ink); text-transform:uppercase;
+}
+.brand-name .amp{color:var(--oxblood);}
+.brand-sub{
+  font-family:var(--type); font-size:9px; letter-spacing:.22em;
+  color:var(--ink-faint); text-transform:uppercase; padding-bottom:1px;
+}
+.brand-call{ /* the app's own call number, penciled beside the brand */
+  font-family:var(--type); font-size:9.5px; color:var(--ink-faint);
+  border:1px solid var(--hairline-dk); border-radius:2px; padding:1px 7px 2px;
+  letter-spacing:.08em; background:var(--card-aged);
+}
+.titlebar-spacer{flex:1;}
+
+/* gauges — circulation stamps in the corner of the card */
+.gauges{display:flex; gap:9px; align-items:center;}
+.gauge{
+  display:flex; align-items:center; gap:6px; padding:3px 10px 4px;
+  font-family:var(--type); font-size:9.5px; letter-spacing:.12em; color:var(--ink-soft);
+  border:1.2px solid currentColor; border-radius:2px;
+  background:rgba(253,250,240,.55);
+  transform:rotate(-.4deg);
+}
+.gauge:nth-child(2){transform:rotate(.5deg);}
+.gauge:nth-child(3){transform:rotate(-.3deg);}
+.gauge b{font-weight:400; font-size:12px;}
+.gauge .gdot{width:7px; height:7px; border-radius:50%; flex:none;}
+.g-live{color:var(--shelf-green);} .g-live .gdot{background:var(--shelf-green); box-shadow:0 0 0 2.5px var(--shelf-green-soft);}
+.g-queue{color:var(--amber);} .g-queue .gdot{background:var(--amber); box-shadow:0 0 0 2.5px var(--amber-soft);}
+.g-sent{color:var(--catalog-blue);} .g-sent .gdot{background:var(--catalog-blue); box-shadow:0 0 0 2.5px var(--catalog-blue-soft);}
+
+.top-btn{
+  font-family:var(--type); font-size:10px; letter-spacing:.14em;
+  padding:5px 13px 6px; border-radius:2px; color:var(--ink-soft);
+  border:1px solid var(--hairline-dk); background:var(--card-aged);
+  box-shadow:0 1px 0 rgba(255,250,236,.7) inset, 0 1px 2px rgba(74,58,30,.10);
+  transition:all .16s ease;
+}
+.top-btn:hover{color:var(--ink); background:var(--card); transform:translateY(-1px); box-shadow:var(--sh-card);}
+.top-btn.update{
+  background:linear-gradient(to bottom, #92392e, var(--oxblood) 55%, var(--oxblood-dk));
+  border-color:var(--oxblood-dk); color:#f6e8dc;
+  text-shadow:0 1px 1px rgba(46,10,6,.5);
+  box-shadow:inset 0 1px 0 rgba(255,226,208,.35), 0 2px 6px rgba(94,33,26,.35);
+}
+.top-btn.update:hover{background:linear-gradient(to bottom, #a2443a, #8b352a 55%, var(--oxblood-dk)); color:#fdf3ea;}
+
+/* ================================================================
+   2 · APP FRAME
+   ================================================================ */
+#app{position:relative; z-index:1; flex:1; display:flex; min-height:0;}
+
+/* ================================================================
+   3 · LEFT RAIL — the card catalogue drawer
+   ================================================================ */
+#rail{
+  flex:none; width:236px; display:flex; flex-direction:column; min-height:0;
+  padding:12px 12px 10px;
+  background:linear-gradient(to right, #e7dec5, #ebe2ca 82%, #e2d8bc);
+  border-right:1px solid var(--hairline-dk);
+  box-shadow:inset -6px 0 12px -8px rgba(74,58,30,.22);
+  position:relative;
+}
+/* the drawer's brass pull, centered under the header */
+.drawer-front{
+  flex:none; position:relative; margin:0 2px 13px;
+  padding:8px 10px 20px;
+  background:var(--card-aged); border:1px solid var(--hairline-dk); border-radius:3px;
+  box-shadow:0 1px 0 rgba(255,250,236,.8) inset, 0 2px 5px rgba(74,58,30,.12);
+  text-align:center;
+}
+.drawer-label{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+}
+.rail-title{
+  font-family:var(--type); font-size:10.5px; letter-spacing:.16em;
+  color:var(--type-ink); text-transform:uppercase;
+}
+.rail-range{ /* drawer index range, like Aa–Cz */
+  display:block; margin-top:2px;
+  font-family:var(--serif); font-style:italic; font-size:11px; color:var(--ink-faint);
+}
+.drawer-pull{ /* brass cup pull with card slot */
+  position:absolute; left:50%; bottom:-9px; transform:translateX(-50%);
+  width:58px; height:14px; border-radius:2px 2px 8px 8px;
+  background:linear-gradient(to bottom, var(--brass-hi), var(--brass) 45%, var(--brass-lo));
+  box-shadow:var(--sh-brass);
+}
+.drawer-pull::after{
+  content:''; position:absolute; left:50%; top:6px; transform:translateX(-50%);
+  width:30px; height:5px; border-radius:0 0 5px 5px;
+  background:linear-gradient(to bottom, #55420f, #6e5518);
+  box-shadow:0 1px 0 rgba(255,244,210,.4);
+}
+.btn-detect{
+  font-family:var(--type); font-size:9.5px; letter-spacing:.12em; color:var(--ink-soft);
+  padding:2px 8px 3px; border:1px dashed var(--ink-faint); border-radius:2px;
+  background:transparent; transition:all .16s ease; text-transform:uppercase;
+}
+.btn-detect:hover{border-style:solid; border-color:var(--oxblood); color:var(--oxblood); background:var(--card);}
+
+#attention-list{flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column; gap:11px; padding-top:4px;}
+
+/* index cards — feint blue rules, red head rule, typed heading, call no. */
+.index-card{
+  --edge:var(--ink-faint);
+  position:relative; text-align:left; cursor:pointer;
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 17px, rgba(93,130,158,.16) 17px 18px),
+    var(--card);
+  background-position:0 26px;
+  border:1px solid rgba(150,130,90,.35); border-radius:2px;
+  padding:6px 11px 10px 12px;
+  box-shadow:var(--sh-card);
+  transition:transform .18s ease, box-shadow .18s ease;
+}
+.index-card:hover{transform:translateY(-2px) rotate(-.4deg); box-shadow:var(--sh-lift);}
+.index-card::before{ /* red head rule of a real index card */
+  content:''; position:absolute; left:0; right:0; top:22px; height:1px;
+  background:var(--rule-red); opacity:.75;
+}
+.index-card::after{ /* punched rod hole at the bottom */
+  content:''; position:absolute; left:50%; bottom:3px; transform:translateX(-50%);
+  width:7px; height:7px; border-radius:50%;
+  background:var(--linen-dim);
+  box-shadow:inset 0 1px 2px rgba(74,58,30,.4), 0 1px 0 rgba(255,250,236,.8);
+}
+.card-head{
+  display:flex; align-items:baseline; justify-content:space-between; gap:6px;
+  margin-bottom:5px;
+}
+.card-kind{
+  font-family:var(--type); font-size:9.5px; letter-spacing:.16em;
+  color:var(--edge); text-transform:uppercase;
+  display:flex; align-items:center; gap:5px;
+}
+.card-kind i{width:6px; height:6px; border-radius:50%; background:var(--edge); flex:none;}
+.card-callno{
+  font-family:var(--type); font-size:8.5px; color:var(--ink-faint); letter-spacing:.06em;
+}
+.card-session{
+  font-family:var(--serif); font-weight:600; font-size:14px; color:var(--ink);
+  line-height:18px;
+}
+.card-body{font-size:12px; color:var(--ink-soft); line-height:18px; font-style:italic;}
+.card-body code{
+  font-family:var(--mono); font-style:normal; font-size:10.5px;
+  background:var(--linen-dim); padding:0 4px 1px; border-radius:2px; color:var(--oxblood);
+}
+.index-card.k-approval{--edge:var(--amber); border-top:2px solid var(--amber);}
+.index-card.k-preview{--edge:var(--catalog-blue); border-top:2px solid var(--catalog-blue);}
+.index-card.k-exited{--edge:var(--stamp-red); border-top:2px solid rgba(163,61,47,.55); opacity:.86;}
+/* marginalia in a second hand, red ink */
+.margin-note{
+  position:absolute; right:6px; bottom:8px; z-index:2;
+  font-family:var(--hand); font-size:14px; color:var(--stamp-red);
+  transform:rotate(-3deg); pointer-events:none; line-height:1;
+  opacity:.88;
+}
+
+.rail-foot{flex:none; margin-top:12px; padding:8px 3px 2px; border-top:1px solid var(--hairline-dk); position:relative;}
+.rail-foot::before{content:''; position:absolute; left:3px; right:3px; top:2px; height:1px; background:var(--hairline);}
+.rail-foot-label{font-family:var(--type); font-size:8.5px; letter-spacing:.18em; color:var(--ink-faint); text-transform:uppercase;}
+.pathlink{
+  display:block; margin-top:3px; font-family:var(--mono); font-size:11px;
+  color:var(--oxblood); text-align:left; padding:0;
+  text-decoration:underline dotted rgba(124,47,38,.5); text-underline-offset:3px;
+}
+.pathlink:hover{color:var(--oxblood-dk); text-decoration-style:solid;}
+
+/* ================================================================
+   4 · WORKSPACE + SESSION TABS — catalogue divider tabs
+   ================================================================ */
+#workspace{flex:1; display:flex; flex-direction:column; min-width:0; min-height:0;}
+#session-tabs{
+  flex:none; display:flex; align-items:flex-end; gap:6px;
+  margin:12px 18px 0; padding:0 6px;
+  border-bottom:2px solid var(--hairline-dk);
+  position:relative;
+}
+.session-tab{
+  position:relative; display:flex; flex-direction:column; align-items:flex-start;
+  gap:1px; padding:6px 16px 7px 14px; margin-bottom:-2px;
+  border:1px solid var(--hairline-dk); border-bottom:2px solid var(--hairline-dk);
+  border-radius:6px 6px 0 0;
+  background:linear-gradient(to bottom, var(--linen-dim), #e3dabd);
+  color:var(--ink-soft);
+  transition:all .18s ease;
+  min-width:168px;
+}
+.session-tab:hover{background:linear-gradient(to bottom, var(--card-aged), var(--linen-dim)); color:var(--ink);}
+.session-tab.active{
+  background:var(--card); color:var(--ink);
+  border-bottom-color:var(--card);
+  box-shadow:0 -3px 8px rgba(74,58,30,.10);
+  padding-top:8px;
+}
+/* the ribbon bookmark spilling from the active volume */
+.session-tab.active::after{
+  content:''; position:absolute; top:-1px; right:14px; width:11px; height:34px;
+  background:linear-gradient(to right, var(--oxblood-dk), var(--oxblood) 40%, #94443a 60%, var(--oxblood-dk));
+  clip-path:polygon(0 0, 100% 0, 100% 100%, 50% 82%, 0 100%);
+  box-shadow:1px 2px 3px rgba(46,10,6,.3);
+}
+.tab-callno{
+  font-family:var(--type); font-size:8px; letter-spacing:.14em;
+  color:var(--ink-faint); text-transform:uppercase;
+}
+.session-tab.active .tab-callno{color:var(--brass-lo);}
+.tab-main{display:flex; align-items:center; gap:7px;}
+.tab-label{font-family:var(--serif); font-weight:600; font-size:13.5px; line-height:1.15;}
+.tab-label .agent{font-weight:400; font-style:italic; color:var(--ink-faint);}
+.session-tab.active .tab-label .agent{color:var(--oxblood);}
+.tdot{width:7px; height:7px; border-radius:50%; flex:none;}
+.tdot.live{background:var(--shelf-green); box-shadow:0 0 0 2.5px var(--shelf-green-soft);}
+.tdot.dead{background:var(--stamp-red); box-shadow:0 0 0 2.5px var(--oxblood-soft);}
+.tab-badge{ /* circular date-stamp badge */
+  min-width:17px; height:17px; padding:0 4px; border-radius:50%;
+  display:grid; place-items:center;
+  border:1.4px solid var(--stamp-red); color:var(--stamp-red);
+  font-family:var(--type); font-size:9.5px;
+  background:rgba(253,250,240,.7);
+  transform:rotate(-6deg);
+}
+.add-tab{
+  align-self:center; width:27px; height:27px; margin-bottom:5px; padding:0;
+  border-radius:2px; display:grid; place-items:center;
+  font-family:var(--serif); font-size:17px; color:var(--ink-faint);
+  border:1px dashed var(--ink-faint); transition:all .18s ease;
+}
+.add-tab:hover{color:var(--oxblood); border-color:var(--oxblood); border-style:solid; background:var(--card);}
+
+/* ================================================================
+   5 · STAGE — the reading desk
+   ================================================================ */
+#stage{flex:1; display:flex; min-height:0; padding:14px 18px 12px;}
+
+/* ── terminal pane — the microfiche reader ── */
+#terminal-pane{
+  flex:0 0 46%; min-width:0; display:flex; flex-direction:column;
+  background:var(--ledger);
+  border:1px solid #171d17; border-radius:4px;
+  box-shadow:var(--sh-lift), inset 0 1px 0 rgba(233,224,196,.07);
+  overflow:hidden; position:relative;
+}
+/* lamp glow across the reader glass */
+#terminal-pane::after{
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background:radial-gradient(ellipse 90% 60% at 50% -8%, rgba(233,224,196,.07), transparent 60%);
+}
+.term-head{
+  flex:none; display:flex; align-items:center; gap:10px;
+  padding:8px 14px;
+  background:var(--ledger-head); border-bottom:1px solid var(--ledger-line);
+}
+.term-plate{transform:rotate(0); font-size:9px;}
+.term-title{font-family:var(--serif); font-size:13px; color:var(--ledger-text);}
+.term-title em{font-style:italic; color:var(--brass-hi);}
+.term-cwd{margin-left:auto; font-family:var(--mono); font-size:10.5px; color:var(--ledger-dim);}
+.term-body{
+  flex:1; min-height:0; overflow:hidden; position:relative;
+  padding:14px 18px 14px 44px;
+  font-family:var(--mono); font-size:12px; line-height:1.8;
+  color:var(--ledger-text);
+}
+/* ledger margin: red rule + faint row lines, like an accession register */
+.term-body::before{
+  content:''; position:absolute; left:32px; top:0; bottom:0; width:1px;
+  background:rgba(163,61,47,.5);
+}
+.term-body::after{
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(to bottom, transparent 0 21px, rgba(233,224,196,.045) 21px 22px);
+}
+.t-line{white-space:pre-wrap; position:relative;}
+.t-welcome .spark{color:var(--brass-hi);}
+.t-welcome .path{float:right; color:var(--ledger-dim); font-size:10.5px;}
+.t-user{color:#f4ecd2;}
+.t-user .caret{color:#c9705f;}
+.t-agent{color:#cfc7a8;}
+.t-agent .bullet{color:#c9705f;}
+.t-agent .file{color:var(--ledger-text); text-decoration:underline dotted rgba(233,224,196,.35); text-underline-offset:3px;}
+.t-agent .meta{color:var(--ledger-dim);}
+.t-del{color:#dba193; background:rgba(163,61,47,.22); border-radius:2px;}
+.t-add{color:#b9cf9d; background:rgba(94,128,86,.24); border-radius:2px;}
+.t-ok{color:#aec698;}
+.t-ok .check{color:#8fb87c;}
+.t-await{color:var(--ledger-dim); font-style:italic;}
+.cursor{
+  display:inline-block; width:8px; height:14px; margin-right:7px;
+  vertical-align:text-bottom; border-radius:1px;
+  background:var(--brass-hi);
+  animation:lamp 1.7s ease-in-out infinite;
+}
+@keyframes lamp{0%,100%{opacity:1;} 50%{opacity:.2;}}
+
+/* ── divider — the brass shelf rod ── */
+#divider{
+  flex:none; width:7px; margin:0 6px; cursor:col-resize; position:relative;
+  border-radius:3px;
+}
+#divider::before{
+  content:''; position:absolute; left:2.5px; top:10%; bottom:10%; width:2px; border-radius:2px;
+  background:linear-gradient(to right, var(--brass-lo), var(--brass-hi), var(--brass-lo));
+  box-shadow:0 0 0 .5px rgba(84,62,16,.3);
+}
+#divider::after{ /* knurled grip */
+  content:''; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+  width:5px; height:30px; border-radius:3px;
+  background:repeating-linear-gradient(to bottom, var(--brass) 0 2px, var(--brass-lo) 2px 4px);
+  box-shadow:var(--sh-brass);
+}
+#divider:hover::before{background:linear-gradient(to right, var(--brass), var(--brass-hi), var(--brass));}
+
+/* ── browser pane — the examined volume ── */
+#browser-pane{
+  flex:1; min-width:0; display:flex; flex-direction:column; position:relative;
+  background:var(--card); border:1px solid var(--hairline-dk);
+  border-radius:4px; box-shadow:var(--sh-lift);
+}
+/* brass corner plate naming the room */
+.pane-plate{
+  position:absolute; top:-10px; left:18px; z-index:3; transform:rotate(-.8deg);
+}
+/* second ribbon bookmark hanging over the toolbar edge */
+.pane-ribbon{
+  position:absolute; top:-1px; right:34px; z-index:3;
+  width:13px; height:46px;
+  background:linear-gradient(to right, #2e4a63, var(--catalog-blue) 40%, #4d729c 60%, #2e4a63);
+  clip-path:polygon(0 0, 100% 0, 100% 100%, 50% 84%, 0 100%);
+  box-shadow:1px 2px 4px rgba(20,34,50,.35);
+}
+.browser-toolbar{
+  flex:none; display:flex; align-items:center; gap:6px;
+  padding:11px 12px 9px; border-bottom:1px solid var(--hairline);
+  background:linear-gradient(to bottom, var(--card-aged), #f4eeda);
+  border-radius:4px 4px 0 0;
+}
+.nav-btn{
+  width:24px; height:24px; border-radius:2px; display:grid; place-items:center;
+  font-size:11px; color:var(--ink-soft);
+  border:1px solid var(--hairline-dk); background:var(--card);
+  box-shadow:0 1px 0 rgba(255,250,236,.8) inset, 0 1px 2px rgba(74,58,30,.08);
+  transition:all .15s ease;
+}
+.nav-btn:hover{color:var(--ink); transform:translateY(-1px); box-shadow:var(--sh-card);}
+.nav-btn:disabled{opacity:.4; cursor:default;}
+.url-bar{
+  flex:1; min-width:170px; display:flex; align-items:center; gap:6px;
+  padding:4px 11px 5px; border-radius:2px;
+  background:var(--linen); border:1px solid var(--hairline-dk);
+  box-shadow:inset 0 1px 3px rgba(74,58,30,.12);
+  font-family:var(--mono); font-size:10.5px; color:var(--ink-soft);
+  overflow:hidden; white-space:nowrap;
+}
+.url-bar .lock{color:var(--shelf-green); font-size:9px;}
+.url-bar .addr{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis;}
+.url-bar .scheme{color:var(--ink-faint); display:none;}
+@media (min-width:1560px){ .url-bar .scheme{display:inline;} }
+.url-bar .host{color:var(--ink);}
+.chip{
+  flex:none; display:flex; align-items:center; gap:6px;
+  padding:4px 10px 5px; border-radius:2px;
+  font-family:var(--type); font-size:9.5px; letter-spacing:.1em; text-transform:uppercase;
+  border:1px solid var(--hairline-dk); background:var(--card); color:var(--ink-soft);
+  box-shadow:0 1px 0 rgba(255,250,236,.8) inset, 0 1px 2px rgba(74,58,30,.08);
+  transition:all .15s ease;
+}
+.chip:hover{color:var(--ink); transform:translateY(-1px); box-shadow:var(--sh-card);}
+.chip.primary{
+  background:linear-gradient(to bottom, #92392e, var(--oxblood) 55%, var(--oxblood-dk));
+  border-color:var(--oxblood-dk); color:#f6e8dc;
+  text-shadow:0 1px 1px rgba(46,10,6,.5);
+  box-shadow:inset 0 1px 0 rgba(255,226,208,.35), 0 2px 6px rgba(94,33,26,.3);
+}
+.chip.primary:hover{background:linear-gradient(to bottom, #a2443a, #8b352a 55%, var(--oxblood-dk)); color:#fdf3ea;}
+.chip .badge{
+  min-width:15px; height:15px; padding:0 3px; border-radius:50%;
+  display:grid; place-items:center; transform:rotate(-6deg);
+  border:1.2px solid var(--stamp-red); color:var(--stamp-red);
+  background:rgba(253,250,240,.8); font-size:9px;
+}
+.chip.console-ok{color:var(--shelf-green); border-color:#c2cfbb; background:var(--shelf-green-soft); cursor:default;}
+@media (max-width:1400px){
+  .chip .opt{display:none;}
+  .chip{padding:4px 8px 5px;}
+  .url-bar{font-size:10px;}
+}
+</style>
+<style>
+/* ── the rendered web page — a modern sheet under the reading lamp ── */
+.webview{
+  flex:1; min-height:0; position:relative; overflow:hidden;
+  background:#fcfcfa; border-radius:0 0 4px 4px;
+  font-family:'Avenir Next','Helvetica Neue',Helvetica,Arial,sans-serif;
+}
+.site{height:100%; display:flex; flex-direction:column; color:#272a31;}
+.site-nav{
+  flex:none; display:flex; align-items:center; gap:22px;
+  padding:13px 30px; border-bottom:1px solid #eaeaee; background:#fff;
+}
+.site-logo{font-weight:800; font-size:14.5px; letter-spacing:-.01em; color:#1e2028;}
+.site-logo span{color:#4a63e7;}
+.site-steps{display:flex; gap:16px; font-size:12px; color:#9a9ca6; margin-left:auto;}
+.site-steps .on{color:#4a63e7; font-weight:700;}
+.site-main{flex:1; display:flex; align-items:flex-start; justify-content:center; gap:26px; padding:32px 30px;}
+.order-card{
+  width:330px; background:#fff; border:1px solid #e7e7ec; border-radius:10px;
+  box-shadow:0 4px 16px rgba(30,32,44,.06); padding:22px 24px;
+}
+.order-card h3{font-size:15px; font-weight:700; margin-bottom:14px; color:#1e2028;}
+.order-row{display:flex; justify-content:space-between; font-size:13px; color:#4c4f58; padding:7px 0;}
+.order-row .qty{color:#9a9ca6; font-size:11.5px; margin-left:5px;}
+.order-row.total{border-top:1px solid #ececf0; margin-top:8px; padding-top:12px;
+  font-weight:800; font-size:14.5px; color:#1e2028;}
+.pay-panel{width:280px; display:flex; flex-direction:column; gap:12px;}
+.pay-field{display:flex; flex-direction:column; gap:4px;}
+.pay-field label{font-size:11px; font-weight:700; color:#71747e; letter-spacing:.02em;}
+.pay-field .fake-input{
+  height:34px; border:1px solid #dcdde3; border-radius:7px; background:#fbfbfd;
+  display:flex; align-items:center; padding:0 11px; font-size:12.5px; color:#585b64;
+}
+.pay-cta{
+  margin-top:6px; height:44px; border-radius:9px; border:none;
+  background:#4a63e7; color:#fff; font-size:14.5px; font-weight:700;
+  font-family:inherit; box-shadow:0 4px 14px rgba(74,99,231,.32);
+  transition:transform .15s ease, box-shadow .15s ease;
+}
+.pay-cta:hover{transform:translateY(-1px); box-shadow:0 7px 20px rgba(74,99,231,.4);}
+.pay-note{font-size:10.5px; color:#a4a6af; text-align:center;}
+/* auto-reload flash — a date-due style stamp */
+.refreshed{
+  position:absolute; right:20px; top:16px; z-index:3;
+  padding:3px 12px 4px; transform:rotate(4deg);
+  border:1.6px solid var(--shelf-green); border-radius:2px;
+  color:var(--shelf-green); background:rgba(252,252,250,.85);
+  font-family:var(--type); font-size:9.5px; letter-spacing:.16em;
+  animation:stampIn .4s cubic-bezier(.2,1.6,.45,1) .3s both;
+}
+@keyframes stampIn{from{opacity:0; transform:rotate(14deg) scale(1.7);} to{opacity:1; transform:rotate(4deg) scale(1);}}
+/* librarian's marginal note beside the CTA */
+.web-marginalia{
+  position:absolute; right:14px; bottom:30px; z-index:3;
+  font-family:var(--hand); font-size:16px; color:var(--stamp-red);
+  transform:rotate(-4deg); pointer-events:none; line-height:1.15;
+  text-align:right; opacity:.9;
+}
+.web-marginalia .tick{font-size:19px;}
+
+/* ================================================================
+   6 · STATUS BAR — the date-due slip
+   ================================================================ */
+#statusbar{
+  position:relative; z-index:6; flex:none; height:27px;
+  display:flex; align-items:center; gap:14px; padding:0 14px;
+  background:linear-gradient(to bottom, #e9e0c6, #e2d8bb);
+  border-top:1px solid var(--hairline-dk);
+  font-family:var(--type); font-size:9.5px; letter-spacing:.08em; color:var(--ink-soft);
+}
+#statusbar::before{content:''; position:absolute; left:0; right:0; top:2px; height:1px; background:var(--hairline); opacity:.9;}
+.sb-key{color:var(--ink-faint); letter-spacing:.16em; text-transform:uppercase;}
+.sb-val em{font-style:normal; color:var(--oxblood);}
+.sb-sep{width:3px; height:3px; border-radius:50%; background:var(--ink-faint); opacity:.6;}
+.sb-spacer{flex:1;}
+.sb-btn{
+  font-family:var(--type); font-size:9.5px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--ink-soft); padding:2px 10px 3px; border-radius:2px;
+  border:1px solid transparent; transition:all .15s ease;
+}
+.sb-btn:hover{border-color:var(--hairline-dk); background:var(--card); color:var(--ink);}
+.sb-ver{color:var(--ink-faint); font-family:var(--serif); font-style:italic; font-size:11.5px; letter-spacing:.02em;}
+
+/* corner variation tag — small brass shelf plate */
+.corner-tag{
+  position:fixed; right:14px; bottom:34px; z-index:60;
+  transform:rotate(-1.2deg); pointer-events:none;
+}
+.corner-tag .plate{font-size:9.5px; padding:3px 14px 4px;}
+.corner-tag .plate b{font-weight:400; color:#5e211a; margin-right:4px;}
+
+/* ================================================================
+   7 · CAPTURE MODAL — the accession slip
+   ================================================================ */
+.overlay{
+  position:fixed; inset:0; z-index:50; display:grid; place-items:center;
+  background:rgba(44,36,24,.42);
+  -webkit-backdrop-filter:blur(2.5px); backdrop-filter:blur(2.5px);
+}
+.modal{
+  width:900px; max-width:calc(100vw - 80px); max-height:calc(100vh - 80px);
+  display:flex; flex-direction:column; position:relative;
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 25px, rgba(93,130,158,.08) 25px 26px),
+    var(--card);
+  border:1px solid var(--hairline-dk); border-radius:3px;
+  box-shadow:var(--sh-deep);
+  animation:fileIn .4s cubic-bezier(.25,.85,.35,1) both;
+}
+/* red head rule across the whole slip */
+.modal::before{
+  content:''; position:absolute; left:0; right:0; top:52px; height:1px;
+  background:var(--rule-red); opacity:.7; pointer-events:none;
+}
+.modal-head{
+  flex:none; display:flex; align-items:center; gap:12px;
+  padding:13px 20px 12px;
+}
+.modal-title{
+  font-family:var(--type); font-size:11.5px; letter-spacing:.18em;
+  color:var(--type-ink); text-transform:uppercase;
+}
+.modal-title .arrow{color:var(--oxblood);}
+.modal-callno{
+  font-family:var(--type); font-size:9px; color:var(--ink-faint); letter-spacing:.1em;
+  border:1px solid var(--hairline-dk); border-radius:2px; padding:1px 7px 2px;
+  background:var(--card-aged);
+}
+.modal-head .head-spacer{flex:1;}
+.modal-x{
+  width:25px; height:25px; border-radius:2px; display:grid; place-items:center;
+  font-size:12px; color:var(--ink-faint);
+  border:1px solid transparent; transition:all .15s ease;
+}
+.modal-x:hover{color:var(--stamp-red); border-color:var(--hairline-dk); background:var(--card-aged);}
+.cap-grid{
+  flex:1; min-height:0; display:grid; grid-template-columns:1fr 1fr; gap:0;
+  padding:14px 0 16px; overflow:auto;
+}
+.cap-col{display:flex; flex-direction:column; gap:13px; min-width:0; padding:4px 20px 0;}
+.cap-col + .cap-col{border-left:1px dashed var(--hairline-dk);}
+.cap-summary{
+  display:grid; grid-template-columns:max-content 1fr; gap:7px 14px;
+  padding:11px 13px 12px;
+  background:var(--card-aged); border:1px solid var(--hairline); border-radius:2px;
+  font-size:12px;
+}
+.cap-summary dt{
+  font-family:var(--type); font-size:8.5px; letter-spacing:.16em; color:var(--ink-faint);
+  text-transform:uppercase; padding-top:3px;
+}
+.cap-summary dd{color:var(--ink); font-family:var(--mono); font-size:11.5px;}
+.field-label{
+  display:block; margin-bottom:5px;
+  font-family:var(--type); font-size:8.5px; letter-spacing:.16em;
+  color:var(--ink-soft); text-transform:uppercase;
+}
+textarea,select{
+  width:100%; font-family:var(--serif); font-size:13px; color:var(--ink);
+  background:var(--linen); border:1px solid var(--hairline-dk); border-radius:2px;
+  padding:8px 11px; resize:none; outline:none;
+  box-shadow:inset 0 1px 3px rgba(74,58,30,.10);
+}
+textarea:focus,select:focus{border-color:var(--oxblood); box-shadow:0 0 0 3px var(--oxblood-soft);}
+textarea::placeholder{color:var(--ink-faint); font-style:italic;}
+select{
+  font-family:var(--mono); font-size:11.5px;
+  appearance:none; -webkit-appearance:none; cursor:pointer;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%235d5240' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 12px center;
+}
+.cap-shot{
+  height:102px; border-radius:2px;
+  border:1.5px dashed var(--ink-faint); background:var(--linen);
+  display:grid; place-items:center;
+}
+.cap-shot .shot-frame{
+  width:210px; height:72px; border-radius:3px; background:#fcfcfa;
+  border:1px solid var(--hairline-dk); box-shadow:var(--sh-card);
+  display:grid; place-items:center; color:#8d90a0;
+  font-family:var(--mono); font-size:10.5px;
+}
+/* carbon copy — payload typed through violet carbon paper */
+.carbon-head{display:flex; align-items:baseline; justify-content:space-between; gap:8px;}
+.carbon-stamp{
+  font-family:var(--type); font-size:8px; letter-spacing:.14em; color:var(--carbon);
+  border:1.2px solid var(--carbon); border-radius:2px; padding:1px 7px 2px;
+  transform:rotate(2deg); opacity:.8; text-transform:uppercase;
+}
+.yaml-view{
+  flex:1; min-height:228px; overflow:auto; position:relative;
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 20px, rgba(77,74,114,.07) 20px 21px),
+    #f7f4e8;
+  color:var(--carbon);
+  border:1px solid var(--hairline-dk); border-radius:2px;
+  padding:13px 16px; font-family:var(--mono); font-size:11.5px; line-height:1.82;
+  box-shadow:inset 0 1px 4px rgba(74,58,30,.10);
+}
+.yaml-view .yk{color:#3c3a60; font-weight:600;}
+.yaml-view .yv{color:var(--carbon);}
+.yaml-view .ys{color:#5f5b8e;}
+.yaml-view .yc{color:#8f8cad;}
+.modal-foot{
+  flex:none; display:flex; align-items:center; gap:10px;
+  padding:12px 20px 14px; border-top:1px dashed var(--hairline-dk);
+}
+.foot-spacer{flex:1;}
+.btn{
+  font-family:var(--type); font-size:10px; letter-spacing:.14em; text-transform:uppercase;
+  padding:7px 16px 8px; border-radius:2px;
+  border:1px solid var(--hairline-dk); background:var(--card-aged); color:var(--ink-soft);
+  box-shadow:0 1px 0 rgba(255,250,236,.8) inset, 0 1px 2px rgba(74,58,30,.08);
+  transition:all .16s ease;
+}
+.btn:hover{color:var(--ink); background:var(--card); transform:translateY(-1px); box-shadow:var(--sh-card);}
+.btn.primary{
+  background:linear-gradient(to bottom, #92392e, var(--oxblood) 55%, var(--oxblood-dk));
+  border-color:var(--oxblood-dk); color:#f6e8dc;
+  text-shadow:0 1px 1px rgba(46,10,6,.5);
+  box-shadow:inset 0 1px 0 rgba(255,226,208,.35), 0 2px 8px rgba(94,33,26,.32);
+}
+.btn.primary:hover{background:linear-gradient(to bottom, #a2443a, #8b352a 55%, var(--oxblood-dk)); color:#fdf3ea;}
+
+/* quiet the room for those who ask */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation:none !important; transition:none !important;}
+}
+</style>
+</head>
+<body>
+
+<!-- ══ titlebar — top of the catalogue cabinet ══ -->
+<header id="titlebar" class="file-in" style="--d:0s">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">
+      <!-- three catalogued nodes threaded on a chevron of string -->
+      <svg viewBox="0 0 64 64" width="20" height="20">
+        <path d="M21 17 Q34 21 45 32 Q34 43 21 47" fill="none" stroke="#988a6d" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="1 5"/>
+        <rect x="14" y="10.5" width="13" height="13" rx="2.5" fill="#c26a3c" transform="rotate(-6 20.5 17)"/>
+        <rect x="38.5" y="25.5" width="13" height="13" rx="2.5" fill="#7a6194" transform="rotate(4 45 32)"/>
+        <rect x="14" y="40.5" width="13" height="13" rx="2.5" fill="#45604b" transform="rotate(-4 20.5 47)"/>
+        <line x1="17" y1="15.2" x2="24" y2="14.5" stroke="#f2ecdc" stroke-width="1.4" stroke-linecap="round"/>
+        <line x1="41.5" y1="30.6" x2="48.5" y2="31.2" stroke="#f2ecdc" stroke-width="1.4" stroke-linecap="round"/>
+        <line x1="17" y1="45.2" x2="24" y2="44.7" stroke="#f2ecdc" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+    </span>
+    <span class="brand-text">
+      <span class="brand-name">Chrom<span class="amp">u</span>x</span>
+      <span class="brand-sub">agent cockpit</span>
+    </span>
+    <span class="brand-call" title="Shelved under: agent orchestration">QA 76.9 .A34 C47</span>
+  </div>
+  <div class="titlebar-spacer"></div>
+  <div class="gauges" aria-label="Circulation stamps">
+    <span class="gauge g-live"><i class="gdot"></i><b>3</b> SESSIONS</span>
+    <span class="gauge g-queue"><i class="gdot"></i><b>2</b> QUEUED</span>
+    <span class="gauge g-sent"><i class="gdot"></i><b>14</b> SENT</span>
+  </div>
+  <button class="top-btn update" title="A new edition is ready to shelve">✦ UPDATE READY</button>
+  <button class="top-btn" title="Settings">SETTINGS</button>
+</header>
+
+<!-- ══ main frame ══ -->
+<div id="app">
+
+  <!-- ── left rail — the card catalogue drawer ── -->
+  <aside id="rail" class="file-in" style="--d:.06s">
+    <div class="drawer-front">
+      <div class="drawer-label">
+        <span>
+          <span class="rail-title">Attention Queue</span>
+          <span class="rail-range">Approvals — Exits · drawer 21</span>
+        </span>
+        <button class="btn-detect" title="Detect open terminal tabs and agent sessions (⌘D)">⛶ detect</button>
+      </div>
+      <span class="drawer-pull" aria-hidden="true"></span>
+    </div>
+
+    <div id="attention-list">
+      <button class="index-card k-approval file-in" style="--d:.16s">
+        <div class="card-head">
+          <span class="card-kind"><i></i>Approval</span>
+          <span class="card-callno">AQ .001</span>
+        </div>
+        <div class="card-session">checkout-flow</div>
+        <div class="card-body">claude wants to run <code>npm run db:migrate</code></div>
+        <span class="margin-note">needs a yes! —</span>
+      </button>
+      <button class="index-card k-preview file-in" style="--d:.24s">
+        <div class="card-head">
+          <span class="card-kind"><i></i>Preview</span>
+          <span class="card-callno">AQ .002</span>
+        </div>
+        <div class="card-session">landing-page</div>
+        <div class="card-body">localhost:5173 changed — review ready</div>
+      </button>
+      <button class="index-card k-exited file-in" style="--d:.32s">
+        <div class="card-head">
+          <span class="card-kind"><i></i>Exited</span>
+          <span class="card-callno">AQ .003</span>
+        </div>
+        <div class="card-session">api-server</div>
+        <div class="card-body">codex exited (code 0) · 12m ago</div>
+      </button>
+    </div>
+
+    <div class="rail-foot">
+      <div class="rail-foot-label">Local Storage</div>
+      <button class="pathlink" title="Reveal in Finder">~/.chromux/captures</button>
+    </div>
+  </aside>
+
+  <!-- ── workspace ── -->
+  <div id="workspace">
+
+    <nav id="session-tabs" class="file-in" style="--d:.1s" aria-label="Session tabs">
+      <button class="session-tab active">
+        <span class="tab-callno">Vol. I · QA 76 .CHK</span>
+        <span class="tab-main">
+          <i class="tdot live"></i>
+          <span class="tab-label">checkout-flow <span class="agent">· claude</span></span>
+          <span class="tab-badge">2</span>
+        </span>
+      </button>
+      <button class="session-tab">
+        <span class="tab-callno">Vol. II · QA 76 .LND</span>
+        <span class="tab-main">
+          <i class="tdot live"></i>
+          <span class="tab-label">landing-page <span class="agent">· grok</span></span>
+        </span>
+      </button>
+      <button class="session-tab">
+        <span class="tab-callno">Vol. III · QA 76 .API</span>
+        <span class="tab-main">
+          <i class="tdot dead"></i>
+          <span class="tab-label">api-server <span class="agent">· codex</span></span>
+        </span>
+      </button>
+      <button class="add-tab" title="Accession a new volume (⌘T)" aria-label="New session">+</button>
+    </nav>
+
+    <main id="stage">
+
+      <!-- terminal pane — the microfiche reader -->
+      <section id="terminal-pane" class="file-in" style="--d:.18s">
+        <div class="term-head">
+          <span class="plate term-plate">READING ROOM</span>
+          <span class="term-title">Terminal — <em>claude</em></span>
+          <span class="term-cwd">~/projects/shop/checkout-flow</span>
+        </div>
+        <div class="term-body">
+<div class="t-line t-welcome"><span class="spark">✻</span> Welcome to Claude Code!<span class="path">/projects/shop/checkout-flow</span></div>
+<div class="t-line">&nbsp;</div>
+<div class="t-line t-user"><span class="caret">&gt;</span> fix the CTA overflow on the checkout page</div>
+<div class="t-line">&nbsp;</div>
+<div class="t-line t-agent"><span class="bullet">●</span> I'll look at the checkout component styles.</div>
+<div class="t-line t-agent"><span class="bullet">●</span> Read <span class="file">src/components/CheckoutCTA.tsx</span> <span class="meta">(84 lines)</span></div>
+<div class="t-line t-agent"><span class="bullet">●</span> Edit <span class="file">src/styles/checkout.css</span></div>
+<div class="t-line">  <span class="t-del">- .cta-row { width: 120%; }</span></div>
+<div class="t-line">  <span class="t-add">+ .cta-row { width: 100%; max-width: 480px; }</span></div>
+<div class="t-line t-ok"><span class="check">✔</span> Change applied — dev server reloaded</div>
+<div class="t-line t-agent"><span class="bullet">●</span> The button no longer overflows. Preview updated on the right.</div>
+<div class="t-line">&nbsp;</div>
+<div class="t-line t-await"><span class="cursor"></span>awaiting your next instruction…</div>
+        </div>
+      </section>
+
+      <div id="divider" title="Drag to resize" aria-hidden="true"></div>
+
+      <!-- browser pane — the examined volume -->
+      <section id="browser-pane" class="file-in" style="--d:.26s">
+        <span class="pane-plate plate">LOCALHOST PREVIEW</span>
+        <span class="pane-ribbon" aria-hidden="true"></span>
+        <div class="browser-toolbar">
+          <button class="nav-btn" title="Back">←</button>
+          <button class="nav-btn" title="Forward" disabled>→</button>
+          <button class="nav-btn" title="Reload">↻</button>
+          <div class="url-bar"><span class="lock">●</span><span class="addr"><span class="scheme">http://</span><span class="host">localhost:5173</span>/checkout</span></div>
+          <button id="btn-capture" class="chip primary">⛶ Capture</button>
+          <button class="chip">Queue <span class="badge">2</span></button>
+          <span class="chip console-ok">console: 0</span>
+          <button class="chip" title="Collapse pane">⌄<span class="opt">&nbsp;Collapse</span></button>
+        </div>
+        <div class="webview">
+          <span class="refreshed">✓ REFRESHED</span>
+          <div class="site">
+            <div class="site-nav">
+              <span class="site-logo">shop<span>mark</span></span>
+              <div class="site-steps"><span>Cart</span><span class="on">Checkout</span><span>Done</span></div>
+            </div>
+            <div class="site-main">
+              <div class="order-card">
+                <h3>Order summary</h3>
+                <div class="order-row"><span>Field notebook, gridded<span class="qty">×1</span></span><span>$32.00</span></div>
+                <div class="order-row"><span>Archival pen set<span class="qty">×2</span></span><span>$10.00</span></div>
+                <div class="order-row"><span>Shipping</span><span>$6.00</span></div>
+                <div class="order-row total"><span>Total</span><span>$48.00</span></div>
+              </div>
+              <div class="pay-panel">
+                <div class="pay-field"><label>EMAIL</label><div class="fake-input">june@archive.example</div></div>
+                <div class="pay-field"><label>CARD</label><div class="fake-input">•••• •••• •••• 4242</div></div>
+                <button class="pay-cta">Pay $48.00</button>
+                <div class="pay-note">Payments are encrypted and secure.</div>
+              </div>
+            </div>
+          </div>
+          <span class="web-marginalia">overflow fixed <span class="tick">✓</span><br/>— shelve it</span>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- ══ status bar — the date-due slip ══ -->
+<footer id="statusbar" class="file-in" style="--d:.34s">
+  <span><span class="sb-key">Adapter</span> <span class="sb-val"><em>claude -p</em> · one-off</span></span>
+  <span class="sb-sep"></span>
+  <span><span class="sb-key">Pairing</span> <span class="sb-val">1:1 session ↔ pane</span></span>
+  <span class="sb-spacer"></span>
+  <button class="sb-btn">Delivery Log</button>
+  <span class="sb-ver">chromux 0.17.0 — library stacks concept</span>
+</footer>
+
+<div class="corner-tag"><span class="plate"><b>21</b>LIBRARY STACKS</span></div>
+
+<!-- ══ capture modal — the accession slip ══ -->
+<div id="modal-capture" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Capture to agent">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-title">Accession Slip — Capture <span class="arrow">→</span> Agent</span>
+      <span class="modal-callno">CAP 2026 .0711</span>
+      <span class="head-spacer"></span>
+      <button class="modal-x" data-close title="Close (Esc)">✕</button>
+    </div>
+    <div class="cap-grid">
+      <div class="cap-col">
+        <dl class="cap-summary">
+          <dt>Session</dt><dd>checkout-flow · claude</dd>
+          <dt>URL</dt><dd>localhost:5173/checkout</dd>
+          <dt>Selection</dt><dd>"CTA button region 412×88"</dd>
+        </dl>
+        <label>
+          <span class="field-label">Note to agent — what's wrong / what to do</span>
+          <textarea rows="3" spellcheck="false" placeholder="e.g. the CTA button overflows its container — fix the CSS"></textarea>
+        </label>
+        <label>
+          <span class="field-label">Target</span>
+          <select><option>checkout-flow · claude -p</option><option>landing-page · grok</option></select>
+        </label>
+        <div>
+          <span class="field-label">Screenshot</span>
+          <div class="cap-shot"><div class="shot-frame">CTA button region · 412×88</div></div>
+        </div>
+      </div>
+      <div class="cap-col">
+        <div class="carbon-head">
+          <span class="field-label" style="margin:0">Payload Preview — YAML v1</span>
+          <span class="carbon-stamp">Carbon Copy</span>
+        </div>
+        <pre class="yaml-view"><span class="yk">chromux_capture</span><span class="yv">: v1</span>
+<span class="yk">session</span><span class="yv">: checkout-flow</span>
+<span class="yk">agent</span><span class="yv">: claude</span>
+<span class="yk">url</span><span class="yv">: http://localhost:5173/checkout</span>
+<span class="yk">note</span><span class="ys">: CTA overflows container</span>
+<span class="yk">screenshot</span><span class="yv">: ~/.chromux/captures/2026-07-11-0142.png</span>
+<span class="yk">console_errors</span><span class="yc">: []</span></pre>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" data-close>Cancel</button>
+      <span class="foot-spacer"></span>
+      <button class="btn" title="Write payload to ~/.chromux/captures only">File-Drop Only</button>
+      <button class="btn primary">Send — claude -p</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var modal = document.getElementById('modal-capture');
+  document.getElementById('btn-capture').addEventListener('click', function(){
+    modal.classList.remove('hidden');
+  });
+  modal.querySelectorAll('[data-close]').forEach(function(btn){
+    btn.addEventListener('click', function(){ modal.classList.add('hidden'); });
+  });
+  modal.addEventListener('click', function(e){
+    if (e.target === modal) modal.classList.add('hidden');
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') modal.classList.add('hidden');
+  });
+})();
+</script>
+</body>
+</html>

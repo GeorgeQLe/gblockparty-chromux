@@ -23,7 +23,7 @@ function verifyGallery(indexPath, prefix, expectedCount) {
   return routes.length;
 }
 
-const designCount = verifyGallery(path.join("designs", "index.html"), "designs", 16);
+const designCount = verifyGallery(path.join("designs", "index.html"), "designs", 36);
 const mobileCount = verifyGallery(path.join("mobile", "index.html"), "mobile", 7);
 
 console.log(`Verified ${designCount} clean design routes and ${mobileCount} clean mobile routes.`);

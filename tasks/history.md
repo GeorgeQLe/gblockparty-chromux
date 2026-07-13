@@ -1,5 +1,11 @@
 # Session History
 
+## 2026-07-12 — Chromux v0.24.0 design gallery batch 4
+
+- Added twenty new desktop design-refresh prototypes (17 Mission Patch, 18 Cartographer, 19 Darkroom, 20 Bauhaus Console, 21 Library Stacks, 22 Analog Synth, 23 Air-Traffic Control, 24 Executive Glass, 25 Comic Control Room, 26 Field Notebook, 27 Broadcast Studio, 28 Museum Archive, 29 Kinetic Typography, 30 Cybernetic Organism, 31 Medieval Scriptorium, 32 Financial Terminal, 33 Japanese Station System, 34 Thermal Industrial, 35 Soundstage Blueprint, 36 Chromatic Shadow) under `design-prototypes/`, each a self-contained static mockup following the shared `SPEC.md` contract and fabricated app state.
+- Wired the new batch into the gallery `index.html` (Batch 4 cards with hand-built swatches), the `README.md` table, and clean `/designs/*` routes; extended `scripts/test-website-routes.js` from 16 to 36 expected design routes.
+- Validation: `npm test` passed (36 design + 7 mobile clean routes); all twenty prototypes grep-verified for required regions (`titlebar`, `rail`, `session-tabs`, `stage`, `statusbar`), the `chromux 0.17.0 — <name> concept` status line, capture-modal YAML payload, and no external script/stylesheet references; every inline script passed `node --check` with no duplicate ids.
+
 ## 2026-07-12 — Chromux v0.23.0 mobile prototype gallery
 
 - Added seven self-contained mobile Chromux interaction prototypes under `mobile-prototypes/` (A Mission Control, B Agent Inbox, C Browser Field Kit, D Timeline / Black Box, E Deck of Agents, F Command Lens, G Remote Workbench tablet-first), framing the phone as a remote agent command center.

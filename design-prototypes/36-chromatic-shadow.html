@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Chromux — Chromatic Shadow</title>
+<style>
+/* ============================================================
+   CHROMATIC SHADOW — white minimalism, color lives only in
+   the soft saturated shadows each surface casts on the page.
+   Panels: pure white, near-black text, hairline borders.
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;800&display=swap');
+
+:root{
+  /* the only pigments in the app — and they never touch a surface,
+     they only fall beneath one. */
+  --h-blue:   224;   /* titlebar        */
+  --h-violet: 262;   /* rail            */
+  --h-amber:   36;   /* session tabs    */
+  --h-teal:   176;   /* terminal        */
+  --h-coral:   12;   /* browser         */
+  --h-green:  148;   /* statusbar       */
+  --h-red:      2;   /* urgent          */
+  --h-cyan:   194;   /* info            */
+
+  --ground:#FBFBFC;
+  --paper:#FFFFFF;
+  --ink:#17171C;
+  --ink-2:#54545E;
+  --ink-3:#8A8A94;
+  --hairline:rgba(23,23,28,.10);
+  --hairline-soft:rgba(23,23,28,.06);
+
+  --sans:'Schibsted Grotesk','Avenir Next','Helvetica Neue',system-ui,sans-serif;
+  --mono:'SF Mono',Menlo,Monaco,'Courier New',monospace;
+
+  --r-lg:16px;
+  --r-md:11px;
+  --r-sm:8px;
+}
+
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  min-width:1280px;
+  height:100vh;
+  overflow:hidden;
+  background:var(--ground);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:13px;
+  -webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;
+  padding:20px 22px 18px;
+  gap:18px;
+}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+
+/* ————————————————————————————————————————————————
+   the casting system.
+   every surface is white; its identity is the hue it
+   spills onto the floor. hover lifts the surface and
+   the pool of color deepens and slides.
+   ———————————————————————————————————————————————— */
+.cast{
+  background:var(--paper);
+  border:1px solid var(--hairline);
+  border-radius:var(--r-lg);
+  box-shadow:
+    0 1px 2px rgba(23,23,28,.04),
+    0 10px 22px -12px hsla(var(--h,224),90%,58%,.30),
+    0 30px 64px -22px hsla(var(--h,224),92%,56%,.42);
+  transition:box-shadow .35s cubic-bezier(.22,.61,.36,1),
+             transform .35s cubic-bezier(.22,.61,.36,1);
+}
+.cast:hover{
+  box-shadow:
+    0 1px 2px rgba(23,23,28,.04),
+    0 14px 28px -12px hsla(var(--h,224),92%,56%,.36),
+    0 42px 84px -24px hsla(var(--h,224),94%,54%,.52);
+}
+.hue-blue  {--h:var(--h-blue)}
+.hue-violet{--h:var(--h-violet)}
+.hue-amber {--h:var(--h-amber)}
+.hue-teal  {--h:var(--h-teal)}
+.hue-coral {--h:var(--h-coral)}
+.hue-green {--h:var(--h-green)}
+.hue-red   {--h:var(--h-red)}
+.hue-cyan  {--h:var(--h-cyan)}
+
+/* entrance — panels settle onto the page, shadows blooming after */
+@keyframes settle{
+  from{opacity:0;transform:translateY(10px)}
+  to{opacity:1;transform:translateY(0)}
+}
+.settle{animation:settle .55s cubic-bezier(.22,.61,.36,1) both}
+
+/* ——— shared atoms ——— */
+.microlabel{
+  font-size:9.5px;font-weight:800;letter-spacing:.19em;
+  text-transform:uppercase;color:var(--ink-2);
+}
+.btn{
+  display:inline-flex;align-items:center;gap:7px;
+  background:var(--paper);
+  border:1px solid var(--hairline);
+  border-radius:999px;
+  padding:6px 14px;
+  font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+  white-space:nowrap;
+  box-shadow:
+    0 1px 2px rgba(23,23,28,.05),
+    0 8px 18px -8px hsla(var(--h,224),88%,56%,.38);
+  transition:box-shadow .25s ease,transform .25s ease;
+}
+.btn:hover{
+  transform:translateY(-1px);
+  box-shadow:
+    0 1px 2px rgba(23,23,28,.05),
+    0 12px 26px -8px hsla(var(--h,224),92%,54%,.55);
+}
+.btn:active{
+  transform:translateY(1px);
+  box-shadow:
+    0 1px 2px rgba(23,23,28,.06),
+    0 4px 10px -6px hsla(var(--h,224),88%,54%,.42);
+}
+.chip{
+  display:inline-flex;align-items:center;gap:7px;
+  background:var(--paper);
+  border:1px solid var(--hairline);
+  border-radius:999px;
+  padding:4.5px 12px;
+  font-size:10.5px;font-weight:600;letter-spacing:.08em;
+  box-shadow:0 6px 16px -8px hsla(var(--h,224),85%,56%,.34);
+}
+.chip b{font-weight:800}
+
+/* status dots — white cores, colored halos: light, not paint */
+.dot{
+  width:8px;height:8px;border-radius:50%;
+  background:var(--paper);
+  border:1px solid var(--hairline);
+  display:inline-block;flex:0 0 auto;
+  box-shadow:0 2px 7px 1px hsla(var(--dh,148),95%,48%,.75);
+}
+.dot.green{--dh:var(--h-green)}
+.dot.amber{--dh:var(--h-amber)}
+.dot.cyan {--dh:var(--h-cyan)}
+.dot.red  {--dh:var(--h-red)}
+@keyframes halo{
+  0%,100%{box-shadow:0 2px 7px 1px hsla(var(--dh,148),95%,48%,.75)}
+  50%    {box-shadow:0 2px 11px 3px hsla(var(--dh,148),95%,48%,.95)}
+}
+.dot.live{animation:halo 2s ease-in-out infinite}
+
+/* ————————————————— titlebar ————————————————— */
+#titlebar{
+  flex:0 0 50px;
+  display:flex;align-items:center;gap:16px;
+  padding-left:84px;padding-right:12px;
+  -webkit-app-region:drag;
+  animation-delay:.02s;
+}
+#titlebar .btn,#titlebar .chip{-webkit-app-region:no-drag}
+.brand{display:flex;align-items:center;gap:12px}
+/* three white nodes, each casting its own hue — the mark IS the thesis */
+.brand-mark{
+  position:relative;width:40px;height:34px;flex:0 0 auto;
+}
+.brand-mark svg{position:absolute;inset:0}
+.brand-mark i{
+  position:absolute;width:11px;height:11px;border-radius:50%;
+  background:var(--paper);border:1px solid var(--hairline);
+}
+.brand-mark i.n1{left:3px;top:2px;  box-shadow:0 3px 9px 2px hsla(26,96%,52%,.85)}
+.brand-mark i.n2{right:5px;top:11.5px;box-shadow:0 3px 9px 2px hsla(262,90%,58%,.85)}
+.brand-mark i.n3{left:3px;bottom:2px;box-shadow:0 3px 9px 2px hsla(148,85%,42%,.85)}
+.brand-name{
+  font-size:16.5px;font-weight:800;letter-spacing:.22em;
+}
+.brand-sub{
+  font-size:8.5px;font-weight:800;letter-spacing:.26em;color:var(--ink-3);
+  border:1px solid var(--hairline);border-radius:999px;padding:3px 9px;
+  box-shadow:0 5px 12px -5px hsla(var(--h-blue),88%,56%,.40);
+}
+.tb-gauges{margin-left:auto;display:flex;align-items:center;gap:11px}
+/* urgent: the one shadow that behaves like an alarm — it breathes */
+@keyframes urgent-breathe{
+  0%,100%{box-shadow:0 1px 2px rgba(23,23,28,.05),0 9px 22px -6px hsla(var(--h-red),95%,54%,.55)}
+  50%    {box-shadow:0 1px 2px rgba(23,23,28,.05),0 13px 32px -6px hsla(var(--h-red),98%,52%,.85)}
+}
+#btn-update{
+  --h:var(--h-red);
+  font-weight:800;
+  animation:urgent-breathe 2.4s ease-in-out infinite;
+}
+#btn-update:hover{animation-play-state:paused}
+
+/* ————————————————— frame ————————————————— */
+#app{flex:1;display:flex;gap:20px;min-height:0}
+
+/* ————————————————— rail — violet ————————————————— */
+#rail{
+  flex:0 0 232px;
+  display:flex;flex-direction:column;gap:12px;
+  padding:14px 13px 13px;
+  min-height:0;
+  animation-delay:.10s;
+}
+.rail-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:1px 2px}
+.rail-head .btn{padding:4.5px 10px;font-size:9.5px;--h:var(--h-violet)}
+.qcard{
+  background:var(--paper);
+  border:1px solid var(--hairline-soft);
+  border-radius:var(--r-md);
+  padding:11px 12px 12px;
+  display:flex;flex-direction:column;gap:6px;
+  box-shadow:
+    0 1px 2px rgba(23,23,28,.03),
+    0 10px 24px -10px hsla(var(--qh,262),90%,56%,.38);
+  transition:box-shadow .3s ease,transform .3s ease;
+}
+.qcard:hover{
+  transform:translateY(-2px);
+  box-shadow:
+    0 1px 2px rgba(23,23,28,.03),
+    0 16px 34px -10px hsla(var(--qh,262),92%,54%,.55);
+}
+.qcard.approval{--qh:var(--h-red)}
+.qcard.preview {--qh:var(--h-cyan)}
+.qcard.exited  {--qh:var(--h-red)}
+.qcard.exited{
+  box-shadow:0 1px 2px rgba(23,23,28,.03),0 8px 18px -10px rgba(23,23,28,.20);
+}
+.qcard.exited:hover{
+  transform:translateY(-2px);
+  box-shadow:0 1px 2px rgba(23,23,28,.03),0 12px 24px -10px rgba(23,23,28,.28);
+}
+.qcard .tag{
+  align-self:flex-start;
+  font-size:8.5px;font-weight:800;letter-spacing:.18em;
+  border:1px solid var(--hairline);border-radius:999px;
+  padding:2.5px 8px;
+  box-shadow:0 4px 10px -3px hsla(var(--qh,262),92%,52%,.60);
+}
+.qcard.exited .tag{color:var(--ink-3);box-shadow:0 4px 10px -4px rgba(23,23,28,.25)}
+.qcard .qname{font-size:12.5px;font-weight:800;letter-spacing:.01em}
+.qcard .qmsg{font-size:11.5px;line-height:1.5;color:var(--ink-2)}
+.qcard .qmsg code{
+  font-family:var(--mono);font-size:10px;
+  border:1px solid var(--hairline-soft);border-radius:5px;padding:1px 5px;
+  box-shadow:0 3px 8px -3px hsla(var(--h-red),90%,54%,.35);
+  white-space:nowrap;
+}
+.qcard.exited .qmsg{color:var(--ink-3)}
+.rail-foot{
+  margin-top:auto;display:flex;flex-direction:column;gap:7px;
+  padding:11px 2px 1px;border-top:1px solid var(--hairline-soft);
+}
+.pathlink{
+  text-align:left;
+  font-family:var(--mono);font-size:11px;color:var(--ink-2);
+  border:1px solid var(--hairline-soft);border-radius:var(--r-sm);
+  padding:6px 10px;
+  box-shadow:0 6px 14px -7px hsla(var(--h-violet),90%,56%,.40);
+  transition:box-shadow .25s ease,transform .25s ease,color .25s ease;
+}
+.pathlink:hover{
+  transform:translateY(-1px);color:var(--ink);
+  box-shadow:0 9px 20px -7px hsla(var(--h-violet),92%,54%,.58);
+}
+
+/* ————————————— workspace + tabs — amber ————————————— */
+#workspace{flex:1;display:flex;flex-direction:column;gap:15px;min-width:0;min-height:0}
+#session-tabs{
+  flex:0 0 auto;display:flex;align-items:center;gap:12px;
+  padding:2px 2px 0;
+  animation-delay:.18s;
+}
+.stab{
+  display:inline-flex;align-items:center;gap:9px;
+  background:var(--paper);
+  border:1px solid var(--hairline);
+  border-radius:999px;
+  padding:8px 16px;
+  font-size:12px;font-weight:600;letter-spacing:.01em;
+  box-shadow:0 1px 2px rgba(23,23,28,.04),0 7px 16px -8px rgba(23,23,28,.18);
+  transition:box-shadow .3s ease,transform .3s ease;
+}
+.stab:hover{
+  transform:translateY(-2px);
+  box-shadow:0 1px 2px rgba(23,23,28,.04),0 12px 24px -8px hsla(var(--h-amber),95%,50%,.42);
+}
+.stab.active{
+  font-weight:800;
+  box-shadow:
+    0 1px 2px rgba(23,23,28,.04),
+    0 10px 22px -8px hsla(var(--h-amber),96%,50%,.55),
+    0 24px 46px -16px hsla(var(--h-amber),98%,48%,.55);
+}
+.stab.active:hover{
+  transform:translateY(-2px);
+  box-shadow:
+    0 1px 2px rgba(23,23,28,.04),
+    0 14px 28px -8px hsla(var(--h-amber),96%,48%,.62),
+    0 30px 56px -16px hsla(var(--h-amber),98%,46%,.62);
+}
+.stab .agent{font-family:var(--mono);font-size:10px;font-weight:400;color:var(--ink-3)}
+.stab.dead{color:var(--ink-3)}
+.stab.dead:hover{box-shadow:0 1px 2px rgba(23,23,28,.04),0 10px 20px -8px hsla(var(--h-red),90%,54%,.35)}
+.stab .badge{
+  min-width:18px;height:18px;
+  display:inline-grid;place-items:center;
+  font-size:9.5px;font-weight:800;
+  background:var(--paper);
+  border:1px solid var(--hairline);border-radius:999px;
+  box-shadow:0 3px 9px hsla(var(--h-coral),96%,52%,.70);
+}
+.add-tab{
+  width:32px;height:32px;display:grid;place-items:center;
+  background:var(--paper);
+  border:1px solid var(--hairline);border-radius:50%;
+  font-size:15px;font-weight:600;color:var(--ink-2);
+  box-shadow:0 6px 14px -6px hsla(var(--h-amber),92%,52%,.40);
+  transition:box-shadow .25s ease,transform .25s ease,color .25s ease;
+}
+.add-tab:hover{
+  transform:translateY(-2px);color:var(--ink);
+  box-shadow:0 10px 20px -6px hsla(var(--h-amber),94%,50%,.60);
+}
+
+/* ————————————————— stage ————————————————— */
+#stage{flex:1;display:flex;min-height:0}
+.pane{
+  display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;
+}
+#pane-term{flex:0 0 44%;animation-delay:.26s}
+#pane-browser{flex:1;animation-delay:.34s}
+.pane-head{
+  flex:0 0 42px;display:flex;align-items:center;gap:10px;
+  padding:0 16px;
+  border-bottom:1px solid var(--hairline-soft);
+}
+.pane-title{font-size:9.5px;font-weight:800;letter-spacing:.19em}
+.pane-title .agent-name{color:var(--ink-3);letter-spacing:.19em}
+.pane-cwd{
+  margin-left:auto;
+  font-family:var(--mono);font-size:10px;color:var(--ink-2);
+  border:1px solid var(--hairline-soft);border-radius:999px;
+  padding:3px 10px;
+  box-shadow:0 4px 10px -4px hsla(var(--h-teal),85%,44%,.45);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:55%;
+}
+
+/* terminal — white paper terminal, ink text, teal pool below the pane */
+.term{
+  flex:1;min-height:0;overflow:hidden;
+  padding:16px 20px;
+  font-family:var(--mono);font-size:12px;line-height:1.85;
+  white-space:pre-wrap;word-break:break-word;
+  color:var(--ink);
+}
+.term .t-hello{font-weight:700}
+.term .t-glyph{
+  display:inline-block;
+  color:var(--ink);
+  text-shadow:0 3px 10px hsla(var(--h-teal),95%,42%,.95);
+}
+.term .t-path{float:right;color:var(--ink-3);font-size:11px}
+.term .t-user{font-weight:700}
+.term .t-user::before{
+  content:'>';margin-right:8px;font-weight:700;
+  text-shadow:0 3px 9px hsla(var(--h-violet),92%,55%,.95);
+}
+.term .t-dot{text-shadow:0 3px 9px hsla(var(--h-teal),95%,40%,.95)}
+.term .t-dim{color:var(--ink-3)}
+.term .t-del{
+  color:var(--ink-2);text-decoration:line-through;
+  text-decoration-color:hsla(var(--h-red),90%,58%,.65);
+  text-decoration-thickness:1.5px;
+}
+.term .t-add{font-weight:700;text-shadow:0 3px 10px hsla(var(--h-green),90%,40%,.55)}
+.term .t-ok{font-weight:700}
+.term .t-ok .t-glyph{text-shadow:0 3px 10px hsla(var(--h-green),90%,38%,.95)}
+.term .t-cursor{
+  display:inline-block;width:8px;height:14px;
+  background:var(--ink);
+  vertical-align:-2px;margin-right:7px;
+  box-shadow:0 4px 12px hsla(var(--h-teal),95%,42%,.9);
+  animation:blink 1.15s steps(2,start) infinite;
+}
+@keyframes blink{to{visibility:hidden}}
+
+/* divider — a slim white grip hovering between two pools of color */
+#divider{
+  flex:0 0 20px;
+  display:flex;align-items:center;justify-content:center;
+  cursor:col-resize;
+}
+#divider .grip{
+  width:6px;height:72px;
+  background:var(--paper);
+  border:1px solid var(--hairline);
+  border-radius:999px;
+  box-shadow:
+    -6px 8px 16px -6px hsla(var(--h-teal),90%,44%,.50),
+    6px 8px 16px -6px hsla(var(--h-coral),92%,54%,.50);
+  transition:box-shadow .3s ease;
+}
+#divider:hover .grip{
+  box-shadow:
+    -8px 12px 22px -6px hsla(var(--h-teal),92%,42%,.70),
+    8px 12px 22px -6px hsla(var(--h-coral),94%,52%,.70);
+}
+
+/* ————————————— browser pane — coral ————————————— */
+.btoolbar{
+  flex:0 0 48px;display:flex;align-items:center;gap:6px;
+  padding:0 11px;
+  border-bottom:1px solid var(--hairline-soft);
+}
+.nav-btn{
+  flex:0 0 auto;width:25px;height:25px;
+  display:grid;place-items:center;
+  border:1px solid var(--hairline-soft);border-radius:50%;
+  font-size:12.5px;color:var(--ink-2);
+  box-shadow:0 4px 10px -4px hsla(var(--h-coral),88%,54%,.35);
+  transition:box-shadow .25s ease,transform .25s ease,color .25s ease;
+}
+.nav-btn:hover{
+  transform:translateY(-1px);color:var(--ink);
+  box-shadow:0 7px 15px -4px hsla(var(--h-coral),92%,52%,.55);
+}
+.urlbar{
+  flex:1 1 auto;min-width:150px;
+  display:flex;align-items:center;gap:8px;
+  border:1px solid var(--hairline-soft);border-radius:999px;
+  padding:5.5px 11px;
+  font-family:var(--mono);font-size:11px;color:var(--ink-2);
+  box-shadow:inset 0 2px 8px -3px hsla(var(--h-coral),85%,55%,.22);
+  overflow:hidden;white-space:nowrap;
+}
+.urlbar .lock{
+  width:6px;height:6px;border-radius:50%;flex:0 0 auto;
+  background:var(--paper);border:1px solid var(--hairline);
+  box-shadow:0 2px 6px 1px hsla(var(--h-green),90%,42%,.85);
+}
+.urlbar .url-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.urlbar .url-path{color:var(--ink);font-weight:700}
+.btoolbar .btn{flex:0 0 auto;padding:5px 8px;font-size:9.5px;letter-spacing:.06em;gap:5px}
+#btn-capture{--h:var(--h-coral);font-weight:800;
+  box-shadow:
+    0 1px 2px rgba(23,23,28,.05),
+    0 8px 18px -6px hsla(var(--h-coral),95%,54%,.55),
+    0 18px 36px -12px hsla(var(--h-coral),96%,52%,.50);
+}
+#btn-capture:hover{
+  box-shadow:
+    0 1px 2px rgba(23,23,28,.05),
+    0 12px 24px -6px hsla(var(--h-coral),96%,52%,.68),
+    0 24px 46px -12px hsla(var(--h-coral),98%,50%,.60);
+}
+.btoolbar .btn .b-badge{
+  min-width:16px;height:16px;
+  display:inline-grid;place-items:center;
+  font-size:8.5px;font-weight:800;
+  border:1px solid var(--hairline);border-radius:999px;
+  box-shadow:0 3px 8px hsla(var(--h-coral),96%,52%,.70);
+}
+.console-chip{
+  flex:0 0 auto;
+  font-family:var(--mono);font-size:10px;text-transform:none;letter-spacing:0;
+  padding:3.5px 8px;
+  box-shadow:0 5px 12px -6px hsla(var(--h-green),88%,44%,.55);
+}
+@media (max-width:1560px){.urlbar .url-scheme{display:none}}
+@media (max-width:1380px){
+  #pane-term{flex-basis:40%}
+  .btoolbar{gap:5px;padding:0 10px}
+  .urlbar{min-width:96px}
+}
+
+/* ——— fake rendered web page — a normal page, pigment allowed here:
+       this is content, not chrome. deliberately conventional. ——— */
+.webpage{
+  flex:1;min-height:0;overflow:hidden;position:relative;
+  background:#F3F4F7;color:#1D2430;
+  font-family:'Helvetica Neue','Avenir Next',Arial,sans-serif;
+  border-radius:0 0 var(--r-lg) var(--r-lg);
+  border-top:1px solid var(--hairline-soft);
+}
+.wp-nav{
+  height:46px;background:#fff;border-bottom:1px solid #E5E8EE;
+  display:flex;align-items:center;gap:18px;padding:0 28px;
+}
+.wp-logo{font-weight:700;font-size:14px}
+.wp-logo em{font-style:normal;color:#3D5CE0}
+.wp-nav span{font-size:12px;color:#6A7280}
+.wp-steps{margin-left:auto;font-size:11px;color:#6A7280}
+.wp-steps b{color:#1D2430}
+.wp-body{display:flex;gap:22px;padding:28px 32px;justify-content:center}
+.wp-card{
+  background:#fff;border:1px solid #E5E8EE;border-radius:10px;
+  box-shadow:0 1px 3px rgba(16,24,40,.06);
+  padding:20px 22px;
+}
+.wp-form{width:min(46%,340px)}
+.wp-h{font-size:15px;font-weight:700;margin-bottom:14px}
+.wp-field{margin-bottom:12px}
+.wp-field label{display:block;font-size:10.5px;color:#6A7280;margin-bottom:4px}
+.wp-input{
+  height:32px;border:1px solid #D6DBE3;border-radius:6px;background:#FBFCFD;
+  display:flex;align-items:center;padding:0 10px;font-size:12px;color:#3A4150;
+}
+.wp-row{display:flex;gap:10px}
+.wp-row .wp-field{flex:1}
+.wp-summary{width:min(40%,300px);align-self:flex-start}
+.wp-line{display:flex;justify-content:space-between;font-size:12.5px;padding:7px 0;color:#3A4150}
+.wp-line.total{border-top:1px solid #E5E8EE;margin-top:6px;padding-top:12px;font-weight:700;font-size:14px;color:#1D2430}
+.wp-cta{
+  width:100%;max-width:480px;margin-top:14px;height:42px;
+  background:#3D5CE0;color:#fff;border:none;border-radius:8px;
+  font-size:14px;font-weight:700;cursor:pointer;
+  box-shadow:0 2px 6px rgba(61,92,224,.35);
+}
+.wp-cta:hover{background:#3450C4}
+.wp-secure{margin-top:10px;font-size:10.5px;color:#98A0AD;text-align:center}
+/* auto-reload flash — a white chip with a green pool, back in app language */
+.flash-chip{
+  position:absolute;right:16px;top:60px;
+  font-family:var(--sans);font-size:8.5px;font-weight:800;letter-spacing:.18em;
+  color:var(--ink);
+  background:var(--paper);
+  border:1px solid var(--hairline);border-radius:999px;
+  padding:4px 11px;
+  box-shadow:0 8px 18px -4px hsla(var(--h-green),92%,42%,.65);
+  animation:flashfade 3s ease-in-out infinite;
+}
+@keyframes flashfade{0%,58%,100%{opacity:1}80%{opacity:.3}}
+
+/* ————————————— statusbar — green ————————————— */
+#statusbar{
+  flex:0 0 36px;
+  display:flex;align-items:center;gap:16px;
+  padding:0 16px;
+  font-size:11px;
+  border-radius:999px;
+  animation-delay:.42s;
+}
+#statusbar .microlabel{font-size:8.5px;margin-right:6px}
+.sb-val{font-family:var(--mono);font-size:10.5px;font-weight:700}
+.sb-sep{
+  width:5px;height:5px;border-radius:50%;flex:0 0 auto;
+  background:var(--paper);border:1px solid var(--hairline);
+  box-shadow:0 2px 6px hsla(var(--h-green),90%,42%,.70);
+}
+.sb-right{margin-left:auto;display:flex;align-items:center;gap:13px}
+.sb-right .btn{padding:3.5px 11px;font-size:9px;--h:var(--h-green)}
+.sb-ver{font-family:var(--mono);font-size:10.5px;color:var(--ink-2)}
+
+/* ————————————— capture modal — the eclipse ————————————— */
+#overlay{
+  position:fixed;inset:0;z-index:50;
+  background:rgba(250,250,252,.72);
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  display:none;align-items:center;justify-content:center;
+}
+#overlay.open{display:flex}
+.modal{
+  width:min(880px,92vw);max-height:88vh;
+  background:var(--paper);
+  border:1px solid var(--hairline);
+  border-radius:20px;
+  display:flex;flex-direction:column;overflow:hidden;
+  /* the one place three hues pool together */
+  box-shadow:
+    0 2px 6px rgba(23,23,28,.05),
+    -40px 44px 110px -30px hsla(var(--h-violet),92%,56%,.55),
+    0 54px 120px -32px hsla(var(--h-teal),92%,44%,.55),
+    40px 44px 110px -30px hsla(var(--h-coral),94%,54%,.55);
+}
+@keyframes rise{
+  from{opacity:0;transform:translateY(16px) scale(.985)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+#overlay.open .modal{animation:rise .3s cubic-bezier(.22,.61,.36,1)}
+.modal-head{
+  flex:0 0 50px;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 18px;
+  border-bottom:1px solid var(--hairline-soft);
+}
+.modal-head .microlabel{font-size:10.5px;color:var(--ink)}
+.modal-x{
+  width:28px;height:28px;display:grid;place-items:center;
+  border:1px solid var(--hairline-soft);border-radius:50%;
+  font-size:12px;color:var(--ink-2);
+  box-shadow:0 5px 12px -4px hsla(var(--h-red),90%,54%,.40);
+  transition:box-shadow .25s ease,transform .25s ease,color .25s ease;
+}
+.modal-x:hover{
+  transform:translateY(-1px);color:var(--ink);
+  box-shadow:0 8px 16px -4px hsla(var(--h-red),92%,52%,.60);
+}
+.modal-body{
+  flex:1;min-height:0;overflow:auto;
+  display:grid;grid-template-columns:1fr 1fr;gap:18px;
+  padding:18px;
+}
+.cap-col{display:flex;flex-direction:column;gap:13px;min-width:0}
+.cap-summary{
+  border:1px solid var(--hairline-soft);border-radius:var(--r-md);
+  overflow:hidden;
+  box-shadow:0 10px 24px -12px hsla(var(--h-violet),90%,56%,.40);
+}
+.cap-row{display:flex;gap:12px;padding:9px 13px;font-size:11.5px}
+.cap-row+.cap-row{border-top:1px solid var(--hairline-soft)}
+.cap-row .k{
+  flex:0 0 78px;padding-top:2px;
+  font-size:8.5px;font-weight:800;letter-spacing:.17em;color:var(--ink-2);
+}
+.cap-row .v{font-family:var(--mono);font-size:11px;font-weight:700;word-break:break-all}
+.field{display:flex;flex-direction:column;gap:6px}
+.field textarea,.field select{
+  font:inherit;color:var(--ink);
+  background:var(--paper);
+  border:1px solid var(--hairline-soft);border-radius:var(--r-sm);
+  padding:9px 11px;font-size:12px;resize:none;
+  box-shadow:inset 0 2px 9px -4px hsla(var(--h-teal),85%,46%,.28);
+}
+.field textarea:focus,.field select:focus{
+  outline:none;
+  border-color:var(--hairline);
+  box-shadow:inset 0 2px 9px -4px hsla(var(--h-teal),85%,46%,.28),
+             0 8px 20px -8px hsla(var(--h-teal),90%,44%,.50);
+}
+.field textarea::placeholder{color:var(--ink-3)}
+.field select{
+  appearance:none;font-family:var(--mono);font-size:11.5px;font-weight:700;
+  background-image:linear-gradient(45deg,transparent 49%,var(--ink-2) 50%),linear-gradient(-45deg,transparent 49%,var(--ink-2) 50%);
+  background-position:calc(100% - 18px) 55%,calc(100% - 12px) 55%;
+  background-size:6px 6px;background-repeat:no-repeat;
+}
+.cap-shot{
+  height:96px;
+  border:1px dashed var(--hairline);border-radius:var(--r-md);
+  display:grid;place-items:center;
+  box-shadow:inset 0 2px 12px -4px hsla(var(--h-coral),85%,55%,.20);
+}
+.cap-shot span{
+  font-size:8.5px;font-weight:800;letter-spacing:.16em;
+  background:var(--paper);
+  border:1px solid var(--hairline);border-radius:999px;
+  padding:4px 11px;
+  box-shadow:0 6px 14px -4px hsla(var(--h-coral),92%,54%,.55);
+}
+.yaml{
+  flex:1;min-height:200px;overflow:auto;
+  background:var(--paper);
+  border:1px solid var(--hairline-soft);border-radius:var(--r-md);
+  padding:15px 17px;
+  font-family:var(--mono);font-size:11.5px;line-height:1.8;
+  white-space:pre;
+  box-shadow:inset 0 2px 14px -6px hsla(var(--h-violet),85%,56%,.24);
+}
+.yaml .yk{color:var(--ink-3)}
+.yaml .yv{color:var(--ink);font-weight:700}
+.yaml .yh{color:var(--ink-3)}
+.modal-foot{
+  flex:0 0 58px;
+  border-top:1px solid var(--hairline-soft);
+  display:flex;align-items:center;justify-content:flex-end;gap:13px;
+  padding:0 18px;
+}
+.modal-foot .btn{--h:var(--h-violet)}
+.modal-foot .btn.primary{
+  --h:var(--h-coral);font-weight:800;
+  box-shadow:
+    0 1px 2px rgba(23,23,28,.05),
+    0 9px 20px -6px hsla(var(--h-coral),95%,54%,.58),
+    0 20px 40px -12px hsla(var(--h-coral),96%,52%,.50);
+}
+.modal-foot .btn.primary:hover{
+  box-shadow:
+    0 1px 2px rgba(23,23,28,.05),
+    0 13px 26px -6px hsla(var(--h-coral),96%,52%,.70),
+    0 26px 50px -12px hsla(var(--h-coral),98%,50%,.60);
+}
+
+/* ————————————— corner tag ————————————— */
+#corner-tag{
+  position:fixed;right:24px;bottom:64px;z-index:40;
+  font-size:8.5px;font-weight:800;letter-spacing:.2em;
+  background:var(--paper);color:var(--ink);
+  border:1px solid var(--hairline);border-radius:999px;
+  padding:6px 13px;
+  box-shadow:
+    -10px 12px 26px -8px hsla(var(--h-violet),92%,56%,.60),
+    0 14px 30px -10px hsla(var(--h-teal),92%,44%,.55),
+    10px 12px 26px -8px hsla(var(--h-coral),94%,54%,.60);
+  pointer-events:none;
+}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation:none !important;transition:none !important}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════ titlebar — casts blue ══════════ -->
+<header id="titlebar" class="cast settle hue-blue">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 40 34" width="40" height="34" fill="none">
+        <path d="M11 7.5 L27 17 L11 26.5" stroke="#17171C" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <i class="n1"></i><i class="n2"></i><i class="n3"></i>
+    </span>
+    <span class="brand-name">CHROMUX</span>
+    <span class="brand-sub">AGENT COCKPIT</span>
+  </div>
+  <div class="tb-gauges">
+    <span class="chip hue-green"><i class="dot green live"></i><b>3</b>&nbsp;SESSIONS</span>
+    <span class="chip hue-amber"><i class="dot amber"></i><b>2</b>&nbsp;QUEUED</span>
+    <span class="chip hue-cyan"><i class="dot cyan"></i><b>14</b>&nbsp;SENT</span>
+    <button id="btn-update" class="btn">UPDATE READY</button>
+    <button class="btn hue-blue">SETTINGS</button>
+  </div>
+</header>
+
+<!-- ══════════ main frame ══════════ -->
+<div id="app">
+
+  <!-- rail — casts violet -->
+  <aside id="rail" class="cast settle hue-violet">
+    <div class="rail-head">
+      <span class="microlabel">Attention Queue</span>
+      <button class="btn">⛶ DETECT</button>
+    </div>
+    <div class="qcard approval">
+      <span class="tag">APPROVAL</span>
+      <span class="qname">checkout-flow</span>
+      <span class="qmsg">claude wants to run <code>npm run db:migrate</code></span>
+    </div>
+    <div class="qcard preview">
+      <span class="tag">PREVIEW</span>
+      <span class="qname">landing-page</span>
+      <span class="qmsg">localhost:5173 changed — review ready</span>
+    </div>
+    <div class="qcard exited">
+      <span class="tag">EXITED</span>
+      <span class="qname">api-server</span>
+      <span class="qmsg">codex exited (code 0) · 12m ago</span>
+    </div>
+    <div class="rail-foot">
+      <span class="microlabel">Local Storage</span>
+      <button class="pathlink">~/.chromux/captures</button>
+    </div>
+  </aside>
+
+  <div id="workspace">
+
+    <!-- session tabs — cast amber -->
+    <nav id="session-tabs" class="settle" aria-label="Session tabs">
+      <button class="stab active"><i class="dot green live"></i>checkout-flow<span class="agent">· claude</span><span class="badge">2</span></button>
+      <button class="stab"><i class="dot green live"></i>landing-page<span class="agent">· grok</span></button>
+      <button class="stab dead"><i class="dot red"></i>api-server<span class="agent">· codex</span></button>
+      <button class="add-tab" aria-label="New session">+</button>
+    </nav>
+
+    <main id="stage">
+
+      <!-- terminal pane — casts teal -->
+      <section id="pane-term" class="pane cast settle hue-teal">
+        <div class="pane-head">
+          <span class="pane-title">TERMINAL <span class="agent-name">— CLAUDE</span></span>
+          <span class="pane-cwd">~/projects/shop/checkout-flow</span>
+        </div>
+        <div class="term"><span class="t-hello"><span class="t-glyph">✻</span> Welcome to Claude Code!</span><span class="t-path">/projects/shop/checkout-flow</span>
+<span class="t-user">fix the CTA overflow on the checkout page</span>
+<span class="t-dot">●</span> I'll look at the checkout component styles.
+<span class="t-dot">●</span> Read src/components/CheckoutCTA.tsx <span class="t-dim">(84 lines)</span>
+<span class="t-dot">●</span> Edit src/styles/checkout.css
+<span class="t-del">  - .cta-row { width: 120%; }</span>
+<span class="t-add">  + .cta-row { width: 100%; max-width: 480px; }</span>
+<span class="t-ok"><span class="t-glyph">✔</span> Change applied — dev server reloaded</span>
+<span class="t-dot">●</span> The button no longer overflows. Preview updated on the right.
+<span class="t-cursor"></span><span class="t-dim">awaiting your next instruction…</span></div>
+      </section>
+
+      <div id="divider" title="Drag to resize"><div class="grip"></div></div>
+
+      <!-- browser pane — casts coral -->
+      <section id="pane-browser" class="pane cast settle hue-coral">
+        <div class="btoolbar">
+          <button class="nav-btn">←</button>
+          <button class="nav-btn">→</button>
+          <button class="nav-btn">⟳</button>
+          <div class="urlbar">
+            <span class="lock" aria-hidden="true"></span>
+            <span class="url-text"><span class="url-scheme">http://</span>localhost:5173<span class="url-path">/checkout</span></span>
+          </div>
+          <button id="btn-capture" class="btn">⛶ CAPTURE</button>
+          <button class="btn hue-coral">QUEUE <span class="b-badge">2</span></button>
+          <span class="chip console-chip">console: 0</span>
+          <button class="btn hue-coral">⌄ COLLAPSE</button>
+        </div>
+        <div class="webpage">
+          <div class="wp-nav">
+            <span class="wp-logo">shop<em>ly</em></span>
+            <span>Cart</span><span>Shipping</span><span><b style="color:#1D2430">Payment</b></span>
+            <span class="wp-steps">Step <b>3</b> of 3</span>
+          </div>
+          <div class="wp-body">
+            <div class="wp-card wp-form">
+              <div class="wp-h">Payment details</div>
+              <div class="wp-field"><label>Card number</label><div class="wp-input">4242 4242 4242 4242</div></div>
+              <div class="wp-row">
+                <div class="wp-field"><label>Expiry</label><div class="wp-input">08 / 28</div></div>
+                <div class="wp-field"><label>CVC</label><div class="wp-input">•••</div></div>
+              </div>
+              <div class="wp-field"><label>Name on card</label><div class="wp-input">A. Customer</div></div>
+              <button class="wp-cta">Pay $48.00</button>
+              <div class="wp-secure">🔒 Payments are encrypted and secure</div>
+            </div>
+            <div class="wp-card wp-summary">
+              <div class="wp-h">Order summary</div>
+              <div class="wp-line"><span>Canvas tote — natural</span><span>$24.00</span></div>
+              <div class="wp-line"><span>Enamel mug × 2</span><span>$18.00</span></div>
+              <div class="wp-line"><span>Shipping</span><span>$6.00</span></div>
+              <div class="wp-line total"><span>Total</span><span>$48.00</span></div>
+            </div>
+          </div>
+          <div class="flash-chip">REFRESHED</div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<!-- ══════════ status bar — casts green ══════════ -->
+<footer id="statusbar" class="cast settle hue-green">
+  <span><span class="microlabel">Adapter</span><span class="sb-val">claude -p · one-off</span></span>
+  <span class="sb-sep" aria-hidden="true"></span>
+  <span><span class="microlabel">Pairing</span><span class="sb-val">1:1 session ↔ pane</span></span>
+  <div class="sb-right">
+    <button class="btn">DELIVERY LOG</button>
+    <span class="sb-ver">chromux 0.17.0 — chromatic shadow concept</span>
+  </div>
+</footer>
+
+<div id="corner-tag">#36 · CHROMATIC SHADOW</div>
+
+<!-- ══════════ capture modal ══════════ -->
+<div id="overlay" role="dialog" aria-modal="true" aria-label="Capture to agent">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="microlabel">Capture → Agent</span>
+      <button id="modal-close" class="modal-x" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="cap-col">
+        <div class="cap-summary">
+          <div class="cap-row"><span class="k">SESSION</span><span class="v">checkout-flow · claude</span></div>
+          <div class="cap-row"><span class="k">URL</span><span class="v">localhost:5173/checkout</span></div>
+          <div class="cap-row"><span class="k">SELECTION</span><span class="v">CTA button region 412×88</span></div>
+        </div>
+        <label class="field">
+          <span class="microlabel">Note to agent — what's wrong / what to do</span>
+          <textarea rows="3" spellcheck="false" placeholder="e.g. the CTA button overflows its container — fix the CSS"></textarea>
+        </label>
+        <label class="field">
+          <span class="microlabel">Target</span>
+          <select><option>checkout-flow · claude -p</option></select>
+        </label>
+        <div class="field">
+          <span class="microlabel">Screenshot</span>
+          <div class="cap-shot"><span>412 × 88 — CTA REGION</span></div>
+        </div>
+      </div>
+      <div class="cap-col">
+        <span class="microlabel">Payload Preview — YAML v1</span>
+        <pre class="yaml"><span class="yk">chromux_capture:</span> <span class="yv">v1</span>
+<span class="yk">session:</span> <span class="yv">checkout-flow</span>
+<span class="yk">agent:</span> <span class="yv">claude</span>
+<span class="yk">url:</span> <span class="yv">http://localhost:5173/checkout</span>
+<span class="yk">note:</span> <span class="yv">CTA overflows container</span>
+<span class="yk">screenshot:</span> <span class="yv">~/.chromux/captures/2026-07-11-0142.png</span>
+<span class="yk">console_errors:</span> <span class="yh">[]</span></pre>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button id="modal-cancel" class="btn">CANCEL</button>
+      <button class="btn">FILE-DROP ONLY</button>
+      <button class="btn primary">SEND — claude -p</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var overlay=document.getElementById('overlay');
+  function open(){overlay.classList.add('open');}
+  function close(){overlay.classList.remove('open');}
+  document.getElementById('btn-capture').addEventListener('click',open);
+  document.getElementById('modal-close').addEventListener('click',close);
+  document.getElementById('modal-cancel').addEventListener('click',close);
+  overlay.addEventListener('click',function(e){if(e.target===overlay)close();});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')close();});
+  if(/[?&]modal=1/.test(location.search))open();
+})();
+</script>
+</body>
+</html>

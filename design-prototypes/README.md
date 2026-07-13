@@ -1,6 +1,6 @@
 # Chromux Design Refresh Prototypes
 
-Sixteen self-contained visual design explorations for the Chromux desktop app.
+Thirty-six self-contained visual design explorations for the Chromux desktop app.
 These are **static HTML mockups only** — they do not replace or modify the
 shipping app in `prototype/`. Each file mocks the full main window (titlebar,
 attention rail, session tabs, terminal + browser split, status bar) plus the
@@ -27,8 +27,29 @@ Open `index.html` for a gallery, or open any variation directly in a browser:
 | 14 | `14-streak.html` | Streak | Gamified learning-app energy — saturated green, bubbly rounded UI, 3D-bottom buttons, XP gauges |
 | 15 | `15-offset.html` | Offset | Neubrutalism — flat pastel panels, thick black outlines, hard offset shadows, sticker chips |
 | 16 | `16-liquid-glass.html` | Liquid Glass | Optical glass layers — bright silver-blue translucency, fine white edge light, refractive depth, restrained spectral accents |
+| 17 | `17-mission-patch.html` | Mission Patch | NASA-era aerospace documentation — midnight blue, cream technical labels, embroidered mission badges, telemetry strips, hardware-panel controls |
+| 18 | `18-cartographer.html` | Cartographer | Topographic command center — contour lines, coordinate grids, terrain colors, route markers, sessions as expeditions |
+| 19 | `19-darkroom.html` | Darkroom | Photographic contact sheet — near-black surfaces, red safelight accents, film perforations, captures treated like negatives |
+| 20 | `20-bauhaus-console.html` | Bauhaus Console | Primary geometry, asymmetric composition, oversized type, strict circles and rectangles, functional Bauhaus color coding |
+| 21 | `21-library-stacks.html` | Library Stacks | Academic research desk — linen paper, index cards, marginalia, brass labels, sessions catalogued like volumes |
+| 22 | `22-analog-synth.html` | Analog Synth | Modular synthesizer — patch cables, waveform activity, labeled modules, rotary controls, blinking sequencer states |
+| 23 | `23-air-traffic-control.html` | Air-Traffic Control | Dense but disciplined radar UI — desaturated green, range rings, compact flight strips, attention events as tracked contacts |
+| 24 | `24-executive-glass.html` | Executive Glass | Restrained enterprise luxury — charcoal glass, warm metallic accents, immaculate spacing, data-dense tables, almost no motion |
+| 25 | `25-comic-control-room.html` | Comic Control Room | Bold ink outlines, halftone shadows, panel layouts, speech-bubble notifications, impact typography for agent events |
+| 26 | `26-field-notebook.html` | Field Notebook | Weatherproof expedition gear — olive canvas, graph paper, stamped labels, grease-pencil marks, rugged physical controls |
+| 27 | `27-broadcast-studio.html` | Broadcast Studio | Live-production switcher — multiview panes, tally lights, program/preview states, lower-thirds, ON AIR attention |
+| 28 | `28-museum-archive.html` | Museum Archive | Quiet institutional presentation — neutral stone, accession numbers, specimen labels, display-case depth, captures as artifacts |
+| 29 | `29-kinetic-typography.html` | Kinetic Typography | Nearly monochrome, type-first — scale, weight, spacing, and motion communicate state instead of panels, icons, or color |
+| 30 | `30-cybernetic-organism.html` | Cybernetic Organism | Bio-digital — branching neural paths, translucent membranes, pulse rhythms, sessions visualized as living nodes |
+| 31 | `31-medieval-scriptorium.html` | Medieval Scriptorium | Illuminated-manuscript structure, cleanly interpreted — parchment, rubrication, decorated initials, narrow columns, seals |
+| 32 | `32-financial-terminal.html` | Financial Terminal | Extreme information density — compact tabular type, keyboard-first navigation, sparklines, strong status colors |
+| 33 | `33-japanese-station.html` | Japanese Station System | Transit wayfinding — immaculate grids, route colors, platform identifiers, directional type, sessions as lines through stations |
+| 34 | `34-thermal-industrial.html` | Thermal Industrial | Infrared palette over dark machinery — temperature gradients, diagnostic outlines, warning thresholds, heat tied to activity |
+| 35 | `35-soundstage-blueprint.html` | Soundstage Blueprint | Screenplay meets production planning — scene slates, cue sheets, shot lists, timecode, agent actions as production cues |
+| 36 | `36-chromatic-shadow.html` | Chromatic Shadow | Minimal white surfaces where every panel casts a different saturated colored shadow — playful without becoming Memphis |
 
-Rows 01–05 are batch 1; rows 06–15 are batch 2; row 16 is batch 3.
+Rows 01–05 are batch 1; rows 06–15 are batch 2; row 16 is batch 3; rows 17–36
+are batch 4.
 
 For reference, the current shipping design is a "flight-deck instrument panel":
 graphite black, phosphor amber, hairline bezels, condensed instrument labels

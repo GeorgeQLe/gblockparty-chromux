@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.24.0
+
+Tag: `chromux-v0.24.0`
+
+- Add twenty new desktop design-refresh prototypes (17–36) to the design gallery: Mission Patch, Cartographer, Darkroom, Bauhaus Console, Library Stacks, Analog Synth, Air-Traffic Control, Executive Glass, Comic Control Room, Field Notebook, Broadcast Studio, Museum Archive, Kinetic Typography, Cybernetic Organism, Medieval Scriptorium, Financial Terminal, Japanese Station System, Thermal Industrial, Soundstage Blueprint, and Chromatic Shadow.
+- Each variation is a self-contained static mockup of the full main window rendering the shared `design-prototypes/SPEC.md` app state, so all thirty-six directions remain directly comparable.
+- Publish the new batch as clean `/designs/*` routes on the static site and extend the website route regression test to cover all 36 design routes.
+
 ## GBlockParty Chromux v0.23.0
 
 Tag: `chromux-v0.23.0`

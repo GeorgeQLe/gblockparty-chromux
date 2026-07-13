@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Chromux — Comic Control Room</title>
+<style>
+/* Progressive enhancement — strong macOS fallbacks carry the whole design */
+@import url('https://fonts.googleapis.com/css2?family=Bangers&family=Oswald:wght@500;600&display=swap');
+
+/* ─────────────────────────────────────────────────────────
+   CHROMUX №25 — COMIC CONTROL ROOM
+   ink outlines · halftone-dot shadows · panel gutters ·
+   speech-bubble queue · newsprint ground · four-colour press
+   ───────────────────────────────────────────────────────── */
+:root{
+  --ink:#191210;
+  --ink-soft:#3a2f28;
+  --paper:#f4edda;          /* newsprint ground (the gutters) */
+  --paper-deep:#eae1c6;
+  --panel:#fffcf2;          /* panel interior — brighter stock */
+  --red:#d23a2b;
+  --red-deep:#a92c20;
+  --blue:#2456b8;
+  --blue-deep:#1a4090;
+  --yellow:#f7c440;
+  --yellow-pale:#fbe29b;
+  --green:#2d9457;
+  --cyan:#3f9fc4;
+  --term:#211a15;
+  --term-text:#f1e8d2;
+  --line:3px;
+
+  --impact:'Bangers','Futura','Avenir Next Condensed','Impact',sans-serif;
+  --label:'Oswald','Avenir Next Condensed','Futura','Trebuchet MS',sans-serif;
+  --body:'Avenir Next','Avenir','Helvetica Neue',sans-serif;
+  --mono:'Menlo','SF Mono','Monaco',monospace;
+
+  /* benday / halftone dot screens */
+  --dots-ink:radial-gradient(circle,rgba(25,18,16,.82) 1.35px,transparent 1.8px);
+  --dots-cyan:radial-gradient(circle,rgba(63,159,196,.4) 1.5px,transparent 1.95px);
+  --dots-red:radial-gradient(circle,rgba(210,58,43,.4) 1.5px,transparent 1.95px);
+  --dots-yellow:radial-gradient(circle,rgba(244,180,0,.5) 1.7px,transparent 2.15px);
+
+  /* jagged starburst for onomatopoeia moments */
+  --burst:polygon(0% 50%,5% 22%,13% 33%,17% 6%,27% 27%,36% 0%,45% 25%,55% 2%,63% 27%,73% 4%,82% 30%,90% 12%,96% 34%,100% 50%,95% 72%,88% 62%,81% 94%,72% 70%,62% 98%,53% 72%,43% 96%,35% 71%,25% 92%,17% 68%,9% 86%,4% 68%);
+}
+
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:var(--body);
+  color:var(--ink);
+  overflow:hidden;
+  min-width:1280px;
+  display:flex;
+  flex-direction:column;
+  -webkit-font-smoothing:antialiased;
+  /* newsprint — faint pulp mottling under everything */
+  background:
+    radial-gradient(circle at 18% 30%,rgba(120,96,60,.05),transparent 42%),
+    radial-gradient(circle at 82% 70%,rgba(120,96,60,.05),transparent 40%),
+    var(--paper);
+}
+button{font-family:inherit;cursor:pointer;color:inherit}
+
+.microlabel{
+  font-family:var(--label);
+  font-weight:600;
+  font-size:10px;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+}
+
+/* ══ shared ink button ══ */
+.btn{
+  background:var(--panel);
+  border:2.5px solid var(--ink);
+  border-radius:4px;
+  font-family:var(--label);
+  font-weight:600;
+  font-size:10.5px;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  padding:5px 11px;
+  transition:transform .16s ease,background .16s ease,box-shadow .16s ease;
+}
+.btn:hover{transform:translateY(-1px);background:var(--yellow-pale)}
+.btn:active{transform:translateY(1px)}
+.btn-red{background:var(--red);color:#fffcf2}
+.btn-red:hover{background:var(--red-deep)}
+.btn-blue{background:var(--blue);color:#fffcf2}
+.btn-blue:hover{background:var(--blue-deep)}
+.btn-yellow{background:var(--yellow)}
+.btn-yellow:hover{background:#f2b62e}
+
+/* ══ comic panel — ink frame + halftone drop shadow ══ */
+.panel{
+  position:relative;
+  background:var(--panel);
+  border:var(--line) solid var(--ink);
+  border-radius:5px;
+}
+.panel::after{                       /* the halftone shadow screen */
+  content:'';
+  position:absolute;
+  z-index:-1;
+  inset:11px -10px -10px 11px;
+  border-radius:5px;
+  background-image:var(--dots-ink);
+  background-size:6.5px 6.5px;
+  opacity:.5;
+  -webkit-mask:linear-gradient(135deg,#000 45%,rgba(0,0,0,.15) 100%);
+          mask:linear-gradient(135deg,#000 45%,rgba(0,0,0,.15) 100%);
+  pointer-events:none;
+}
+
+/* caption plate — the little narration box pinned to a panel edge */
+.caption-plate{
+  position:absolute;
+  top:-13px;
+  left:14px;
+  background:var(--yellow);
+  border:2.5px solid var(--ink);
+  border-radius:3px;
+  padding:3px 10px 2px;
+  font-family:var(--label);
+  font-weight:600;
+  font-size:10px;
+  letter-spacing:.18em;
+  text-transform:uppercase;
+  transform:rotate(-.6deg);
+  box-shadow:2px 2px 0 rgba(25,18,16,.18);
+  white-space:nowrap;
+}
+
+/* starburst onomatopoeia chip */
+.burst{
+  display:inline-grid;
+  place-items:center;
+  filter:
+    drop-shadow(1.6px 0 0 var(--ink)) drop-shadow(-1.6px 0 0 var(--ink))
+    drop-shadow(0 1.6px 0 var(--ink)) drop-shadow(0 -1.6px 0 var(--ink));
+}
+.burst > *{
+  clip-path:var(--burst);
+  font-family:var(--impact);
+  letter-spacing:.05em;
+  border:none;
+  display:grid;
+  place-items:center;
+  text-align:center;
+}
+
+/* ══ 1 · TITLEBAR — the masthead ══ */
+#titlebar{
+  flex:0 0 54px;
+  display:flex;
+  align-items:center;
+  gap:16px;
+  padding-left:84px;                 /* macOS traffic-light gutter */
+  padding-right:16px;
+  background:var(--panel);
+  border-bottom:var(--line) solid var(--ink);
+  position:relative;
+  z-index:6;
+}
+#titlebar::after{                    /* benday press-strip under the masthead */
+  content:'';
+  position:absolute;
+  left:0;right:0;bottom:-11px;
+  height:8px;
+  background-image:var(--dots-ink);
+  background-size:6.5px 6.5px;
+  opacity:.35;
+  -webkit-mask:linear-gradient(90deg,#000 55%,transparent 100%);
+          mask:linear-gradient(90deg,#000 55%,transparent 100%);
+  pointer-events:none;
+}
+.brand{display:flex;align-items:baseline;gap:11px}
+.brand-mark{
+  align-self:center;
+  width:36px;height:36px;
+  display:grid;place-items:center;
+  background:var(--panel);
+  border:2.5px solid var(--ink);
+  border-radius:5px;
+  transform:rotate(-2deg);
+  box-shadow:2.5px 2.5px 0 rgba(25,18,16,.2);
+}
+.brand-name{
+  font-family:var(--impact);
+  font-size:27px;
+  letter-spacing:.045em;
+  line-height:1;
+  /* four-colour press mis-registration */
+  text-shadow:2px 2px 0 var(--yellow),-1.5px -1px 0 rgba(63,159,196,.55);
+}
+.brand-sub{
+  font-family:var(--label);
+  font-weight:600;
+  font-size:9.5px;
+  letter-spacing:.22em;
+  background:var(--ink);
+  color:var(--paper);
+  padding:3px 8px 2px;
+  border-radius:2px;
+  transform:translateY(-2px) rotate(-1deg);
+}
+.title-strip{                        /* halftone gradient filler between brand and gauges */
+  flex:1;
+  align-self:stretch;
+  margin:16px 4px;
+  min-width:60px;
+  background-image:var(--dots-ink);
+  background-size:8px 8px;
+  opacity:.22;
+  -webkit-mask:linear-gradient(90deg,transparent 0%,#000 30%,#000 70%,transparent 100%);
+          mask:linear-gradient(90deg,transparent 0%,#000 30%,#000 70%,transparent 100%);
+}
+.titlebar-gauges{display:flex;align-items:center;gap:10px}
+.gauge{
+  display:flex;align-items:center;gap:7px;
+  font-family:var(--label);font-weight:600;
+  font-size:10px;letter-spacing:.12em;
+  background:var(--panel);
+  border:2.5px solid var(--ink);
+  border-radius:3px;
+  padding:4px 10px 3px;
+}
+.gauge b{font-family:var(--impact);font-size:14px;font-weight:400;letter-spacing:.02em;transform:translateY(.5px)}
+.gdot{width:9px;height:9px;border-radius:50%;border:2px solid var(--ink)}
+.g-green{background:var(--green)}
+.g-amber{background:var(--yellow);box-shadow:0 0 0 2.5px rgba(247,196,64,.35)}
+.g-cyan{background:var(--cyan)}
+/* UPDATE READY — a proper starburst */
+#btn-update{
+  background:var(--yellow);
+  color:var(--red-deep);
+  font-size:13.5px;
+  padding:11px 27px;
+  line-height:1;
+  animation:burst-pulse 2.8s ease-in-out infinite;
+}
+@keyframes burst-pulse{
+  0%,84%,100%{transform:scale(1) rotate(0)}
+  90%{transform:scale(1.07) rotate(-1.5deg)}
+  95%{transform:scale(1.02) rotate(1deg)}
+}
+#btn-update:hover{background:#f2b62e}
+
+/* ══ layout frame — the comic page with gutters ══ */
+#app{
+  flex:1;
+  display:flex;
+  gap:16px;
+  min-height:0;
+  padding:18px 16px 16px;
+}
+
+/* ══ 2 · LEFT RAIL — the speech-bubble column ══ */
+#rail{
+  width:236px;
+  flex:0 0 236px;
+  display:flex;
+  flex-direction:column;
+  min-height:0;
+}
+.rail-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 12px 10px;
+  border-bottom:2.5px solid var(--ink);
+  background:
+    linear-gradient(rgba(255,252,242,.82),rgba(255,252,242,.82)),
+    var(--dots-red);
+  background-size:auto,7px 7px;
+  border-radius:2px 2px 0 0;
+}
+.rail-head .microlabel{font-size:10.5px}
+.rail-head .btn{padding:3px 7px;font-size:9.5px}
+
+#attention-list{
+  padding:16px 12px 6px;
+  display:flex;
+  flex-direction:column;
+  gap:19px;
+  overflow:hidden;
+}
+/* speech bubble */
+.bubble{
+  position:relative;
+  background:#fff;
+  border:2.5px solid var(--ink);
+  border-radius:12px;
+  padding:9px 11px 10px;
+}
+.bubble::before{                     /* ink tail */
+  content:'';
+  position:absolute;
+  bottom:-14px;left:24px;
+  border:8px solid transparent;
+  border-top:14px solid var(--ink);
+  border-bottom:0;
+  transform:skewX(-18deg);
+}
+.bubble::after{                      /* paper tail inset */
+  content:'';
+  position:absolute;
+  bottom:-8px;left:27.5px;
+  border:5px solid transparent;
+  border-top:9px solid #fff;
+  border-bottom:0;
+  transform:skewX(-18deg);
+}
+/* urgent shout — double-ruled red bubble */
+.bubble.b-shout{
+  border-color:var(--red-deep);
+  box-shadow:0 0 0 2.5px #fff,0 0 0 5px var(--red-deep);
+  border-radius:8px;
+}
+.bubble.b-shout::before{border-top-color:var(--red-deep)}
+/* whisper — the dashed bubble comics use for a quiet aside */
+.bubble.b-whisper{
+  border-style:dashed;
+  border-color:var(--ink-soft);
+  background:var(--panel);
+}
+.bubble.b-whisper::before,
+.bubble.b-whisper::after{display:none}
+/* thought-trail dots for the whisper (session already exited) */
+.thought-trail{
+  display:flex;gap:5px;
+  margin:6px 0 0 20px;
+}
+.thought-trail i{
+  width:9px;height:9px;
+  border:2px dashed var(--ink-soft);
+  border-radius:50%;
+  background:var(--panel);
+}
+.thought-trail i:last-child{width:6px;height:6px}
+
+.qc-top{display:flex;align-items:center;gap:7px;margin-bottom:5px}
+.qc-kind{
+  font-family:var(--impact);
+  font-size:12px;
+  letter-spacing:.08em;
+  color:#fffcf2;
+  border:2px solid var(--ink);
+  border-radius:3px;
+  padding:2px 7px 1px;
+  line-height:1.2;
+  transform:rotate(-1.2deg);
+}
+.k-approval{background:var(--red)}
+.k-preview{background:var(--blue)}
+.k-exited{background:var(--ink-soft)}
+.qc-session{font-family:var(--mono);font-size:10.5px;font-weight:700}
+.qc-msg{font-size:11.5px;line-height:1.5;color:#33291f}
+.qc-msg code{
+  font-family:var(--mono);font-size:10px;
+  background:var(--paper);
+  border:1.5px solid var(--ink);
+  border-radius:2px;
+  padding:0 3px;
+}
+/* benday screen fills the rail's empty belly */
+.rail-fill{
+  flex:1;
+  margin:4px 12px 8px;
+  background-image:var(--dots-cyan);
+  background-size:8px 8px;
+  -webkit-mask:linear-gradient(#000 0%,transparent 92%);
+          mask:linear-gradient(#000 0%,transparent 92%);
+  min-height:20px;
+}
+.rail-foot{
+  border-top:2.5px solid var(--ink);
+  padding:9px 12px 11px;
+  background:var(--panel);
+  border-radius:0 0 2px 2px;
+}
+.rail-foot .microlabel{display:block;color:#7a6c58;margin-bottom:3px;font-size:8.5px}
+.pathlink{
+  background:none;border:none;padding:0;
+  font-family:var(--mono);font-size:11px;font-weight:700;
+  color:var(--blue);
+  text-decoration:underline;
+  text-decoration-thickness:2px;
+  text-underline-offset:3px;
+}
+.pathlink:hover{color:var(--red)}
+
+/* ══ workspace column ══ */
+#workspace{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+  min-width:0;
+  min-height:0;
+}
+
+/* ══ 3 · SESSION TAB STRIP — the episode index ══ */
+#session-tabs{
+  flex:0 0 50px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:0 12px;
+  background:
+    linear-gradient(rgba(255,252,242,.88),rgba(255,252,242,.88)),
+    var(--dots-yellow);
+  background-size:auto,8px 8px;
+}
+.tabs-label{
+  font-family:var(--impact);
+  font-size:14px;
+  letter-spacing:.08em;
+  color:var(--ink-soft);
+  margin-right:2px;
+}
+.session-tab{
+  display:flex;align-items:center;gap:8px;
+  background:#fff;
+  border:2.5px solid var(--ink);
+  border-radius:4px;
+  font-family:var(--label);
+  font-weight:600;
+  font-size:10.5px;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  padding:6px 12px;
+  transition:transform .16s ease,background .16s ease;
+}
+.session-tab:hover{transform:translateY(-2px)}
+.session-tab.active{
+  background:var(--ink);
+  color:var(--paper);
+  transform:translateY(-2px) rotate(-.6deg);
+  box-shadow:3px 3px 0 var(--yellow),3px 3px 0 2.5px var(--ink);
+}
+.tab-dot{width:9px;height:9px;border-radius:50%;border:2px solid var(--ink);flex:0 0 auto}
+.session-tab.active .tab-dot{border-color:var(--paper)}
+.tab-dot.live{background:var(--green)}
+.tab-dot.dead{background:var(--red)}
+.tab-badge{
+  font-family:var(--impact);
+  font-size:11px;
+  background:var(--red);color:#fffcf2;
+  border:2px solid var(--ink);
+  border-radius:999px;
+  min-width:18px;height:18px;
+  display:grid;place-items:center;
+  transform:rotate(6deg);
+}
+.session-tab.active .tab-badge{border-color:var(--paper)}
+.add-tab{
+  width:30px;height:30px;padding:0;
+  display:grid;place-items:center;
+  font-family:var(--impact);
+  font-size:16px;
+  background:var(--yellow);
+  border:2.5px solid var(--ink);
+  border-radius:50%;
+  transition:transform .18s ease;
+}
+.add-tab:hover{transform:rotate(90deg) scale(1.1)}
+.tabs-fill{flex:1}
+.tabs-issue{
+  font-family:var(--label);font-weight:600;
+  font-size:9px;letter-spacing:.2em;text-transform:uppercase;
+  color:#8a7a62;
+}
+
+/* ══ 4 · STAGE — two facing story panels ══ */
+#stage{
+  flex:1;
+  display:flex;
+  gap:0;
+  min-height:0;
+}
+
+/* pane heads styled as narration caption strips */
+.pane-head{
+  flex:0 0 40px;
+  display:flex;align-items:center;gap:10px;
+  padding:0 13px;
+  border-bottom:2.5px solid var(--ink);
+}
+.pane-title{
+  font-family:var(--impact);
+  font-size:15px;
+  letter-spacing:.07em;
+  line-height:1;
+  transform:translateY(1px);
+}
+.pane-cwd{
+  font-family:var(--mono);font-size:10.5px;font-weight:700;
+  margin-left:auto;
+  background:#fff;color:var(--ink);
+  border:2px solid var(--ink);
+  border-radius:3px;
+  padding:2.5px 8px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  max-width:58%;
+}
+
+/* — terminal panel: the night-scene panel — */
+#terminal-pane{
+  flex:0 0 46%;
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+  overflow:visible;
+}
+#terminal-pane .pane-head{
+  background:
+    linear-gradient(rgba(255,252,242,.85),rgba(255,252,242,.85)),
+    var(--dots-red);
+  background-size:auto,7px 7px;
+  border-radius:2px 2px 0 0;
+}
+#terminal-pane .pane-title{color:var(--red-deep)}
+.term-body{
+  flex:1;
+  background:var(--term);
+  color:var(--term-text);
+  font-family:var(--mono);
+  font-size:12.5px;
+  line-height:1.78;
+  padding:16px 18px;
+  overflow:hidden;
+  border-radius:0 0 2px 2px;
+  position:relative;
+}
+.term-body::after{                   /* faint halftone screen over the dark panel */
+  content:'';
+  position:absolute;inset:0;
+  background-image:radial-gradient(circle,rgba(241,232,210,.05) 1.3px,transparent 1.7px);
+  background-size:7px 7px;
+  pointer-events:none;
+}
+.t-wel{color:var(--yellow)}
+.t-wel small{color:#9a8c72;float:right;font-size:11px}
+.t-user{color:#fff;font-weight:700}
+.t-user::before{content:'> ';color:var(--cyan)}
+.t-act{color:#d8cdb4}
+.t-act::before{content:'● ';color:#6ea8ff}
+.t-del{color:#ff8a7d}
+.t-add{color:#7fdba4}
+.t-ok{color:#57c983}
+.t-dim{color:#9a8c72}
+.t-ind{padding-left:2ch}
+.t-cursor{color:var(--yellow);animation:blink 1.1s steps(2) infinite}
+@keyframes blink{50%{opacity:.15}}
+/* the tasteful onomatopoeia — one FIXED! burst on the success beat */
+.pow{
+  margin-left:9px;
+  vertical-align:1px;
+}
+.pow > span{
+  background:var(--yellow);
+  color:var(--red-deep);
+  font-size:13px;
+  padding:7px 16px;
+  line-height:1;
+  transform:rotate(-3deg);
+}
+
+/* — gutter divider between the two story panels — */
+#divider{
+  flex:0 0 16px;
+  cursor:col-resize;
+  position:relative;
+}
+#divider::before{                    /* dotted grab spine in the gutter */
+  content:'';
+  position:absolute;
+  top:18%;bottom:18%;
+  left:50%;
+  width:5px;
+  transform:translateX(-50%);
+  background-image:radial-gradient(circle,var(--ink) 1.6px,transparent 2px);
+  background-size:5px 11px;
+  background-position:center top;
+  opacity:.55;
+}
+#divider:hover::before{opacity:1}
+
+/* — browser panel: the daylight panel — */
+#browser-pane{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+  overflow:visible;
+}
+#browser-pane .pane-head{
+  background:
+    linear-gradient(rgba(255,252,242,.87),rgba(255,252,242,.87)),
+    var(--dots-cyan);
+  background-size:auto,7px 7px;
+  gap:7px;
+  flex-basis:44px;
+  border-radius:2px 2px 0 0;
+}
+#browser-pane .pane-head > *{flex:0 0 auto}
+#browser-pane .pane-head .btn{padding:4px 9px;font-size:9.5px;white-space:nowrap}
+.nav-btn{
+  width:25px;height:25px;padding:0;
+  display:grid;place-items:center;
+  background:#fff;
+  border:2.5px solid var(--ink);
+  border-radius:50%;
+  font-size:12px;font-weight:700;
+  transition:transform .16s ease,background .16s ease;
+}
+.nav-btn:hover{transform:translateY(-1.5px);background:var(--yellow-pale)}
+.url-bar{
+  flex:1 1 auto !important;min-width:110px;
+  font-family:var(--mono);font-size:11px;font-weight:700;
+  background:#fff;
+  border:2.5px solid var(--ink);
+  border-radius:999px;
+  padding:4.5px 12px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.url-bar span{color:#8a7a62}
+#btn-queue{position:relative}
+#btn-queue .tab-badge{position:absolute;top:-9px;right:-9px;background:var(--blue)}
+.chip-console{
+  font-family:var(--mono);font-size:10px;font-weight:700;
+  border:2px solid var(--ink);
+  border-radius:3px;
+  background:#fff;
+  padding:3px 7px;
+  white-space:nowrap;
+}
+.chip-console b{color:var(--green)}
+@media (max-width:1380px){
+  #browser-pane .pane-head{gap:5px}
+  #browser-pane .pane-head .btn{padding:4px 7px;font-size:9px}
+  .nav-btn{width:22px;height:22px;font-size:11px}
+  .url-bar span{display:none}
+  .chip-console{font-size:9px;padding:2px 5px}
+}
+
+/* the rendered web page — deliberately calm, modern, un-inked */
+.web-body{
+  flex:1;
+  position:relative;
+  overflow:hidden;
+  display:grid;place-items:center;
+  background:#eef0f4;
+  border-radius:0 0 2px 2px;
+  font-family:'Helvetica Neue','Avenir Next',Arial,sans-serif;
+}
+.web-page{
+  width:min(430px,80%);
+  background:#fff;
+  border:1px solid #dde1e7;
+  border-radius:12px;
+  padding:26px 28px;
+  color:#1d2530;
+  box-shadow:0 10px 30px rgba(29,37,48,.1);
+}
+.web-shop{display:flex;align-items:center;gap:8px;font-size:12px;color:#69737f;margin-bottom:14px}
+.web-shop i{
+  width:20px;height:20px;border-radius:6px;background:#1d2530;
+  display:inline-grid;place-items:center;
+  color:#fff;font-style:normal;font-size:10px;font-weight:700;
+}
+.web-h1{font-size:19px;font-weight:700;letter-spacing:-.01em;margin-bottom:15px}
+.web-row{
+  display:flex;justify-content:space-between;
+  font-size:13px;color:#48515d;
+  padding:7px 0;
+  border-bottom:1px solid #eceef2;
+}
+.web-row.total{border-bottom:none;padding-top:11px;font-weight:700;color:#1d2530;font-size:14px}
+.web-cta{
+  display:block;width:100%;max-width:480px;
+  margin-top:16px;
+  background:#1d2530;color:#fff;
+  border:none;border-radius:9px;
+  font-size:14px;font-weight:600;
+  padding:12px 0;
+  transition:background .15s ease;
+}
+.web-cta:hover{background:#333f4e}
+.web-secure{text-align:center;font-size:11px;color:#8b949f;margin-top:10px}
+/* auto-reload flash — a proper KA-CHOW starburst */
+.refreshed-burst{
+  position:absolute;top:16px;right:18px;
+  animation:pop-in .45s cubic-bezier(.3,1.6,.5,1) both;
+}
+.refreshed-burst > span{
+  background:var(--green);
+  color:#fffcf2;
+  font-size:12px;
+  padding:12px 23px;
+  line-height:1;
+  transform:rotate(4deg);
+}
+@keyframes pop-in{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
+
+/* ══ 5 · STATUS BAR — the "to be continued" strip ══ */
+#statusbar{
+  flex:0 0 30px;
+  display:flex;align-items:center;gap:14px;
+  padding:0 14px;
+  background:var(--ink);
+  color:var(--paper);
+  font-size:10px;
+  position:relative;z-index:6;
+}
+#statusbar .microlabel{color:var(--yellow);font-size:8.5px}
+.sb-val{font-family:var(--mono);font-size:10.5px;font-weight:700}
+.sb-sep{
+  width:30px;height:7px;
+  background-image:radial-gradient(circle,var(--paper) 1.3px,transparent 1.7px);
+  background-size:7px 7px;
+  opacity:.5;
+}
+.sb-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.sb-btn{
+  background:var(--yellow);color:var(--ink);
+  border:2px solid var(--paper);
+  border-radius:3px;
+  font-family:var(--label);font-weight:600;
+  font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;
+  padding:3px 9px 2px;
+  transition:transform .16s ease;
+}
+.sb-btn:hover{transform:translateY(-1px)}
+.sb-ver{font-family:var(--mono);font-size:10px;color:#b5a789}
+
+/* ══ corner variation tag — comic cover issue box ══ */
+#corner-tag{
+  position:fixed;
+  right:16px;bottom:44px;
+  z-index:60;
+  background:var(--panel);
+  border:2.5px solid var(--ink);
+  border-radius:4px;
+  padding:6px 10px 5px;
+  text-align:center;
+  transform:rotate(-2deg);
+  box-shadow:3px 3px 0 rgba(25,18,16,.22);
+  pointer-events:none;
+}
+#corner-tag .issue-no{
+  display:block;
+  font-family:var(--impact);
+  font-size:19px;
+  line-height:1;
+  color:var(--red);
+  text-shadow:1.5px 1.5px 0 var(--yellow);
+}
+#corner-tag .issue-name{
+  display:block;
+  font-family:var(--label);font-weight:600;
+  font-size:7.5px;letter-spacing:.18em;text-transform:uppercase;
+  margin-top:2px;
+}
+
+/* ══ 6 · CAPTURE MODAL — the splash page ══ */
+#modal-capture{
+  position:fixed;inset:0;z-index:100;
+  display:grid;place-items:center;
+  background:rgba(25,18,16,.6);
+}
+#modal-capture::before{              /* big halftone screen over the dimmed page */
+  content:'';
+  position:absolute;inset:0;
+  z-index:-1;                        /* under the modal card, over the dim wash */
+  background-image:radial-gradient(circle,rgba(247,196,64,.3) 1.8px,transparent 2.3px);
+  background-size:17px 17px;
+  pointer-events:none;
+}
+#modal-capture.hidden{display:none}
+.modal{
+  width:min(880px,92vw);
+  max-height:88vh;
+  display:flex;flex-direction:column;
+  animation:modal-in .4s cubic-bezier(.3,1.5,.5,1) backwards;
+}
+@keyframes modal-in{from{transform:scale(.86) rotate(-1deg);opacity:0}to{transform:scale(1) rotate(0);opacity:1}}
+.modal-head{
+  display:flex;align-items:center;gap:12px;
+  padding:12px 15px 10px;
+  border-bottom:2.5px solid var(--ink);
+  background:
+    linear-gradient(rgba(255,252,242,.82),rgba(255,252,242,.82)),
+    var(--dots-yellow);
+  background-size:auto,8px 8px;
+  border-radius:2px 2px 0 0;
+}
+.modal-title{
+  font-family:var(--impact);
+  font-size:21px;
+  letter-spacing:.06em;
+  line-height:1;
+  text-shadow:1.8px 1.8px 0 var(--yellow);
+}
+.modal-sub{
+  font-family:var(--label);font-weight:600;
+  font-size:9px;letter-spacing:.18em;text-transform:uppercase;
+  color:#8a7a62;
+  transform:translateY(2px);
+}
+.modal-x{
+  margin-left:auto;
+  width:28px;height:28px;padding:0;
+  display:grid;place-items:center;
+  background:var(--red);color:#fffcf2;
+  border:2.5px solid var(--ink);
+  border-radius:50%;
+  font-size:12px;font-weight:700;
+  transition:transform .18s ease;
+}
+.modal-x:hover{transform:rotate(90deg) scale(1.1)}
+.cap-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:18px;
+  padding:17px 16px;
+  overflow:auto;
+}
+.cap-col{display:flex;flex-direction:column;gap:12px;min-width:0}
+.cap-summary{
+  border:2.5px solid var(--ink);
+  border-radius:4px;
+  background:#fff;
+  overflow:hidden;
+}
+.cap-row{display:flex;gap:10px;padding:7px 11px;font-size:11.5px;align-items:baseline}
+.cap-row + .cap-row{border-top:2px dotted var(--ink)}
+.cap-row .microlabel{flex:0 0 76px;color:#8a7a62;font-size:8.5px}
+.cap-row b{font-family:var(--mono);font-size:11px}
+.field{display:flex;flex-direction:column;gap:5px}
+.field .microlabel{color:#8a7a62;font-size:8.5px}
+textarea,select{
+  font-family:var(--mono);font-size:11.5px;
+  border:2.5px solid var(--ink);
+  border-radius:4px;
+  background:#fff;color:var(--ink);
+  padding:8px 10px;
+  resize:none;
+  outline:none;
+}
+textarea:focus,select:focus{background:var(--yellow-pale)}
+.cap-shot{
+  height:86px;
+  border:2.5px dashed var(--ink);
+  border-radius:4px;
+  display:grid;place-items:center;
+  background-image:var(--dots-cyan);
+  background-size:9px 9px;
+  background-color:#fff;
+}
+.cap-shot span{
+  font-family:var(--mono);font-size:10.5px;
+  background:#fff;
+  border:2px solid var(--ink);
+  border-radius:3px;
+  padding:3px 10px;
+  transform:rotate(-1deg);
+}
+.yaml-view{
+  flex:1;
+  font-family:var(--mono);font-size:11.5px;line-height:1.75;
+  background:var(--term);color:var(--term-text);
+  border:2.5px solid var(--ink);
+  border-radius:4px;
+  padding:13px 14px;
+  overflow:auto;white-space:pre;
+}
+.yaml-view .y-key{color:var(--yellow)}
+.yaml-view .y-str{color:#8fc7e8}
+.modal-foot{
+  display:flex;align-items:center;gap:10px;
+  padding:12px 15px;
+  border-top:2.5px solid var(--ink);
+  background:var(--paper-deep);
+  border-radius:0 0 2px 2px;
+}
+.modal-foot .foot-dots{
+  margin-right:auto;
+  width:110px;height:8px;
+  background-image:var(--dots-ink);
+  background-size:7px 7px;
+  opacity:.4;
+  -webkit-mask:linear-gradient(90deg,#000,transparent);
+          mask:linear-gradient(90deg,#000,transparent);
+}
+.modal-foot .btn-red{
+  font-family:var(--impact);
+  font-size:14px;
+  letter-spacing:.06em;
+  padding:6px 16px 5px;
+}
+
+/* ══ page-load: panels print onto the page ══ */
+#rail,#session-tabs,#terminal-pane,#browser-pane{
+  /* fill:backwards — once done, no lingering transform/opacity, so the
+     panels do not become stacking contexts and the ::after halftone
+     shadow keeps painting BEHIND the panel, not inside it */
+  animation:print-in .45s cubic-bezier(.25,1.3,.5,1) backwards;
+}
+#rail{animation-delay:.05s}
+#session-tabs{animation-delay:.12s}
+#terminal-pane{animation-delay:.2s}
+#browser-pane{animation-delay:.28s}
+@keyframes print-in{
+  from{opacity:0;transform:translateY(10px) scale(.985)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+
+/* ══ reduced motion ══ */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation:none !important;transition:none !important}
+}
+</style>
+</head>
+<body>
+
+<!-- ══ 1 · TITLEBAR — MASTHEAD ══ -->
+<header id="titlebar">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 64 64" width="24" height="24">
+        <path d="M22 18 L44 32 L22 46" fill="none" stroke="#191210" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="22" cy="18" r="8.5" fill="#e08a3c" stroke="#191210" stroke-width="3.5"/>
+        <circle cx="44" cy="32" r="8.5" fill="#9a6fe0" stroke="#191210" stroke-width="3.5"/>
+        <circle cx="22" cy="46" r="8.5" fill="#3fae6d" stroke="#191210" stroke-width="3.5"/>
+      </svg>
+    </span>
+    <span class="brand-name">CHROMUX</span>
+    <span class="brand-sub">AGENT COCKPIT</span>
+  </div>
+  <div class="title-strip" aria-hidden="true"></div>
+  <div class="titlebar-gauges">
+    <span class="gauge"><i class="gdot g-green"></i><b>3</b>SESSIONS</span>
+    <span class="gauge"><i class="gdot g-amber"></i><b>2</b>QUEUED</span>
+    <span class="gauge"><i class="gdot g-cyan"></i><b>14</b>SENT</span>
+    <span class="burst"><button id="btn-update">UPDATE READY</button></span>
+    <button class="btn">SETTINGS</button>
+  </div>
+</header>
+
+<!-- ══ THE COMIC PAGE ══ -->
+<div id="app">
+
+  <!-- ══ 2 · LEFT RAIL — SPEECH-BUBBLE COLUMN ══ -->
+  <aside id="rail" class="panel">
+    <span class="caption-plate">Panel 1 — Attention Queue</span>
+    <div class="rail-head">
+      <span class="microlabel">Attention Queue</span>
+      <button class="btn">⛶ Detect</button>
+    </div>
+    <div id="attention-list">
+      <div class="bubble b-shout">
+        <div class="qc-top"><span class="qc-kind k-approval">APPROVAL!</span><span class="qc-session">checkout-flow</span></div>
+        <div class="qc-msg">claude wants to run <code>npm run db:migrate</code></div>
+      </div>
+      <div class="bubble">
+        <div class="qc-top"><span class="qc-kind k-preview">PREVIEW</span><span class="qc-session">landing-page</span></div>
+        <div class="qc-msg">localhost:5173 changed — review ready</div>
+      </div>
+      <div>
+        <div class="bubble b-whisper">
+          <div class="qc-top"><span class="qc-kind k-exited">exited…</span><span class="qc-session">api-server</span></div>
+          <div class="qc-msg">codex exited (code 0) · 12m ago</div>
+        </div>
+        <div class="thought-trail" aria-hidden="true"><i></i><i></i></div>
+      </div>
+    </div>
+    <div class="rail-fill" aria-hidden="true"></div>
+    <div class="rail-foot">
+      <span class="microlabel">Local Storage</span>
+      <button class="pathlink">~/.chromux/captures</button>
+    </div>
+  </aside>
+
+  <!-- ══ workspace ══ -->
+  <div id="workspace">
+
+    <!-- ══ 3 · SESSION TABS — EPISODE INDEX ══ -->
+    <nav id="session-tabs" class="panel" aria-label="Session tabs">
+      <span class="tabs-label">EPISODES:</span>
+      <button class="session-tab active"><span class="tab-dot live"></span>checkout-flow · claude<span class="tab-badge">2</span></button>
+      <button class="session-tab"><span class="tab-dot live"></span>landing-page · grok</button>
+      <button class="session-tab"><span class="tab-dot dead"></span>api-server · codex</button>
+      <button class="add-tab" aria-label="New session">+</button>
+      <div class="tabs-fill" aria-hidden="true"></div>
+      <span class="tabs-issue">Vol. 1 · Issue №25</span>
+    </nav>
+
+    <!-- ══ 4 · STAGE — TWO FACING PANELS ══ -->
+    <main id="stage">
+
+      <!-- terminal panel -->
+      <section id="terminal-pane" class="panel">
+        <span class="caption-plate">Meanwhile, in the terminal…</span>
+        <div class="pane-head">
+          <span class="pane-title">TERMINAL — CLAUDE</span>
+          <span class="pane-cwd">~/projects/shop/checkout-flow</span>
+        </div>
+        <div class="term-body">
+          <div class="t-wel">✻ Welcome to Claude Code! <small>/projects/shop/checkout-flow</small></div>
+          <div class="t-user">fix the CTA overflow on the checkout page</div>
+          <div class="t-act">I'll look at the checkout component styles.</div>
+          <div class="t-act">Read src/components/CheckoutCTA.tsx <span class="t-dim">(84 lines)</span></div>
+          <div class="t-act">Edit src/styles/checkout.css</div>
+          <div class="t-del t-ind">- .cta-row { width: 120%; }</div>
+          <div class="t-add t-ind">+ .cta-row { width: 100%; max-width: 480px; }</div>
+          <div class="t-ok">✔ Change applied — dev server reloaded<span class="pow burst"><span>FIXED!</span></span></div>
+          <div class="t-act">The button no longer overflows. Preview updated on the right.</div>
+          <div class="t-dim"><span class="t-cursor">▌</span>awaiting your next instruction…</div>
+        </div>
+      </section>
+
+      <!-- gutter divider -->
+      <div id="divider" role="separator" aria-orientation="vertical" title="Drag to resize"></div>
+
+      <!-- browser panel -->
+      <section id="browser-pane" class="panel">
+        <span class="caption-plate">The live preview</span>
+        <div class="pane-head">
+          <button class="nav-btn" aria-label="Back">‹</button>
+          <button class="nav-btn" aria-label="Forward">›</button>
+          <button class="nav-btn" aria-label="Reload">⟳</button>
+          <span class="url-bar"><span>http://</span>localhost:5173/checkout</span>
+          <button id="btn-capture" class="btn btn-red">⛶ CAPTURE</button>
+          <button id="btn-queue" class="btn">QUEUE<span class="tab-badge">2</span></button>
+          <span class="chip-console">console: <b>0</b></span>
+          <button class="btn">⌄ COLLAPSE</button>
+        </div>
+        <div class="web-body">
+          <div class="web-page">
+            <div class="web-shop"><i>S</i> shop.dev — secure checkout</div>
+            <div class="web-h1">Order summary</div>
+            <div class="web-row"><span>Studio Tee — Charcoal (M)</span><span>$32.00</span></div>
+            <div class="web-row"><span>Sticker pack × 2</span><span>$8.00</span></div>
+            <div class="web-row"><span>Shipping</span><span>$8.00</span></div>
+            <div class="web-row total"><span>Total</span><span>$48.00</span></div>
+            <button class="web-cta">Pay $48.00</button>
+            <div class="web-secure">🔒 Encrypted · powered by shop.dev pay</div>
+          </div>
+          <span class="refreshed-burst burst"><span>REFRESHED!</span></span>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- ══ 5 · STATUS BAR ══ -->
+<footer id="statusbar">
+  <span class="microlabel">Adapter</span><span class="sb-val">claude -p · one-off</span>
+  <span class="sb-sep" aria-hidden="true"></span>
+  <span class="microlabel">Pairing</span><span class="sb-val">1:1 session ↔ pane</span>
+  <div class="sb-right">
+    <button class="sb-btn">Delivery Log</button>
+    <span class="sb-ver">chromux 0.17.0 — comic control room concept</span>
+  </div>
+</footer>
+
+<!-- ══ corner issue box ══ -->
+<div id="corner-tag">
+  <span class="issue-no">№25</span>
+  <span class="issue-name">Comic Control Room</span>
+</div>
+
+<!-- ══ 6 · CAPTURE MODAL — SPLASH PAGE ══ -->
+<div id="modal-capture" class="hidden" role="dialog" aria-modal="true" aria-label="Capture to agent">
+  <div class="modal panel">
+    <div class="modal-head">
+      <span class="modal-title">CAPTURE!</span>
+      <span class="modal-sub">Snapshot → Agent</span>
+      <button class="modal-x" id="cap-close" aria-label="Close">✕</button>
+    </div>
+    <div class="cap-grid">
+      <div class="cap-col">
+        <div class="cap-summary">
+          <div class="cap-row"><span class="microlabel">Session</span><b>checkout-flow · claude</b></div>
+          <div class="cap-row"><span class="microlabel">URL</span><b>localhost:5173/checkout</b></div>
+          <div class="cap-row"><span class="microlabel">Selection</span><b>"CTA button region 412×88"</b></div>
+        </div>
+        <label class="field">
+          <span class="microlabel">Note to agent — what's wrong / what to do</span>
+          <textarea rows="3" spellcheck="false" placeholder="e.g. the CTA button overflows its container — fix the CSS"></textarea>
+        </label>
+        <label class="field">
+          <span class="microlabel">Target</span>
+          <select><option>checkout-flow · claude -p</option></select>
+        </label>
+        <div class="field">
+          <span class="microlabel">Screenshot</span>
+          <div class="cap-shot"><span>2026-07-11-0142.png · 412×88</span></div>
+        </div>
+      </div>
+      <div class="cap-col">
+        <span class="microlabel">Payload Preview — YAML v1</span>
+        <pre class="yaml-view"><span class="y-key">chromux_capture:</span> v1
+<span class="y-key">session:</span> checkout-flow
+<span class="y-key">agent:</span> claude
+<span class="y-key">url:</span> <span class="y-str">http://localhost:5173/checkout</span>
+<span class="y-key">note:</span> CTA overflows container
+<span class="y-key">screenshot:</span> <span class="y-str">~/.chromux/captures/2026-07-11-0142.png</span>
+<span class="y-key">console_errors:</span> []</pre>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <div class="foot-dots" aria-hidden="true"></div>
+      <button class="btn" id="cap-cancel">CANCEL</button>
+      <button class="btn btn-yellow">FILE-DROP ONLY</button>
+      <button class="btn btn-red">SEND — claude -p</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var modal = document.getElementById('modal-capture');
+  function open(){ modal.classList.remove('hidden'); }
+  function close(){ modal.classList.add('hidden'); }
+  document.getElementById('btn-capture').addEventListener('click', open);
+  document.getElementById('cap-close').addEventListener('click', close);
+  document.getElementById('cap-cancel').addEventListener('click', close);
+  modal.addEventListener('click', function(e){ if (e.target === modal) close(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') close(); });
+  if (/[?&]modal=1/.test(location.search)) open();
+})();
+</script>
+</body>
+</html>

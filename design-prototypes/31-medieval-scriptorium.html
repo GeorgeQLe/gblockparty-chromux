@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Chromux — Medieval Scriptorium</title>
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   CHROMUX · Nº 31 “MEDIEVAL SCRIPTORIUM”
+   Illuminated-manuscript apparatus, read strictly:
+   parchment ground · sepia ink · rubrication (red = function
+   only, as a rubricator would use it) · lapis for information ·
+   one gilded initial · marginalia column · wax seals for status ·
+   blackletter as small display accents only.
+   ═══════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=UnifrakturMaguntia&display=swap');
+
+:root{
+  /* parchment */
+  --vellum:       #eee3c8;                   /* page ground            */
+  --vellum-deep:  #e4d5b0;                   /* book-edge / recessed   */
+  --vellum-dark:  #d9c79d;                   /* deeper recess          */
+  --leaf:         #f6eeda;                   /* writing surface        */
+  --leaf-bright:  #faf4e6;                   /* brightest panel        */
+
+  /* inks */
+  --ink:          #372b1a;                   /* sepia text ink         */
+  --ink-80:       rgba(55,43,26,.82);
+  --ink-65:       rgba(55,43,26,.65);
+  --ink-50:       rgba(55,43,26,.50);
+  --ink-35:       rgba(55,43,26,.35);
+
+  /* rules — pricked & ruled lines */
+  --rule:         #d3bf95;
+  --rule-firm:    #b9a171;
+  --ruling:       rgba(150,120,70,.20);      /* faint page ruling      */
+
+  /* the rubricator's red — functional emphasis ONLY */
+  --rubric:       #9e2a1c;
+  --rubric-deep:  #7f2013;
+  --rubric-faint: rgba(158,42,28,.10);
+
+  /* lapis — the informational blue of alternate initials */
+  --lapis:        #2f4f74;
+  --lapis-faint:  rgba(47,79,116,.12);
+
+  /* gilding + verdigris */
+  --gilt:         #b3862c;
+  --gilt-deep:    #8a651c;
+  --gilt-hi:      #e3c06a;
+  --verdant:      #4d6b3f;                   /* live / affirmed        */
+
+  --body:  "EB Garamond", "Iowan Old Style", "Palatino", Palatino, Georgia, serif;
+  --black: "UnifrakturMaguntia", "Luminari", "Palatino", serif;
+  --mono:  "SF Mono", Menlo, Monaco, "Courier New", monospace;
+}
+
+*{ margin:0; padding:0; box-sizing:border-box; }
+html,body{ height:100%; }
+body{
+  min-width:1280px;
+  height:100vh;
+  overflow:hidden;
+  display:grid;
+  grid-template-rows:46px minmax(0,1fr) 28px;
+  background:
+    radial-gradient(120% 90% at 50% 6%, rgba(255,250,235,.55), transparent 60%),
+    radial-gradient(130% 110% at 50% 108%, rgba(120,90,40,.16), transparent 55%),
+    var(--vellum);
+  color:var(--ink);
+  font-family:var(--body);
+  font-feature-settings:"onum" 1, "pnum" 1, "liga" 1;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* parchment mottle — turbulence, warm-multiplied over everything */
+body::after{
+  content:""; position:fixed; inset:0; z-index:130; pointer-events:none;
+  opacity:.075; mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.55' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)'/%3E%3C/svg%3E");
+}
+
+button{ font-family:inherit; color:inherit; background:none; border:none; cursor:pointer; }
+button:focus-visible, textarea:focus-visible, select:focus-visible{
+  outline:1.5px solid var(--rubric); outline-offset:2px;
+}
+
+/* ——— shared type pieces ——— */
+
+/* rubricated small-cap caption — the red section heading of a rubricator */
+.rubrica{
+  font-family:var(--body); font-variant:small-caps;
+  font-size:11.5px; font-weight:600; letter-spacing:.22em;
+  color:var(--rubric);
+}
+/* quiet ink caption (small caps, sepia) */
+.capt{
+  font-family:var(--body); font-variant:small-caps;
+  font-size:11px; font-weight:500; letter-spacing:.2em;
+  color:var(--ink-50);
+}
+/* pilcrow marker used before rubrics */
+.pil{ color:var(--rubric); font-weight:500; margin-right:.45em; }
+
+/* hairline manuscript button */
+.btn{
+  font-family:var(--body); font-variant:small-caps;
+  font-size:11.5px; font-weight:600; letter-spacing:.14em;
+  color:var(--ink-80);
+  border:1px solid var(--rule-firm);
+  background:var(--leaf);
+  padding:4px 12px 5px;
+  border-radius:2px;
+  transition:color .15s, border-color .15s, background .15s, box-shadow .15s;
+}
+.btn:hover{ color:var(--rubric); border-color:var(--rubric); box-shadow:inset 0 -2px 0 var(--rubric); }
+.btn-rubric{
+  background:var(--rubric); border-color:var(--rubric-deep); color:var(--leaf-bright);
+  box-shadow:inset 0 1px 0 rgba(255,235,210,.25), 0 1px 0 rgba(90,30,15,.25);
+}
+.btn-rubric:hover{ background:var(--rubric-deep); border-color:var(--rubric-deep); color:var(--leaf-bright); box-shadow:none; }
+
+/* page-load: lines settle onto the leaf like laid ink */
+@keyframes settle{ from{ opacity:0; transform:translateY(8px); } to{ opacity:1; transform:none; } }
+.settle{ animation:settle .6s cubic-bezier(.22,.7,.3,1) both; }
+#titlebar.settle      { animation-delay:.04s; }
+#rail.settle          { animation-delay:.14s; }
+#session-tabs.settle  { animation-delay:.22s; }
+#pane-terminal.settle { animation-delay:.30s; }
+#pane-browser.settle  { animation-delay:.38s; }
+#statusbar.settle     { animation-delay:.46s; }
+
+@keyframes quillblink{ 0%,55%{ opacity:1; } 56%,100%{ opacity:0; } }
+@keyframes sealpulse { 0%,100%{ opacity:.55; } 50%{ opacity:1; } }
+
+/* ══════════════ TITLEBAR — the headpiece ══════════════ */
+#titlebar{
+  position:relative;
+  display:flex; align-items:center;
+  padding:0 16px 0 86px;                    /* traffic-light clearance */
+  background:linear-gradient(to bottom, var(--leaf), var(--vellum));
+  /* double frame rule: thick over thin, like a headpiece band */
+  border-bottom:1px solid var(--rule-firm);
+  box-shadow:0 2px 0 rgba(150,115,60,.14);
+  -webkit-app-region:drag;
+}
+#titlebar::before{
+  content:""; position:absolute; left:0; right:0; top:0; height:3px;
+  background:linear-gradient(90deg, var(--gilt-deep), var(--gilt-hi) 30%, var(--gilt) 55%, var(--gilt-hi) 78%, var(--gilt-deep));
+}
+#titlebar button{ -webkit-app-region:no-drag; }
+.traffic{ position:absolute; left:18px; top:50%; transform:translateY(-50%); display:flex; gap:8px; }
+.traffic i{ width:11px; height:11px; border-radius:50%; border:1px solid var(--rule-firm); background:var(--leaf); }
+
+.brand{ display:flex; align-items:center; gap:12px; }
+.brand-mark{ display:flex; }
+.brand-name{
+  font-family:var(--black);
+  font-size:21px; font-weight:400; letter-spacing:.02em;
+  color:var(--ink);
+  transform:translateY(-1px);
+}
+.brand-name::first-letter{ color:var(--rubric); }
+.brand-rule{ width:1px; height:15px; background:var(--rule-firm); }
+.brand-sub{
+  font-variant:small-caps; font-size:11px; font-weight:600;
+  letter-spacing:.3em; color:var(--ink-50);
+}
+
+.titlebar-gauges{ margin-left:auto; display:flex; align-items:center; gap:16px; }
+.gauge{
+  font-variant:small-caps; font-size:12px; letter-spacing:.14em;
+  color:var(--ink-65); display:flex; align-items:center; gap:7px;
+}
+.gauge b{ font-weight:600; color:var(--ink); font-size:13px; font-variant-numeric:oldstyle-nums; }
+.gdot{ width:7px; height:7px; border-radius:50%; display:inline-block;
+       box-shadow:inset 0 -1px 0 rgba(0,0,0,.2); }
+.g-live { background:var(--verdant); }
+.g-queue{ background:var(--rubric); }
+.g-sent { background:var(--lapis); }
+.gauge-sep{ width:5px; height:5px; transform:rotate(45deg); background:var(--rule-firm); }
+
+/* UPDATE READY — a pressed wax pellet */
+.top-btn.update-ready{
+  position:relative; padding-left:26px;
+  color:var(--rubric); border-color:var(--rubric);
+  background:var(--rubric-faint);
+}
+.top-btn.update-ready::before{
+  content:""; position:absolute; left:9px; top:50%; transform:translateY(-50%);
+  width:9px; height:9px; border-radius:48% 52% 50% 50%;
+  background:radial-gradient(circle at 34% 30%, #c8523d, var(--rubric) 55%, var(--rubric-deep));
+  animation:sealpulse 2.4s ease-in-out infinite;
+}
+.top-btn.update-ready:hover{ background:var(--rubric); color:var(--leaf-bright); box-shadow:none; }
+
+/* ══════════════ FRAME ══════════════ */
+#app{ display:flex; min-height:0; }
+
+/* ══════════════ LEFT RAIL — the margin of the page ══════════════ */
+#rail{
+  position:relative;
+  width:236px; flex:0 0 236px;
+  display:flex; flex-direction:column;
+  background:var(--vellum);
+  border-right:1px solid var(--rule-firm);
+}
+/* twin pricked ruling lines bounding the margin, as on a ruled leaf */
+#rail::before{
+  content:""; position:absolute; top:0; bottom:0; left:20px; width:5px;
+  border-left:1px solid rgba(158,42,28,.42);
+  border-right:1px solid rgba(158,42,28,.22);
+}
+.rail-head{
+  display:flex; align-items:flex-start; justify-content:space-between;
+  padding:16px 12px 8px 36px;
+}
+.rail-caption{ display:flex; flex-direction:column; gap:3px; }
+.rail-title{ font-size:12.5px; letter-spacing:.24em; }
+.rail-gloss{
+  font-size:11px; font-style:italic; color:var(--ink-50); letter-spacing:.03em;
+}
+.rail-head .btn{ padding:3px 9px 4px; font-size:10.5px; }
+
+#attention-list{ padding:9px 12px 0 36px; display:flex; flex-direction:column; gap:10px; }
+
+/* queue card — an entry with its wax seal */
+.qcard{
+  position:relative;
+  display:grid; grid-template-columns:34px 1fr; gap:0 10px;
+  border:1px solid var(--rule);
+  background:var(--leaf);
+  padding:10px 11px 11px;
+  border-radius:2px;
+  transition:border-color .15s, box-shadow .15s;
+}
+.qcard:hover{ border-color:var(--rule-firm); box-shadow:2px 2px 0 rgba(140,105,55,.16); }
+
+/* the seal itself — irregular wax roundel with an impressed letter */
+.seal{
+  grid-row:1 / 3; align-self:start; margin-top:1px;
+  width:32px; height:32px;
+  border-radius:47% 53% 51% 49% / 52% 48% 54% 46%;
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--black); font-size:15px; line-height:1;
+  box-shadow:inset 0 2px 3px rgba(255,240,220,.35), inset 0 -3px 4px rgba(0,0,0,.28),
+             0 1px 1px rgba(80,55,20,.35);
+}
+.seal-red  { background:radial-gradient(circle at 35% 30%, #c4523c, var(--rubric) 52%, var(--rubric-deep)); color:#f4dcc9; }
+.seal-blue { background:radial-gradient(circle at 35% 30%, #5d80a6, var(--lapis) 52%, #223c5a); color:#dbe6f2; }
+.seal-spent{
+  background:radial-gradient(circle at 35% 30%, #b7a888, #998a67 55%, #7d704f);
+  color:rgba(255,248,230,.75);
+  box-shadow:inset 0 1px 2px rgba(255,245,225,.3), inset 0 -2px 3px rgba(0,0,0,.2);
+}
+.qkind{
+  font-variant:small-caps; font-size:10.5px; font-weight:700; letter-spacing:.22em;
+  color:var(--ink-50);
+}
+.qcard.urgent .qkind{ color:var(--rubric); }
+.qcard.info   .qkind{ color:var(--lapis); }
+.qname{
+  font-size:14.5px; font-weight:600; font-style:italic; letter-spacing:.01em;
+  margin:1px 0 2px;
+}
+.qdesc{ font-size:11.5px; line-height:1.5; color:var(--ink-65); }
+.qdesc code{
+  font-family:var(--mono); font-size:9.5px;
+  border-bottom:1px solid var(--rule-firm); padding-bottom:1px;
+}
+.qcard.urgent{ border-left:2px solid var(--rubric); }
+.qcard.exited .qname{ color:var(--ink-50); font-weight:500; }
+.qcard.exited .qdesc{ color:var(--ink-50); }
+
+/* rail footer — the press-mark */
+.rail-foot{
+  margin-top:auto;
+  border-top:1px solid var(--rule);
+  padding:11px 12px 14px 36px;
+}
+.pathlink{
+  display:block; margin-top:4px; padding:0;
+  font-family:var(--mono); font-size:10px; color:var(--ink-80);
+  text-align:left; text-decoration:underline;
+  text-decoration-color:var(--rule-firm); text-underline-offset:3px;
+}
+.pathlink:hover{ color:var(--rubric); text-decoration-color:var(--rubric); }
+
+/* ══════════════ WORKSPACE ══════════════ */
+#workspace{ flex:1; min-width:0; display:flex; flex-direction:column; }
+
+/* ══════════════ SESSION TABS — leaf markers on the book edge ══════════════ */
+#session-tabs{
+  display:flex; align-items:flex-end; gap:6px;
+  height:42px; flex:0 0 42px;
+  padding:8px 14px 0;
+  background:var(--vellum-deep);
+  border-bottom:1px solid var(--rule-firm);
+  box-shadow:inset 0 4px 6px -4px rgba(110,80,35,.35);
+}
+.session-tab{
+  display:flex; align-items:center; gap:8px;
+  height:33px; padding:0 16px;
+  font-size:12.5px; letter-spacing:.02em;
+  color:var(--ink-50);
+  background:var(--vellum);
+  border:1px solid var(--rule);
+  border-bottom:none;
+  border-radius:3px 3px 0 0;
+  transition:color .15s, background .15s, border-color .15s;
+}
+.session-tab em{ font-style:italic; font-weight:500; }
+.session-tab:hover{ color:var(--ink); background:var(--leaf); }
+.session-tab.active{
+  color:var(--ink); font-weight:600;
+  background:var(--leaf);
+  border-color:var(--rule-firm);
+  box-shadow:inset 0 3px 0 var(--rubric);   /* rubricated header stripe */
+  position:relative; z-index:2; margin-bottom:-1px; height:34px;
+}
+.tab-dot{ width:6px; height:6px; border-radius:50%; flex:0 0 auto; }
+.tab-dot.live{ background:var(--verdant); }
+.tab-dot.dead{ background:none; border:1.5px solid var(--rubric); }
+.tab-badge{
+  font-size:10px; font-weight:700; color:var(--leaf-bright);
+  background:var(--rubric);
+  border-radius:50%;
+  width:15px; height:15px; line-height:15px; text-align:center;
+}
+.add-tab{
+  align-self:center; margin-left:4px;
+  width:24px; height:24px;
+  border:1px solid var(--rule-firm); border-radius:50%;
+  font-size:15px; line-height:1; color:var(--ink-65);
+  background:var(--vellum);
+}
+.add-tab:hover{ color:var(--rubric); border-color:var(--rubric); background:var(--leaf); }
+
+/* ══════════════ STAGE — the opened leaf ══════════════ */
+#stage{ flex:1; min-height:0; display:flex; background:var(--leaf); }
+
+.pane{ display:flex; flex-direction:column; min-width:0; min-height:0; }
+#pane-terminal{ flex:0 0 46%; }
+#pane-browser { flex:1; }
+
+.pane-head{
+  display:flex; align-items:baseline; justify-content:space-between;
+  height:36px; flex:0 0 36px;
+  padding:12px 20px 0;
+  border-bottom:1px solid var(--rule);
+}
+.pane-cwd{ font-family:var(--mono); font-size:9.5px; color:var(--ink-50); }
+
+/* divider — the gutter between two ruled columns */
+#divider{
+  flex:0 0 8px; cursor:col-resize; position:relative;
+  background:var(--vellum);
+  border-left:1px solid var(--rule); border-right:1px solid var(--rule);
+}
+#divider::after{
+  content:"❦";                                /* aldine leaf as grip */
+  position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+  font-size:9px; color:var(--rule-firm);
+}
+#divider:hover{ border-color:var(--rubric); }
+#divider:hover::after{ color:var(--rubric); }
+
+/* ——— TERMINAL — the ruled text block with marginalia ——— */
+.folio{
+  flex:1; min-height:0; overflow:hidden;
+  padding:20px 24px 16px 16px;
+  /* faint horizontal ruling, as a leaf ruled for writing */
+  background:
+    repeating-linear-gradient(to bottom,
+      transparent 0 26px, var(--ruling) 26px 27px);
+  background-origin:content-box;
+  font-size:13.5px; line-height:27px;
+  color:var(--ink);
+}
+
+/* every transcript line = marginal gloss + text column */
+.tl{
+  display:grid; grid-template-columns:86px 1fr; gap:0 14px;
+  white-space:pre-wrap;
+}
+.gloss{
+  font-size:10.5px; font-style:italic; letter-spacing:.04em;
+  color:var(--rubric); text-align:right;
+  line-height:27px;
+  opacity:.9;
+}
+.gloss.quiet{ color:var(--ink-35); }
+.tl .pfx{ color:var(--ink-35); }
+.tl .mono{ font-family:var(--mono); font-size:11px; }
+
+/* the incipit block — rubric line + petition with gilded initial */
+.incipit{
+  display:grid; grid-template-columns:86px 46px 1fr; gap:0 14px;
+  margin-bottom:0;
+}
+.incipit .gloss{ grid-row:1 / 3; }
+/* THE illuminated initial — one per page, as is proper */
+.versal{
+  grid-row:1 / 3; align-self:start; margin-top:3px;
+  width:46px; height:46px;
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--black); font-size:30px; line-height:1;
+  color:var(--rubric-deep);
+  background:
+    linear-gradient(135deg, var(--gilt-hi), var(--gilt) 55%, var(--gilt-deep));
+  border:1px solid var(--gilt-deep);
+  box-shadow:inset 0 0 0 2px rgba(255,244,214,.55), 1px 2px 0 rgba(110,80,30,.3);
+  position:relative;
+}
+/* red penwork flourish trailing off the initial */
+.versal::after{
+  content:""; position:absolute; left:50%; top:100%; width:1px; height:14px;
+  background:linear-gradient(to bottom, var(--rubric), transparent);
+}
+.inc-rubric{
+  grid-column:3; align-self:end;
+  font-variant:small-caps; font-size:12px; font-weight:600;
+  letter-spacing:.18em; color:var(--rubric); line-height:27px;
+  display:flex; justify-content:space-between; align-items:baseline;
+}
+.inc-rubric .path{
+  font-family:var(--mono); font-size:9.5px; letter-spacing:0;
+  color:var(--ink-35); font-variant:normal; font-weight:400;
+}
+.inc-petition{
+  grid-column:3; line-height:27px;
+  font-size:14.5px; font-weight:600; font-style:italic;
+}
+
+/* transcript treatments */
+.tl-read .body em, .tl-edit .body em{ font-style:normal; }
+.tl-diff .body{ padding-left:2ch; }
+.tl-del{ color:var(--ink-50); text-decoration:line-through; text-decoration-color:var(--rubric); text-decoration-thickness:1px; }
+.tl-add{ text-decoration:underline; text-underline-offset:4px; text-decoration-color:var(--rubric); }
+.tl-ok .pfx{ color:var(--verdant); }
+.tl-ok .body{ color:var(--ink-80); }
+.tl-await .body{ color:var(--rubric); font-weight:600; font-style:italic; }
+.quill{ animation:quillblink 1.1s step-end infinite; color:var(--rubric); }
+
+/* ——— BROWSER PANE — the miniature ——— */
+.browser-bar{
+  display:flex; align-items:center; gap:8px;
+  height:44px; flex:0 0 44px;
+  padding:0 14px;
+  border-bottom:1px solid var(--rule);
+}
+.nav-btn{
+  width:25px; height:25px; flex:0 0 auto;
+  border:1px solid var(--rule-firm); border-radius:50%;
+  background:var(--leaf);
+  font-family:var(--mono); font-size:11px; line-height:1;
+  color:var(--ink-65);
+}
+.nav-btn:hover{ color:var(--rubric); border-color:var(--rubric); }
+.url-bar{
+  flex:1; min-width:0;
+  border:1px solid var(--rule-firm); border-radius:2px;
+  background:var(--leaf-bright);
+  padding:5px 12px;
+  font-family:var(--mono); font-size:10.5px; color:var(--ink-80);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  box-shadow:inset 0 1px 2px rgba(120,90,40,.12);
+}
+.url-bar .proto{ color:var(--ink-35); }
+.bar-btn{ white-space:nowrap; }
+.bar-btn .bdg{
+  display:inline-block; margin-left:6px;
+  min-width:14px; height:14px; line-height:14px; border-radius:50%;
+  background:var(--rubric); color:var(--leaf-bright);
+  font-size:9.5px; font-weight:700; text-align:center; font-variant:normal;
+}
+.chip-console{
+  font-variant:small-caps; font-size:11px; letter-spacing:.16em;
+  color:var(--ink-50); padding:4px 2px;
+}
+.chip-console b{ color:var(--verdant); font-weight:700; }
+.btn-collapse{ border-color:transparent; background:none; }
+.btn-collapse:hover{ border-color:transparent; box-shadow:none; color:var(--rubric); }
+
+.browser-body{
+  flex:1; min-height:0;
+  display:flex; flex-direction:column; align-items:center;
+  padding:22px 32px 12px;
+  position:relative;
+}
+/* the miniature: modern page held in a gilt-and-rubric double frame */
+.miniature{
+  position:relative;
+  width:100%; max-width:680px; flex:1; min-height:0;
+  background:#ffffff;
+  border:1px solid var(--gilt-deep);
+  outline:1px solid var(--rubric);
+  outline-offset:4px;
+  box-shadow:0 0 0 3px var(--gilt-hi), 3px 4px 0 rgba(120,88,38,.22);
+  display:flex; flex-direction:column;
+  overflow:hidden;
+}
+.mini-caption{
+  flex:0 0 auto; margin:14px 0 0;
+  font-variant:small-caps; font-size:11px; letter-spacing:.22em;
+  color:var(--ink-50);
+}
+.mini-caption b{ color:var(--rubric); font-weight:600; }
+
+/* REFRESHED — an inked stamp, slightly askew */
+.chip-refresh{
+  position:absolute; bottom:14px; right:14px; z-index:3;
+  transform:rotate(-4deg);
+  font-variant:small-caps; font-size:10.5px; font-weight:700; letter-spacing:.24em;
+  color:var(--rubric);
+  border:2px solid var(--rubric); border-radius:3px;
+  padding:2px 9px 3px;
+  background:rgba(250,244,230,.9);
+  animation:sealpulse 2.6s ease-in-out infinite;
+}
+
+/* the fake web page — deliberately its own modern world */
+.web{ font-family:-apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; color:#18181b;
+      display:flex; flex-direction:column; flex:1; min-height:0; background:#fff; }
+.web-head{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:13px 26px; border-bottom:1px solid #ececec;
+}
+.web-logo{ font-size:13.5px; font-weight:700; letter-spacing:-.01em; }
+.web-nav{ display:flex; gap:18px; font-size:11.5px; color:#71717a; }
+.web-main{ flex:1; overflow:hidden; display:flex; justify-content:center; align-items:center; padding:20px; }
+.web-col{ width:330px; }
+.web-h1{ font-size:19px; font-weight:700; letter-spacing:-.02em; margin-bottom:14px; }
+.web-card{ border:1px solid #e4e4e7; border-radius:9px; padding:16px 18px; background:#fff;
+           box-shadow:0 1px 3px rgba(0,0,0,.05); }
+.web-row{ display:flex; justify-content:space-between; font-size:12.5px; color:#3f3f46; padding:5px 0; }
+.web-row.total{ border-top:1px solid #e4e4e7; margin-top:7px; padding-top:11px; font-weight:700; color:#18181b; font-size:13px; }
+.web-cta{
+  display:block; width:100%; margin-top:14px;
+  background:#18181b; color:#fff; border:none; border-radius:7px;
+  font-size:13.5px; font-weight:600; padding:11px 0; text-align:center; cursor:pointer;
+}
+.web-fine{ margin-top:10px; font-size:10px; color:#a1a1aa; text-align:center; }
+
+/* ══════════════ STATUS BAR — the colophon ══════════════ */
+#statusbar{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 16px;
+  background:linear-gradient(to top, var(--vellum-deep), var(--vellum));
+  border-top:1px solid var(--rule-firm);
+  box-shadow:inset 0 3px 0 rgba(179,134,44,.35);   /* thin gilt closing band */
+  font-variant:small-caps; font-size:11px; letter-spacing:.14em;
+}
+.sb-left,.sb-right{ display:flex; align-items:center; gap:10px; }
+.sb-key{ color:var(--rubric); font-weight:600; letter-spacing:.2em; }
+.sb-val{ color:var(--ink-80); font-variant:normal; font-size:11.5px; font-style:italic; letter-spacing:.02em; }
+.sb-sep{ width:4px; height:4px; transform:rotate(45deg); background:var(--rule-firm); }
+.sb-btn{
+  font-variant:small-caps; font-size:11px; font-weight:600; letter-spacing:.18em;
+  color:var(--ink-80); padding:2px 0;
+  border-bottom:1px solid var(--rule-firm);
+}
+.sb-btn:hover{ color:var(--rubric); border-bottom-color:var(--rubric); }
+.sb-ver{ color:var(--ink-50); font-variant:normal; font-size:10.5px; font-style:italic; letter-spacing:.03em; }
+
+/* ══════════════ CAPTURE MODAL — the charter ══════════════ */
+.overlay{
+  position:fixed; inset:0; z-index:80;
+  display:flex; align-items:center; justify-content:center;
+  background:rgba(233,220,192,.88);
+}
+.overlay.hidden{ display:none; }
+.charter{
+  position:relative;
+  width:900px; max-width:calc(100vw - 80px);
+  background:var(--leaf);
+  border:1px solid var(--gilt-deep);
+  outline:1px solid var(--rubric);
+  outline-offset:5px;
+  box-shadow:0 0 0 3px var(--gilt-hi), 0 18px 40px rgba(90,64,25,.35);
+}
+.charter-head{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 20px 12px;
+  border-bottom:1px solid var(--rule);
+}
+.charter-title{ display:flex; align-items:baseline; gap:12px; }
+.charter-title .black{
+  font-family:var(--black); font-size:19px; color:var(--ink);
+}
+.charter-title .black::first-letter{ color:var(--rubric); }
+.charter-x{
+  font-family:var(--mono); font-size:12px; color:var(--ink-50);
+  width:24px; height:24px; border:1px solid var(--rule-firm); border-radius:50%;
+}
+.charter-x:hover{ color:var(--rubric); border-color:var(--rubric); }
+
+.cap-grid{ display:grid; grid-template-columns:1fr 1fr; }
+.cap-col{ padding:16px 22px 20px; display:flex; flex-direction:column; gap:14px; }
+.cap-col.left{ border-right:1px solid var(--rule); }
+
+.cap-summary{ display:flex; flex-direction:column; }
+.cap-row{
+  display:grid; grid-template-columns:92px 1fr; align-items:baseline;
+  padding:6px 0 7px; border-bottom:1px solid var(--rule);
+}
+.cap-row:first-child{ border-top:1px solid var(--rule); }
+.cap-key{ font-variant:small-caps; font-size:11px; font-weight:600; letter-spacing:.18em; color:var(--rubric); }
+.cap-val{ font-family:var(--mono); font-size:10.5px; color:var(--ink-80); }
+.cap-val em{ font-family:var(--body); font-size:12.5px; }
+
+.field{ display:flex; flex-direction:column; gap:6px; }
+.field textarea, .field select{
+  width:100%; background:var(--leaf-bright);
+  border:1px solid var(--rule-firm); border-radius:2px;
+  font-family:var(--mono); font-size:10.5px; color:var(--ink);
+  padding:8px 10px; resize:none;
+  box-shadow:inset 0 1px 2px rgba(120,90,40,.1);
+  -webkit-appearance:none; appearance:none;
+}
+.field textarea::placeholder{ color:var(--ink-35); font-style:italic; font-family:var(--body); font-size:12px; }
+.selectwrap{ position:relative; }
+.selectwrap::after{
+  content:"⌄"; position:absolute; right:10px; top:50%; transform:translateY(-55%);
+  font-family:var(--mono); font-size:10px; color:var(--rubric); pointer-events:none;
+}
+.cap-shot{
+  height:76px; border:1px solid var(--rule-firm);
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  background:repeating-linear-gradient(45deg, transparent 0 8px, rgba(158,42,28,.05) 8px 9px);
+  font-variant:small-caps; font-size:10.5px; letter-spacing:.18em; color:var(--ink-50);
+}
+.cap-shot .pil{ font-size:12px; }
+
+.yaml-label{ display:flex; justify-content:space-between; align-items:baseline; }
+.yaml-view{
+  flex:1; border:1px solid var(--rule-firm); background:var(--leaf-bright);
+  padding:12px 15px; border-radius:2px;
+  box-shadow:inset 0 1px 2px rgba(120,90,40,.1);
+  font-family:var(--mono); font-size:10.5px; line-height:2; color:var(--ink-80);
+  white-space:pre; overflow:auto;
+}
+.yaml-view .yk{ color:var(--rubric); }
+
+.charter-foot{
+  position:relative;
+  display:flex; align-items:center; justify-content:flex-end; gap:10px;
+  padding:14px 20px 16px 96px;
+  border-top:1px solid var(--rule);
+}
+/* the hanging seal on the charter foot */
+.foot-seal{
+  position:absolute; left:26px; top:-14px;
+  width:46px; height:46px;
+  border-radius:46% 54% 52% 48% / 53% 47% 55% 45%;
+  background:radial-gradient(circle at 34% 28%, #c4523c, var(--rubric) 52%, var(--rubric-deep));
+  box-shadow:inset 0 3px 4px rgba(255,240,220,.35), inset 0 -4px 6px rgba(0,0,0,.3),
+             0 3px 5px rgba(90,55,20,.35);
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--black); font-size:19px; color:#f4dcc9;
+}
+/* its ribbon */
+.foot-seal::before{
+  content:""; position:absolute; top:-12px; left:50%; transform:translateX(-50%) rotate(2deg);
+  width:9px; height:16px;
+  background:linear-gradient(to bottom, var(--gilt), var(--gilt-deep));
+  z-index:-1;
+}
+
+/* ══════════════ CORNER TAG — the folio number ══════════════ */
+#corner-tag{
+  position:fixed; right:14px; bottom:36px; z-index:60;
+  font-variant:small-caps; font-size:10.5px; letter-spacing:.22em;
+  color:var(--ink-65); background:var(--leaf);
+  border:1px solid var(--rule-firm); border-radius:2px;
+  padding:4px 10px 5px;
+  box-shadow:2px 2px 0 rgba(140,105,55,.18);
+}
+#corner-tag b{ color:var(--rubric); font-weight:700; }
+#corner-tag i{ font-style:italic; color:var(--ink-50); letter-spacing:.04em; }
+</style>
+</head>
+<body>
+
+<!-- ══ titlebar ══ -->
+<header id="titlebar" class="settle">
+  <span class="traffic" aria-hidden="true"><i></i><i></i><i></i></span>
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">
+      <!-- three illuminated roundels joined by a penwork chevron -->
+      <svg viewBox="0 0 64 64" width="20" height="20">
+        <path d="M22 18 L44 32 L22 46" fill="none" stroke="#9e2a1c" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="1 4.5"/>
+        <circle cx="22" cy="18" r="6.6" fill="#c07a2e" stroke="#8a651c" stroke-width="1.4"/>
+        <circle cx="22" cy="18" r="3"   fill="none" stroke="#f4e6c4" stroke-width="1"/>
+        <circle cx="44" cy="32" r="6.6" fill="#6c5a92" stroke="#8a651c" stroke-width="1.4"/>
+        <circle cx="44" cy="32" r="3"   fill="none" stroke="#f4e6c4" stroke-width="1"/>
+        <circle cx="22" cy="46" r="6.6" fill="#4d6b3f" stroke="#8a651c" stroke-width="1.4"/>
+        <circle cx="22" cy="46" r="3"   fill="none" stroke="#f4e6c4" stroke-width="1"/>
+      </svg>
+    </span>
+    <span class="brand-name">Chromux</span>
+    <span class="brand-rule"></span>
+    <span class="brand-sub">Agent&nbsp;Cockpit</span>
+  </div>
+  <div class="titlebar-gauges">
+    <span class="gauge"><i class="gdot g-live"></i><b>3</b>&nbsp;sessions</span>
+    <span class="gauge-sep"></span>
+    <span class="gauge"><i class="gdot g-queue"></i><b>2</b>&nbsp;queued</span>
+    <span class="gauge-sep"></span>
+    <span class="gauge"><i class="gdot g-sent"></i><b>14</b>&nbsp;sent</span>
+    <span class="gauge-sep"></span>
+    <button class="btn top-btn update-ready">Update&nbsp;Ready</button>
+    <button class="btn top-btn">Settings</button>
+  </div>
+</header>
+
+<!-- ══ main frame ══ -->
+<div id="app">
+
+  <!-- ══ left rail — the ruled margin ══ -->
+  <aside id="rail" class="settle">
+    <div class="rail-head">
+      <div class="rail-caption">
+        <span class="rubrica rail-title"><span class="pil">¶</span>Attention&nbsp;Queue</span>
+        <span class="rail-gloss">matters awaiting the reader</span>
+      </div>
+      <button class="btn">⛶&nbsp;Detect</button>
+    </div>
+
+    <div id="attention-list">
+      <article class="qcard urgent">
+        <span class="seal seal-red" aria-hidden="true">A</span>
+        <span class="qkind">Approval</span>
+        <div>
+          <div class="qname">checkout-flow</div>
+          <div class="qdesc">claude wants to run <code>npm run db:migrate</code></div>
+        </div>
+      </article>
+
+      <article class="qcard info">
+        <span class="seal seal-blue" aria-hidden="true">P</span>
+        <span class="qkind">Preview</span>
+        <div>
+          <div class="qname">landing-page</div>
+          <div class="qdesc">localhost:5173 changed — review ready</div>
+        </div>
+      </article>
+
+      <article class="qcard exited">
+        <span class="seal seal-spent" aria-hidden="true">E</span>
+        <span class="qkind">Exited</span>
+        <div>
+          <div class="qname">api-server</div>
+          <div class="qdesc">codex exited (code 0) · 12m ago</div>
+        </div>
+      </article>
+    </div>
+
+    <div class="rail-foot">
+      <span class="capt">Local&nbsp;Storage</span>
+      <button class="pathlink">~/.chromux/captures</button>
+    </div>
+  </aside>
+
+  <!-- ══ workspace ══ -->
+  <div id="workspace">
+
+    <nav id="session-tabs" class="settle" aria-label="Session tabs">
+      <button class="session-tab active">
+        <i class="tab-dot live"></i><em>checkout-flow</em>&nbsp;·&nbsp;claude<span class="tab-badge">2</span>
+      </button>
+      <button class="session-tab">
+        <i class="tab-dot live"></i><em>landing-page</em>&nbsp;·&nbsp;grok
+      </button>
+      <button class="session-tab">
+        <i class="tab-dot dead"></i><em>api-server</em>&nbsp;·&nbsp;codex
+      </button>
+      <button class="add-tab" title="New session">+</button>
+    </nav>
+
+    <!-- ══ stage ══ -->
+    <main id="stage">
+
+      <!-- terminal pane — the ruled text block -->
+      <section class="pane settle" id="pane-terminal">
+        <div class="pane-head">
+          <span class="rubrica"><span class="pil">¶</span>Terminal&nbsp;—&nbsp;claude</span>
+          <span class="pane-cwd">~/projects/shop/checkout-flow</span>
+        </div>
+
+        <div class="folio">
+
+          <!-- incipit: rubric + gilded initial + the petition -->
+          <div class="incipit">
+            <span class="gloss">incipit</span>
+            <span class="versal" aria-hidden="true">F</span>
+            <div class="inc-rubric"><span>✻&nbsp;Welcome&nbsp;to&nbsp;Claude&nbsp;Code</span><span class="path">/projects/shop/checkout-flow</span></div>
+            <div class="inc-petition">ix the CTA overflow on the checkout page</div>
+          </div>
+
+          <div class="tl">
+            <span class="gloss">responsio</span>
+            <span class="body"><span class="pfx">●</span> I’ll look at the checkout component styles.</span>
+          </div>
+
+          <div class="tl tl-read">
+            <span class="gloss">lectio</span>
+            <span class="body"><span class="pfx">●</span> Read <span class="mono">src/components/CheckoutCTA.tsx</span> <span class="pfx">(84 lines)</span></span>
+          </div>
+
+          <div class="tl tl-edit">
+            <span class="gloss">correctio</span>
+            <span class="body"><span class="pfx">●</span> Edit <span class="mono">src/styles/checkout.css</span></span>
+          </div>
+
+          <div class="tl tl-diff">
+            <span class="gloss quiet">del.</span>
+            <span class="body mono"><span class="pfx">−</span> <span class="tl-del">.cta-row { width: 120%; }</span></span>
+          </div>
+
+          <div class="tl tl-diff">
+            <span class="gloss quiet">add.</span>
+            <span class="body mono"><span class="pfx">+</span> <span class="tl-add">.cta-row { width: 100%; max-width: 480px; }</span></span>
+          </div>
+
+          <div class="tl tl-ok">
+            <span class="gloss">probatum</span>
+            <span class="body"><span class="pfx">✔</span> Change applied — dev server reloaded</span>
+          </div>
+
+          <div class="tl">
+            <span class="gloss quiet">nota</span>
+            <span class="body"><span class="pfx">●</span> The button no longer overflows. Preview updated on the right.</span>
+          </div>
+
+          <div class="tl tl-await">
+            <span class="gloss">vacat</span>
+            <span class="body"><span class="quill">▌</span>awaiting your next instruction…</span>
+          </div>
+
+        </div>
+      </section>
+
+      <div id="divider" title="Drag to resize"></div>
+
+      <!-- browser pane — the miniature -->
+      <section class="pane settle" id="pane-browser">
+        <div class="browser-bar">
+          <button class="nav-btn" title="Back">←</button>
+          <button class="nav-btn" title="Forward">→</button>
+          <button class="nav-btn" title="Reload">↻</button>
+          <div class="url-bar"><span class="proto">http://</span>localhost:5173/checkout</div>
+          <button id="btn-capture" class="btn btn-rubric bar-btn">⛶&nbsp;Capture</button>
+          <button class="btn bar-btn">Queue<span class="bdg">2</span></button>
+          <span class="chip-console">console:&nbsp;<b>0</b></span>
+          <button class="btn bar-btn btn-collapse">⌄&nbsp;Collapse</button>
+        </div>
+
+        <div class="browser-body">
+          <figure class="miniature">
+            <span class="chip-refresh">Refreshed</span>
+            <div class="web">
+              <div class="web-head">
+                <span class="web-logo">Meridian&nbsp;Goods</span>
+                <nav class="web-nav"><span>Shop</span><span>About</span><span>Cart&nbsp;(2)</span></nav>
+              </div>
+              <div class="web-main">
+                <div class="web-col">
+                  <h1 class="web-h1">Checkout</h1>
+                  <div class="web-card">
+                    <div class="web-row"><span>Field Notebook × 2</span><span>$18.00</span></div>
+                    <div class="web-row"><span>Canvas Tote</span><span>$22.00</span></div>
+                    <div class="web-row"><span>Shipping</span><span>$8.00</span></div>
+                    <div class="web-row total"><span>Total</span><span>$48.00</span></div>
+                    <button class="web-cta">Pay $48.00</button>
+                    <div class="web-fine">Secured by Meridian Pay · Cancel anytime</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </figure>
+          <figcaption class="mini-caption"><b>miniature</b> — localhost:5173/checkout</figcaption>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- ══ status bar — the colophon ══ -->
+<footer id="statusbar" class="settle">
+  <div class="sb-left">
+    <span class="sb-key">Adapter</span><span class="sb-val">claude -p · one-off</span>
+    <span class="sb-sep"></span>
+    <span class="sb-key">Pairing</span><span class="sb-val">1:1 session ↔ pane</span>
+  </div>
+  <div class="sb-right">
+    <button class="sb-btn">Delivery&nbsp;Log</button>
+    <span class="sb-ver">chromux 0.17.0 — medieval scriptorium concept</span>
+  </div>
+</footer>
+
+<!-- ══ capture modal — the sealed charter ══ -->
+<div id="modal-capture" class="overlay hidden">
+  <div class="charter" role="dialog" aria-modal="true" aria-label="Capture to agent">
+    <div class="charter-head">
+      <div class="charter-title">
+        <span class="black">Capture</span>
+        <span class="rubrica"><span class="pil">¶</span>dispatch&nbsp;to&nbsp;agent</span>
+      </div>
+      <button class="charter-x" data-close title="Close">✕</button>
+    </div>
+
+    <div class="cap-grid">
+      <div class="cap-col left">
+        <div class="cap-summary">
+          <div class="cap-row"><span class="cap-key">Session</span><span class="cap-val">checkout-flow · claude</span></div>
+          <div class="cap-row"><span class="cap-key">URL</span><span class="cap-val">localhost:5173/checkout</span></div>
+          <div class="cap-row"><span class="cap-key">Selection</span><span class="cap-val"><em>“CTA button region 412 × 88”</em></span></div>
+        </div>
+
+        <label class="field">
+          <span class="capt">Note to agent — what’s wrong / what to do</span>
+          <textarea rows="3" spellcheck="false"
+            placeholder="e.g. the CTA button overflows its container — fix the CSS"></textarea>
+        </label>
+
+        <label class="field">
+          <span class="capt">Target</span>
+          <span class="selectwrap">
+            <select><option>checkout-flow · claude -p</option></select>
+          </span>
+        </label>
+
+        <div class="field">
+          <span class="capt">Screenshot</span>
+          <div class="cap-shot"><span class="pil">❧</span>CTA&nbsp;region&nbsp;·&nbsp;412&nbsp;×&nbsp;88&nbsp;—&nbsp;pending</div>
+        </div>
+      </div>
+
+      <div class="cap-col">
+        <div class="yaml-label">
+          <span class="rubrica" style="font-size:11px;"><span class="pil">¶</span>Payload&nbsp;Preview</span>
+          <span class="capt">YAML&nbsp;v1</span>
+        </div>
+<pre class="yaml-view"><span class="yk">chromux_capture:</span> v1
+<span class="yk">session:</span> checkout-flow
+<span class="yk">agent:</span> claude
+<span class="yk">url:</span> http://localhost:5173/checkout
+<span class="yk">note:</span> CTA overflows container
+<span class="yk">screenshot:</span> ~/.chromux/captures/2026-07-11-0142.png
+<span class="yk">console_errors:</span> []</pre>
+      </div>
+    </div>
+
+    <div class="charter-foot">
+      <span class="foot-seal" aria-hidden="true">C</span>
+      <button class="btn" data-close>Cancel</button>
+      <button class="btn">File-Drop&nbsp;Only</button>
+      <button class="btn btn-rubric">Send&nbsp;—&nbsp;claude&nbsp;-p</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ corner tag — folio mark ══ -->
+<div id="corner-tag"><b>Nº&nbsp;31</b>&nbsp;·&nbsp;Medieval&nbsp;Scriptorium&nbsp;·&nbsp;<i>fol.&nbsp;31&nbsp;r</i></div>
+
+<script>
+(function(){
+  var modal = document.getElementById('modal-capture');
+  document.getElementById('btn-capture').addEventListener('click', function(){
+    modal.classList.remove('hidden');
+  });
+  modal.querySelectorAll('[data-close]').forEach(function(el){
+    el.addEventListener('click', function(){ modal.classList.add('hidden'); });
+  });
+  modal.addEventListener('click', function(e){
+    if (e.target === modal) modal.classList.add('hidden');
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') modal.classList.add('hidden');
+  });
+})();
+</script>
+</body>
+</html>

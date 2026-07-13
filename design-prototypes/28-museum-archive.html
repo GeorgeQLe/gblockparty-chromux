@@ -1,0 +1,1452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Chromux — Museum Archive</title>
+<style>
+/* ============================================================
+   CHROMUX 28 — "MUSEUM ARCHIVE"
+   Quiet institutional presentation. Warm stone & plaster
+   neutrals, accession numbers on every item, specimen-label
+   typography, vitrine depth (inset shadows + glass-shelf
+   highlights), generous museum spacing. Every capture is a
+   catalogued artifact with a provenance line. Kunsthalle
+   wall-label craft — never grayscale, never editorial Swiss.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap');
+
+:root {
+  /* stone & plaster — warm, never cool */
+  --wall:      #e9e3d6;   /* gallery wall plaster */
+  --wall-deep: #ded6c4;   /* recessed alcove */
+  --bone:      #f6f2e8;   /* wall label / card stock */
+  --card:      #fbf8f0;   /* brightest sheet — vitrine interior */
+
+  /* warm inks */
+  --ink:       #2c261d;   /* sepia-black, engraved text */
+  --umber:     #6e6353;   /* secondary — raw umber */
+  --taupe:     #b0a48c;   /* tertiary — worn stone */
+  --hairline:  #d6cdb8;   /* rule lines */
+  --hair-deep: #c4b99f;
+
+  /* institutional accents — metals & oxides, used sparingly */
+  --brass:     #8f7134;   /* primary action — polished brass plaque */
+  --brass-hi:  #a98a48;
+  --oxide:     #9c3b21;   /* urgent — terracotta oxide */
+  --slate:     #4f6e7d;   /* info — slate blue placard */
+  --verdigris: #4c7a5e;   /* live — patinated bronze green */
+
+  /* vitrine machinery */
+  --glass-hi:  rgba(255, 255, 255, 0.65);
+  --case-in:   inset 0 2px 6px rgba(44, 38, 29, 0.14),
+               inset 0 1px 2px rgba(44, 38, 29, 0.10),
+               inset 0 -1px 0 rgba(255, 255, 255, 0.55);
+  --label-up:  0 1px 0 rgba(255, 255, 255, 0.7) inset,
+               0 1px 2px rgba(44, 38, 29, 0.10),
+               0 3px 8px rgba(44, 38, 29, 0.07);
+
+  --display: "Cormorant Garamond", Didot, "Bodoni 72", "Hoefler Text", Georgia, serif;
+  --label:   Optima, "Optima Nova", Candara, "Gill Sans", "Avenir Next", sans-serif;
+  --body:    "Spectral", "Iowan Old Style", Charter, Georgia, serif;
+  --mono:    "SF Mono", Menlo, Monaco, "Andale Mono", monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  min-width: 1280px;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(1200px 500px at 50% -180px, rgba(255,255,255,0.5), transparent 70%),
+    var(--wall);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* faint plaster grain over everything */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  pointer-events: none;
+  opacity: 0.35;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0.45 0 0 0 0 0.40 0 0 0 0 0.32 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+button:focus-visible, a:focus-visible, textarea:focus-visible, select:focus-visible {
+  outline: 1px solid var(--brass);
+  outline-offset: 2px;
+}
+
+.hidden { display: none !important; }
+
+/* ── specimen-label micro type: the wayfinding voice ── */
+.micro {
+  font-family: var(--label);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--umber);
+}
+
+/* ── accession number: stamped on every item ── */
+.acc {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--taupe);
+  white-space: nowrap;
+}
+
+/* ── plaque button: engraved brass-edged label ── */
+.btn {
+  font-family: var(--label);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink);
+  border: 1px solid var(--hair-deep);
+  background: linear-gradient(180deg, var(--card), var(--bone));
+  box-shadow: 0 1px 0 rgba(255,255,255,0.8) inset, 0 1px 2px rgba(44,38,29,0.10);
+  padding: 5px 12px;
+  border-radius: 1px;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.btn:hover { border-color: var(--umber); }
+.btn:active {
+  background: var(--bone);
+  box-shadow: inset 0 1px 3px rgba(44,38,29,0.14);
+}
+
+/* primary — polished brass */
+.btn-brass {
+  color: var(--card);
+  border-color: #6f5726;
+  background: linear-gradient(180deg, var(--brass-hi), var(--brass));
+  box-shadow: 0 1px 0 rgba(255,255,255,0.35) inset, 0 1px 3px rgba(44,38,29,0.22);
+  text-shadow: 0 1px 1px rgba(44,38,29,0.25);
+}
+.btn-brass:hover { border-color: #5c481f; background: linear-gradient(180deg, #b3924e, #977939); }
+.btn-brass:active { box-shadow: inset 0 2px 4px rgba(44,38,29,0.3); }
+
+/* urgent — terracotta oxide */
+.btn-oxide {
+  color: var(--card);
+  border-color: #7c2e19;
+  background: linear-gradient(180deg, #ad4a2e, var(--oxide));
+  box-shadow: 0 1px 0 rgba(255,255,255,0.28) inset, 0 1px 3px rgba(44,38,29,0.22);
+  text-shadow: 0 1px 1px rgba(44,38,29,0.3);
+}
+.btn-oxide:hover { background: linear-gradient(180deg, #b8502f, #8c351d); }
+
+/* ============================================================
+   TITLEBAR — the museum lintel
+   ============================================================ */
+#titlebar {
+  height: 46px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  padding-left: 84px;                /* macOS traffic lights */
+  padding-right: 16px;
+  gap: 22px;
+  background: linear-gradient(180deg, #f0ebdf, var(--wall));
+  border-bottom: 1px solid var(--hair-deep);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.7) inset;
+  -webkit-app-region: drag;
+  position: relative;
+}
+#titlebar::after {                   /* carved lintel shadow line */
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: -4px;
+  height: 4px;
+  background: linear-gradient(180deg, rgba(44,38,29,0.10), transparent);
+  pointer-events: none;
+}
+#titlebar button { -webkit-app-region: no-drag; }
+
+.brand { display: flex; align-items: center; gap: 11px; }
+.brand-mark { display: inline-flex; filter: drop-shadow(0 1px 1px rgba(44,38,29,0.2)); }
+.brand-text { display: flex; align-items: baseline; gap: 10px; }
+.brand-name {
+  font-family: var(--display);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: var(--ink);
+  text-shadow: 0 1px 0 rgba(255,255,255,0.6);
+}
+.brand-sub {
+  font-family: var(--label);
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.30em;
+  text-transform: uppercase;
+  color: var(--umber);
+  border-left: 1px solid var(--hair-deep);
+  padding-left: 10px;
+}
+.brand-acc { margin-left: 2px; }
+
+.gauges {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* gauges as tiny wall placards */
+.gauge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--label);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--umber);
+  background: var(--bone);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--label-up);
+  padding: 4px 10px;
+  border-radius: 1px;
+}
+.gauge b {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: 0;
+}
+.gdot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex: none;
+  box-shadow: 0 0 0 1px rgba(44,38,29,0.15), 0 1px 1px rgba(44,38,29,0.2);
+}
+.gdot-live { background: var(--verdigris); }
+.gdot-warn { background: var(--brass-hi); }
+.gdot-info { background: var(--slate); }
+
+.gauge-sep { width: 1px; height: 18px; background: var(--hair-deep); }
+
+#btn-update {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--label);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--oxide);
+  border: 1px solid var(--oxide);
+  background: linear-gradient(180deg, var(--card), var(--bone));
+  box-shadow: var(--label-up);
+  padding: 5px 12px;
+  border-radius: 1px;
+  transition: background 120ms ease, color 120ms ease;
+}
+#btn-update:hover {
+  color: var(--card);
+  background: linear-gradient(180deg, #ad4a2e, var(--oxide));
+  text-shadow: 0 1px 1px rgba(44,38,29,0.3);
+}
+#btn-update .udot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: acquire 2.6s ease-in-out infinite;
+}
+@keyframes acquire { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+/* ============================================================
+   FRAME
+   ============================================================ */
+#app { flex: 1; display: flex; min-height: 0; }
+
+/* ============================================================
+   LEFT RAIL — attention queue as a wall of specimen labels
+   ============================================================ */
+#rail {
+  width: 244px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  background: var(--wall);
+  border-right: 1px solid var(--hair-deep);
+  box-shadow: inset -6px 0 12px -8px rgba(44,38,29,0.12);
+}
+.rail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 14px 12px;
+  border-bottom: 1px solid var(--hairline);
+}
+.rail-head .btn { padding: 4px 9px; font-size: 9px; }
+
+#attention {
+  flex: 1;
+  overflow: hidden;
+  padding: 16px 14px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* wall label — the specimen card */
+.qcard {
+  background: var(--bone);
+  border: 1px solid var(--hairline);
+  border-radius: 1px;
+  box-shadow: var(--label-up);
+  padding: 10px 12px 11px;
+  position: relative;
+  cursor: default;
+  animation: hang 480ms ease backwards;
+  transition: box-shadow 140ms ease, transform 140ms ease;
+}
+.qcard:nth-child(1) { animation-delay: 60ms; }
+.qcard:nth-child(2) { animation-delay: 160ms; }
+.qcard:nth-child(3) { animation-delay: 260ms; }
+@keyframes hang {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+.qcard:hover {
+  box-shadow: 0 1px 0 rgba(255,255,255,0.7) inset,
+              0 2px 4px rgba(44,38,29,0.12),
+              0 6px 14px rgba(44,38,29,0.10);
+  transform: translateY(-1px);
+}
+.qcard::before {                     /* mounting rule along the top */
+  content: "";
+  position: absolute;
+  left: -1px; right: -1px; top: -1px;
+  height: 3px;
+  background: var(--taupe);
+}
+.qcard-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.qcard-tag {
+  font-family: var(--label);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--umber);
+}
+.qcard-name {
+  font-family: var(--display);
+  font-size: 17px;
+  font-weight: 600;
+  font-style: italic;
+  letter-spacing: 0.01em;
+  margin-top: 3px;
+  color: var(--ink);
+}
+.qcard-desc {
+  font-size: 11.5px;
+  color: var(--umber);
+  margin-top: 4px;
+  line-height: 1.45;
+}
+.qcard-desc code {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: var(--ink);
+  background: var(--wall);
+  border: 1px solid var(--hairline);
+  padding: 0 4px;
+  border-radius: 1px;
+}
+.qcard-prov {
+  margin-top: 7px;
+  padding-top: 6px;
+  border-top: 1px solid var(--hairline);
+  font-size: 10px;
+  font-style: italic;
+  color: var(--taupe);
+  line-height: 1.4;
+}
+
+.qcard-urgent::before { background: var(--oxide); }
+.qcard-urgent .qcard-tag { color: var(--oxide); }
+
+.qcard-info::before { background: var(--slate); }
+.qcard-info .qcard-tag { color: var(--slate); }
+
+.qcard-muted { background: color-mix(in srgb, var(--bone) 70%, var(--wall)); }
+.qcard-muted::before { background: var(--hair-deep); }
+.qcard-muted .qcard-name { color: var(--umber); font-style: normal; }
+.qcard-muted .qcard-stamp {          /* deaccession stamp */
+  position: absolute;
+  right: 10px; bottom: 26px;
+  font-family: var(--label);
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--oxide);
+  border: 1px solid currentColor;
+  padding: 1px 5px;
+  transform: rotate(-6deg);
+  opacity: 0.5;
+  border-radius: 1px;
+}
+
+.rail-foot {
+  flex: none;
+  border-top: 1px solid var(--hairline);
+  padding: 12px 14px 14px;
+  background: linear-gradient(180deg, transparent, rgba(44,38,29,0.03));
+}
+.pathlink {
+  display: block;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--umber);
+  margin-top: 5px;
+  padding: 0;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: var(--taupe);
+  text-underline-offset: 3px;
+}
+.pathlink:hover { color: var(--ink); text-decoration-color: var(--ink); }
+
+/* ============================================================
+   WORKSPACE — session tab strip as gallery-room tabs
+   ============================================================ */
+#workspace { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+#session-tabs {
+  height: 40px;
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  background: var(--wall-deep);
+  border-bottom: 1px solid var(--hair-deep);
+  box-shadow: inset 0 -4px 8px -6px rgba(44,38,29,0.18);
+  padding-left: 12px;
+}
+.stab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 7px;
+  padding: 0 16px;
+  font-family: var(--body);
+  font-size: 12px;
+  color: var(--umber);
+  background: color-mix(in srgb, var(--bone) 55%, var(--wall-deep));
+  border: 1px solid var(--hairline);
+  border-bottom: 0;
+  border-radius: 2px 2px 0 0;
+  margin-right: 4px;
+  position: relative;
+  transition: background 120ms ease, color 120ms ease;
+}
+.stab:hover { color: var(--ink); background: var(--bone); }
+.stab-on {
+  background: var(--bone);
+  color: var(--ink);
+  font-weight: 600;
+  border-color: var(--hair-deep);
+  box-shadow: 0 -2px 5px rgba(44,38,29,0.07);
+}
+.stab-on::before {                   /* brass gallery rail on the active room */
+  content: "";
+  position: absolute;
+  left: -1px; right: -1px; top: -1px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--brass-hi), var(--brass));
+  border-radius: 2px 2px 0 0;
+}
+.stab-on::after {                    /* fuse with the stage below */
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: -1px;
+  height: 1px;
+  background: var(--bone);
+}
+.stab .roman {
+  font-family: var(--display);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--taupe);
+  letter-spacing: 0.05em;
+}
+.stab-on .roman { color: var(--brass); }
+.stab .agent { font-style: italic; color: var(--taupe); }
+.stab-on .agent { color: var(--umber); }
+.sdot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex: none;
+  box-shadow: 0 0 0 1px rgba(44,38,29,0.12);
+}
+.sdot-live { background: var(--verdigris); }
+.sdot-dead { background: var(--oxide); opacity: 0.65; }
+.sbadge {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  min-width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--card);
+  background: var(--oxide);
+  box-shadow: 0 1px 1px rgba(44,38,29,0.2);
+}
+.add-tab {
+  width: 34px;
+  margin-top: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  color: var(--umber);
+  border: 1px dashed var(--hair-deep);
+  border-bottom: 0;
+  border-radius: 2px 2px 0 0;
+}
+.add-tab:hover { color: var(--ink); background: color-mix(in srgb, var(--bone) 60%, transparent); }
+
+/* ============================================================
+   STAGE — split view: two vitrines side by side
+   ============================================================ */
+#stage {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  background: var(--bone);
+}
+
+.pane { display: flex; flex-direction: column; min-width: 0; }
+#pane-term { flex: 0 0 46%; }
+#pane-web  { flex: 1; }
+
+.pane-head {
+  height: 38px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--bone);
+}
+.pane-title {
+  font-family: var(--label);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+.pane-title em {
+  font-family: var(--display);
+  font-style: italic;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--umber);
+}
+.pane-cwd {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--taupe);
+}
+
+/* ── terminal: the conservation record ── */
+#term-body {
+  flex: 1;
+  overflow: hidden;
+  padding: 20px 22px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.9;
+  color: var(--ink);
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0 21px,
+      rgba(176, 164, 140, 0.16) 21px 22px
+    ),
+    var(--card);
+  box-shadow: var(--case-in);
+  position: relative;
+}
+#term-body::after {                  /* record sheet accession, pinned corner */
+  content: "REC. 2026.07.109 — CONSERVATION TRANSCRIPT";
+  position: absolute;
+  top: 8px; right: 12px;
+  font-family: var(--label);
+  font-size: 7.5px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  color: var(--taupe);
+}
+.tl { white-space: pre-wrap; }
+.tl-welcome { display: flex; justify-content: space-between; gap: 12px; font-weight: 700; }
+.tl-welcome .star { color: var(--brass); }
+.tl-welcome .wpath { font-weight: 400; color: var(--taupe); }
+.tl-user {
+  font-weight: 700;
+  border-left: 2px solid var(--brass);
+  padding-left: 10px;
+  margin: 10px 0;
+}
+.tl-agent .bullet { color: var(--brass); }
+.tl-tool { color: var(--umber); }
+.tl-tool .bullet { color: var(--taupe); }
+.tl-tool .fname {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--taupe);
+  text-underline-offset: 2px;
+}
+.tl-del { color: var(--oxide); padding-left: 16px; text-decoration: line-through; text-decoration-thickness: 1px; opacity: 0.85; }
+.tl-add { color: var(--verdigris); font-weight: 700; padding-left: 16px; }
+.tl-ok { font-weight: 700; color: var(--verdigris); margin-top: 6px; }
+.tl-wait { color: var(--umber); font-style: italic; margin-top: 12px; }
+.tl-wait .caret {
+  display: inline-block;
+  width: 7px; height: 13px;
+  background: var(--brass);
+  vertical-align: -2px;
+  margin-right: 8px;
+  animation: acquire 1.4s steps(2, start) infinite;
+}
+.term-rule { border: 0; border-top: 1px solid var(--hairline); margin: 8px 0 10px; }
+
+/* ── divider: brass gallery rail ── */
+#divider {
+  flex: none;
+  width: 7px;
+  cursor: col-resize;
+  background: linear-gradient(90deg, var(--wall-deep), var(--wall) 50%, var(--wall-deep));
+  border-left: 1px solid var(--hair-deep);
+  border-right: 1px solid var(--hair-deep);
+  position: relative;
+}
+#divider::after {                    /* turned brass grip */
+  content: "";
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 3px; height: 34px;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(180deg, var(--brass-hi), var(--brass) 55%, #6f5726);
+  border-radius: 2px;
+  box-shadow: 0 1px 2px rgba(44,38,29,0.3);
+}
+#divider:hover { background: var(--wall-deep); }
+
+/* ── browser pane toolbar ── */
+#webbar {
+  height: 42px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--bone);
+}
+#webbar .btn { padding: 4px 8px; font-size: 9.5px; letter-spacing: 0.1em; white-space: nowrap; flex: none; }
+.navbtn {
+  width: 24px; height: 24px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--hair-deep);
+  background: linear-gradient(180deg, var(--card), var(--bone));
+  box-shadow: 0 1px 0 rgba(255,255,255,0.8) inset, 0 1px 2px rgba(44,38,29,0.08);
+  border-radius: 1px;
+  font-size: 11px;
+  color: var(--ink);
+}
+.navbtn:hover { border-color: var(--umber); }
+.navbtn[disabled] { color: var(--taupe); border-color: var(--hairline); box-shadow: none; background: var(--bone); cursor: default; }
+
+#urlbar {
+  flex: 1;
+  min-width: 90px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid var(--hair-deep);
+  border-radius: 1px;
+  background: var(--card);
+  box-shadow: inset 0 1px 3px rgba(44,38,29,0.1);   /* engraved slot */
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink);
+  overflow: hidden;
+}
+#urlbar .lock { color: var(--brass); font-size: 9px; flex: none; }
+#urlbar .url {
+  flex: 1;
+  min-width: 0;
+  direction: rtl;                    /* truncate from the left */
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#urlbar .url bdo { direction: ltr; unicode-bidi: bidi-override; }
+
+.chip {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--umber);
+  border: 1px solid var(--hairline);
+  padding: 3px 7px;
+  border-radius: 1px;
+  background: var(--bone);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset;
+  white-space: nowrap;
+  flex: none;
+}
+.qbtn { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.qbtn .sbadge { min-width: 14px; height: 14px; font-size: 8.5px; }
+
+/* ── the vitrine: mock rendered page under glass ── */
+#webview {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(700px 300px at 50% 0%, rgba(255,255,255,0.5), transparent 75%),
+    var(--wall-deep);
+  box-shadow: var(--case-in);
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 44px 32px;
+}
+#webview::before {                   /* glass sheen sweeping the case */
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+  background: linear-gradient(
+    115deg,
+    transparent 18%,
+    var(--glass-hi) 26%,
+    transparent 33%,
+    transparent 58%,
+    rgba(255,255,255,0.3) 64%,
+    transparent 70%
+  );
+  opacity: 0.5;
+}
+#webview::after {                    /* glass-shelf highlight along the base */
+  content: "";
+  position: absolute;
+  left: 26px; right: 26px; bottom: 20px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--glass-hi) 18%, var(--glass-hi) 82%, transparent);
+  box-shadow: 0 3px 8px rgba(255,255,255,0.5);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* the exhibited artifact — a deliberately modern, sans-serif
+   commerce page, alien to the museum chrome around it */
+.shop {
+  width: 424px;
+  max-width: 92%;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow:
+    0 1px 2px rgba(44,38,29,0.14),
+    0 14px 34px rgba(44,38,29,0.22);
+  padding: 24px 26px 22px;
+  font-family: "Helvetica Neue", "Avenir Next", Arial, sans-serif;
+  color: #16181d;
+  position: relative;
+  z-index: 1;
+}
+.shop-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #16181d;
+}
+.shop-logo { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+.shop-step { font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: #8a8f98; }
+.shop h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin: 16px 0 12px; }
+.order-card {
+  border: 1px solid #e4e6ea;
+  border-radius: 6px;
+  padding: 4px 16px;
+  background: #fafbfc;
+}
+.order-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid #edeef1;
+  font-size: 13px;
+}
+.order-row .oqty { color: #8a8f98; font-size: 12px; }
+.order-row .oprice { font-variant-numeric: tabular-nums; }
+.order-row.sub { color: #6b7078; font-size: 12.5px; }
+.order-row.total { border-bottom: 0; font-weight: 700; font-size: 14px; padding: 11px 0; }
+.cta-row { width: 100%; max-width: 480px; margin-top: 16px; }
+.pay-btn {
+  width: 100%;
+  background: #1d4ed8;
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  padding: 12px 0;
+  border: 0;
+  border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(29,78,216,0.35);
+}
+.pay-btn:hover { background: #1e45bd; }
+.shop-fine {
+  margin-top: 12px;
+  font-size: 10.5px;
+  color: #8a8f98;
+  text-align: center;
+}
+
+/* wall label for the exhibited page — the museum apparatus */
+#exhibit-label {
+  position: absolute;
+  left: 30px; bottom: 40px;
+  width: 172px;
+  background: var(--bone);
+  border: 1px solid var(--hairline);
+  border-radius: 1px;
+  box-shadow: var(--label-up);
+  padding: 8px 10px 9px;
+  z-index: 2;
+}
+#exhibit-label .acc { display: block; margin-bottom: 3px; }
+#exhibit-label .el-title {
+  font-family: var(--display);
+  font-size: 13px;
+  font-style: italic;
+  font-weight: 600;
+  color: var(--ink);
+}
+#exhibit-label .el-medium {
+  font-size: 9.5px;
+  color: var(--umber);
+  margin-top: 2px;
+  line-height: 1.45;
+}
+#exhibit-label .el-prov {
+  font-size: 9px;
+  font-style: italic;
+  color: var(--taupe);
+  margin-top: 5px;
+  padding-top: 4px;
+  border-top: 1px solid var(--hairline);
+}
+
+/* auto-reload flash — a dated collection stamp */
+#refreshed {
+  position: absolute;
+  top: 14px; right: 16px;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--label);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--verdigris);
+  border: 1px solid var(--verdigris);
+  border-radius: 1px;
+  background: var(--card);
+  box-shadow: var(--label-up);
+  padding: 3px 9px;
+  transform: rotate(1.5deg);
+}
+#refreshed .rdot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+/* ============================================================
+   STATUS BAR — the plinth
+   ============================================================ */
+#statusbar {
+  height: 28px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 14px 0 16px;
+  background: linear-gradient(180deg, var(--wall), var(--wall-deep));
+  border-top: 1px solid var(--hair-deep);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset;
+  font-size: 10px;
+}
+.sb-group { display: inline-flex; align-items: baseline; gap: 8px; }
+.sb-val { font-family: var(--mono); font-size: 10px; color: var(--ink); }
+.sb-sep { width: 1px; height: 13px; background: var(--hair-deep); align-self: center; }
+.sb-right { margin-left: auto; display: inline-flex; align-items: center; gap: 14px; }
+.sb-btn {
+  font-family: var(--label);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--umber);
+  text-decoration: underline;
+  text-decoration-color: var(--taupe);
+  text-underline-offset: 3px;
+  padding: 0;
+}
+.sb-btn:hover { color: var(--ink); text-decoration-color: var(--ink); }
+.sb-ver { font-family: var(--mono); font-size: 9.5px; color: var(--umber); }
+
+/* ============================================================
+   CAPTURE MODAL — the accession record
+   ============================================================ */
+#overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(58, 50, 38, 0.42);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#modal {
+  width: 900px;
+  max-width: calc(100vw - 80px);
+  max-height: calc(100vh - 72px);
+  display: flex;
+  flex-direction: column;
+  background: var(--bone);
+  border: 1px solid var(--hair-deep);
+  outline: 1px solid var(--hairline);   /* double catalog-card rule */
+  outline-offset: 4px;
+  border-radius: 1px;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.7) inset,
+    0 8px 20px rgba(44,38,29,0.28),
+    0 30px 70px rgba(44,38,29,0.30);
+  animation: hang 260ms ease;
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 2px solid var(--ink);
+}
+.modal-title {
+  font-family: var(--label);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+.modal-acc { margin-right: auto; }
+.modal-x {
+  width: 24px; height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--hair-deep);
+  border-radius: 1px;
+  background: linear-gradient(180deg, var(--card), var(--bone));
+  box-shadow: 0 1px 0 rgba(255,255,255,0.8) inset, 0 1px 2px rgba(44,38,29,0.08);
+  font-size: 11px;
+  color: var(--umber);
+}
+.modal-x:hover { border-color: var(--umber); color: var(--ink); }
+
+.modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.cap-left {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  border-right: 1px solid var(--hairline);
+}
+.cap-right {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  background: color-mix(in srgb, var(--bone) 65%, var(--wall));
+}
+
+.cap-summary {
+  border: 1px solid var(--hairline);
+  border-radius: 1px;
+  background: var(--card);
+  box-shadow: var(--label-up);
+}
+.cap-srow {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 12px;
+  align-items: baseline;
+  padding: 9px 13px;
+  border-bottom: 1px solid var(--hairline);
+}
+.cap-srow:last-child { border-bottom: 0; }
+.cap-sval { font-size: 12.5px; color: var(--ink); }
+.cap-sval em { font-family: var(--display); font-size: 14px; font-weight: 600; }
+.cap-sval .mono, .cap-sval code { font-family: var(--mono); font-size: 11px; }
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field textarea {
+  font-family: var(--body);
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--card);
+  border: 1px solid var(--hair-deep);
+  border-radius: 1px;
+  box-shadow: inset 0 1px 3px rgba(44,38,29,0.09);
+  padding: 9px 11px;
+  resize: none;
+  line-height: 1.55;
+}
+.field textarea::placeholder { color: var(--taupe); font-style: italic; }
+.field textarea:focus { outline: none; border-color: var(--brass); }
+.field select {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink);
+  background-color: var(--card);
+  border: 1px solid var(--hair-deep);
+  border-radius: 1px;
+  box-shadow: inset 0 1px 3px rgba(44,38,29,0.09);
+  padding: 7px 9px;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%236e6353'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+
+/* screenshot slot — a photographic plate with corner mounts */
+.cap-shot {
+  height: 112px;
+  border: 1px solid var(--hair-deep);
+  border-radius: 1px;
+  background:
+    radial-gradient(320px 90px at 50% 0%, rgba(255,255,255,0.55), transparent 80%),
+    var(--wall-deep);
+  box-shadow: var(--case-in);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.cap-shot i {                        /* photo-corner mounts */
+  position: absolute;
+  width: 13px; height: 13px;
+  border: 2px solid var(--taupe);
+}
+.cap-shot i:nth-of-type(1) { left: 6px;  top: 6px;    border-right: 0; border-bottom: 0; }
+.cap-shot i:nth-of-type(2) { right: 6px; top: 6px;    border-left: 0;  border-bottom: 0; }
+.cap-shot i:nth-of-type(3) { left: 6px;  bottom: 6px; border-right: 0; border-top: 0; }
+.cap-shot i:nth-of-type(4) { right: 6px; bottom: 6px; border-left: 0;  border-top: 0; }
+.cap-shot span {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--umber);
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: 1px;
+  box-shadow: 0 1px 2px rgba(44,38,29,0.1);
+  padding: 4px 10px;
+}
+
+.yaml {
+  flex: 1;
+  border: 1px solid var(--hairline);
+  border-radius: 1px;
+  background: var(--card);
+  box-shadow: var(--label-up);
+  padding: 13px 15px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.85;
+  color: var(--ink);
+  overflow: auto;
+  white-space: pre;
+}
+.yaml .yk { color: var(--brass); }
+
+.cap-prov {
+  font-size: 10px;
+  font-style: italic;
+  color: var(--taupe);
+  padding-top: 7px;
+  border-top: 1px solid var(--hairline);
+  line-height: 1.5;
+}
+
+.modal-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 18px;
+  border-top: 1px solid var(--hair-deep);
+  background: linear-gradient(180deg, transparent, rgba(44,38,29,0.03));
+}
+.modal-foot .acc { margin-right: auto; }
+
+/* ── fixed corner tag ── */
+#corner-tag {
+  position: fixed;
+  right: 12px;
+  bottom: 36px;
+  z-index: 110;
+  font-family: var(--label);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--umber);
+  border: 1px solid var(--hair-deep);
+  border-radius: 1px;
+  background: var(--bone);
+  box-shadow: var(--label-up);
+  padding: 4px 9px;
+  pointer-events: none;
+}
+</style>
+</head>
+<body>
+<!-- ══ titlebar — the lintel ══ -->
+<header id="titlebar">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">
+      <!-- three-node motif rendered as mounted specimen pins -->
+      <svg viewBox="0 0 64 64" width="20" height="20">
+        <path d="M22 18 L44 32 L22 46" fill="none" stroke="#8f7134" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="22" cy="18" r="7" fill="#c26a2e" stroke="#2c261d" stroke-width="1.3"/>
+        <circle cx="44" cy="32" r="7" fill="#7c6890" stroke="#2c261d" stroke-width="1.3"/>
+        <circle cx="22" cy="46" r="7" fill="#5d7f60" stroke="#2c261d" stroke-width="1.3"/>
+        <circle cx="20" cy="16" r="2" fill="#fbf8f0" opacity="0.7"/>
+        <circle cx="42" cy="30" r="2" fill="#fbf8f0" opacity="0.7"/>
+        <circle cx="20" cy="44" r="2" fill="#fbf8f0" opacity="0.7"/>
+      </svg>
+    </span>
+    <span class="brand-text">
+      <span class="brand-name">Chromux</span>
+      <span class="brand-sub">Agent&nbsp;Cockpit</span>
+      <span class="acc brand-acc">ACC.&nbsp;2026.07.100</span>
+    </span>
+  </div>
+
+  <div class="gauges">
+    <span class="gauge"><i class="gdot gdot-live"></i><b>3</b> Sessions</span>
+    <span class="gauge"><i class="gdot gdot-warn"></i><b>2</b> Queued</span>
+    <span class="gauge"><i class="gdot gdot-info"></i><b>14</b> Sent</span>
+    <span class="gauge-sep"></span>
+    <button id="btn-update" title="A new release is available"><span class="udot"></span>Update Ready</button>
+    <button class="btn" title="Settings">Settings</button>
+  </div>
+</header>
+
+<!-- ══ main frame ══ -->
+<div id="app">
+
+  <!-- ── left rail: the wall of specimen labels ── -->
+  <aside id="rail">
+    <div class="rail-head">
+      <span class="micro">Attention Queue</span>
+      <button class="btn" title="Detect open terminals">⛶ Detect</button>
+    </div>
+
+    <div id="attention">
+      <div class="qcard qcard-urgent">
+        <div class="qcard-head">
+          <span class="qcard-tag">Approval</span>
+          <span class="acc">2026.07.114</span>
+        </div>
+        <div class="qcard-name">checkout-flow</div>
+        <div class="qcard-desc">claude wants to run <code>npm run db:migrate</code></div>
+        <div class="qcard-prov">Provenance: claude session · awaiting curator approval</div>
+      </div>
+
+      <div class="qcard qcard-info">
+        <div class="qcard-head">
+          <span class="qcard-tag">Preview</span>
+          <span class="acc">2026.07.113</span>
+        </div>
+        <div class="qcard-name">landing-page</div>
+        <div class="qcard-desc">localhost:5173 changed — review ready</div>
+        <div class="qcard-prov">Provenance: grok session · new state on view</div>
+      </div>
+
+      <div class="qcard qcard-muted">
+        <div class="qcard-head">
+          <span class="qcard-tag">Exited</span>
+          <span class="acc">2026.07.108</span>
+        </div>
+        <div class="qcard-name">api-server</div>
+        <div class="qcard-desc">codex exited (code 0) · 12m ago</div>
+        <div class="qcard-stamp">Deaccessioned</div>
+        <div class="qcard-prov">Provenance: codex session · retired from display</div>
+      </div>
+    </div>
+
+    <div class="rail-foot">
+      <span class="micro">Local Storage</span>
+      <button class="pathlink" title="Reveal in Finder">~/.chromux/captures</button>
+    </div>
+  </aside>
+
+  <!-- ── workspace ── -->
+  <div id="workspace">
+
+    <nav id="session-tabs" aria-label="Session tabs">
+      <button class="stab stab-on">
+        <span class="roman">I.</span>
+        <i class="sdot sdot-live"></i>
+        checkout-flow <span class="agent">· claude</span>
+        <span class="sbadge">2</span>
+      </button>
+      <button class="stab">
+        <span class="roman">II.</span>
+        <i class="sdot sdot-live"></i>
+        landing-page <span class="agent">· grok</span>
+      </button>
+      <button class="stab">
+        <span class="roman">III.</span>
+        <i class="sdot sdot-dead"></i>
+        api-server <span class="agent">· codex</span>
+      </button>
+      <button class="add-tab" title="New session">+</button>
+    </nav>
+
+    <!-- ── stage: two vitrines ── -->
+    <main id="stage">
+
+      <!-- terminal pane: the conservation record -->
+      <section class="pane" id="pane-term">
+        <div class="pane-head">
+          <span class="pane-title">Terminal — <em>claude</em></span>
+          <span class="pane-cwd">~/projects/shop/checkout-flow</span>
+        </div>
+        <div id="term-body">
+          <div class="tl tl-welcome"><span><span class="star">✻</span> Welcome to Claude Code!</span><span class="wpath">/projects/shop/checkout-flow</span></div>
+          <hr class="term-rule" />
+          <div class="tl tl-user">&gt; fix the CTA overflow on the checkout page</div>
+          <div class="tl tl-agent"><span class="bullet">●</span> I'll look at the checkout component styles.</div>
+          <div class="tl tl-tool"><span class="bullet">●</span> Read <span class="fname">src/components/CheckoutCTA.tsx</span> (84 lines)</div>
+          <div class="tl tl-tool"><span class="bullet">●</span> Edit <span class="fname">src/styles/checkout.css</span></div>
+          <div class="tl tl-del">- .cta-row { width: 120%; }</div>
+          <div class="tl tl-add">+ .cta-row { width: 100%; max-width: 480px; }</div>
+          <div class="tl tl-ok">✔ Change applied — dev server reloaded</div>
+          <div class="tl tl-agent"><span class="bullet">●</span> The button no longer overflows. Preview updated on the right.</div>
+          <div class="tl tl-wait"><span class="caret"></span>awaiting your next instruction…</div>
+        </div>
+      </section>
+
+      <!-- divider: brass gallery rail -->
+      <div id="divider" role="separator" aria-orientation="vertical" title="Drag to resize"></div>
+
+      <!-- browser pane: the display case -->
+      <section class="pane" id="pane-web">
+        <div id="webbar">
+          <button class="navbtn" title="Back">←</button>
+          <button class="navbtn" disabled title="Forward">→</button>
+          <button class="navbtn" title="Reload">⟳</button>
+          <div id="urlbar"><span class="lock">◈</span><span class="url"><bdo dir="ltr">http://localhost:5173/checkout</bdo></span></div>
+          <button id="btn-capture" class="btn btn-brass">⛶ Capture</button>
+          <button class="btn qbtn">Queue <span class="sbadge">2</span></button>
+          <span class="chip">console: 0</span>
+          <button class="btn" title="Collapse pane">⌄ Collapse</button>
+        </div>
+
+        <div id="webview">
+          <!-- the exhibited artifact -->
+          <div class="shop">
+            <div class="shop-header">
+              <span class="shop-logo">Fieldgoods Supply</span>
+              <span class="shop-step">Checkout · Step 2 of 2</span>
+            </div>
+            <h1>Order summary</h1>
+            <div class="order-card">
+              <div class="order-row"><span>Wool camp socks <span class="oqty">× 2</span></span><span class="oprice">$24.00</span></div>
+              <div class="order-row"><span>Enamel field mug <span class="oqty">× 1</span></span><span class="oprice">$20.00</span></div>
+              <div class="order-row sub"><span>Subtotal</span><span class="oprice">$44.00</span></div>
+              <div class="order-row sub"><span>Shipping — standard</span><span class="oprice">$4.00</span></div>
+              <div class="order-row total"><span>Total</span><span class="oprice">$48.00</span></div>
+            </div>
+            <div class="cta-row">
+              <button class="pay-btn">Pay $48.00</button>
+            </div>
+            <p class="shop-fine">Secure checkout · 30-day returns · Receipts by email</p>
+          </div>
+
+          <!-- wall label for the exhibit -->
+          <div id="exhibit-label" aria-hidden="true">
+            <span class="acc">2026.07.112</span>
+            <div class="el-title">Checkout, with overflow corrected</div>
+            <div class="el-medium">Live web page. HTML, CSS and JavaScript on localhost:5173.</div>
+            <div class="el-prov">On loan from the claude session, refreshed this minute.</div>
+          </div>
+
+          <!-- auto-reload flash: collection stamp -->
+          <div id="refreshed"><span class="rdot"></span>Refreshed</div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- ══ status bar — the plinth ══ -->
+<footer id="statusbar">
+  <span class="sb-group"><span class="micro">Adapter</span><span class="sb-val">claude -p · one-off</span></span>
+  <span class="sb-sep"></span>
+  <span class="sb-group"><span class="micro">Pairing</span><span class="sb-val">1:1 session ↔ pane</span></span>
+  <div class="sb-right">
+    <button class="sb-btn">Delivery Log</button>
+    <span class="sb-ver">chromux 0.17.0 — museum archive concept</span>
+  </div>
+</footer>
+
+<!-- ══ capture modal — the accession record ══ -->
+<div id="overlay" class="hidden">
+  <div id="modal" role="dialog" aria-modal="true" aria-label="Capture to agent">
+    <div class="modal-head">
+      <span class="modal-title">Accession — Capture → Agent</span>
+      <span class="acc modal-acc">NEW&nbsp;ACC.&nbsp;2026.07.115</span>
+      <button class="modal-x" id="modal-close" title="Close">✕</button>
+    </div>
+
+    <div class="modal-body">
+      <div class="cap-left">
+        <div class="cap-summary">
+          <div class="cap-srow"><span class="micro">Session</span><span class="cap-sval"><em>checkout-flow</em> · claude</span></div>
+          <div class="cap-srow"><span class="micro">URL</span><span class="cap-sval mono">localhost:5173/checkout</span></div>
+          <div class="cap-srow"><span class="micro">Selection</span><span class="cap-sval">“CTA button region <span class="mono">412×88</span>”</span></div>
+        </div>
+
+        <label class="field">
+          <span class="micro">Note to agent — what's wrong / what to do</span>
+          <textarea rows="3" spellcheck="false" placeholder="e.g. the CTA button overflows its container — fix the CSS"></textarea>
+        </label>
+
+        <label class="field">
+          <span class="micro">Target</span>
+          <select>
+            <option>checkout-flow · claude -p</option>
+            <option>landing-page · grok</option>
+            <option>api-server · codex</option>
+          </select>
+        </label>
+
+        <div class="field">
+          <span class="micro">Screenshot — Plate 115</span>
+          <div class="cap-shot">
+            <i></i><i></i><i></i><i></i>
+            <span>checkout @ 1280×800 · full-color plate</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="cap-right">
+        <span class="micro">Payload Preview — YAML v1</span>
+        <pre class="yaml"><span class="yk">chromux_capture:</span> v1
+<span class="yk">session:</span> checkout-flow
+<span class="yk">agent:</span> claude
+<span class="yk">url:</span> http://localhost:5173/checkout
+<span class="yk">note:</span> CTA overflows container
+<span class="yk">screenshot:</span> ~/.chromux/captures/2026-07-11-0142.png
+<span class="yk">console_errors:</span> []</pre>
+        <div class="cap-prov">Provenance: captured from the checkout-flow vitrine · to be catalogued under <span class="acc" style="font-style:normal">2026.07.115</span> upon delivery.</div>
+      </div>
+    </div>
+
+    <div class="modal-foot">
+      <span class="acc">CAT. ENTRY PENDING — REGISTRAR: chromux</span>
+      <button class="btn" id="modal-cancel">Cancel</button>
+      <button class="btn">File-Drop Only</button>
+      <button class="btn btn-brass">Send — claude -p</button>
+    </div>
+  </div>
+</div>
+
+<!-- fixed corner tag -->
+<div id="corner-tag">28 · Museum Archive</div>
+
+<script>
+(function () {
+  var overlay = document.getElementById('overlay');
+
+  function openModal()  { overlay.classList.remove('hidden'); }
+  function closeModal() { overlay.classList.add('hidden'); }
+
+  document.getElementById('btn-capture').addEventListener('click', openModal);
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  document.getElementById('modal-cancel').addEventListener('click', closeModal);
+
+  // backdrop click closes; clicks inside the record card do not
+  overlay.addEventListener('click', function (e) {
+    if (e.target === overlay) closeModal();
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeModal();
+  });
+
+  // headless screenshot hook: ?modal=1 opens the capture modal
+  if (/[?&]modal=1/.test(location.search)) openModal();
+})();
+</script>
+</body>
+</html>

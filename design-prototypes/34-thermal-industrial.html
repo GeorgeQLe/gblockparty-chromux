@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Chromux — Thermal Industrial</title>
+<style>
+/* ================================================================
+   CHROMUX CONCEPT 34 — "THERMAL INDUSTRIAL"
+   Infrared diagnostic vision over dark machinery.
+   Near-black chassis, faint outline schematics, and an ironbow
+   colormap (deep purple → magenta → orange → yellow-white)
+   applied FUNCTIONALLY: heat = activity. FLIR craft.
+   ================================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Oxanium:wght@500;600;700;800&display=swap');
+
+:root{
+  /* chassis — cold matte machine surfaces */
+  --void:#030304;
+  --chassis:#08090c;
+  --chassis-2:#0b0d11;
+  --panel:#0d0f14;
+  --panel-2:#10131a;
+  --edge:#232837;          /* diagnostic outline */
+  --edge-dim:#171b26;
+  --edge-bright:#39415a;
+  --tick:#4a5570;
+
+  /* ironbow ramp — cold → hot */
+  --ir0:#0b0221;   /* 20°  deep void purple */
+  --ir1:#2a0a68;   /* 32°  violet           */
+  --ir2:#6b0f8f;   /* 44°  purple-magenta   */
+  --ir3:#b01d7c;   /* 56°  magenta          */
+  --ir4:#e4442f;   /* 68°  hot orange-red   */
+  --ir5:#fb8b24;   /* 80°  orange           */
+  --ir6:#fdd835;   /* 90°  yellow           */
+  --ir7:#fffbe0;   /* 98°  white-hot        */
+
+  --ironbow:linear-gradient(90deg,var(--ir0) 0%,var(--ir1) 14%,var(--ir2) 29%,var(--ir3) 44%,var(--ir4) 60%,var(--ir5) 75%,var(--ir6) 89%,var(--ir7) 100%);
+  --ironbow-v:linear-gradient(0deg,var(--ir0) 0%,var(--ir1) 14%,var(--ir2) 29%,var(--ir3) 44%,var(--ir4) 60%,var(--ir5) 75%,var(--ir6) 89%,var(--ir7) 100%);
+
+  /* text temperatures */
+  --txt-cold:#5a6480;      /* ambient labels        */
+  --txt-cool:#8b93ad;      /* secondary             */
+  --txt-warm:#d8dcea;      /* primary reading       */
+  --txt-hot:#ffd964;       /* alert reading         */
+
+  --ok:#57e0a2;            /* nominal green (brand node) */
+  --violet:#a06bff;        /* brand node */
+  --hot:#fb8b24;
+  --hot-hi:#ffd964;
+  --mag:#e0388a;
+  --cold-dead:#3d6cd6;     /* below-ambient / dead */
+
+  --disp:'Oxanium','Avenir Next Condensed','Futura','Arial Narrow',sans-serif;
+  --mono:ui-monospace,'Menlo','SF Mono','Monaco',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  min-width:1280px;height:100vh;overflow:hidden;
+  background:
+    radial-gradient(120% 85% at 72% 8%, rgba(43,10,104,.14), transparent 55%),
+    radial-gradient(90% 70% at 8% 100%, rgba(11,2,33,.5), transparent 60%),
+    var(--void);
+  color:var(--txt-warm);
+  font-family:var(--disp);
+  display:flex;flex-direction:column;
+  -webkit-font-smoothing:antialiased;
+  user-select:none;
+}
+/* sensor-noise grain over everything, very faint */
+body::before{
+  content:"";position:fixed;inset:0;z-index:200;pointer-events:none;opacity:.5;
+  background-image:
+    repeating-linear-gradient(0deg, rgba(255,255,255,.012) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(0,0,0,.05) 0 1px, transparent 1px 4px);
+}
+
+/* ---------------- shared diagnostic hardware ---------------- */
+
+/* outlined machine panel with corner registration brackets */
+.dpanel{
+  background:linear-gradient(180deg,var(--panel-2),var(--panel) 55%,var(--chassis-2));
+  border:1px solid var(--edge);
+  position:relative;
+  box-shadow:0 0 0 1px rgba(0,0,0,.6), inset 0 1px 0 rgba(120,132,180,.06);
+}
+.corner{position:absolute;width:11px;height:11px;z-index:5;pointer-events:none}
+.corner::before,.corner::after{content:"";position:absolute;background:var(--tick)}
+.corner::before{width:11px;height:1px}
+.corner::after{width:1px;height:11px}
+.corner.tl{top:-1px;left:-1px}
+.corner.tr{top:-1px;right:-1px}
+.corner.tr::before{right:0}.corner.tr::after{right:0}
+.corner.bl{bottom:-1px;left:-1px}
+.corner.bl::before{bottom:0}.corner.bl::after{bottom:0}
+.corner.br{bottom:-1px;right:-1px}
+.corner.br::before{bottom:0;right:0}.corner.br::after{bottom:0;right:0}
+
+/* stencilled machine label */
+.dlabel{
+  font-family:var(--disp);font-weight:700;font-size:10px;
+  letter-spacing:.3em;text-transform:uppercase;color:var(--txt-cold);
+  white-space:nowrap;
+}
+.dlabel b{color:var(--txt-warm);font-weight:800}
+
+/* temperature readout chip — the recurring signature */
+.temp{
+  font-family:var(--mono);font-size:10px;letter-spacing:.04em;
+  color:var(--txt-cool);white-space:nowrap;
+  display:inline-flex;align-items:center;gap:5px;
+}
+.temp .tval{font-weight:700}
+.temp .tbar{
+  width:34px;height:5px;border:1px solid var(--edge-bright);border-radius:1px;
+  background:var(--chassis);position:relative;overflow:hidden;flex:none;
+}
+.temp .tbar i{position:absolute;inset:0;background:var(--ironbow);transform-origin:left}
+.temp.t-hot .tval{color:var(--hot-hi)}
+.temp.t-warm .tval{color:var(--mag)}
+.temp.t-cool .tval{color:#8f6ae0}
+.temp.t-cold .tval{color:var(--cold-dead)}
+
+/* ghost key — cold machine button */
+.gkey{
+  font-family:var(--disp);font-weight:700;font-size:10px;
+  letter-spacing:.18em;text-transform:uppercase;color:var(--txt-cool);
+  background:linear-gradient(180deg,#141826,#0c0e15);
+  border:1px solid var(--edge-bright);border-radius:2px;
+  padding:6px 11px;cursor:pointer;white-space:nowrap;
+  box-shadow:inset 0 1px 0 rgba(150,160,210,.08), 0 1px 0 rgba(0,0,0,.7);
+}
+.gkey:hover{color:var(--txt-warm);border-color:var(--tick);background:linear-gradient(180deg,#1a1f30,#0e111a)}
+.gkey:active{transform:translateY(1px);box-shadow:inset 0 1px 3px rgba(0,0,0,.7)}
+
+/* hot key — thermally saturated primary action */
+.hotkey{
+  font-family:var(--disp);font-weight:800;font-size:10px;
+  letter-spacing:.18em;text-transform:uppercase;color:#1c0c02;
+  background:linear-gradient(180deg,var(--ir6),var(--ir5) 55%,var(--ir4));
+  border:1px solid #601c05;border-radius:2px;
+  padding:6px 12px;cursor:pointer;white-space:nowrap;position:relative;
+  box-shadow:0 0 14px rgba(251,139,36,.35), 0 0 3px rgba(253,216,53,.5),
+             inset 0 1px 0 rgba(255,251,224,.55);
+  text-shadow:0 1px 0 rgba(255,240,180,.4);
+}
+.hotkey:hover{filter:brightness(1.1)}
+.hotkey:active{transform:translateY(1px);box-shadow:0 0 8px rgba(251,139,36,.3), inset 0 1px 2px rgba(96,28,5,.5)}
+
+/* heat pip — session lamp, colormap-coded */
+.pip{width:9px;height:9px;border-radius:50%;flex:none;display:inline-block;
+  border:1px solid rgba(0,0,0,.6)}
+.pip-hot{background:radial-gradient(circle at 40% 32%, var(--ir7), var(--ir6) 30%, var(--ir5) 60%, var(--ir4));
+  box-shadow:0 0 8px rgba(251,139,36,.75), 0 0 2px var(--ir6)}
+.pip-warm{background:radial-gradient(circle at 40% 32%, #ff9ecf, var(--mag) 45%, var(--ir2));
+  box-shadow:0 0 7px rgba(224,56,138,.55)}
+.pip-cool{background:radial-gradient(circle at 40% 32%, #b493ff, #7a3fd8 45%, var(--ir1));
+  box-shadow:0 0 6px rgba(122,63,216,.45)}
+.pip-cold{background:radial-gradient(circle at 40% 32%, #7fa4ec, var(--cold-dead) 50%, #16244d);
+  box-shadow:0 0 5px rgba(61,108,214,.4)}
+.pip-throb{animation:throb 2.2s ease-in-out infinite}
+@keyframes throb{0%,100%{filter:brightness(1)}50%{filter:brightness(1.55)}}
+
+/* ---------------- titlebar ---------------- */
+#titlebar{
+  height:44px;flex:none;display:flex;align-items:center;gap:20px;
+  padding:0 14px 0 84px;
+  background:linear-gradient(180deg,#0d0f15,#07080b);
+  border-bottom:1px solid var(--edge);
+  position:relative;z-index:20;
+}
+/* ironbow hairline under titlebar — the instrument's calibration strip */
+#titlebar::after{
+  content:"";position:absolute;left:0;right:0;bottom:-2px;height:1px;
+  background:var(--ironbow);opacity:.55;
+}
+.brand{display:flex;align-items:center;gap:10px}
+.brand-mark{width:26px;height:26px;flex:none;display:grid;place-items:center;
+  border:1px solid var(--edge-bright);border-radius:2px;
+  background:radial-gradient(circle at 50% 40%, #131627, #07080c 75%);
+  box-shadow:inset 0 0 8px rgba(43,10,104,.5)}
+.brand-name{font-weight:800;font-size:15px;letter-spacing:.34em;color:var(--txt-warm);
+  text-shadow:0 0 12px rgba(251,139,36,.25)}
+.brand-sub{font-size:8.5px;font-weight:700;letter-spacing:.34em;color:var(--txt-cold);
+  border-left:1px solid var(--edge-bright);padding-left:10px}
+.titlebar-gauges{margin-left:auto;display:flex;align-items:center;gap:9px}
+.gauge{
+  display:inline-flex;align-items:center;gap:7px;
+  border:1px solid var(--edge);border-radius:2px;
+  background:linear-gradient(180deg,#0c0e14,#090a0e);
+  padding:4px 9px 5px;
+  font-size:9px;font-weight:700;letter-spacing:.2em;color:var(--txt-cold);
+  box-shadow:inset 0 1px 0 rgba(120,132,180,.05);
+}
+.gauge b{font-family:var(--mono);color:var(--txt-warm);font-size:12px;font-weight:700;letter-spacing:0}
+#btn-update-ready{
+  font-family:var(--disp);font-weight:800;font-size:9.5px;letter-spacing:.2em;
+  text-transform:uppercase;color:#1c0c02;cursor:pointer;
+  border:1px solid #601c05;border-radius:2px;padding:6px 11px;
+  background:linear-gradient(90deg,var(--ir4),var(--ir5) 45%,var(--ir6));
+  background-size:200% 100%;
+  box-shadow:0 0 16px rgba(251,139,36,.4), inset 0 1px 0 rgba(255,251,224,.5);
+  animation:overheat 2.6s ease-in-out infinite;
+}
+@keyframes overheat{0%,100%{background-position:0 0}50%{background-position:100% 0}}
+#btn-update-ready:hover{filter:brightness(1.12)}
+#btn-update-ready:active{transform:translateY(1px)}
+
+/* ---------------- app frame ---------------- */
+#app{flex:1;display:flex;min-height:0;padding:10px 10px 8px;gap:10px}
+
+/* ---------------- left rail ---------------- */
+#rail{
+  width:230px;flex:none;display:flex;flex-direction:column;min-height:0;
+  padding:11px 10px 9px;gap:10px;
+}
+.rail-head{display:flex;flex-direction:column;gap:9px}
+.rail-head-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+/* tiny reticle glyph before rail header */
+.reticle{
+  width:12px;height:12px;flex:none;position:relative;display:inline-block;
+  border:1px solid var(--tick);border-radius:50%;
+}
+.reticle::before,.reticle::after{content:"";position:absolute;background:var(--tick)}
+.reticle::before{left:50%;top:-3px;bottom:-3px;width:1px;transform:translateX(-.5px)}
+.reticle::after{top:50%;left:-3px;right:-3px;height:1px;transform:translateY(-.5px)}
+#btn-detect{width:100%;text-align:center;display:flex;align-items:center;justify-content:center;gap:7px}
+#attention-list{flex:1;min-height:0;display:flex;flex-direction:column;gap:9px;overflow:hidden}
+
+/* queue card — outlined component, heat gutter on the left */
+.qcard{
+  border:1px solid var(--edge);border-radius:2px;cursor:pointer;
+  background:linear-gradient(180deg,#0e1017,#0a0b10);
+  position:relative;overflow:hidden;
+  display:grid;grid-template-columns:7px 1fr;
+  box-shadow:0 1px 0 rgba(0,0,0,.7);
+}
+.qcard:hover{border-color:var(--edge-bright);background:linear-gradient(180deg,#12141d,#0b0d13)}
+.qcard:active{transform:translateY(1px)}
+.qgutter{position:relative;background:var(--chassis)}
+.qgutter i{position:absolute;left:0;right:0;bottom:0}
+.q-hot .qgutter i{top:0;background:linear-gradient(0deg,var(--ir3),var(--ir4) 40%,var(--ir5) 75%,var(--ir6));box-shadow:0 0 9px rgba(251,139,36,.55)}
+.q-warm .qgutter i{top:26%;background:linear-gradient(0deg,var(--ir1),var(--ir2) 55%,var(--ir3));box-shadow:0 0 7px rgba(176,29,124,.45)}
+.q-cold .qgutter i{top:68%;background:linear-gradient(0deg,#101a38,var(--cold-dead));box-shadow:0 0 6px rgba(61,108,214,.35)}
+.qbody{padding:8px 9px 9px;min-width:0}
+.qtop{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.qkind{
+  font-size:8px;font-weight:800;letter-spacing:.24em;padding:2px 6px 2px 7px;
+  border:1px solid;border-radius:1px;flex:none;
+}
+.q-hot .qkind{color:var(--hot-hi);border-color:rgba(253,216,53,.5);background:rgba(228,68,47,.14);text-shadow:0 0 6px rgba(253,216,53,.5)}
+.q-warm .qkind{color:#ff8ec6;border-color:rgba(224,56,138,.45);background:rgba(176,29,124,.13)}
+.q-cold .qkind{color:#7fa4ec;border-color:rgba(61,108,214,.4);background:rgba(61,108,214,.1)}
+.qsess{font-family:var(--mono);font-size:10px;color:var(--txt-cool);letter-spacing:0;overflow:hidden;text-overflow:ellipsis}
+.qmsg{font-family:var(--mono);font-size:10px;line-height:1.5;color:var(--txt-cool);letter-spacing:0}
+.qmsg code{
+  font-family:var(--mono);font-size:9.5px;color:var(--txt-warm);
+  background:#151827;border:1px solid var(--edge-bright);border-radius:2px;padding:0 3px;
+}
+.qfoot{display:flex;justify-content:space-between;align-items:center;margin-top:6px}
+.qspot{font-family:var(--mono);font-size:8.5px;letter-spacing:.14em;color:var(--txt-cold)}
+
+/* rail footer */
+.rail-foot{
+  border-top:1px dashed var(--edge-dim);padding-top:8px;
+  display:flex;flex-direction:column;gap:4px;
+}
+.pathlink{
+  background:none;border:none;cursor:pointer;text-align:left;padding:0;
+  font-family:var(--mono);font-size:10.5px;color:#c98a4a;letter-spacing:0;
+  text-decoration:underline dotted;text-underline-offset:3px;
+}
+.pathlink:hover{color:var(--hot-hi)}
+
+/* ---------------- workspace ---------------- */
+#workspace{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0}
+
+/* session tabs — spot targets on a rail; heat encodes activity */
+#session-tabs{flex:none;display:flex;align-items:stretch;gap:7px;padding:0 1px 8px}
+.session-tab{
+  display:inline-flex;align-items:center;gap:8px;
+  font-family:var(--disp);font-weight:700;font-size:10.5px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--txt-cool);
+  background:linear-gradient(180deg,#0e1017,#0a0b10);
+  border:1px solid var(--edge);border-radius:2px;
+  padding:7px 12px 8px;cursor:pointer;position:relative;overflow:hidden;
+}
+.session-tab::after{ /* heat underline — cold by default */
+  content:"";position:absolute;left:0;right:0;bottom:0;height:2px;
+  background:linear-gradient(90deg,var(--ir0),var(--ir1));opacity:.7;
+}
+.session-tab:hover{border-color:var(--edge-bright);color:var(--txt-warm)}
+.session-tab.active{
+  color:var(--txt-warm);border-color:#7a4a20;
+  background:linear-gradient(180deg,#191019,#0e0a10);
+  box-shadow:0 0 16px rgba(228,68,47,.18), inset 0 0 14px rgba(176,29,124,.12);
+}
+.session-tab.active::after{
+  height:3px;background:var(--ironbow);opacity:1;
+  box-shadow:0 0 8px rgba(251,139,36,.6);
+}
+.session-tab.dead{color:var(--txt-cold)}
+.session-tab.dead::after{background:linear-gradient(90deg,#0a1226,#1c2f63);opacity:.8}
+.tab-agent{font-family:var(--mono);font-size:9.5px;letter-spacing:0;text-transform:none;color:var(--txt-cold)}
+.tab-temp{font-family:var(--mono);font-size:8.5px;letter-spacing:.04em;color:var(--txt-cold)}
+.session-tab.active .tab-temp{color:var(--hot-hi);text-shadow:0 0 6px rgba(253,216,53,.45)}
+.session-tab.dead .tab-temp{color:var(--cold-dead)}
+.tab-badge{
+  min-width:16px;height:16px;display:inline-grid;place-items:center;padding:0 4px;
+  font-family:var(--mono);font-size:9.5px;font-weight:700;color:#1c0c02;
+  background:linear-gradient(180deg,var(--ir6),var(--ir5));
+  border:1px solid #601c05;border-radius:2px;
+  box-shadow:0 0 8px rgba(251,139,36,.5);
+}
+.add-tab{font-size:13px;font-weight:800;padding:7px 12px;line-height:1}
+
+/* ---------------- stage ---------------- */
+#stage{flex:1;min-height:0;display:flex;padding:10px;gap:0}
+.pane{display:flex;flex-direction:column;min-width:0;min-height:0;
+  border:1px solid var(--edge);position:relative;background:var(--chassis)}
+.pane-terminal{width:44%;flex:none}
+.pane-browser{flex:1}
+.pane-head{
+  flex:none;display:flex;align-items:center;gap:10px;min-height:34px;
+  padding:0 11px;border-bottom:1px solid var(--edge);
+  background:linear-gradient(180deg,#0e1017,#0a0b10);
+}
+.pane-cwd{font-family:var(--mono);font-size:10px;color:var(--txt-cold);letter-spacing:0;margin-left:auto}
+
+/* terminal body — the hottest component in frame */
+.term-body{
+  flex:1;min-height:0;position:relative;overflow:hidden;
+  background:
+    radial-gradient(130% 100% at 20% 108%, rgba(107,15,143,.13), transparent 55%),
+    radial-gradient(80% 60% at 85% -10%, rgba(42,10,104,.16), transparent 60%),
+    var(--void);
+}
+/* faint diagnostic outline schematic behind the transcript */
+.term-body::before{
+  content:"";position:absolute;inset:0;pointer-events:none;opacity:.5;
+  background:
+    linear-gradient(var(--edge-dim) 1px, transparent 1px) 0 0/100% 34px,
+    linear-gradient(90deg, var(--edge-dim) 1px, transparent 1px) 0 0/34px 100%;
+  mask-image:radial-gradient(90% 80% at 50% 50%, transparent 35%, #000 100%);
+  -webkit-mask-image:radial-gradient(90% 80% at 50% 50%, transparent 35%, #000 100%);
+}
+.term-scroll{
+  position:absolute;inset:0;padding:13px 14px 13px 26px;overflow:hidden;
+  font-family:var(--mono);font-size:11.5px;line-height:1.74;
+  color:var(--txt-cool);letter-spacing:0;
+}
+/* activity heat rail — vertical ironbow strip: hotter toward "now" */
+.term-heatrail{
+  position:absolute;left:8px;top:13px;bottom:13px;width:4px;
+  border:1px solid var(--edge-dim);border-radius:1px;overflow:hidden;
+}
+.term-heatrail i{position:absolute;inset:0;background:var(--ironbow-v);opacity:.9}
+.t-dim{color:#565f7c}
+.t-user{color:#f4f1ff;font-weight:700}
+.t-user .t-caret{color:var(--ir5)}
+.t-bullet{color:#a7aec6}
+.t-bullet .t-dot{color:var(--ir3)}
+.t-file{color:#e3e6f2}
+.t-del{color:#ff7d9b}
+.t-add{color:#63e6a8}
+.t-ok{color:#63e6a8;font-weight:700}
+.t-await{color:#8f89a8}
+.t-heat-hi{text-shadow:0 0 10px rgba(228,68,47,.35)}
+.block-cursor{
+  display:inline-block;width:8px;height:13px;vertical-align:-2px;margin-right:6px;
+  background:linear-gradient(180deg,var(--ir7),var(--ir5));
+  box-shadow:0 0 9px rgba(251,139,36,.8);
+  animation:blockblink 1.05s steps(1,end) infinite;
+}
+@keyframes blockblink{0%,49%{opacity:1}50%,100%{opacity:0}}
+/* spot-meter reticle floating in the terminal corner */
+.spotmeter{
+  position:absolute;right:12px;top:12px;z-index:6;pointer-events:none;
+  display:flex;align-items:center;gap:7px;
+  font-family:var(--mono);font-size:9px;letter-spacing:.08em;color:var(--hot-hi);
+  text-shadow:0 0 8px rgba(253,216,53,.5);
+}
+.spotmeter .reticle{border-color:rgba(253,216,53,.75)}
+.spotmeter .reticle::before,.spotmeter .reticle::after{background:rgba(253,216,53,.75)}
+
+/* divider — calibrated tick ruler */
+#divider{
+  width:12px;flex:none;cursor:col-resize;position:relative;margin:14px 0;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 9px, var(--edge) 9px 10px),
+    var(--chassis-2);
+  border-left:1px solid var(--edge-dim);border-right:1px solid var(--edge-dim);
+}
+#divider::after{
+  content:"";position:absolute;left:3px;right:3px;top:50%;height:26px;transform:translateY(-50%);
+  border:1px solid var(--edge-bright);border-radius:2px;
+  background:linear-gradient(180deg,#161a28,#0c0e15);
+}
+#divider:hover::after{border-color:var(--tick)}
+
+/* ---------------- browser pane ---------------- */
+.btoolbar{
+  flex:none;display:flex;align-items:center;gap:6px;
+  padding:6px 9px;border-bottom:1px solid var(--edge);
+  background:linear-gradient(180deg,#0e1017,#0a0b10);
+  flex-wrap:nowrap;overflow:hidden;
+}
+.nav-key{padding:5px 8px !important;font-size:10px;letter-spacing:.02em}
+.urlbar{
+  flex:1;min-width:120px;display:flex;align-items:center;gap:8px;
+  background:var(--void);border:1px solid var(--edge);border-radius:2px;
+  padding:5px 9px;overflow:hidden;white-space:nowrap;
+  font-family:var(--mono);font-size:10.5px;color:#c9cede;letter-spacing:0;
+  box-shadow:inset 0 1px 4px rgba(0,0,0,.8);
+}
+.urlbar .pip{width:7px;height:7px}
+.chip{
+  font-family:var(--mono);font-size:9px;letter-spacing:0;flex:none;
+  border:1px solid var(--edge);border-radius:2px;padding:3px 7px;
+  color:var(--txt-cool);background:#0b0d12;white-space:nowrap;
+}
+.gkey .kbadge{
+  display:inline-grid;place-items:center;min-width:14px;height:14px;margin-left:6px;
+  font-family:var(--mono);font-size:9px;font-weight:700;color:#1c0c02;
+  background:linear-gradient(180deg,var(--ir6),var(--ir5));
+  border:1px solid #601c05;border-radius:2px;vertical-align:-2px;
+  box-shadow:0 0 6px rgba(251,139,36,.5);
+}
+
+/* viewport frame around the webpage */
+.viewport{
+  flex:1;min-height:0;margin:9px;position:relative;
+  border:1px solid var(--edge);
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.7), 0 0 22px rgba(43,10,104,.18);
+  overflow:hidden;background:var(--void);
+}
+/* the fake rendered light-mode checkout — deliberate contrast */
+.webpage{
+  position:absolute;inset:0;overflow:hidden;
+  background:#f4f3ef;color:#26251f;
+  font-family:'Avenir Next','Helvetica Neue',sans-serif;
+  letter-spacing:0;user-select:text;
+}
+.wp-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:13px 26px;border-bottom:1px solid #e2dfd6;background:#fcfbf8;
+}
+.wp-logo{font-weight:700;font-size:15px;color:#20201c}
+.wp-logo span{color:#9b968b;font-weight:500}
+.wp-steps{font-size:11.5px;color:#8e897d}
+.wp-steps b{color:#26251f}
+.wp-body{display:flex;justify-content:center;gap:22px;padding:28px 26px}
+.wp-card{
+  width:330px;background:#fff;border:1px solid #e4e1d8;border-radius:10px;
+  box-shadow:0 8px 22px rgba(40,36,28,.09);padding:20px 22px;position:relative;
+}
+.wp-card h3{font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:#8e897d;margin-bottom:13px;font-weight:600}
+.wp-row{display:flex;justify-content:space-between;font-size:13.5px;padding:7px 0;color:#34332e}
+.wp-row .muted{color:#8e897d}
+.wp-row.total{border-top:1px solid #edebdf;margin-top:8px;padding-top:12px;font-weight:700;font-size:15px}
+.wp-cta{
+  display:block;width:100%;margin-top:18px;padding:13px 0;
+  background:#215f8f;color:#fff;border:none;border-radius:8px;
+  font-family:inherit;font-size:14.5px;font-weight:600;cursor:pointer;
+  box-shadow:0 3px 10px rgba(33,95,143,.3);
+}
+.wp-cta:hover{background:#1c5680}
+.wp-fine{margin-top:12px;font-size:10.5px;color:#a5a093;text-align:center}
+.refreshed-chip{
+  position:absolute;top:56px;right:14px;z-index:8;
+  font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.08em;
+  background:rgba(7,8,11,.85);color:var(--ok);border:1px solid rgba(87,224,162,.5);
+  border-radius:2px;padding:3px 8px;
+  box-shadow:0 0 10px rgba(87,224,162,.25);
+}
+
+/* spot-meter crosshair locked on the CTA — the IR overlay */
+.spot-overlay{position:absolute;inset:0;pointer-events:none;z-index:7}
+.spot-box{
+  position:absolute;left:50%;bottom:96px;width:300px;height:66px;
+  transform:translateX(-50%);
+}
+.spot-box::before{ /* thermal wash over the target region */
+  content:"";position:absolute;inset:-8px;
+  background:radial-gradient(70% 90% at 50% 50%, rgba(228,68,47,.28), rgba(176,29,124,.14) 55%, transparent 78%);
+  mix-blend-mode:multiply;
+}
+.spot-corner{position:absolute;width:14px;height:14px}
+.spot-corner::before,.spot-corner::after{content:"";position:absolute;background:var(--hot-hi);
+  box-shadow:0 0 6px rgba(253,216,53,.7)}
+.spot-corner::before{width:14px;height:1.5px}
+.spot-corner::after{width:1.5px;height:14px}
+.spot-corner.tl{top:0;left:0}
+.spot-corner.tr{top:0;right:0}.spot-corner.tr::before{right:0}.spot-corner.tr::after{right:0}
+.spot-corner.bl{bottom:0;left:0}.spot-corner.bl::before{bottom:0}.spot-corner.bl::after{bottom:0}
+.spot-corner.br{bottom:0;right:0}.spot-corner.br::before{bottom:0;right:0}.spot-corner.br::after{bottom:0;right:0}
+.spot-cross{position:absolute;left:50%;top:50%;width:22px;height:22px;transform:translate(-50%,-50%)}
+.spot-cross::before,.spot-cross::after{content:"";position:absolute;background:var(--hot-hi);
+  box-shadow:0 0 6px rgba(253,216,53,.8)}
+.spot-cross::before{left:50%;top:0;bottom:0;width:1.5px;transform:translateX(-50%)}
+.spot-cross::after{top:50%;left:0;right:0;height:1.5px;transform:translateY(-50%)}
+.spot-tag{
+  position:absolute;left:calc(50% + 160px);bottom:118px;
+  font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.06em;
+  color:var(--hot-hi);background:rgba(7,8,11,.88);
+  border:1px solid rgba(253,216,53,.55);border-radius:2px;padding:3px 8px;
+  text-shadow:0 0 6px rgba(253,216,53,.5);white-space:nowrap;
+}
+.spot-tag small{display:block;font-size:8px;color:var(--txt-cool);font-weight:400;letter-spacing:.1em}
+/* slow scan sweep across the viewport */
+.scanline{
+  position:absolute;left:0;right:0;top:0;height:44px;pointer-events:none;z-index:6;
+  background:linear-gradient(180deg, transparent, rgba(176,29,124,.06) 55%, rgba(251,139,36,.09) 82%, rgba(253,216,53,.16) 99%, transparent 100%);
+  animation:scan 7s linear infinite;opacity:.8;
+}
+@keyframes scan{0%{transform:translateY(-48px)}100%{transform:translateY(640px)}}
+
+/* ---------------- ironbow legend column ---------------- */
+#legend{
+  width:56px;flex:none;margin-left:10px;display:flex;flex-direction:column;
+  border:1px solid var(--edge);background:var(--chassis);
+  padding:8px 6px;gap:6px;position:relative;
+}
+#legend .dlabel{letter-spacing:.2em;font-size:7.5px;text-align:center}
+.legend-scale{flex:1;min-height:0;display:flex;gap:5px;justify-content:center;position:relative}
+.legend-bar{
+  width:12px;border:1px solid var(--edge-bright);border-radius:1px;
+  background:var(--ironbow-v);position:relative;
+  box-shadow:0 0 12px rgba(176,29,124,.25);
+}
+/* alarm threshold notch on the bar */
+.legend-alarm{
+  position:absolute;left:-4px;right:-4px;top:11%;height:0;
+  border-top:1.5px dashed var(--hot-hi);
+}
+.legend-alarm::after{
+  content:"ALM";position:absolute;right:-2px;top:-11px;
+  font-family:var(--mono);font-size:7px;letter-spacing:.1em;color:var(--hot-hi);
+}
+/* live max marker */
+.legend-live{
+  position:absolute;left:-5px;top:26%;width:0;height:0;
+  border-top:4px solid transparent;border-bottom:4px solid transparent;
+  border-left:6px solid var(--ir7);
+  filter:drop-shadow(0 0 4px rgba(255,251,224,.8));
+  animation:livemark 3.2s ease-in-out infinite;
+}
+@keyframes livemark{0%,100%{top:26%}50%{top:29%}}
+.legend-ticks{
+  display:flex;flex-direction:column;justify-content:space-between;
+  font-family:var(--mono);font-size:7.5px;color:var(--txt-cold);
+  text-align:left;padding:0;letter-spacing:0;
+}
+.legend-foot{
+  font-family:var(--mono);font-size:7.5px;color:var(--txt-cool);
+  text-align:center;line-height:1.6;border-top:1px dashed var(--edge-dim);padding-top:5px;
+}
+.legend-foot b{color:var(--hot-hi);font-weight:700}
+
+/* ---------------- status bar ---------------- */
+#statusbar{
+  flex:none;height:27px;display:flex;align-items:center;gap:12px;
+  padding:0 12px;position:relative;
+  background:linear-gradient(180deg,#0b0d12,#07080b);
+  border-top:1px solid var(--edge);
+  font-size:8.5px;font-weight:700;letter-spacing:.22em;color:var(--txt-cold);
+}
+#statusbar::before{
+  content:"";position:absolute;left:0;right:0;top:-2px;height:1px;
+  background:var(--ironbow);opacity:.35;
+}
+#statusbar .sb-val{font-family:var(--mono);font-size:10px;font-weight:400;
+  letter-spacing:.02em;text-transform:none;color:var(--txt-cool)}
+.sb-sep{width:1px;height:11px;background:var(--edge-bright)}
+.sb-right{margin-left:auto;display:flex;align-items:center;gap:11px}
+.sb-btn{
+  font-family:var(--disp);font-weight:700;font-size:8.5px;letter-spacing:.2em;
+  color:var(--txt-cool);background:#10131c;border:1px solid var(--edge-bright);
+  border-radius:2px;padding:3px 9px;cursor:pointer;text-transform:uppercase;
+}
+.sb-btn:hover{color:var(--txt-warm);border-color:var(--tick)}
+.sb-version{font-family:var(--mono);font-size:9.5px;letter-spacing:.02em;
+  font-weight:400;text-transform:none;color:var(--txt-cool)}
+
+/* ---------------- corner variation tag ---------------- */
+#corner-tag{
+  position:fixed;right:12px;bottom:36px;z-index:60;pointer-events:none;
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.2em;
+  color:var(--txt-cool);background:rgba(7,8,11,.9);
+  border:1px solid var(--edge-bright);border-radius:2px;padding:4px 10px;
+}
+#corner-tag b{color:var(--hot-hi);text-shadow:0 0 7px rgba(253,216,53,.5)}
+
+/* ---------------- capture modal ---------------- */
+.overlay{
+  position:fixed;inset:0;z-index:100;display:grid;place-items:center;
+  background:rgba(3,3,4,.78);
+  backdrop-filter:blur(2px);
+}
+.overlay.hidden{display:none}
+.modal{
+  width:900px;max-width:calc(100vw - 80px);max-height:calc(100vh - 70px);
+  display:flex;flex-direction:column;position:relative;
+  background:linear-gradient(180deg,var(--panel-2),var(--chassis-2));
+  border:1px solid var(--edge-bright);
+  box-shadow:0 0 0 1px #000, 0 0 60px rgba(176,29,124,.22), 0 24px 60px rgba(0,0,0,.8);
+}
+.modal::before{ /* ironbow calibration strip along the top */
+  content:"";position:absolute;left:0;right:0;top:0;height:3px;
+  background:var(--ironbow);
+}
+.modal-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:13px 16px 11px;border-bottom:1px solid var(--edge);
+}
+.modal-head .dlabel{font-size:11px;color:var(--txt-warm);letter-spacing:.26em}
+.modal-head .dlabel b{color:var(--hot-hi);text-shadow:0 0 8px rgba(253,216,53,.4)}
+.modal-x{
+  width:24px;height:24px;display:grid;place-items:center;cursor:pointer;
+  background:#10131c;border:1px solid var(--edge-bright);border-radius:2px;
+  font-family:var(--disp);font-weight:800;font-size:11px;color:var(--txt-cool);
+}
+.modal-x:hover{color:var(--hot-hi);border-color:#7a4a20}
+.cap-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:14px;
+  padding:14px 16px;overflow:auto;min-height:0;
+}
+.cap-col{display:flex;flex-direction:column;gap:11px;min-width:0}
+.cap-summary{border:1px solid var(--edge);background:#0b0d13}
+.cap-sumrow{
+  display:flex;gap:10px;align-items:baseline;padding:7px 11px;
+  border-bottom:1px dashed var(--edge-dim);
+}
+.cap-sumrow:last-child{border-bottom:none}
+.cap-sumrow .dlabel{width:78px;flex:none;font-size:8px;letter-spacing:.24em}
+.cap-sumrow .v{font-family:var(--mono);font-size:10.5px;color:var(--txt-warm);letter-spacing:0}
+.field{display:flex;flex-direction:column;gap:6px}
+.field .dlabel{font-size:8px;letter-spacing:.22em}
+textarea, select{
+  font-family:var(--mono);font-size:11px;color:var(--txt-warm);letter-spacing:0;
+  background:var(--void);border:1px solid var(--edge-bright);border-radius:2px;
+  box-shadow:inset 0 1px 5px rgba(0,0,0,.8);
+  padding:8px 10px;resize:none;outline:none;width:100%;
+}
+textarea:focus,select:focus{border-color:#7a4a20;box-shadow:inset 0 1px 5px rgba(0,0,0,.8), 0 0 8px rgba(228,68,47,.25)}
+textarea::placeholder{color:#4d5670}
+select{appearance:none;-webkit-appearance:none;cursor:pointer;
+  background-image:linear-gradient(45deg, transparent 50%, var(--txt-cool) 50%),linear-gradient(135deg, var(--txt-cool) 50%, transparent 50%);
+  background-position:calc(100% - 16px) 55%, calc(100% - 11px) 55%;
+  background-size:5px 5px;background-repeat:no-repeat;}
+.cap-shot{
+  height:92px;display:grid;place-items:center;position:relative;
+  background:var(--void);border:1px solid var(--edge);
+  font-family:var(--mono);font-size:10px;color:var(--txt-cold);letter-spacing:.05em;
+  box-shadow:inset 0 0 20px rgba(43,10,104,.3);overflow:hidden;
+}
+.cap-shot .reticle{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:26px;height:26px;opacity:.4}
+.cap-shot span{position:relative;background:rgba(3,3,4,.7);padding:2px 8px}
+.yaml-well{
+  flex:1;min-height:238px;position:relative;overflow:auto;
+  background:var(--void);border:1px solid var(--edge);
+  box-shadow:inset 0 0 24px rgba(43,10,104,.28);
+}
+.yaml-well pre{
+  padding:13px 15px;font-family:var(--mono);font-size:11px;line-height:1.75;
+  color:#b9bfd4;letter-spacing:0;
+}
+.yaml-well .yk{color:var(--ir5)}
+.yaml-well .yh{color:var(--hot-hi)}
+.modal-foot{
+  display:flex;align-items:center;gap:9px;justify-content:flex-end;
+  padding:12px 16px;border-top:1px solid var(--edge);
+}
+
+/* motion guard */
+@media (prefers-reduced-motion: reduce){
+  .pip-throb,.block-cursor,#btn-update-ready,.scanline,.legend-live{animation:none !important}
+}
+</style>
+</head>
+<body>
+
+<!-- ══ titlebar ══ -->
+<header id="titlebar">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 64 64" width="18" height="18">
+        <path d="M22 18 L44 32 L22 46" fill="none" stroke="#39415a" stroke-width="3" stroke-linecap="square" stroke-dasharray="3 3"/>
+        <circle cx="22" cy="18" r="7" fill="#fb8b24"/>
+        <circle cx="22" cy="18" r="7" fill="none" stroke="#fdd835" stroke-width="1.5" opacity=".8"/>
+        <circle cx="44" cy="32" r="7" fill="#6b0f8f"/>
+        <circle cx="44" cy="32" r="7" fill="none" stroke="#a06bff" stroke-width="1.5" opacity=".7"/>
+        <circle cx="22" cy="46" r="7" fill="#1c6e4c"/>
+        <circle cx="22" cy="46" r="7" fill="none" stroke="#57e0a2" stroke-width="1.5" opacity=".7"/>
+      </svg>
+    </span>
+    <span class="brand-name">CHROMUX</span>
+    <span class="brand-sub">AGENT&nbsp;COCKPIT</span>
+  </div>
+  <span class="temp t-hot" title="Frame maximum temperature">
+    MAX <span class="tval">71.8°C</span>
+    <span class="tbar"><i style="transform:scaleX(.72)"></i></span>
+  </span>
+  <div class="titlebar-gauges">
+    <span class="gauge"><i class="pip pip-hot"></i><b>3</b>&nbsp;SESSIONS</span>
+    <span class="gauge"><i class="pip pip-warm pip-throb"></i><b>2</b>&nbsp;QUEUED</span>
+    <span class="gauge"><i class="pip pip-cool"></i><b>14</b>&nbsp;SENT</span>
+    <button id="btn-update-ready" title="Update ready — install">UPDATE READY</button>
+    <button class="gkey" style="padding:5px 11px 6px">SETTINGS</button>
+  </div>
+</header>
+
+<!-- ══ main frame ══ -->
+<div id="app">
+
+  <!-- left rail -->
+  <aside id="rail" class="dpanel">
+    <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+    <div class="rail-head">
+      <div class="rail-head-row">
+        <span class="dlabel"><b>Attention</b> Queue</span>
+        <span class="temp t-warm"><span class="tval">Δ48.1°</span></span>
+      </div>
+      <button id="btn-detect" class="gkey"><span class="reticle" aria-hidden="true"></span>&nbsp;Detect</button>
+    </div>
+    <div id="attention-list">
+
+      <div class="qcard q-hot">
+        <div class="qgutter"><i></i></div>
+        <div class="qbody">
+          <div class="qtop">
+            <span class="qkind">APPROVAL</span>
+            <span class="qsess">checkout-flow</span>
+          </div>
+          <div class="qmsg">claude wants to run <code>npm run db:migrate</code></div>
+          <div class="qfoot">
+            <span class="qspot">SP1 · REGION A</span>
+            <span class="temp t-hot"><span class="tval">72.4°C</span></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="qcard q-warm">
+        <div class="qgutter"><i></i></div>
+        <div class="qbody">
+          <div class="qtop">
+            <span class="qkind">PREVIEW</span>
+            <span class="qsess">landing-page</span>
+          </div>
+          <div class="qmsg">localhost:5173 changed — review ready</div>
+          <div class="qfoot">
+            <span class="qspot">SP2 · REGION B</span>
+            <span class="temp t-warm"><span class="tval">46.3°C</span></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="qcard q-cold">
+        <div class="qgutter"><i></i></div>
+        <div class="qbody">
+          <div class="qtop">
+            <span class="qkind">EXITED</span>
+            <span class="qsess">api-server</span>
+          </div>
+          <div class="qmsg">codex exited (code 0) · 12m ago</div>
+          <div class="qfoot">
+            <span class="qspot">SP3 · REGION C</span>
+            <span class="temp t-cold"><span class="tval">21.3°C</span></span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <div class="rail-foot">
+      <span class="dlabel" style="font-size:8px;letter-spacing:.26em">LOCAL STORAGE</span>
+      <button class="pathlink" title="Reveal in Finder">~/.chromux/captures</button>
+    </div>
+  </aside>
+
+  <!-- workspace -->
+  <div id="workspace">
+    <nav id="session-tabs" aria-label="Session tabs">
+      <button class="session-tab active">
+        <i class="pip pip-hot pip-throb"></i>
+        checkout-flow&nbsp;<span class="tab-agent">· claude</span>
+        <span class="tab-badge">2</span>
+        <span class="tab-temp">68.2°</span>
+      </button>
+      <button class="session-tab">
+        <i class="pip pip-cool"></i>
+        landing-page&nbsp;<span class="tab-agent">· grok</span>
+        <span class="tab-temp">33.5°</span>
+      </button>
+      <button class="session-tab dead">
+        <i class="pip pip-cold"></i>
+        api-server&nbsp;<span class="tab-agent">· codex</span>
+        <span class="tab-temp">AMB 21.3°</span>
+      </button>
+      <button class="session-tab add-tab" title="New session">+</button>
+    </nav>
+
+    <main id="stage" class="dpanel">
+      <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+
+      <!-- terminal pane -->
+      <section class="pane pane-terminal" style="margin:10px 0 10px 10px">
+        <div class="pane-head">
+          <span class="dlabel"><b>Terminal</b> — claude</span>
+          <span class="temp t-hot"><span class="tval">CORE 71.8°C ▲</span></span>
+          <span class="pane-cwd">~/projects/shop/checkout-flow</span>
+        </div>
+        <div class="term-body">
+          <div class="term-heatrail" aria-hidden="true"><i></i></div>
+          <div class="spotmeter" aria-hidden="true"><span class="reticle"></span>SP0 71.8°C</div>
+          <div class="term-scroll">
+<div><span style="color:var(--ir5)">&#10035;</span> <span class="t-dim">Welcome to Claude Code!</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="t-dim">/projects/shop/checkout-flow</span></div>
+<div>&nbsp;</div>
+<div class="t-user"><span class="t-caret">&gt;</span> fix the CTA overflow on the checkout page</div>
+<div>&nbsp;</div>
+<div class="t-bullet"><span class="t-dot">&#9679;</span> I'll look at the checkout component styles.</div>
+<div class="t-bullet"><span class="t-dot">&#9679;</span> Read <span class="t-file">src/components/CheckoutCTA.tsx</span> <span class="t-dim">(84 lines)</span></div>
+<div class="t-bullet t-heat-hi"><span class="t-dot" style="color:var(--ir5)">&#9679;</span> Edit <span class="t-file">src/styles/checkout.css</span></div>
+<div class="t-del">&nbsp;&nbsp;- .cta-row { width: 120%; }</div>
+<div class="t-add">&nbsp;&nbsp;+ .cta-row { width: 100%; max-width: 480px; }</div>
+<div>&nbsp;</div>
+<div class="t-ok">&#10004; Change applied — dev server reloaded</div>
+<div class="t-bullet"><span class="t-dot">&#9679;</span> The button no longer overflows. Preview updated on the right.</div>
+<div>&nbsp;</div>
+<div class="t-await"><span class="block-cursor"></span>awaiting your next instruction&hellip;</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- calibrated divider -->
+      <div id="divider" title="Drag to resize"></div>
+
+      <!-- browser pane -->
+      <section class="pane pane-browser" style="margin:10px 0 10px">
+        <div class="btoolbar">
+          <button class="gkey nav-key" title="Back">&#9664;</button>
+          <button class="gkey nav-key" title="Forward">&#9654;</button>
+          <button class="gkey nav-key" title="Reload">&#10227;</button>
+          <div class="urlbar"><i class="pip pip-hot"></i>http://localhost:5173/checkout</div>
+          <button id="btn-capture" class="hotkey">&#8982; Capture</button>
+          <button class="gkey">Queue<span class="kbadge">2</span></button>
+          <span class="chip">console: 0</span>
+          <button class="gkey">&#8964; Collapse</button>
+        </div>
+        <div class="viewport">
+          <div class="webpage">
+            <div class="wp-head">
+              <div class="wp-logo">shop<span>/checkout</span></div>
+              <div class="wp-steps">cart &rsaquo; <b>payment</b> &rsaquo; done</div>
+            </div>
+            <div class="wp-body">
+              <div class="wp-card">
+                <h3>Order summary</h3>
+                <div class="wp-row"><span>Canvas Tote &times; 1</span><span>$28.00</span></div>
+                <div class="wp-row"><span>Enamel Mug &times; 1</span><span>$12.00</span></div>
+                <div class="wp-row"><span class="muted">Shipping</span><span class="muted">$8.00</span></div>
+                <div class="wp-row total"><span>Total</span><span>$48.00</span></div>
+                <button class="wp-cta">Pay $48.00</button>
+                <div class="wp-fine">Secured by shop-pay &middot; refunds within 30 days</div>
+              </div>
+            </div>
+          </div>
+          <!-- IR spot-meter locked on the CTA region -->
+          <div class="spot-overlay" aria-hidden="true">
+            <div class="spot-box">
+              <i class="spot-corner tl"></i><i class="spot-corner tr"></i>
+              <i class="spot-corner bl"></i><i class="spot-corner br"></i>
+              <i class="spot-cross"></i>
+            </div>
+            <div class="spot-tag">SP1 36.2°C<small>CTA REGION 412&times;88</small></div>
+          </div>
+          <div class="scanline" aria-hidden="true"></div>
+          <div class="refreshed-chip">&#8635; REFRESHED</div>
+        </div>
+      </section>
+
+      <!-- ironbow color-scale legend -->
+      <aside id="legend" aria-label="Temperature scale">
+        <span class="dlabel">IRONBOW</span>
+        <div class="legend-scale">
+          <div class="legend-bar">
+            <i class="legend-alarm"></i>
+            <i class="legend-live" title="frame max 71.8°C"></i>
+          </div>
+          <div class="legend-ticks">
+            <span>95°</span><span>80°</span><span>65°</span>
+            <span>50°</span><span>35°</span><span>20°</span>
+          </div>
+        </div>
+        <div class="legend-foot">ALM <b>85°</b><br>ε 0.95<br>AMB 21°</div>
+      </aside>
+
+    </main>
+  </div>
+</div>
+
+<!-- ══ status bar ══ -->
+<footer id="statusbar">
+  <span>ADAPTER</span><span class="sb-val">claude -p &middot; one-off</span>
+  <span class="sb-sep"></span>
+  <span>PAIRING</span><span class="sb-val">1:1 session &harr; pane</span>
+  <span class="sb-sep"></span>
+  <span class="temp t-cool" style="font-size:9px"><span class="tval">SENSOR OK</span></span>
+  <div class="sb-right">
+    <button class="sb-btn">DELIVERY LOG</button>
+    <span class="sb-version">chromux 0.17.0 &mdash; thermal industrial concept</span>
+  </div>
+</footer>
+
+<div id="corner-tag">CONCEPT 34 &mdash; <b>THERMAL INDUSTRIAL</b></div>
+
+<!-- ══ capture modal ══ -->
+<div id="modal-capture" class="overlay hidden" role="dialog" aria-modal="true" aria-label="Capture to agent">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="dlabel">&#8982; Thermal Capture <b>&rarr; Agent</b></span>
+      <button class="modal-x" data-close title="Close">&#10005;</button>
+    </div>
+    <div class="cap-grid">
+      <div class="cap-col">
+        <div class="cap-summary">
+          <div class="cap-sumrow"><span class="dlabel">SESSION</span><span class="v">checkout-flow &middot; claude</span></div>
+          <div class="cap-sumrow"><span class="dlabel">URL</span><span class="v">localhost:5173/checkout</span></div>
+          <div class="cap-sumrow"><span class="dlabel">SELECTION</span><span class="v">&ldquo;CTA button region 412&times;88&rdquo;</span></div>
+        </div>
+        <label class="field">
+          <span class="dlabel">NOTE TO AGENT — WHAT'S WRONG / WHAT TO DO</span>
+          <textarea rows="3" spellcheck="false" placeholder="e.g. the CTA button overflows its container — fix the CSS"></textarea>
+        </label>
+        <label class="field">
+          <span class="dlabel">TARGET</span>
+          <select><option>checkout-flow &middot; claude -p</option></select>
+        </label>
+        <div class="field">
+          <span class="dlabel">SCREENSHOT</span>
+          <div class="cap-shot">
+            <i class="reticle" aria-hidden="true"></i>
+            <span>no screenshot &mdash; capture region to attach</span>
+          </div>
+        </div>
+      </div>
+      <div class="cap-col">
+        <span class="dlabel" style="font-size:8px;letter-spacing:.22em">PAYLOAD PREVIEW — YAML v1</span>
+        <div class="yaml-well"><pre><span class="yk">chromux_capture:</span> <span class="yh">v1</span>
+<span class="yk">session:</span> checkout-flow
+<span class="yk">agent:</span> claude
+<span class="yk">url:</span> http://localhost:5173/checkout
+<span class="yk">note:</span> CTA overflows container
+<span class="yk">screenshot:</span> ~/.chromux/captures/2026-07-11-0142.png
+<span class="yk">console_errors:</span> []</pre></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="gkey" data-close>Cancel</button>
+      <button class="gkey">File-Drop Only</button>
+      <button class="hotkey">Send &mdash; claude -p</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var modal = document.getElementById('modal-capture');
+  document.getElementById('btn-capture').addEventListener('click', function(){
+    modal.classList.remove('hidden');
+  });
+  modal.querySelectorAll('[data-close]').forEach(function(b){
+    b.addEventListener('click', function(){ modal.classList.add('hidden'); });
+  });
+  modal.addEventListener('click', function(e){
+    if (e.target === modal) modal.classList.add('hidden');
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') modal.classList.add('hidden');
+  });
+})();
+</script>
+</body>
+</html>

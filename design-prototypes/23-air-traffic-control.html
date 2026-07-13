@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Chromux — Air-Traffic Control</title>
+<style>
+/* ────────────────────────────────────────────────────────────────────
+   CHROMUX / VARIATION 23 — "AIR-TRAFFIC CONTROL"
+   Modern radar console. NAV CANADA / Eurocontrol lineage — crisp,
+   desaturated green-on-charcoal, procedural discipline. Flight-progress
+   strips in the attention bay, range rings + a slow sweep on the stage,
+   data blocks with leader lines, contacts identified by squawk code.
+   No CRT, no glow, no scanlines. Everything is 1px-honest.
+   B612 was commissioned by Airbus for cockpit displays — the exact
+   right voice. Falls back to Helvetica Neue / Menlo cleanly.
+   ──────────────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=B612:ital,wght@0,400;0,700;1,400&family=B612+Mono:wght@400;700&display=swap');
+
+:root {
+  /* console surfaces */
+  --ink:        #0a0d0e;   /* deepest well — scope + terminal */
+  --bg:         #101415;   /* app background */
+  --panel:      #151b1c;   /* raised panel */
+  --panel-2:    #1a2223;   /* strip / toolbar surface */
+  --line:       #26332e;   /* primary hairline */
+  --line-soft:  #1c2723;   /* recessed hairline */
+  --line-hi:    #39493f;   /* focus hairline */
+  /* desaturated phosphor-adjacent greens — flat, no bloom */
+  --grn-hi:     #d3e7da;   /* max luminance readout */
+  --grn:        #93bfa2;   /* primary data green */
+  --grn-dim:    #5f8770;   /* secondary data */
+  --grn-faint:  #3d5a4b;   /* ticks, ghosts */
+  --grn-wash:   #22352b;   /* fills */
+  /* controlled secondary channels */
+  --amber:      #d8a949;   /* attention / handoff pending */
+  --amber-dim:  #8f6f2f;
+  --amber-wash: #2c2414;
+  --cyan:       #7fb4bd;   /* datalink / info */
+  --cyan-dim:   #4c6f76;
+  --red:        #bd6a5a;   /* lost contact */
+  --red-dim:    #7c463c;
+  /* type */
+  --sans: "B612", "Helvetica Neue", Helvetica, Optima, sans-serif;
+  --mono: "B612 Mono", "SF Mono", Menlo, Monaco, monospace;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { height:100%; }
+body {
+  min-width:1280px;
+  height:100vh;
+  overflow:hidden;
+  background:var(--bg);
+  color:var(--grn);
+  font-family:var(--sans);
+  font-size:12px;
+  line-height:1.45;
+  display:flex;
+  flex-direction:column;
+  -webkit-font-smoothing:antialiased;
+}
+button { font:inherit; color:inherit; background:none; border:none; cursor:pointer; }
+::selection { background:var(--grn-wash); color:var(--grn-hi); }
+
+/* microtype used everywhere on the console */
+.mlabel {
+  font-family:var(--mono);
+  font-size:9px; font-weight:700;
+  letter-spacing:2.2px;
+  color:var(--grn-dim);
+  text-transform:uppercase;
+}
+.mono { font-family:var(--mono); }
+
+/* generic flat console button — 1px border, no radius, no glow */
+.kbtn {
+  font-family:var(--mono); font-size:9.5px; font-weight:700;
+  letter-spacing:1.6px; text-transform:uppercase;
+  color:var(--grn); background:var(--panel);
+  border:1px solid var(--line);
+  padding:5px 10px 4px;
+  white-space:nowrap;
+  transition:border-color .12s, color .12s, background .12s;
+}
+.kbtn:hover { border-color:var(--line-hi); color:var(--grn-hi); }
+.kbtn:active { background:var(--grn-wash); }
+.kbtn.primary {
+  color:var(--ink); background:var(--grn);
+  border-color:var(--grn);
+}
+.kbtn.primary:hover { background:var(--grn-hi); border-color:var(--grn-hi); color:var(--ink); }
+.kbtn.alert {
+  color:var(--amber); border-color:var(--amber-dim);
+  background:var(--amber-wash);
+}
+.kbtn.alert:hover { color:#eec573; border-color:var(--amber); }
+.kbtn.ghost { background:transparent; }
+
+/* ── TITLEBAR — console header rail ─────────────────────────────── */
+#titlebar {
+  height:44px; flex:none;
+  display:flex; align-items:center;
+  padding:0 14px 0 84px;               /* traffic-light gutter */
+  gap:20px;
+  background:linear-gradient(to bottom, #171e1f, #121718);
+  border-bottom:1px solid var(--line);
+  position:relative; z-index:30;
+  -webkit-app-region:drag;
+}
+#titlebar button { -webkit-app-region:no-drag; }
+/* precision tick ruler etched along the titlebar base */
+#titlebar::after {
+  content:""; position:absolute; left:84px; right:14px; bottom:0; height:5px;
+  background:repeating-linear-gradient(to right,
+    var(--grn-faint) 0 1px, transparent 1px 24px);
+  opacity:.5; pointer-events:none;
+}
+.brand { display:flex; align-items:center; gap:10px; }
+.brand-mark { display:grid; place-items:center; }
+.brand-name {
+  font-family:var(--mono); font-weight:700;
+  font-size:15px; letter-spacing:4px;
+  color:var(--grn-hi);
+}
+.brand-sub {
+  font-family:var(--mono); font-size:8.5px; font-weight:700;
+  letter-spacing:2.4px; color:var(--grn-dim);
+  border:1px solid var(--line);
+  padding:2px 6px 1px;
+  background:var(--ink);
+}
+
+/* gauges as a segmented data readout block */
+.tb-readout {
+  margin-left:auto;
+  display:flex; align-items:stretch;
+  border:1px solid var(--line);
+  background:var(--ink);
+  height:26px;
+}
+.ro-cell {
+  display:flex; align-items:center; gap:7px;
+  padding:0 12px;
+  font-family:var(--mono); font-size:9.5px; font-weight:700;
+  letter-spacing:1.6px; color:var(--grn-dim);
+}
+.ro-cell + .ro-cell { border-left:1px solid var(--line-soft); }
+.ro-cell b { font-size:12px; color:var(--grn-hi); font-weight:700; letter-spacing:0; }
+.ro-cell.warn b { color:var(--amber); }
+.ro-cell.info b { color:var(--cyan); }
+.trk {
+  width:7px; height:7px; flex:none;
+  background:var(--grn); position:relative;
+  transform:rotate(45deg);              /* radar contact: rotated square */
+}
+.trk.live { animation:trk-blip 2.6s ease-in-out infinite; }
+.trk.warn { background:var(--amber); }
+.trk.info { background:transparent; border:1px solid var(--cyan); }
+@keyframes trk-blip { 0%,100% { opacity:1; } 50% { opacity:.35; } }
+.tb-actions { display:flex; align-items:center; gap:8px; }
+.kbtn.alert .up-carat { display:inline-block; animation:trk-blip 1.8s ease-in-out infinite; }
+
+/* ── APP FRAME ───────────────────────────────────────────────────── */
+#app { flex:1; display:flex; min-height:0; position:relative; z-index:10; }
+
+/* ── LEFT RAIL — the strip bay ───────────────────────────────────── */
+#rail {
+  width:236px; flex:none;
+  display:flex; flex-direction:column;
+  background:var(--panel);
+  border-right:1px solid var(--line);
+}
+.rail-head {
+  flex:none; height:34px;
+  padding:0 10px;
+  display:flex; align-items:center; justify-content:space-between;
+  border-bottom:1px solid var(--line);
+  background:var(--panel-2);
+}
+.rail-head .mlabel { color:var(--grn); }
+#attention-list {
+  flex:1; overflow:hidden;
+  padding:10px 9px;
+  display:flex; flex-direction:column; gap:9px;
+}
+
+/* FLIGHT PROGRESS STRIP — the core motif.
+   Colored holder bay | callsign block | annotation field, hairline cells. */
+.strip {
+  display:grid;
+  grid-template-columns:5px 62px 1fr;
+  border:1px solid var(--line);
+  background:var(--panel-2);
+  min-height:64px;
+  cursor:pointer;
+  position:relative;
+  transition:border-color .12s, transform .12s;
+}
+.strip:hover { border-color:var(--line-hi); transform:translateX(2px); }
+/* strip holder edge */
+.strip-bay { background:var(--grn-dim); }
+.strip.urgent .strip-bay { background:var(--amber); }
+.strip.info   .strip-bay { background:var(--cyan-dim); }
+.strip.lost   .strip-bay { background:var(--red-dim); }
+/* callsign / squawk cell */
+.strip-id {
+  border-right:1px solid var(--line-soft);
+  padding:6px 6px 5px 7px;
+  display:flex; flex-direction:column; justify-content:space-between;
+  background:var(--ink);
+}
+.strip-callsign {
+  font-family:var(--mono); font-size:11px; font-weight:700;
+  letter-spacing:.5px; color:var(--grn-hi);
+}
+.strip.urgent .strip-callsign { color:var(--amber); }
+.strip.lost .strip-callsign { color:var(--red); }
+.strip-sqk {
+  font-family:var(--mono); font-size:8px; font-weight:700;
+  letter-spacing:1px; color:var(--grn-faint);
+}
+.strip-sqk b { color:var(--grn-dim); font-weight:700; }
+.strip.urgent .strip-sqk b { color:var(--amber-dim); }
+.strip.lost .strip-sqk b { color:var(--red-dim); }
+/* annotation field */
+.strip-data {
+  padding:5px 8px 5px 8px;
+  display:flex; flex-direction:column; gap:2px;
+  min-width:0;
+}
+.strip-kind-row {
+  display:flex; align-items:baseline; justify-content:space-between; gap:6px;
+}
+.strip-kind {
+  font-family:var(--mono); font-size:8.5px; font-weight:700;
+  letter-spacing:2px; color:var(--grn-dim);
+}
+.strip.urgent .strip-kind { color:var(--amber); }
+.strip.info   .strip-kind { color:var(--cyan); }
+.strip.lost   .strip-kind { color:var(--red-dim); }
+.strip-time {
+  font-family:var(--mono); font-size:8px;
+  letter-spacing:.5px; color:var(--grn-faint);
+}
+.strip-session {
+  font-size:11.5px; font-weight:700; color:var(--grn-hi);
+  letter-spacing:.2px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.strip.lost .strip-session { color:var(--grn-dim); }
+.strip-copy {
+  font-size:10px; line-height:1.4; color:var(--grn-dim);
+  overflow:hidden;
+}
+.strip-copy code {
+  font-family:var(--mono); font-size:9.5px; color:var(--grn);
+  background:var(--grn-wash); padding:0 3px;
+}
+.strip.lost .strip-copy { color:var(--grn-faint); }
+/* urgent strip carries a pending-handoff pulse on its border */
+.strip.urgent { border-color:var(--amber-dim); animation:strip-hold 3.2s ease-in-out infinite; }
+@keyframes strip-hold {
+  0%,100% { border-color:var(--amber-dim); }
+  50%     { border-color:#5c4a22; }
+}
+
+/* mini situation display between strips and footer */
+.rail-scope {
+  flex:none;
+  border-top:1px solid var(--line);
+  padding:10px 10px 9px;
+  display:flex; gap:10px; align-items:center;
+  background:var(--panel);
+}
+.scope {
+  width:66px; height:66px; flex:none;
+  border-radius:50%;
+  border:1px solid var(--line);
+  background:
+    radial-gradient(circle, transparent 0 21%, var(--line-soft) 21% calc(21% + 1px), transparent calc(21% + 1px) 43%, var(--line-soft) 43% calc(43% + 1px), transparent calc(43% + 1px) 65%, var(--line-soft) 65% calc(65% + 1px), transparent calc(65% + 1px)),
+    linear-gradient(to right, transparent calc(50% - .5px), var(--line-soft) calc(50% - .5px) calc(50% + .5px), transparent calc(50% + .5px)),
+    linear-gradient(to bottom, transparent calc(50% - .5px), var(--line-soft) calc(50% - .5px) calc(50% + .5px), transparent calc(50% + .5px)),
+    var(--ink);
+  position:relative; overflow:hidden;
+}
+.scope-sweep {
+  position:absolute; inset:0; border-radius:50%;
+  background:conic-gradient(from 0deg,
+    rgba(147,191,162,.28) 0deg, rgba(147,191,162,.05) 46deg, transparent 70deg 360deg);
+  animation:scope-rotate 6s linear infinite;
+}
+@keyframes scope-rotate { to { transform:rotate(360deg); } }
+.scope-blip { position:absolute; width:4px; height:4px; background:var(--grn); transform:rotate(45deg); }
+.scope-blip.b1 { top:17px; left:38px; }
+.scope-blip.b2 { top:41px; left:22px; opacity:.75; }
+.scope-blip.b3 { top:28px; left:49px; background:var(--red-dim); opacity:.8; }
+.scope-meta { min-width:0; display:flex; flex-direction:column; gap:3px; }
+.scope-meta .row {
+  display:flex; justify-content:space-between; gap:8px;
+  font-family:var(--mono); font-size:8.5px; letter-spacing:1px;
+  color:var(--grn-faint);
+}
+.scope-meta .row b { color:var(--grn-dim); font-weight:700; }
+.scope-meta .row.hot b { color:var(--grn); }
+
+.rail-foot {
+  flex:none;
+  padding:8px 10px 10px;
+  border-top:1px solid var(--line);
+  background:var(--panel-2);
+}
+.pathlink {
+  display:block; margin-top:3px; padding:0;
+  font-family:var(--mono); font-size:10px;
+  color:var(--grn); text-align:left;
+  text-decoration:underline; text-underline-offset:3px;
+  text-decoration-color:var(--grn-faint);
+}
+.pathlink:hover { color:var(--grn-hi); text-decoration-color:var(--grn-dim); }
+
+/* ── SESSION TAB STRIP — sector channel selectors ────────────────── */
+#workspace { flex:1; display:flex; flex-direction:column; min-width:0; }
+#session-tabs {
+  height:38px; flex:none;
+  display:flex; align-items:stretch; gap:0;
+  padding:0 0 0 10px;
+  background:var(--panel);
+  border-bottom:1px solid var(--line);
+  overflow:hidden;
+}
+.stab {
+  display:flex; align-items:center; gap:8px;
+  padding:0 14px;
+  font-family:var(--mono); font-size:10px; font-weight:700;
+  letter-spacing:1.2px; text-transform:uppercase;
+  color:var(--grn-dim);
+  border-right:1px solid var(--line-soft);
+  position:relative; white-space:nowrap;
+}
+.stab:first-child { border-left:1px solid var(--line-soft); }
+.stab:hover { color:var(--grn); background:var(--panel-2); }
+.stab.active {
+  color:var(--grn-hi);
+  background:var(--bg);
+}
+/* active sector gets the controller's ownership bar */
+.stab.active::after {
+  content:""; position:absolute; left:0; right:0; top:0; height:2px;
+  background:var(--grn);
+}
+.stab .agent { color:var(--grn-faint); font-weight:400; letter-spacing:.5px; text-transform:lowercase; }
+.stab.active .agent { color:var(--grn-dim); }
+.stab .t-trk { width:6px; height:6px; flex:none; transform:rotate(45deg); background:var(--grn); }
+.stab .t-trk.live { animation:trk-blip 2.4s ease-in-out infinite; }
+.stab .t-trk.dead { background:transparent; border:1px solid var(--red-dim); animation:none; }
+.stab .t-badge {
+  font-size:8.5px; padding:1px 5px 0;
+  color:var(--amber); border:1px solid var(--amber-dim);
+  background:var(--amber-wash); letter-spacing:1px;
+}
+.stab.addtab {
+  margin-left:auto; border-left:1px solid var(--line-soft); border-right:none;
+  color:var(--grn-faint); font-size:13px; padding:0 16px;
+}
+.stab.addtab:hover { color:var(--grn); }
+
+/* ── STAGE — the scope. Range rings + slow sweep live back here. ── */
+#stage {
+  flex:1; display:flex; min-height:0;
+  padding:10px;
+  position:relative;
+  background:var(--bg);
+  overflow:hidden;
+}
+/* range rings, centered under the divider seam */
+#stage::before {
+  content:""; position:absolute; inset:-40%; pointer-events:none; z-index:0;
+  background:
+    repeating-radial-gradient(circle at 50% 50%,
+      transparent 0 118px,
+      rgba(147,191,162,.055) 118px 119px),
+    radial-gradient(circle at 50% 50%,
+      rgba(147,191,162,.05) 0 2px, transparent 2px);
+}
+/* the sweep — one slow, disciplined rotation, barely there */
+.stage-sweep {
+  position:absolute; inset:-40%; pointer-events:none; z-index:0;
+  background:conic-gradient(from 0deg at 50% 50%,
+    rgba(147,191,162,.06) 0deg, rgba(147,191,162,.012) 38deg, transparent 60deg 360deg);
+  animation:scope-rotate 24s linear infinite;
+}
+#stage > .pane, #stage > #divider { position:relative; z-index:1; }
+
+.pane { display:flex; flex-direction:column; min-width:0; min-height:0; }
+.pane-term { flex:0 0 46%; }
+.pane-web  { flex:1; }
+
+/* pane chrome: flat panel, corner registration ticks, mono header band */
+.console-pane {
+  display:flex; flex-direction:column; height:100%;
+  border:1px solid var(--line);
+  background:var(--panel);
+  position:relative;
+}
+.console-pane::before, .console-pane::after {
+  content:""; position:absolute; width:9px; height:9px; pointer-events:none; z-index:4;
+}
+.console-pane::before {
+  top:-1px; left:-1px;
+  border-top:1px solid var(--grn-dim); border-left:1px solid var(--grn-dim);
+}
+.console-pane::after {
+  bottom:-1px; right:-1px;
+  border-bottom:1px solid var(--grn-dim); border-right:1px solid var(--grn-dim);
+}
+.pane-head {
+  flex:none; height:30px;
+  display:flex; align-items:center; gap:10px;
+  padding:0 10px;
+  background:var(--panel-2);
+  border-bottom:1px solid var(--line);
+}
+.pane-title {
+  font-family:var(--mono); font-size:9.5px; font-weight:700;
+  letter-spacing:2px; color:var(--grn-hi); text-transform:uppercase;
+}
+.pane-title .agent { color:var(--grn); }
+.pane-cwd {
+  font-family:var(--mono); font-size:9.5px; color:var(--grn-dim);
+  margin-left:auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.pane-tag {
+  font-family:var(--mono); font-size:8px; font-weight:700; letter-spacing:1.5px;
+  color:var(--grn-faint); border:1px solid var(--line-soft);
+  padding:2px 5px 1px; background:var(--ink);
+}
+
+/* terminal transcript — the flight data well */
+.term-body {
+  flex:1; min-height:0; overflow:hidden;
+  background:var(--ink);
+  padding:14px 16px;
+  font-family:var(--mono);
+  font-size:11.5px; line-height:1.72;
+}
+.tl { white-space:pre-wrap; }
+.tl-meta  { color:var(--grn-faint); }
+.tl-user  { color:var(--grn-hi); }
+.tl-agent { color:var(--grn); }
+.tl-tool  { color:var(--grn-dim); }
+.tl-del   { color:var(--red-dim); }
+.tl-add   { color:var(--grn); }
+.tl-ok    { color:var(--grn-hi); }
+.tl-await { color:var(--grn-dim); margin-top:4px; }
+.term-welcome { display:flex; justify-content:space-between; color:var(--grn-dim); }
+.term-welcome .spark { color:var(--grn); }
+.linecursor {
+  display:inline-block; width:7px; height:13px; vertical-align:-2px;
+  border:1px solid var(--grn);
+  animation:cursor-hold 1.2s steps(1) infinite;
+}
+@keyframes cursor-hold { 0%,55% { background:var(--grn); } 56%,100% { background:transparent; } }
+/* altitude-style tick gutter along terminal's left edge */
+.term-frame { flex:1; min-height:0; display:flex; }
+.term-ticks {
+  flex:none; width:14px;
+  background:var(--ink);
+  border-right:1px solid var(--line-soft);
+  background-image:repeating-linear-gradient(to bottom,
+    var(--grn-faint) 0 1px, transparent 1px 18px);
+  background-position:right 3px top 10px;
+  background-size:5px calc(100% - 20px);
+  background-repeat:no-repeat;
+}
+.term-foot {
+  flex:none; height:22px;
+  display:flex; align-items:center; gap:12px;
+  padding:0 10px;
+  border-top:1px solid var(--line);
+  background:var(--panel-2);
+  font-family:var(--mono); font-size:8px; font-weight:700;
+  letter-spacing:1.6px; color:var(--grn-faint);
+}
+.term-foot .live { color:var(--grn-dim); }
+.term-foot .right { margin-left:auto; }
+
+/* divider — hairline seam with grab dots */
+#divider {
+  flex:0 0 10px;
+  display:flex; align-items:center; justify-content:center;
+  cursor:col-resize; user-select:none;
+}
+#divider .grab {
+  width:2px; height:44px;
+  background:repeating-linear-gradient(to bottom,
+    var(--grn-faint) 0 2px, transparent 2px 6px);
+}
+#divider:hover .grab {
+  background:repeating-linear-gradient(to bottom,
+    var(--grn) 0 2px, transparent 2px 6px);
+}
+
+/* browser pane toolbar */
+.web-toolbar {
+  flex:none; height:34px;
+  display:flex; align-items:center; gap:4px;
+  padding:0 8px;
+  background:var(--panel-2);
+  border-bottom:1px solid var(--line);
+  white-space:nowrap; overflow:hidden;
+}
+.web-toolbar > * { flex:none; }
+.web-toolbar .kbtn { letter-spacing:.6px; padding:5px 7px 4px; }
+.web-toolbar .chip { letter-spacing:.6px; padding:3px 6px 2px; }
+.navkey {
+  width:20px; height:22px;
+  display:grid; place-items:center;
+  font-family:var(--mono); font-size:10px;
+  color:var(--grn-dim); border:1px solid var(--line);
+  background:var(--panel);
+}
+.navkey:hover { color:var(--grn-hi); border-color:var(--line-hi); }
+.urlbar {
+  flex:1 1 auto; min-width:120px; height:22px;
+  display:flex; align-items:center; gap:6px;
+  border:1px solid var(--line); background:var(--ink);
+  color:var(--grn-hi);
+  padding:0 8px;
+  font-family:var(--mono); font-size:10px;
+  overflow:hidden;
+}
+.urlbar .proto { color:var(--grn-faint); }
+.chip {
+  font-family:var(--mono); font-size:8.5px; font-weight:700; letter-spacing:1px;
+  color:var(--grn-dim); border:1px solid var(--line);
+  padding:3px 7px 2px; background:var(--ink);
+}
+.qbadge {
+  color:var(--amber); border:1px solid var(--amber-dim);
+  background:var(--amber-wash);
+  font-size:8.5px; padding:0 4px; margin-left:4px;
+}
+
+/* the paired display — light page under surveillance */
+.fb-strip {
+  flex:none; height:20px;
+  display:flex; align-items:center; gap:10px;
+  padding:0 10px;
+  font-family:var(--mono); font-size:8px; font-weight:700; letter-spacing:1.8px;
+  color:var(--grn-faint);
+  background:var(--panel);
+  border-bottom:1px solid var(--line-soft);
+}
+.fb-strip .fb-live { color:var(--grn); animation:trk-blip 2.2s ease-in-out infinite; }
+.fb-strip .fb-url { letter-spacing:.5px; color:var(--grn-dim); }
+.fb-strip .right { margin-left:auto; letter-spacing:1.2px; }
+.fb-wrap {
+  flex:1; min-height:0; position:relative;
+  padding:12px;
+  background:
+    linear-gradient(rgba(147,191,162,.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(147,191,162,.03) 1px, transparent 1px),
+    var(--bg);
+  background-size:28px 28px, 28px 28px, auto;
+}
+.fb-window {
+  position:relative; height:100%; overflow:hidden;
+  background:#f5f6f8;
+  border:1px solid var(--line-hi);
+  box-shadow:0 0 0 4px rgba(10,13,14,.55);
+  font-family:-apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color:#1c2330;
+}
+.refreshed-chip {
+  position:absolute; bottom:18px; left:20px; z-index:6;
+  font-family:var(--mono); font-size:8px; font-weight:700; letter-spacing:2px;
+  color:var(--ink); background:var(--grn);
+  padding:3px 8px 2px;
+  animation:refresh-flash 4s ease-in-out infinite;
+}
+@keyframes refresh-flash { 0%,74%,100% { opacity:1; } 86% { opacity:.2; } }
+
+/* DATA BLOCK + LEADER LINE — tracked contact annotation on the CTA.
+   The page mock is left-anchored with a fixed-width card, so absolute
+   left/top coordinates track the CTA's top-right corner reliably. */
+.datablock {
+  position:absolute; z-index:7;
+  left:296px; top:412px;
+  width:186px;
+  pointer-events:none;
+}
+.db-card {
+  font-family:var(--mono); font-size:8.5px; font-weight:700;
+  letter-spacing:1px; line-height:1.6;
+  color:var(--grn-hi);
+  background:rgba(10,13,14,.92);
+  border:1px solid var(--grn-dim);
+  padding:6px 9px 5px;
+  white-space:nowrap;
+}
+.db-card .k { color:var(--grn-faint); font-weight:400; }
+.db-card .warn { color:var(--amber); }
+.db-leader {
+  position:absolute; left:158px; top:-40px;
+  width:32px; height:42px;
+  overflow:visible;
+}
+.db-anchor {
+  position:absolute; left:160px; top:-46px;
+  width:8px; height:8px;
+  border:1px solid var(--grn);
+  transform:rotate(45deg);
+  background:transparent;
+}
+
+/* light checkout mock — deliberately soft against the console */
+.shop { padding:30px 34px; height:100%; overflow:hidden; }
+.shop-top { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:20px; }
+.shop-logo { font-weight:700; font-size:15px; letter-spacing:-.2px; color:#111827; }
+.shop-step { font-size:11px; color:#8a93a3; }
+.shop-h1 { font-size:19px; font-weight:700; color:#111827; margin-bottom:14px; }
+.order-card {
+  background:#fff; border:1px solid #e3e6ec; border-radius:10px;
+  box-shadow:0 1px 3px rgba(16,24,40,.06), 0 8px 22px rgba(16,24,40,.05);
+  padding:16px 18px; max-width:430px;
+}
+.order-row { display:flex; justify-content:space-between; font-size:12.5px; color:#3c4657; padding:7px 0; border-bottom:1px solid #eef0f4; }
+.order-row .oq { color:#98a1b1; }
+.order-row.total { border-bottom:none; font-weight:700; color:#111827; font-size:13.5px; padding-top:11px; }
+.cta-btn {
+  display:block; width:100%; max-width:430px; margin-top:14px;
+  background:#1f6feb; color:#fff; border:none; border-radius:8px;
+  font-size:14px; font-weight:600; padding:12px 0; cursor:pointer;
+  box-shadow:0 2px 6px rgba(31,111,235,.35), 0 0 0 3px rgba(31,111,235,.12);
+}
+.cta-btn:hover { background:#1a5fd0; }
+.shop-secure { margin-top:10px; font-size:10.5px; color:#98a1b1; display:flex; gap:6px; align-items:center; }
+
+/* ── STATUS BAR — sector data line ───────────────────────────────── */
+#statusbar {
+  height:26px; flex:none;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 12px;
+  background:var(--panel-2);
+  border-top:1px solid var(--line);
+  font-family:var(--mono); font-size:9px; font-weight:700;
+  letter-spacing:1.2px;
+  color:var(--grn-dim);
+  position:relative; z-index:30;
+}
+#statusbar::before {
+  /* thin ownership bar mirrors the active tab */
+  content:""; position:absolute; left:0; top:-1px; width:96px; height:1px;
+  background:var(--grn);
+}
+#statusbar .sb-left, #statusbar .sb-right { display:flex; align-items:center; gap:9px; white-space:nowrap; }
+.sb-key { color:var(--grn-faint); letter-spacing:2px; }
+.sb-val { color:var(--grn); text-transform:none; letter-spacing:.4px; font-weight:400; }
+.sb-sep { color:var(--line-hi); }
+.sb-clock { color:var(--grn-hi); letter-spacing:1.5px; }
+.sb-btn {
+  font-family:var(--mono); font-size:8.5px; font-weight:700; letter-spacing:1.6px;
+  color:var(--grn); border:1px solid var(--line);
+  padding:2px 8px 1px; background:var(--panel);
+}
+.sb-btn:hover { color:var(--grn-hi); border-color:var(--line-hi); }
+.sb-ver { color:var(--grn-dim); text-transform:none; letter-spacing:.4px; font-weight:400; }
+
+/* ── CAPTURE MODAL — handoff / coordination panel ────────────────── */
+.overlay {
+  position:fixed; inset:0; z-index:800;
+  background:rgba(8,11,12,.82);
+  display:flex; align-items:center; justify-content:center;
+}
+.overlay.hidden { display:none; }
+.modal {
+  width:900px; max-width:92vw; max-height:86vh;
+  background:var(--panel);
+  border:1px solid var(--line-hi);
+  display:flex; flex-direction:column; position:relative;
+  box-shadow:0 24px 70px rgba(0,0,0,.55);
+}
+/* registration ticks on the modal too */
+.modal .reg { position:absolute; width:11px; height:11px; pointer-events:none; z-index:2; }
+.modal .reg.tl { top:-1px; left:-1px; border-top:1px solid var(--grn); border-left:1px solid var(--grn); }
+.modal .reg.tr { top:-1px; right:-1px; border-top:1px solid var(--grn); border-right:1px solid var(--grn); }
+.modal .reg.bl { bottom:-1px; left:-1px; border-bottom:1px solid var(--grn); border-left:1px solid var(--grn); }
+.modal .reg.br { bottom:-1px; right:-1px; border-bottom:1px solid var(--grn); border-right:1px solid var(--grn); }
+.modal-head {
+  flex:none; height:38px;
+  display:flex; align-items:center; gap:12px;
+  padding:0 12px;
+  border-bottom:1px solid var(--line);
+  background:var(--panel-2);
+}
+.modal-title {
+  font-family:var(--mono); font-size:10px; font-weight:700;
+  letter-spacing:2.6px; color:var(--grn-hi); text-transform:uppercase;
+}
+.modal-sqk {
+  font-family:var(--mono); font-size:8px; font-weight:700; letter-spacing:1.5px;
+  color:var(--amber); border:1px solid var(--amber-dim);
+  background:var(--amber-wash); padding:2px 7px 1px;
+}
+.modal-x {
+  margin-left:auto;
+  width:22px; height:22px; display:grid; place-items:center;
+  font-family:var(--mono); font-size:11px;
+  color:var(--grn-dim); border:1px solid var(--line);
+}
+.modal-x:hover { color:var(--red); border-color:var(--red-dim); }
+.cap-grid { flex:1; min-height:0; display:grid; grid-template-columns:1fr 1fr; overflow:hidden; }
+.cap-col { padding:14px 16px; display:flex; flex-direction:column; gap:12px; min-width:0; overflow:hidden; }
+.cap-col + .cap-col { border-left:1px solid var(--line); background:var(--panel); }
+.cap-row { display:flex; gap:10px; align-items:baseline; }
+.cap-row .mlabel { flex:0 0 78px; }
+.cap-val { font-family:var(--mono); font-size:11px; color:var(--grn-hi); }
+.field textarea, .field select {
+  width:100%; margin-top:5px;
+  background:var(--ink); color:var(--grn-hi);
+  border:1px solid var(--line); padding:8px 9px;
+  font-family:var(--mono); font-size:11px;
+  resize:none; outline:none;
+}
+.field textarea:focus, .field select:focus { border-color:var(--grn-dim); }
+.field textarea::placeholder { color:var(--grn-faint); }
+.field select { appearance:none; -webkit-appearance:none; }
+.cap-shot {
+  margin-top:5px; height:92px;
+  border:1px solid var(--line);
+  display:grid; place-items:center;
+  font-family:var(--mono); font-size:8.5px; font-weight:700;
+  letter-spacing:2px; color:var(--grn-dim);
+  background:
+    linear-gradient(rgba(147,191,162,.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(147,191,162,.04) 1px, transparent 1px),
+    var(--ink);
+  background-size:14px 14px, 14px 14px, auto;
+}
+.yaml-view {
+  flex:1; min-height:0; margin-top:5px;
+  background:var(--ink); border:1px solid var(--line);
+  padding:12px 14px; overflow:hidden;
+  font-family:var(--mono); font-size:11px; line-height:1.75;
+  color:var(--grn); white-space:pre;
+}
+.yaml-view .yk { color:var(--grn-faint); }
+.yaml-view .yv { color:var(--grn-hi); }
+.modal-foot {
+  flex:none; display:flex; align-items:center; gap:8px;
+  padding:11px 14px;
+  border-top:1px solid var(--line);
+  background:var(--panel-2);
+}
+.modal-foot .foot-meta {
+  font-family:var(--mono); font-size:8px; letter-spacing:1.6px;
+  color:var(--grn-faint); margin-right:auto;
+}
+
+/* corner variation tag */
+#vartag {
+  position:fixed; right:12px; bottom:34px; z-index:950;
+  font-family:var(--mono); font-size:8px; font-weight:700;
+  letter-spacing:2.6px; color:var(--grn-dim);
+  border:1px solid var(--line); padding:3px 9px 2px;
+  background:rgba(10,13,14,.9); pointer-events:none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage-sweep, .scope-sweep { animation:none; }
+  *, *::before, *::after {
+    animation-duration:.001s !important;
+    animation-iteration-count:1 !important;
+  }
+  .linecursor { background:var(--grn); }
+}
+</style>
+</head>
+<body>
+
+<!-- ══ TITLEBAR ══ -->
+<header id="titlebar">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">
+      <!-- three-node mark drawn as radar contacts on a routing vector -->
+      <svg viewBox="0 0 64 64" width="20" height="20">
+        <path d="M22 18 L44 32 L22 46" fill="none" stroke="#3d5a4b" stroke-width="2"
+              stroke-linecap="square" stroke-linejoin="miter" stroke-dasharray="4 3"/>
+        <rect x="17" y="13" width="10" height="10" transform="rotate(45 22 18)"
+              fill="none" stroke="#c98a3d" stroke-width="2"/>
+        <rect x="39" y="27" width="10" height="10" transform="rotate(45 44 32)"
+              fill="#93bfa2"/>
+        <rect x="17" y="41" width="10" height="10" transform="rotate(45 22 46)"
+              fill="none" stroke="#8f7fb0" stroke-width="2"/>
+      </svg>
+    </span>
+    <span class="brand-name">CHROMUX</span>
+    <span class="brand-sub">AGENT COCKPIT</span>
+  </div>
+
+  <div class="tb-readout" role="status" aria-label="Session gauges">
+    <span class="ro-cell"><i class="trk live" aria-hidden="true"></i><b>3</b> SESSIONS</span>
+    <span class="ro-cell warn"><i class="trk warn" aria-hidden="true"></i><b>2</b> QUEUED</span>
+    <span class="ro-cell info"><i class="trk info" aria-hidden="true"></i><b>14</b> SENT</span>
+  </div>
+
+  <div class="tb-actions">
+    <button class="kbtn alert" title="A new Chromux release is ready to install">
+      <span class="up-carat">▴</span> UPDATE READY</button>
+    <button class="kbtn ghost" title="Settings">SETTINGS</button>
+  </div>
+</header>
+
+<!-- ══ MAIN FRAME ══ -->
+<div id="app">
+
+  <!-- ── LEFT RAIL — attention strip bay ── -->
+  <aside id="rail">
+    <div class="rail-head">
+      <span class="mlabel">ATTENTION QUEUE</span>
+      <button class="kbtn ghost" style="padding:3px 7px 2px;">⛶ DETECT</button>
+    </div>
+
+    <div id="attention-list">
+
+      <!-- strip 1 · approval hold — controller action required -->
+      <div class="strip urgent" title="Approval required">
+        <span class="strip-bay" aria-hidden="true"></span>
+        <div class="strip-id">
+          <span class="strip-callsign">CHK301</span>
+          <span class="strip-sqk">SQK <b>7401</b></span>
+        </div>
+        <div class="strip-data">
+          <div class="strip-kind-row">
+            <span class="strip-kind">▴ APPROVAL</span>
+            <span class="strip-time">14:29:41Z</span>
+          </div>
+          <div class="strip-session">checkout-flow</div>
+          <div class="strip-copy">claude wants to run <code>npm run db:migrate</code></div>
+        </div>
+      </div>
+
+      <!-- strip 2 · preview handoff ready -->
+      <div class="strip info" title="Preview ready">
+        <span class="strip-bay" aria-hidden="true"></span>
+        <div class="strip-id">
+          <span class="strip-callsign">LND214</span>
+          <span class="strip-sqk">SQK <b>2314</b></span>
+        </div>
+        <div class="strip-data">
+          <div class="strip-kind-row">
+            <span class="strip-kind">◇ PREVIEW</span>
+            <span class="strip-time">14:27:03Z</span>
+          </div>
+          <div class="strip-session">landing-page</div>
+          <div class="strip-copy">localhost:5173 changed — review ready</div>
+        </div>
+      </div>
+
+      <!-- strip 3 · contact lost — comm failure squawk -->
+      <div class="strip lost" title="Process exited">
+        <span class="strip-bay" aria-hidden="true"></span>
+        <div class="strip-id">
+          <span class="strip-callsign">API099</span>
+          <span class="strip-sqk">SQK <b>7600</b></span>
+        </div>
+        <div class="strip-data">
+          <div class="strip-kind-row">
+            <span class="strip-kind">✕ EXITED</span>
+            <span class="strip-time">14:20:16Z</span>
+          </div>
+          <div class="strip-session">api-server</div>
+          <div class="strip-copy">codex exited (code 0) · 12m ago</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- mini situation display -->
+    <div class="rail-scope" aria-hidden="true">
+      <div class="scope">
+        <div class="scope-sweep"></div>
+        <span class="scope-blip b1"></span>
+        <span class="scope-blip b2"></span>
+        <span class="scope-blip b3"></span>
+      </div>
+      <div class="scope-meta">
+        <span class="row hot"><span>CONTACTS</span><b>03</b></span>
+        <span class="row"><span>HOLDING</span><b>02</b></span>
+        <span class="row"><span>LOST</span><b>01</b></span>
+        <span class="row"><span>SWEEP</span><b>6.0S</b></span>
+      </div>
+    </div>
+
+    <div class="rail-foot">
+      <div class="mlabel">LOCAL STORAGE</div>
+      <button class="pathlink" title="Reveal in Finder">~/.chromux/captures</button>
+    </div>
+  </aside>
+
+  <div id="workspace">
+
+    <!-- ══ SESSION TAB STRIP — sector channels ══ -->
+    <nav id="session-tabs" aria-label="Session tabs">
+      <button class="stab active">
+        <span class="t-trk live" aria-hidden="true"></span>
+        CHECKOUT-FLOW <span class="agent">· claude</span>
+        <span class="t-badge">02</span>
+      </button>
+      <button class="stab">
+        <span class="t-trk live" aria-hidden="true"></span>
+        LANDING-PAGE <span class="agent">· grok</span>
+      </button>
+      <button class="stab">
+        <span class="t-trk dead" aria-hidden="true"></span>
+        API-SERVER <span class="agent">· codex</span>
+      </button>
+      <button class="stab addtab" title="New session (⌘T)">+</button>
+    </nav>
+
+    <!-- ══ STAGE — split view over the scope ══ -->
+    <main id="stage">
+      <div class="stage-sweep" aria-hidden="true"></div>
+
+      <!-- terminal pane -->
+      <section class="pane pane-term">
+        <div class="console-pane">
+          <div class="pane-head">
+            <span class="pane-title">TERMINAL — <span class="agent">CLAUDE</span></span>
+            <span class="pane-tag">PTY LIVE</span>
+            <span class="pane-cwd">~/projects/shop/checkout-flow</span>
+          </div>
+          <div class="term-frame">
+            <div class="term-ticks" aria-hidden="true"></div>
+            <div class="term-body">
+              <div class="tl term-welcome"><span><span class="spark">✻</span> Welcome to Claude Code!</span><span class="tl-meta">/projects/shop/checkout-flow</span></div>
+              <div class="tl">&nbsp;</div>
+              <div class="tl tl-user">&gt; fix the CTA overflow on the checkout page</div>
+              <div class="tl">&nbsp;</div>
+              <div class="tl tl-agent">● I'll look at the checkout component styles.</div>
+              <div class="tl tl-tool">● Read src/components/CheckoutCTA.tsx <span class="tl-meta">(84 lines)</span></div>
+              <div class="tl tl-tool">● Edit src/styles/checkout.css</div>
+              <div class="tl tl-del">&nbsp;&nbsp;- .cta-row { width: 120%; }</div>
+              <div class="tl tl-add">&nbsp;&nbsp;+ .cta-row { width: 100%; max-width: 480px; }</div>
+              <div class="tl tl-ok">✔ Change applied — dev server reloaded</div>
+              <div class="tl tl-agent">● The button no longer overflows. Preview updated on the right.</div>
+              <div class="tl">&nbsp;</div>
+              <div class="tl tl-await"><span class="linecursor" aria-hidden="true"></span>&nbsp;awaiting your next instruction…</div>
+            </div>
+          </div>
+          <div class="term-foot">
+            <span class="live">▪ TTY 46×132</span>
+            <span>STDIN OPEN</span>
+            <span class="right">FDE · CHK301</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- divider -->
+      <div id="divider" title="Drag to resize" aria-hidden="true">
+        <span class="grab"></span>
+      </div>
+
+      <!-- browser pane -->
+      <section class="pane pane-web">
+        <div class="console-pane">
+          <div class="pane-head">
+            <span class="pane-title">BROWSER — <span class="agent">PAIRED PANE</span></span>
+            <span class="pane-tag">SURV 1:1</span>
+            <span class="pane-cwd">track CHK301 · localhost:5173</span>
+          </div>
+          <div class="web-toolbar">
+            <button class="navkey" title="Back">◀</button>
+            <button class="navkey" title="Forward">▶</button>
+            <button class="navkey" title="Reload">⟳</button>
+            <span class="urlbar">
+              <span><span class="proto">http://</span>localhost:5173/checkout</span>
+            </span>
+            <button class="kbtn primary" id="btn-capture">⛶ CAPTURE</button>
+            <button class="kbtn ghost">QUEUE <span class="qbadge">2</span></button>
+            <span class="chip">console: 0</span>
+            <button class="kbtn ghost">⌄ COLLAPSE</button>
+          </div>
+          <div class="fb-strip">
+            <span class="fb-live">◆</span>
+            <span>PAIRED DISPLAY</span>
+            <span class="fb-url">localhost:5173/checkout</span>
+            <span class="right">RNG 4NM · UPD 60HZ</span>
+          </div>
+          <div class="fb-wrap">
+            <div class="fb-window">
+              <span class="refreshed-chip">⟳ REFRESHED</span>
+              <div class="shop">
+                <div class="shop-top">
+                  <span class="shop-logo">shop/checkout</span>
+                  <span class="shop-step">Step 3 of 3 — Payment</span>
+                </div>
+                <div class="shop-h1">Order summary</div>
+                <div class="order-card">
+                  <div class="order-row"><span>Concourse Tee — Black <span class="oq">× 1</span></span><span>$28.00</span></div>
+                  <div class="order-row"><span>Sticker Pack — Dev Icons <span class="oq">× 2</span></span><span>$12.00</span></div>
+                  <div class="order-row"><span>Shipping <span class="oq">standard</span></span><span>$8.00</span></div>
+                  <div class="order-row total"><span>Total</span><span>$48.00</span></div>
+                </div>
+                <button class="cta-btn">Pay $48.00</button>
+                <div class="shop-secure">🔒 Payments are encrypted &amp; processed securely</div>
+              </div>
+            </div>
+
+            <!-- data block + leader line tracking the CTA region -->
+            <div class="datablock" aria-hidden="true">
+              <div class="db-card">
+                <div>CTA-BTN <span class="k">/ REGION</span></div>
+                <div><span class="k">DIM</span> 412×88 <span class="k">· OVF</span> <span class="warn">CLR</span></div>
+                <div><span class="k">TRK</span> CHK301 <span class="k">· SEL</span> ARMED</div>
+              </div>
+              <svg class="db-leader" viewBox="0 0 32 42" aria-hidden="true">
+                <path d="M8 4 L28 40" fill="none" stroke="#93bfa2" stroke-width="1"/>
+              </svg>
+              <span class="db-anchor"></span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- ══ STATUS BAR ══ -->
+<footer id="statusbar">
+  <div class="sb-left">
+    <span class="sb-clock">14:32:07Z</span>
+    <span class="sb-sep">│</span>
+    <span class="sb-key">ADAPTER</span><span class="sb-val">claude -p · one-off</span>
+    <span class="sb-sep">│</span>
+    <span class="sb-key">PAIRING</span><span class="sb-val">1:1 session ↔ pane</span>
+  </div>
+  <div class="sb-right">
+    <button class="sb-btn">DELIVERY LOG</button>
+    <span class="sb-sep">│</span>
+    <span class="sb-ver">chromux 0.17.0 — air-traffic control concept</span>
+  </div>
+</footer>
+
+<div id="vartag">VARIATION 23 · AIR-TRAFFIC CONTROL</div>
+
+<!-- ══ CAPTURE MODAL — handoff panel ══ -->
+<div id="modal-capture" class="overlay hidden">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Capture to agent">
+    <span class="reg tl" aria-hidden="true"></span><span class="reg tr" aria-hidden="true"></span>
+    <span class="reg bl" aria-hidden="true"></span><span class="reg br" aria-hidden="true"></span>
+    <div class="modal-head">
+      <span class="modal-title">CAPTURE → HANDOFF</span>
+      <span class="modal-sqk">TRK CHK301 · SQK 7401</span>
+      <button class="modal-x" data-close aria-label="Close">✕</button>
+    </div>
+    <div class="cap-grid">
+      <div class="cap-col">
+        <div class="cap-row"><span class="mlabel">SESSION</span><span class="cap-val">checkout-flow · claude</span></div>
+        <div class="cap-row"><span class="mlabel">URL</span><span class="cap-val">localhost:5173/checkout</span></div>
+        <div class="cap-row"><span class="mlabel">SELECTION</span><span class="cap-val">"CTA button region 412×88"</span></div>
+        <label class="field">
+          <span class="mlabel">NOTE TO AGENT — WHAT'S WRONG / WHAT TO DO</span>
+          <textarea rows="3" spellcheck="false"
+            placeholder="e.g. the CTA button overflows its container — fix the CSS"></textarea>
+        </label>
+        <label class="field">
+          <span class="mlabel">TARGET</span>
+          <select><option>checkout-flow · claude -p</option></select>
+        </label>
+        <div class="field">
+          <span class="mlabel">SCREENSHOT</span>
+          <div class="cap-shot">◆ FRAME 2026-07-11-0142.PNG · 412×88</div>
+        </div>
+      </div>
+      <div class="cap-col">
+        <span class="mlabel">PAYLOAD PREVIEW — YAML V1</span>
+        <pre class="yaml-view"><span class="yk">chromux_capture:</span> <span class="yv">v1</span>
+<span class="yk">session:</span> <span class="yv">checkout-flow</span>
+<span class="yk">agent:</span> <span class="yv">claude</span>
+<span class="yk">url:</span> <span class="yv">http://localhost:5173/checkout</span>
+<span class="yk">note:</span> <span class="yv">CTA overflows container</span>
+<span class="yk">screenshot:</span> <span class="yv">~/.chromux/captures/2026-07-11-0142.png</span>
+<span class="yk">console_errors:</span> <span class="yv">[]</span></pre>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <span class="foot-meta">CLEARANCE READ-BACK NOT REQUIRED · FILE VIA STDIN</span>
+      <button class="kbtn ghost" data-close>CANCEL</button>
+      <button class="kbtn ghost">FILE-DROP ONLY</button>
+      <button class="kbtn primary">SEND — CLAUDE -P</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var modal = document.getElementById('modal-capture');
+  document.getElementById('btn-capture').addEventListener('click', function () {
+    modal.classList.remove('hidden');
+  });
+  modal.querySelectorAll('[data-close]').forEach(function (el) {
+    el.addEventListener('click', function () { modal.classList.add('hidden'); });
+  });
+  modal.addEventListener('click', function (e) {
+    if (e.target === modal) modal.classList.add('hidden');
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') modal.classList.add('hidden');
+  });
+})();
+</script>
+</body>
+</html>

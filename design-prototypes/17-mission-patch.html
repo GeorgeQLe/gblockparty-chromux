@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Chromux — Mission Patch</title>
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   CHROMUX · 17 MISSION PATCH
+   Apollo-era flight documentation · midnight blue hardware panels
+   cream stencil labeling · embroidered patch · telemetry strips
+   utilitarian aerospace — never luxury, never gold
+   ═══════════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=Allerta+Stencil&family=B612+Mono:wght@400;700&display=swap');
+
+:root{
+  --mid-0:#0b1420;             /* deepest hull                    */
+  --mid-1:#0f1a29;             /* app chrome plate                */
+  --mid-2:#142234;             /* panel face                      */
+  --mid-3:#1a2c42;             /* raised plate                    */
+  --mid-4:#22374f;             /* hover field                     */
+  --cream:#e9dfc4;             /* painted label cream             */
+  --cream-hi:#f6efdb;          /* fresh paint                     */
+  --cream-dim:#b9ae92;         /* worn paint                      */
+  --cream-faint:#7d7a6b;       /* half-erased stencil             */
+  --line:rgba(233,223,196,.22);          /* panel engraving      */
+  --line-strong:rgba(233,223,196,.45);
+  --stitch:rgba(233,223,196,.55);        /* embroidery thread    */
+  --rescue:#e8632c;            /* rescue orange — urgent          */
+  --caution:#e0a33c;           /* caution amber                   */
+  --go:#69c583;                /* GO green                        */
+  --telem:#6db8cf;             /* telemetry cyan                  */
+  --nogo:#d9635c;              /* NO-GO red                       */
+  --node-o:#e08a4e; --node-v:#a98fd8; --node-g:#6cc08c;
+  --stencil:"Allerta Stencil","Futura","Avenir Next Condensed","Trebuchet MS",sans-serif;
+  --uiface:"Futura","Avenir Next","Trebuchet MS","Helvetica Neue",sans-serif;
+  --mono:"B612 Mono","Menlo","SF Mono","Monaco",monospace;
+  --doc:"American Typewriter","Courier New",serif;
+}
+
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  min-width:1280px;height:100vh;overflow:hidden;
+  background:var(--mid-0);
+  color:var(--cream);
+  font-family:var(--uiface);
+  font-size:13px;
+  display:flex;flex-direction:column;
+  position:relative;
+  -webkit-font-smoothing:antialiased;
+}
+/* twill weave — the whole hull reads as heavy patch fabric */
+body::before{
+  content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    repeating-linear-gradient(45deg,
+      rgba(233,223,196,.016) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(-45deg,
+      rgba(0,0,0,.10) 0 1px, transparent 1px 4px);
+}
+
+button{font-family:inherit;color:inherit;background:none;border:none;cursor:pointer;}
+.microlabel{
+  font-family:var(--uiface);font-size:9px;font-weight:600;
+  letter-spacing:.26em;color:var(--cream-dim);text-transform:uppercase;
+}
+
+/* ── rivets — pressed into every plate corner ────────────────── */
+.riveted{position:relative;}
+.riveted::before,.riveted::after,
+.riveted .rivet-b::before,.riveted .rivet-b::after{
+  content:"";position:absolute;width:5px;height:5px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%, #43526a 0%, #1c2838 55%, #0a121e 100%);
+  box-shadow:0 0 0 1px rgba(0,0,0,.5), inset 0 -1px 1px rgba(0,0,0,.6);
+  pointer-events:none;z-index:3;
+}
+.riveted::before{top:5px;left:5px;}
+.riveted::after{top:5px;right:5px;}
+.riveted .rivet-b{position:absolute;inset:0;pointer-events:none;}
+.riveted .rivet-b::before{bottom:5px;left:5px;top:auto;}
+.riveted .rivet-b::after{bottom:5px;right:5px;top:auto;}
+
+/* ── hardware buttons ────────────────────────────────────────── */
+.hw-btn{
+  font-family:var(--uiface);font-weight:600;font-size:9.5px;letter-spacing:.2em;
+  color:var(--cream);padding:6px 12px;
+  border:1px solid var(--line-strong);border-radius:2px;
+  background:linear-gradient(180deg,var(--mid-3),var(--mid-2));
+  box-shadow:0 1px 0 rgba(0,0,0,.5), inset 0 1px 0 rgba(233,223,196,.10);
+  transition:background .2s,color .2s,border-color .2s;
+  white-space:nowrap;text-transform:uppercase;
+}
+.hw-btn:hover{background:var(--mid-4);color:var(--cream-hi);border-color:var(--cream-dim);}
+.hw-btn:active{transform:translateY(1px);box-shadow:none;}
+.hw-primary{
+  background:var(--cream);color:#16202e;border-color:var(--cream-hi);
+  box-shadow:0 1px 0 rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.5);
+}
+.hw-primary:hover{background:var(--cream-hi);color:#0b1420;border-color:var(--cream-hi);}
+
+/* ═══ TITLEBAR — instrument bezel plate ═══ */
+#titlebar{
+  position:relative;z-index:6;
+  height:54px;flex:0 0 54px;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 16px 0 84px;   /* macOS traffic-light reserve */
+  background:linear-gradient(180deg,#132133 0%,var(--mid-1) 100%);
+  border-bottom:2px solid #060c15;
+  box-shadow:inset 0 -1px 0 rgba(233,223,196,.14);
+  -webkit-app-region:drag;
+}
+#titlebar button{-webkit-app-region:no-drag;}
+/* stitched hem along the bottom of the bezel */
+#titlebar::after{
+  content:"";position:absolute;left:0;right:0;bottom:3px;height:0;
+  border-bottom:1px dashed rgba(233,223,196,.28);
+}
+
+.brand{display:flex;align-items:center;gap:13px;}
+.brand-mark{display:flex;align-items:center;filter:drop-shadow(0 2px 3px rgba(0,0,0,.55));}
+.brand-name{
+  font-family:var(--stencil);font-size:18px;letter-spacing:.34em;
+  color:var(--cream-hi);text-indent:.06em;line-height:1;
+  text-shadow:0 1px 0 rgba(0,0,0,.6);
+}
+.brand-sub{
+  font-family:var(--uiface);font-weight:600;font-size:8px;letter-spacing:.32em;
+  color:var(--cream-faint);border-left:1px solid var(--line);
+  padding:2px 0 2px 13px;text-transform:uppercase;
+}
+.brand-doc{
+  font-family:var(--doc);font-size:8.5px;color:var(--cream-faint);
+  letter-spacing:.08em;margin-left:4px;
+  border:1px solid var(--line);padding:3px 7px 2px;border-radius:1px;
+}
+
+/* annunciator lamp block — caution/warning matrix */
+.titlebar-right{display:flex;align-items:center;gap:16px;}
+.gauges{
+  display:flex;align-items:stretch;gap:6px;
+  padding:5px 14px 5px 6px;margin-right:2px;
+  border-right:1px dashed var(--line);
+}
+.lamp{
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  min-width:64px;
+}
+.lamp-lens{
+  width:100%;height:20px;border-radius:2px;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  font-family:var(--mono);font-size:11px;font-weight:700;
+  border:1px solid rgba(0,0,0,.55);
+  box-shadow:inset 0 1px 3px rgba(0,0,0,.55), inset 0 -1px 0 rgba(255,255,255,.06);
+}
+.lamp-lens .lamp-tick{width:5px;height:5px;border-radius:50%;flex:0 0 5px;}
+.lamp-label{font-size:7.5px;font-weight:600;letter-spacing:.22em;color:var(--cream-faint);text-transform:uppercase;}
+.lamp-go .lamp-lens{background:rgba(105,197,131,.14);color:var(--go);border-color:rgba(105,197,131,.4);}
+.lamp-go .lamp-tick{background:var(--go);box-shadow:0 0 5px rgba(105,197,131,.8);}
+.lamp-caution .lamp-lens{background:rgba(224,163,60,.15);color:var(--caution);border-color:rgba(224,163,60,.42);}
+.lamp-caution .lamp-tick{background:var(--caution);box-shadow:0 0 5px rgba(224,163,60,.8);animation:lampblink 2.6s steps(1) infinite;}
+@keyframes lampblink{0%,100%{opacity:1;}50%{opacity:.25;}}
+.lamp-telem .lamp-lens{background:rgba(109,184,207,.13);color:var(--telem);border-color:rgba(109,184,207,.38);}
+.lamp-telem .lamp-tick{background:var(--telem);box-shadow:0 0 5px rgba(109,184,207,.8);}
+
+/* guarded switch — UPDATE READY sits under a hazard-striped guard */
+.guarded{
+  position:relative;padding:6px 12px 6px 26px;
+  font-size:9.5px;font-weight:700;letter-spacing:.18em;
+  color:#16202e;background:var(--rescue);
+  border:1px solid #f2814c;border-radius:2px;
+  box-shadow:0 1px 0 rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.28);
+  text-transform:uppercase;overflow:hidden;
+  animation:guardpulse 3s ease-in-out infinite;
+}
+.guarded::before{ /* hazard-striped guard flange */
+  content:"";position:absolute;left:0;top:0;bottom:0;width:16px;
+  background:repeating-linear-gradient(-45deg,
+    #16202e 0 4px, var(--cream) 4px 8px);
+  border-right:1px solid rgba(0,0,0,.5);
+}
+.guarded:hover{filter:brightness(1.08);}
+@keyframes guardpulse{0%,100%{box-shadow:0 1px 0 rgba(0,0,0,.6), 0 0 0 rgba(232,99,44,0);}
+  50%{box-shadow:0 1px 0 rgba(0,0,0,.6), 0 0 14px rgba(232,99,44,.55);}}
+
+/* ═══ APP FRAME ═══ */
+#app{flex:1;display:flex;min-height:0;position:relative;z-index:1;}
+
+/* ═══ LEFT RAIL — procedure checklist plate ═══ */
+#rail{
+  width:232px;flex:0 0 232px;display:flex;flex-direction:column;
+  background:linear-gradient(180deg,var(--mid-1),#0c1522);
+  border-right:2px solid #060c15;
+  box-shadow:inset -1px 0 0 rgba(233,223,196,.10);
+}
+.rail-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:13px 13px 6px;
+}
+.rail-head .microlabel{color:var(--cream);letter-spacing:.24em;font-size:9.5px;}
+.rail-docno{
+  font-family:var(--doc);font-size:8px;color:var(--cream-faint);
+  letter-spacing:.06em;padding:0 13px 9px;
+  border-bottom:1px dashed var(--line);margin-bottom:10px;
+}
+.btn-detect{
+  font-size:8.5px;font-weight:600;letter-spacing:.14em;color:var(--cream-dim);
+  border:1px solid var(--line);border-radius:2px;padding:4px 8px;
+  background:var(--mid-2);
+  box-shadow:0 1px 0 rgba(0,0,0,.5);
+  transition:color .2s,border-color .2s;
+}
+.btn-detect:hover{color:var(--cream-hi);border-color:var(--cream-dim);}
+
+#attention-list{flex:1;overflow:hidden;padding:0 11px;display:flex;flex-direction:column;gap:9px;}
+.qcard{
+  position:relative;border:1px solid var(--line);border-radius:2px;
+  padding:9px 11px 10px;background:var(--mid-2);
+  box-shadow:0 1px 0 rgba(0,0,0,.45), inset 0 1px 0 rgba(233,223,196,.06);
+  transition:border-color .2s,background .2s;cursor:default;
+}
+.qcard:hover{border-color:var(--line-strong);background:var(--mid-3);}
+/* checklist index tab riveted to the card edge */
+.q-step{
+  position:absolute;top:-1px;right:8px;
+  font-family:var(--mono);font-size:7.5px;letter-spacing:.1em;
+  color:var(--mid-0);padding:1px 6px 2px;
+  background:var(--cream-dim);border-radius:0 0 2px 2px;
+}
+.q-kind{
+  display:inline-block;font-size:8px;font-weight:700;letter-spacing:.26em;
+  padding:2px 6px 1px;margin-bottom:7px;border-radius:1px;
+  text-transform:uppercase;
+}
+.q-urgent .q-kind{background:var(--rescue);color:#16202e;}
+.q-info .q-kind{background:rgba(109,184,207,.18);color:var(--telem);border:1px solid rgba(109,184,207,.4);}
+.q-dead .q-kind{background:rgba(217,99,92,.14);color:var(--nogo);border:1px solid rgba(217,99,92,.38);}
+.q-urgent{border-left:3px solid var(--rescue);}
+.q-info{border-left:3px solid var(--telem);}
+.q-dead{border-left:3px solid rgba(217,99,92,.55);opacity:.85;}
+.q-session{
+  font-family:var(--stencil);font-size:12px;letter-spacing:.08em;
+  color:var(--cream-hi);margin-bottom:4px;
+}
+.q-msg{font-size:10.5px;line-height:1.5;color:var(--cream-dim);}
+.q-msg code{
+  font-family:var(--mono);font-size:9.5px;color:var(--cream-hi);
+  background:rgba(233,223,196,.09);padding:0 4px;border-radius:1px;
+}
+
+/* embroidered mission patch — the rail's centerpiece */
+.rail-patch{
+  display:flex;justify-content:center;padding:14px 0 4px;
+  filter:drop-shadow(0 3px 6px rgba(0,0,0,.55));
+}
+.rail-foot{
+  padding:10px 13px 13px;border-top:1px dashed var(--line);
+}
+.rail-foot .microlabel{font-size:8px;margin-bottom:5px;}
+.pathlink{
+  font-family:var(--mono);font-size:10px;color:var(--cream);
+  letter-spacing:.01em;padding:0;border-bottom:1px dashed transparent;
+  transition:color .2s,border-color .2s;
+}
+.pathlink:hover{color:var(--cream-hi);border-bottom-color:var(--stitch);}
+
+/* ═══ WORKSPACE ═══ */
+#workspace{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;}
+
+/* session tab strip — channel selector plates */
+#session-tabs{
+  display:flex;align-items:stretch;gap:4px;
+  height:40px;flex:0 0 40px;
+  padding:6px 10px 0;background:var(--mid-1);
+  border-bottom:2px solid #060c15;
+}
+.session-tab{
+  position:relative;display:flex;align-items:center;gap:8px;
+  padding:0 14px;font-family:var(--uiface);font-weight:600;
+  font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--cream-dim);
+  background:linear-gradient(180deg,var(--mid-2),var(--mid-1));
+  border:1px solid var(--line);border-bottom:none;
+  border-radius:2px 2px 0 0;
+  box-shadow:inset 0 1px 0 rgba(233,223,196,.06);
+  transition:color .2s,background .2s;
+}
+.session-tab:hover{color:var(--cream);background:var(--mid-3);}
+.session-tab.active{
+  color:var(--mid-0);background:var(--cream);
+  border-color:var(--cream-hi);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5), 0 -1px 6px rgba(233,223,196,.18);
+}
+.session-tab.active .tab-badge{background:var(--rescue);color:#16202e;}
+.tab-dot{width:7px;height:7px;border-radius:50%;flex:0 0 7px;border:1px solid rgba(0,0,0,.4);}
+.dot-live{background:var(--go);box-shadow:0 0 5px rgba(105,197,131,.8);}
+.dot-dead{background:var(--nogo);box-shadow:0 0 4px rgba(217,99,92,.55);}
+.tab-badge{
+  min-width:15px;height:15px;border-radius:2px;
+  display:inline-flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:9px;font-weight:700;color:#16202e;
+  background:var(--caution);
+}
+.add-tab{
+  width:34px;justify-content:center;padding:0;
+  font-size:15px;color:var(--cream-faint);font-weight:400;
+}
+.add-tab:hover{color:var(--cream-hi);}
+
+/* ═══ STAGE — split view over the equipment bay ═══ */
+#stage{flex:1;display:flex;min-height:0;position:relative;padding:13px 13px 10px;gap:0;overflow:hidden;}
+/* faint oversized stencil "17" ghosted on the bay wall */
+#stage::before{
+  content:"17";position:absolute;right:-20px;bottom:-90px;z-index:0;
+  font-family:var(--stencil);font-size:340px;line-height:1;
+  color:rgba(233,223,196,.030);pointer-events:none;letter-spacing:-.04em;
+}
+
+.pane{
+  position:relative;z-index:1;display:flex;flex-direction:column;min-width:0;min-height:0;
+  border:1px solid var(--line-strong);border-radius:3px;
+  background:var(--mid-2);
+  box-shadow:0 2px 0 rgba(0,0,0,.5), 0 10px 28px rgba(0,0,0,.4),
+             inset 0 1px 0 rgba(233,223,196,.08);
+}
+#terminal-pane{flex:0 0 45%;}
+#browser-pane{flex:1;}
+
+.pane-header{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:9px 16px 8px 26px;border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg,var(--mid-3),var(--mid-2));
+}
+.pane-title{
+  font-family:var(--stencil);font-size:11px;letter-spacing:.24em;color:var(--cream);
+  text-transform:uppercase;
+}
+.pane-title .panel-id{
+  font-family:var(--mono);font-size:8px;color:var(--mid-0);
+  background:var(--cream-dim);padding:1px 5px 2px;border-radius:1px;
+  margin-right:8px;letter-spacing:.08em;vertical-align:1px;
+}
+.pane-title em{font-style:normal;color:var(--cream-hi);}
+.pane-cwd{font-family:var(--mono);font-size:9.5px;color:var(--cream-faint);letter-spacing:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+/* terminal transcript — telemetry downlink */
+#terminal-body{
+  flex:1;overflow:hidden;padding:14px 18px 14px 26px;
+  font-family:var(--mono);font-size:11.5px;line-height:1.9;
+  color:var(--cream);
+  background:
+    linear-gradient(180deg,rgba(6,12,21,.5),rgba(6,12,21,.2)),
+    var(--mid-2);
+  position:relative;
+}
+/* margin rule + punch holes, like a teleprinter roll */
+#terminal-body::before{
+  content:"";position:absolute;left:14px;top:0;bottom:0;width:0;
+  border-left:1px dashed rgba(233,223,196,.16);
+}
+.t-line{white-space:pre-wrap;}
+.t-glyph{display:inline-block;width:1.4em;}
+.t-welcome{color:var(--cream-hi);}
+.t-welcome .t-path{color:var(--cream-faint);float:right;font-size:9.5px;}
+.t-user{color:var(--caution);}
+.t-user .t-glyph{color:var(--caution);}
+.t-agent{color:var(--cream);}
+.t-agent .t-glyph{color:var(--cream-faint);}
+.t-tool{color:var(--cream-dim);}
+.t-tool .t-glyph{color:var(--cream-faint);}
+.t-tool code{color:var(--telem);font-size:11px;}
+.t-diff-del{color:var(--nogo);padding-left:1.4em;}
+.t-diff-add{color:var(--go);padding-left:1.4em;}
+.t-ok{color:var(--go);}
+.t-ok .t-glyph{color:var(--go);}
+.t-await{color:var(--cream-faint);}
+.t-cursor{
+  display:inline-block;width:8px;height:13px;margin-right:6px;vertical-align:-2px;
+  background:var(--cream);animation:pulse 1.3s steps(1) infinite;
+}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.15;}}
+
+/* divider — a machined strut with grip knurls */
+#divider{
+  flex:0 0 8px;position:relative;z-index:1;cursor:col-resize;margin:0 3px;
+  display:flex;align-items:center;justify-content:center;
+}
+#divider::before{
+  content:"";width:2px;height:88%;border-radius:1px;
+  background:linear-gradient(180deg,transparent,var(--line-strong) 12%,var(--line-strong) 88%,transparent);
+}
+#divider::after{ /* knurled grip */
+  content:"";position:absolute;width:6px;height:34px;border-radius:2px;
+  background:repeating-linear-gradient(180deg,
+    var(--mid-4) 0 2px, var(--mid-1) 2px 4px);
+  border:1px solid var(--line-strong);
+}
+#divider:hover::after{border-color:var(--cream-dim);}
+
+/* ═══ BROWSER PANE ═══ */
+.browser-toolbar{
+  display:flex;align-items:center;gap:6px;
+  padding:7px 9px;border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg,var(--mid-3),var(--mid-2));
+}
+.nav-btn{
+  width:23px;height:23px;border:1px solid var(--line);border-radius:2px;
+  color:var(--cream-dim);font-size:11px;display:flex;align-items:center;justify-content:center;
+  background:var(--mid-2);
+  box-shadow:0 1px 0 rgba(0,0,0,.45);
+  transition:color .2s,border-color .2s;flex:0 0 23px;
+}
+.nav-btn:hover{color:var(--cream-hi);border-color:var(--cream-dim);}
+.nav-btn:active{transform:translateY(1px);box-shadow:none;}
+.url-bar{
+  flex:1 1 auto;min-width:118px;display:flex;align-items:center;gap:7px;
+  height:25px;padding:0 10px;
+  border:1px solid var(--line);border-radius:2px;
+  background:#0a121e;
+  box-shadow:inset 0 1px 3px rgba(0,0,0,.55);
+  font-family:var(--mono);font-size:10px;color:var(--cream);
+  white-space:nowrap;overflow:hidden;
+}
+.url-text{overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.url-scheme{color:var(--cream-faint);}
+.url-freq{
+  color:var(--telem);font-size:8px;letter-spacing:.12em;flex:0 0 auto;
+  border-right:1px dashed var(--line);padding-right:7px;
+}
+.tool-chip{
+  font-family:var(--mono);font-size:8.5px;color:var(--cream-faint);flex:0 0 auto;
+  border:1px solid var(--line);border-radius:2px;padding:4px 7px;white-space:nowrap;
+  background:var(--mid-1);
+}
+.btn-capture{font-size:9px;letter-spacing:.14em;padding:5px 11px;border-radius:2px;flex:0 0 auto;}
+.btn-queue,.btn-collapse{
+  font-size:8.5px;font-weight:600;letter-spacing:.06em;color:var(--cream-dim);flex:0 0 auto;
+  border:1px solid var(--line);border-radius:2px;padding:5px 8px;
+  background:var(--mid-2);box-shadow:0 1px 0 rgba(0,0,0,.45);
+  transition:color .2s,border-color .2s;white-space:nowrap;text-transform:uppercase;
+}
+.btn-queue:hover,.btn-collapse:hover{color:var(--cream-hi);border-color:var(--cream-dim);}
+.chip-badge{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:14px;height:14px;border-radius:2px;margin-left:5px;
+  font-family:var(--mono);font-size:8.5px;font-weight:700;color:#16202e;
+  background:var(--caution);
+}
+
+/* the framed web page — a light window cut into the dark hull */
+.webview{
+  flex:1;min-height:0;position:relative;margin:11px;border-radius:2px;
+  background:#f4f1ea;color:#2c2a26;overflow:hidden;
+  box-shadow:inset 0 0 0 1px rgba(11,20,32,.5), 0 4px 18px rgba(0,0,0,.5);
+  display:flex;align-items:center;justify-content:center;
+  font-family:"Avenir Next","Helvetica Neue",Arial,sans-serif;
+}
+/* corner crop marks — like a photo pasted into a mission report */
+.webview::before,.webview::after{
+  content:"";position:absolute;width:14px;height:14px;pointer-events:none;z-index:2;
+  border:2px solid rgba(11,20,32,.35);
+}
+.webview::before{top:6px;left:6px;border-right:none;border-bottom:none;}
+.webview::after{bottom:6px;right:6px;border-left:none;border-top:none;}
+.web-page{width:min(430px,88%);}
+.web-shop{font-size:10px;letter-spacing:.28em;color:#8a8578;text-transform:uppercase;margin-bottom:6px;}
+.web-h1{font-size:22px;font-weight:600;color:#22201c;margin-bottom:16px;letter-spacing:-.01em;}
+.order-card{
+  background:#fff;border:1px solid #e2ddd2;border-radius:10px;
+  padding:18px 20px;box-shadow:0 2px 10px rgba(60,50,30,.07);
+}
+.order-row{display:flex;justify-content:space-between;font-size:13px;color:#4a463e;padding:7px 0;}
+.order-row + .order-row{border-top:1px solid #efece4;}
+.order-row .oi-name b{display:block;font-weight:600;color:#22201c;}
+.order-row .oi-name span{font-size:11px;color:#8a8578;}
+.order-total{display:flex;justify-content:space-between;align-items:baseline;
+  margin-top:10px;padding-top:12px;border-top:2px solid #22201c;}
+.order-total .ot-label{font-size:11px;letter-spacing:.14em;color:#8a8578;text-transform:uppercase;}
+.order-total .ot-amt{font-size:20px;font-weight:700;color:#22201c;}
+.pay-cta{
+  display:block;width:100%;max-width:480px;margin-top:16px;
+  background:#1d3557;color:#f5efdf;border:none;border-radius:8px;
+  padding:13px 0;font-size:14px;font-weight:600;letter-spacing:.03em;
+  font-family:inherit;box-shadow:0 3px 12px rgba(29,53,87,.35);
+  transition:transform .2s,box-shadow .2s;
+}
+.pay-cta:hover{transform:translateY(-1px);box-shadow:0 5px 16px rgba(29,53,87,.42);}
+.web-secure{margin-top:10px;font-size:10.5px;color:#a49e8e;text-align:center;}
+.refresh-chip{
+  position:absolute;top:10px;right:10px;z-index:3;
+  font-size:8.5px;font-weight:700;letter-spacing:.18em;color:#0f5c37;
+  background:#dff2e4;border:1px solid #b5dfc2;border-radius:2px;
+  padding:3px 9px;animation:fadeflash 4s ease-in-out infinite;
+}
+@keyframes fadeflash{0%,100%{opacity:.55;}50%{opacity:1;}}
+
+/* ── TELEMETRY STRIP — runs between stage and status bar ────── */
+#telemetry{
+  flex:0 0 22px;height:22px;position:relative;z-index:2;
+  margin:0 13px 8px;overflow:hidden;
+  display:flex;align-items:center;gap:14px;
+  border:1px solid var(--line);border-radius:2px;
+  background:#0a121e;
+  box-shadow:inset 0 1px 3px rgba(0,0,0,.55);
+  padding:0 10px;
+  font-family:var(--mono);font-size:8.5px;color:var(--cream-faint);
+  white-space:nowrap;
+}
+#telemetry .tm-label{color:var(--telem);letter-spacing:.14em;flex:0 0 auto;}
+.tm-wave{flex:1;min-width:60px;height:12px;position:relative;overflow:hidden;}
+.tm-wave svg{position:absolute;left:0;top:0;height:12px;
+  animation:tmscroll 7s linear infinite;}
+@keyframes tmscroll{from{transform:translateX(0);}to{transform:translateX(-160px);}}
+.tm-val{flex:0 0 auto;color:var(--cream-dim);}
+.tm-val b{color:var(--go);font-weight:400;}
+
+/* ═══ STATUS BAR — placard strip ═══ */
+#statusbar{
+  position:relative;z-index:6;
+  height:27px;flex:0 0 27px;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 13px;background:var(--mid-1);
+  border-top:2px solid #060c15;
+  box-shadow:inset 0 1px 0 rgba(233,223,196,.10);
+  font-size:9px;letter-spacing:.14em;
+}
+.sb-left,.sb-right{display:flex;align-items:center;gap:9px;}
+.sb-val{color:var(--cream);font-family:var(--mono);font-size:9.5px;letter-spacing:0;}
+.sb-sep{width:1px;height:12px;background:var(--line);margin:0 4px;}
+.sb-btn{
+  font-size:8.5px;font-weight:600;letter-spacing:.18em;color:var(--cream);
+  border:1px solid var(--line);border-radius:2px;padding:3px 9px;
+  background:var(--mid-2);box-shadow:0 1px 0 rgba(0,0,0,.45);
+  transition:color .2s,border-color .2s;text-transform:uppercase;
+}
+.sb-btn:hover{color:var(--cream-hi);border-color:var(--cream-dim);}
+.sb-ver{color:var(--cream-faint);font-size:8.5px;font-family:var(--mono);letter-spacing:.02em;}
+
+/* fixed corner tag — a sewn-on name tape */
+#variation-tag{
+  position:fixed;right:13px;bottom:64px;z-index:40;
+  font-family:var(--stencil);font-size:9px;letter-spacing:.26em;
+  color:var(--mid-0);background:var(--cream);
+  border:1px dashed rgba(11,20,32,.55);border-radius:1px;
+  padding:5px 10px 4px;box-shadow:0 2px 6px rgba(0,0,0,.5);
+  pointer-events:none;text-transform:uppercase;
+}
+
+/* ═══ CAPTURE MODAL — FORM CMX-CAP-1 ═══ */
+#modal-capture{
+  position:fixed;inset:0;z-index:60;display:none;
+  align-items:center;justify-content:center;
+  background:rgba(4,8,14,.78);
+}
+#modal-capture.open{display:flex;}
+.modal{
+  width:min(930px,92vw);max-height:88vh;display:flex;flex-direction:column;
+  background:var(--mid-2);
+  border:1px solid var(--line-strong);border-radius:3px;
+  box-shadow:0 3px 0 rgba(0,0,0,.55), 0 30px 80px rgba(0,0,0,.7),
+             inset 0 1px 0 rgba(233,223,196,.10);
+  animation:modal-in .28s ease-out;
+}
+@keyframes modal-in{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:none;}}
+.modal-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 18px 11px 26px;border-bottom:1px dashed var(--line-strong);
+  background:linear-gradient(180deg,var(--mid-3),var(--mid-2));
+}
+.modal-title{
+  font-family:var(--stencil);font-size:12px;letter-spacing:.26em;color:var(--cream-hi);
+  text-transform:uppercase;
+}
+.modal-title .form-no{
+  font-family:var(--doc);font-size:8px;letter-spacing:.08em;color:var(--cream-faint);
+  border:1px solid var(--line);padding:2px 6px 1px;margin-left:12px;
+  vertical-align:2px;border-radius:1px;
+}
+.modal-x{
+  width:24px;height:24px;border:1px solid var(--line);border-radius:2px;
+  color:var(--cream-dim);font-size:11px;display:flex;align-items:center;justify-content:center;
+  background:var(--mid-1);box-shadow:0 1px 0 rgba(0,0,0,.45);
+  transition:color .2s,border-color .2s;
+}
+.modal-x:hover{color:var(--cream-hi);border-color:var(--nogo);}
+.cap-grid{
+  flex:1;display:grid;grid-template-columns:1fr 1fr;gap:18px;
+  padding:18px 18px 18px 26px;overflow:auto;min-height:0;
+}
+.cap-col{display:flex;flex-direction:column;gap:12px;min-width:0;}
+.cap-summary{
+  border:1px solid var(--line);border-radius:2px;padding:3px 13px;
+  background:var(--mid-1);
+}
+.cap-row{display:flex;justify-content:space-between;align-items:baseline;gap:14px;padding:8px 0;}
+.cap-row + .cap-row{border-top:1px dashed var(--line);}
+.cap-row .microlabel{flex:0 0 auto;font-size:8px;}
+.cap-row .cap-val{font-family:var(--mono);font-size:10.5px;color:var(--cream);text-align:right;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.field{display:flex;flex-direction:column;gap:6px;}
+.field textarea,.field select{
+  font-family:var(--mono);font-size:10.5px;color:var(--cream);
+  background:#0a121e;border:1px solid var(--line);border-radius:2px;
+  box-shadow:inset 0 1px 3px rgba(0,0,0,.5);
+  padding:9px 11px;resize:none;outline:none;appearance:none;
+}
+.field textarea:focus,.field select:focus{border-color:var(--cream-dim);}
+.field textarea::placeholder{color:var(--cream-faint);}
+.select-wrap{position:relative;}
+.select-wrap::after{content:"▾";position:absolute;right:11px;top:50%;transform:translateY(-52%);
+  color:var(--cream-dim);pointer-events:none;font-size:10px;}
+.select-wrap select{width:100%;}
+.cap-shot{
+  height:94px;border:1px dashed var(--line-strong);border-radius:2px;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  color:var(--cream-faint);font-size:9px;font-weight:600;letter-spacing:.18em;
+  background:
+    repeating-linear-gradient(45deg, rgba(233,223,196,.02) 0 6px, transparent 6px 12px),
+    #0a121e;
+  text-transform:uppercase;
+}
+.cap-shot .shot-reticle{color:var(--rescue);font-size:14px;}
+.yaml-view{
+  flex:1;font-family:var(--mono);font-size:10.5px;line-height:1.85;
+  color:var(--cream);background:#0a121e;
+  border:1px solid var(--line);border-radius:2px;padding:13px 15px;
+  box-shadow:inset 0 1px 3px rgba(0,0,0,.5);
+  overflow:auto;white-space:pre;
+}
+.y-key{color:var(--caution);} .y-str{color:var(--telem);} .y-punc{color:var(--cream-faint);}
+.modal-foot{
+  display:flex;align-items:center;justify-content:flex-end;gap:10px;
+  padding:12px 18px;border-top:1px dashed var(--line-strong);
+  background:linear-gradient(0deg,var(--mid-3),var(--mid-2));
+}
+
+/* ═══ REDUCED MOTION ═══ */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{
+    animation:none !important;
+    transition:none !important;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- ══ titlebar ══ -->
+<header id="titlebar" class="riveted">
+  <span class="rivet-b"></span>
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">
+      <!-- three-node brand mark as a small embroidered patch -->
+      <svg viewBox="0 0 64 64" width="30" height="30">
+        <!-- fabric disc -->
+        <circle cx="32" cy="32" r="30" fill="#101c2b"/>
+        <!-- merrowed (overlock) border: thick cream ring of stitches -->
+        <circle cx="32" cy="32" r="28.5" fill="none" stroke="#e9dfc4"
+                stroke-width="4" stroke-dasharray="1.6 1.4"/>
+        <!-- inner stitched ring -->
+        <circle cx="32" cy="32" r="23" fill="none" stroke="rgba(233,223,196,.5)"
+                stroke-width="1" stroke-dasharray="2.5 2.5"/>
+        <!-- chevron path embroidered as running stitch -->
+        <path d="M22 18 L44 32 L22 46" fill="none" stroke="#e9dfc4"
+              stroke-width="2" stroke-dasharray="3 2.2" stroke-linecap="round"/>
+        <!-- three brand nodes as satin-stitch dots -->
+        <circle cx="22" cy="18" r="4.6" fill="#e08a4e" stroke="#0b1420" stroke-width="1"/>
+        <circle cx="44" cy="32" r="4.6" fill="#a98fd8" stroke="#0b1420" stroke-width="1"/>
+        <circle cx="22" cy="46" r="4.6" fill="#6cc08c" stroke="#0b1420" stroke-width="1"/>
+        <!-- node stitch texture -->
+        <path d="M19.4 18h5.2 M41.4 32h5.2 M19.4 46h5.2" stroke="rgba(11,20,32,.55)"
+              stroke-width=".8" stroke-dasharray="1 1"/>
+      </svg>
+    </span>
+    <span class="brand-name">CHROMUX</span>
+    <span class="brand-sub">AGENT&nbsp;COCKPIT</span>
+    <span class="brand-doc">REF NO. CMX-017-B</span>
+  </div>
+  <div class="titlebar-right">
+    <div class="gauges">
+      <span class="lamp lamp-go">
+        <span class="lamp-lens"><span class="lamp-tick"></span>3</span>
+        <span class="lamp-label">Sessions</span>
+      </span>
+      <span class="lamp lamp-caution">
+        <span class="lamp-lens"><span class="lamp-tick"></span>2</span>
+        <span class="lamp-label">Queued</span>
+      </span>
+      <span class="lamp lamp-telem">
+        <span class="lamp-lens"><span class="lamp-tick"></span>14</span>
+        <span class="lamp-label">Sent</span>
+      </span>
+    </div>
+    <button class="guarded">UPDATE READY</button>
+    <button class="hw-btn">SETTINGS</button>
+  </div>
+</header>
+
+<!-- ══ main frame ══ -->
+<div id="app">
+  <aside id="rail">
+    <div class="rail-head">
+      <span class="microlabel">ATTENTION QUEUE</span>
+      <button class="btn-detect">⛶ DETECT</button>
+    </div>
+    <div class="rail-docno">SEC 3.1 — CREW ACTION ITEMS · REV C</div>
+    <div id="attention-list">
+      <div class="qcard q-urgent">
+        <span class="q-step">STEP 01</span>
+        <div class="q-kind">Approval</div>
+        <div class="q-session">checkout-flow</div>
+        <div class="q-msg">claude wants to run <code>npm run db:migrate</code></div>
+      </div>
+      <div class="qcard q-info">
+        <span class="q-step">STEP 02</span>
+        <div class="q-kind">Preview</div>
+        <div class="q-session">landing-page</div>
+        <div class="q-msg">localhost:5173 changed — review ready</div>
+      </div>
+      <div class="qcard q-dead">
+        <span class="q-step">STEP 03</span>
+        <div class="q-kind">Exited</div>
+        <div class="q-session">api-server</div>
+        <div class="q-msg">codex exited (code 0) · 12m ago</div>
+      </div>
+    </div>
+    <div class="rail-patch" aria-hidden="true">
+      <!-- large embroidered mission patch -->
+      <svg viewBox="0 0 120 120" width="104" height="104">
+        <!-- fabric disc with weave -->
+        <defs>
+          <pattern id="weave" width="4" height="4" patternUnits="userSpaceOnUse">
+            <rect width="4" height="4" fill="#101c2b"/>
+            <path d="M0 0L4 4 M-1 3L1 5 M3 -1L5 1" stroke="rgba(233,223,196,.05)" stroke-width="1"/>
+          </pattern>
+        </defs>
+        <circle cx="60" cy="60" r="57" fill="url(#weave)"/>
+        <!-- merrowed border -->
+        <circle cx="60" cy="60" r="54.5" fill="none" stroke="#e9dfc4"
+                stroke-width="6" stroke-dasharray="1.8 1.6"/>
+        <!-- lettering ring guides -->
+        <circle cx="60" cy="60" r="45" fill="none" stroke="rgba(233,223,196,.35)"
+                stroke-width=".8" stroke-dasharray="2.5 2.5"/>
+        <circle cx="60" cy="60" r="31" fill="none" stroke="rgba(233,223,196,.35)"
+                stroke-width=".8" stroke-dasharray="2.5 2.5"/>
+        <!-- arc lettering -->
+        <defs>
+          <path id="arc-top" d="M22 60 A38 38 0 0 1 98 60"/>
+          <path id="arc-bot" d="M25 60 A35 35 0 0 0 95 60"/>
+        </defs>
+        <text font-family="Futura,'Avenir Next',sans-serif" font-size="9.5"
+              font-weight="700" fill="#e9dfc4" letter-spacing="3.5">
+          <textPath href="#arc-top" startOffset="50%" text-anchor="middle">CHROMUX</textPath>
+        </text>
+        <text font-family="Futura,'Avenir Next',sans-serif" font-size="6.5"
+              font-weight="600" fill="rgba(233,223,196,.75)" letter-spacing="2.6">
+          <textPath href="#arc-bot" startOffset="50%" text-anchor="middle">AGENT · COCKPIT</textPath>
+        </text>
+        <!-- stitched orbit ellipse -->
+        <ellipse cx="60" cy="62" rx="26" ry="11" fill="none"
+                 stroke="rgba(109,184,207,.6)" stroke-width="1.2"
+                 stroke-dasharray="3 2.4" transform="rotate(-18 60 62)"/>
+        <!-- chevron running stitch -->
+        <path d="M48 48 L76 62 L48 76" fill="none" stroke="#e9dfc4"
+              stroke-width="2.4" stroke-dasharray="3.4 2.6" stroke-linecap="round"/>
+        <!-- three satin-stitch nodes -->
+        <circle cx="48" cy="48" r="6" fill="#e08a4e" stroke="#0b1420" stroke-width="1.4"/>
+        <circle cx="76" cy="62" r="6" fill="#a98fd8" stroke="#0b1420" stroke-width="1.4"/>
+        <circle cx="48" cy="76" r="6" fill="#6cc08c" stroke="#0b1420" stroke-width="1.4"/>
+        <path d="M44.5 48h7 M72.5 62h7 M44.5 76h7" stroke="rgba(11,20,32,.6)"
+              stroke-width="1" stroke-dasharray="1.2 1.2"/>
+        <!-- tiny stitched stars -->
+        <path d="M84 44 l0 5 M81.5 46.5 l5 0" stroke="#e9dfc4" stroke-width="1"/>
+        <path d="M36 60 l0 4 M34 62 l4 0" stroke="rgba(233,223,196,.7)" stroke-width="1"/>
+      </svg>
+    </div>
+    <div class="rail-foot">
+      <div class="microlabel">LOCAL STORAGE</div>
+      <button class="pathlink">~/.chromux/captures</button>
+    </div>
+  </aside>
+
+  <div id="workspace">
+    <nav id="session-tabs" aria-label="Session tabs">
+      <button class="session-tab active">
+        <span class="tab-dot dot-live"></span>
+        checkout-flow · claude
+        <span class="tab-badge">2</span>
+      </button>
+      <button class="session-tab">
+        <span class="tab-dot dot-live"></span>
+        landing-page · grok
+      </button>
+      <button class="session-tab">
+        <span class="tab-dot dot-dead"></span>
+        api-server · codex
+      </button>
+      <button class="session-tab add-tab" aria-label="New session">+</button>
+    </nav>
+
+    <main id="stage">
+      <!-- terminal pane -->
+      <section class="pane riveted" id="terminal-pane">
+        <span class="rivet-b"></span>
+        <div class="pane-header">
+          <span class="pane-title"><span class="panel-id">PNL&nbsp;A</span>TERMINAL — <em>claude</em></span>
+          <span class="pane-cwd">~/projects/shop/checkout-flow</span>
+        </div>
+        <div id="terminal-body">
+          <div class="t-line t-welcome"><span class="t-glyph">✻</span>Welcome to Claude Code!<span class="t-path">/projects/shop/checkout-flow</span></div>
+          <div class="t-line t-user"><span class="t-glyph">›</span>fix the CTA overflow on the checkout page</div>
+          <div class="t-line t-agent"><span class="t-glyph">●</span>I'll look at the checkout component styles.</div>
+          <div class="t-line t-tool"><span class="t-glyph">●</span>Read <code>src/components/CheckoutCTA.tsx</code> (84 lines)</div>
+          <div class="t-line t-tool"><span class="t-glyph">●</span>Edit <code>src/styles/checkout.css</code></div>
+          <div class="t-line t-diff-del">- .cta-row { width: 120%; }</div>
+          <div class="t-line t-diff-add">+ .cta-row { width: 100%; max-width: 480px; }</div>
+          <div class="t-line t-ok"><span class="t-glyph">✔</span>Change applied — dev server reloaded</div>
+          <div class="t-line t-agent"><span class="t-glyph">●</span>The button no longer overflows. Preview updated on the right.</div>
+          <div class="t-line t-await"><span class="t-cursor"></span>awaiting your next instruction…</div>
+        </div>
+      </section>
+
+      <div id="divider" role="separator" aria-orientation="vertical"></div>
+
+      <!-- browser pane -->
+      <section class="pane riveted" id="browser-pane">
+        <span class="rivet-b"></span>
+        <div class="browser-toolbar">
+          <button class="nav-btn" aria-label="Back">‹</button>
+          <button class="nav-btn" aria-label="Forward">›</button>
+          <button class="nav-btn" aria-label="Reload">⟳</button>
+          <div class="url-bar">
+            <span class="url-freq">CH&nbsp;01</span>
+            <span class="url-text"><span class="url-scheme">http://</span>localhost:5173/checkout</span>
+          </div>
+          <button id="btn-capture" class="hw-btn hw-primary btn-capture">⛶ CAPTURE</button>
+          <button class="btn-queue">QUEUE<span class="chip-badge">2</span></button>
+          <span class="tool-chip">console: 0</span>
+          <button class="btn-collapse">⌄ COLLAPSE</button>
+        </div>
+        <div class="webview">
+          <span class="refresh-chip">REFRESHED</span>
+          <div class="web-page">
+            <div class="web-shop">Shop / Checkout</div>
+            <div class="web-h1">Order summary</div>
+            <div class="order-card">
+              <div class="order-row">
+                <span class="oi-name"><b>Aurora desk lamp</b><span>Qty 1 · brass</span></span>
+                <span>$36.00</span>
+              </div>
+              <div class="order-row">
+                <span class="oi-name"><b>Cable weave — 2m</b><span>Qty 2 · slate</span></span>
+                <span>$8.00</span>
+              </div>
+              <div class="order-row">
+                <span class="oi-name"><b>Shipping</b><span>Standard, 3–5 days</span></span>
+                <span>$4.00</span>
+              </div>
+              <div class="order-total">
+                <span class="ot-label">Total due</span>
+                <span class="ot-amt">$48.00</span>
+              </div>
+              <button class="pay-cta">Pay $48.00</button>
+              <div class="web-secure">🔒 Payments secured by ShopPay</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- telemetry strip -->
+    <div id="telemetry" aria-hidden="true">
+      <span class="tm-label">TLM&nbsp;DOWNLINK</span>
+      <span class="tm-wave">
+        <svg width="480" height="12" viewBox="0 0 480 12" preserveAspectRatio="none">
+          <path d="M0 8 L14 8 L18 3 L22 10 L26 8 L58 8 L62 5 L66 8 L98 8 L104 2 L110 11 L114 8 L160 8
+                   L174 8 L178 3 L182 10 L186 8 L218 8 L222 5 L226 8 L258 8 L264 2 L270 11 L274 8 L320 8
+                   L334 8 L338 3 L342 10 L346 8 L378 8 L382 5 L386 8 L418 8 L424 2 L430 11 L434 8 L480 8"
+                fill="none" stroke="rgba(109,184,207,.75)" stroke-width="1"/>
+        </svg>
+      </span>
+      <span class="tm-val">SIG <b>NOMINAL</b></span>
+      <span class="tm-val">CPU 12%</span>
+      <span class="tm-val">MEM 214MB</span>
+      <span class="tm-val">GET 04:12:39</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══ status bar ══ -->
+<footer id="statusbar">
+  <div class="sb-left">
+    <span class="microlabel">ADAPTER</span><span class="sb-val">claude -p · one-off</span>
+    <span class="sb-sep"></span>
+    <span class="microlabel">PAIRING</span><span class="sb-val">1:1 session ↔ pane</span>
+  </div>
+  <div class="sb-right">
+    <button class="sb-btn">DELIVERY LOG</button>
+    <span class="sb-ver">chromux 0.17.0 — mission patch concept</span>
+  </div>
+</footer>
+
+<div id="variation-tag">NO. 17 · MISSION PATCH</div>
+
+<!-- ══ capture modal — FORM CMX-CAP-1 ══ -->
+<div id="modal-capture" role="dialog" aria-modal="true" aria-label="Capture to agent">
+  <div class="modal riveted">
+    <span class="rivet-b"></span>
+    <div class="modal-head">
+      <span class="modal-title">CAPTURE → AGENT<span class="form-no">FORM CMX-CAP-1</span></span>
+      <button class="modal-x" id="modal-close" aria-label="Close">✕</button>
+    </div>
+    <div class="cap-grid">
+      <div class="cap-col">
+        <div class="cap-summary">
+          <div class="cap-row"><span class="microlabel">SESSION</span><span class="cap-val">checkout-flow · claude</span></div>
+          <div class="cap-row"><span class="microlabel">URL</span><span class="cap-val">localhost:5173/checkout</span></div>
+          <div class="cap-row"><span class="microlabel">SELECTION</span><span class="cap-val">CTA button region 412×88</span></div>
+        </div>
+        <label class="field">
+          <span class="microlabel">NOTE TO AGENT — WHAT'S WRONG / WHAT TO DO</span>
+          <textarea rows="3" spellcheck="false"
+            placeholder="e.g. the CTA button overflows its container — fix the CSS"></textarea>
+        </label>
+        <div class="field">
+          <span class="microlabel">TARGET</span>
+          <span class="select-wrap">
+            <select><option>checkout-flow · claude -p</option></select>
+          </span>
+        </div>
+        <div class="field">
+          <span class="microlabel">SCREENSHOT</span>
+          <div class="cap-shot"><span class="shot-reticle">⌖</span> CTA REGION · 412 × 88 · PNG</div>
+        </div>
+      </div>
+      <div class="cap-col">
+        <span class="microlabel">PAYLOAD PREVIEW — YAML v1</span>
+        <pre class="yaml-view"><span class="y-key">chromux_capture</span><span class="y-punc">:</span> <span class="y-str">v1</span>
+<span class="y-key">session</span><span class="y-punc">:</span> <span class="y-str">checkout-flow</span>
+<span class="y-key">agent</span><span class="y-punc">:</span> <span class="y-str">claude</span>
+<span class="y-key">url</span><span class="y-punc">:</span> <span class="y-str">http://localhost:5173/checkout</span>
+<span class="y-key">note</span><span class="y-punc">:</span> <span class="y-str">CTA overflows container</span>
+<span class="y-key">screenshot</span><span class="y-punc">:</span> <span class="y-str">~/.chromux/captures/2026-07-11-0142.png</span>
+<span class="y-key">console_errors</span><span class="y-punc">:</span> <span class="y-punc">[]</span></pre>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="hw-btn" id="modal-cancel">CANCEL</button>
+      <button class="hw-btn">FILE-DROP ONLY</button>
+      <button class="hw-btn hw-primary">SEND — claude -p</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var modal = document.getElementById('modal-capture');
+  function open(){ modal.classList.add('open'); }
+  function close(){ modal.classList.remove('open'); }
+
+  document.getElementById('btn-capture').addEventListener('click', open);
+  document.getElementById('modal-close').addEventListener('click', close);
+  document.getElementById('modal-cancel').addEventListener('click', close);
+  modal.addEventListener('click', function(e){ if(e.target === modal) close(); });
+  document.addEventListener('keydown', function(e){ if(e.key === 'Escape') close(); });
+
+  /* headless verification hook: ?modal=1 auto-opens the capture modal */
+  if(/[?&]modal=1/.test(location.search)) open();
+})();
+</script>
+</body>
+</html>
