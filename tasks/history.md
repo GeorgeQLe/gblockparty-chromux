@@ -1,5 +1,12 @@
 # Session History
 
+## 2026-07-13 — Chromux v0.24.2 direct-file design gallery links
+
+- Restored all thirty-six source-gallery cards to relative sibling `.html` links so `design-prototypes/index.html` works when opened directly from disk.
+- Kept the published gallery contract unchanged by translating the source links to clean `/designs/*` routes during the deterministic website build.
+- Added regression coverage for both link contexts, aligned root and prototype metadata at `0.24.2`, and recorded the matching patch release.
+- Validation: `npm test` passed, verifying thirty-six local design links, thirty-six generated clean design routes, and seven generated clean mobile routes; an independent direct-file resolution check confirmed all thirty-six card targets exist; `git diff --check` passed. Electron runtime suites and packaging were skipped because the prototype runtime and dependencies are unchanged. Residual risk is limited to future gallery cards bypassing the two-context route test. Rollback: revert the v0.24.2 commit, redeploy v0.24.1, and remove the `chromux-v0.24.2` tag/release if publication fails.
+
 ## 2026-07-12 — Mobile gallery release audit closure
 
 - Recorded the durable `docs/audits/mobile-gallery-release-2026-07-12.md` verdict: ship-ready as static prototypes, with the validation scope, resolved/rejected findings, and explicit non-functional SSH/terminal/browser limitation.

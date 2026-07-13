@@ -1,6 +1,6 @@
 {
   "name": "chromux-website",
-  "version": "0.24.1",
+  "version": "0.24.2",
   "private": true,
   "description": "Static product site and design gallery for GBlockParty Chromux.",
   "license": "MIT",

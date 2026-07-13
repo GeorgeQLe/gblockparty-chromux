@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.24.2
+
+Tag: `chromux-v0.24.2`
+
+- Restore direct-file navigation from `design-prototypes/index.html` to all thirty-six sibling design mockups.
+- Preserve clean `/designs/*` production URLs by translating the local links only in the generated website artifact.
+- Extend website route regression coverage to verify both direct-file gallery links and deployed clean routes.
+
 ## GBlockParty Chromux v0.24.1
 
 Tag: `chromux-v0.24.1`
