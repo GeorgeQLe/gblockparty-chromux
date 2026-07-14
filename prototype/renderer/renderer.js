@@ -3564,6 +3564,7 @@ async function autoRestoreWorkspace() {
 function openNewSessionModal() {
   $('#ns-name').value = `session-${state.counter + 1}`;
   $('#ns-cwd').value = state.lastCwd || (state.env ? state.env.home : '');
+  renderAgentDataWarning();
   $('#modal-new').classList.remove('hidden');
   renderSavedProjects();
   refreshProjectConfig().catch(() => {});
@@ -3645,6 +3646,17 @@ $('#ns-agent').addEventListener('click', (e) => {
   const btn = e.target.closest('button');
   if (!btn) return;
   for (const b of $('#ns-agent').children) b.classList.toggle('on', b === btn);
+  renderAgentDataWarning();
+});
+
+function renderAgentDataWarning() {
+  const selected = $('#ns-agent .on');
+  $('#grok-data-warning').classList.toggle('hidden', !selected || selected.dataset.agent !== 'grok');
+}
+
+$('#grok-data-warning').addEventListener('click', (e) => {
+  const link = e.target.closest('[data-security-resource]');
+  if (link) window.chromux.openSecurityResource(link.dataset.securityResource).catch(() => {});
 });
 
 $('#ns-create').onclick = async () => {
@@ -4671,6 +4683,19 @@ if (window.chromuxTest) {
   window.chromuxTestAgentCommand = {
     build: (agent, resumeId = null) => agentCommand(agent, resumeId),
     env: () => ({ ...state.env }),
+  };
+
+  window.chromuxTestGrokWarning = {
+    open: openNewSessionModal,
+    select(agent) {
+      const btn = [...$('#ns-agent').children].find((candidate) => candidate.dataset.agent === agent);
+      if (!btn) throw new Error(`Unknown agent: ${agent}`);
+      btn.click();
+    },
+    visible: () => !$('#grok-data-warning').classList.contains('hidden'),
+    text: () => $('#grok-data-warning').textContent.replace(/\s+/g, ' ').trim(),
+    resources: () => [...$('#grok-data-warning').querySelectorAll('[data-security-resource]')]
+      .map((button) => button.dataset.securityResource),
   };
 
   window.chromuxTestShellAdoption = {

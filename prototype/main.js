@@ -21,6 +21,12 @@ const {
 } = require('./shortcut-input');
 
 const SMOKE = process.argv.includes('--smoke');
+const SECURITY_RESOURCES = Object.freeze({
+  'wire-analysis': 'https://gist.github.com/cereblab/dc9a40bc26120f4540e4e09b75ffb547',
+  'reproduction-kit': 'https://github.com/cereblab/grok-build-exfil-repro',
+  'independent-report': 'https://sourcefeed.dev/a/grok-build-quietly-uploads-entire-repos-to-gcs',
+  'xai-privacy': 'https://x.ai/legal/privacy-policy',
+});
 
 const CHROMUX_HOME = path.join(os.homedir(), '.chromux');
 const CAPTURES_DIR = path.join(CHROMUX_HOME, 'captures');
@@ -1546,6 +1552,13 @@ ipcMain.handle('open-update-release', async (_e, opts = {}) => {
   if (!status || !status.releaseUrl) return { ok: false, message: 'No GitHub Release URL is available.' };
   await shell.openExternal(status.releaseUrl);
   return { ok: true, releaseUrl: status.releaseUrl };
+});
+
+ipcMain.handle('open-security-resource', async (_e, resource) => {
+  const url = SECURITY_RESOURCES[resource];
+  if (!url) throw new Error('Unknown security resource');
+  await shell.openExternal(url);
+  return true;
 });
 
 ipcMain.handle('install-update', async (_e, opts = {}) => {

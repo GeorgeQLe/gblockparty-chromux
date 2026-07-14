@@ -128,6 +128,28 @@ Chromux launches Claude Code, Codex, or shell sessions through the user's login
 shell. Those tools keep their own authentication, network behavior, logs, and
 provider-side policies. Chromux does not rewrite or proxy those CLIs.
 
+#### Grok Build / xAI warning
+
+Security researchers reported in July 2026 that Grok Build sent whole repository
+bundles to xAI-controlled infrastructure, potentially including files, Git
+history, secrets, and other material beyond the code needed for a task. The
+published findings are version-specific, and provider behavior and controls can
+change independently of Chromux. Treat Grok Build as capable of transmitting the
+codebase it can access.
+Before using Grok with proprietary, regulated, or sensitive code, review xAI's
+current data controls and consult a cybersecurity or data-security professional.
+
+Chromux displays this warning whenever Grok Build is selected for a new session.
+Chromux cannot verify, limit, or audit what the separately installed Grok CLI
+sends after launch.
+
+Sources and current provider guidance:
+
+- [Reproducible wire-level analysis of Grok Build 0.2.93](https://gist.github.com/cereblab/dc9a40bc26120f4540e4e09b75ffb547), including captured artifacts, checksums, limitations, and reproduction steps.
+- [Open reproduction harness and downloadable evidence](https://github.com/cereblab/grok-build-exfil-repro) for independently testing the version-specific finding with fake canary data.
+- [Independent report summarizing the repository-upload findings](https://sourcefeed.dev/a/grok-build-quietly-uploads-entire-repos-to-gcs).
+- [xAI's current privacy policy](https://x.ai/legal/privacy-policy).
+
 ### `SEND - claude -p`
 
 When the user chooses `SEND - claude -p`, Chromux starts a one-off `claude -p`

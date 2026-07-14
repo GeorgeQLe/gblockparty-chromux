@@ -6,6 +6,7 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Warn before launching Grok Build that the CLI may transmit codebase files, Git history, and secrets to xAI-controlled infrastructure; link the reproducible research, independent reporting, and xAI privacy policy; recommend professional cybersecurity/data-security review for sensitive repositories. _(source: user request; evidence: `prototype/renderer/index.html`, `prototype/renderer/renderer.js`, `prototype/docs/privacy-and-local-data.md`, `prototype/scripts/test-grok-warning-renderer.js`)_
 - [x] Compile the Chromux landing page and 15 design-refresh prototypes into a production-safe static website, publish the gallery at `/designs/`, and configure Vercel deployment. _(source: user request; evidence: `scripts/build-website.sh`, `vercel.json`, `landing/index.html`, `design-prototypes/`)_
 - [x] Add the "Liquid Glass" 16th design-refresh prototype and wire it into the gallery as Batch 3. _(source: user request; evidence: `design-prototypes/16-liquid-glass.html`, `design-prototypes/index.html`, `design-prototypes/README.md`)_
 - [x] Build seven mobile Chromux prototypes (A Mission Control, B Agent Inbox, C Browser Field Kit, D Timeline, E Deck of Agents, F Command Lens, G Remote Workbench) as static HTML mockups sharing one fleet state and layered-context contract, and publish them at `/mobile/`. _(source: user request; evidence: `mobile-prototypes/`, `mobile-prototypes/SPEC.md`, `scripts/build-website.sh`, `scripts/test-website-routes.js`, `landing/index.html`)_

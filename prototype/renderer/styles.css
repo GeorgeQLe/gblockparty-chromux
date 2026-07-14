@@ -964,6 +964,43 @@ input[type="text"]:focus, textarea:focus, select:focus { border-color: var(--amb
 .segmented button:last-child { border-right: none; }
 .segmented button.on { background: var(--amber-dim); color: var(--amber); }
 
+.agent-data-warning {
+  margin-top: 8px;
+  border: 1px solid var(--red);
+  border-left-width: 3px;
+  background: rgba(255, 85, 85, 0.08);
+  color: var(--text);
+  padding: 10px 11px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.agent-data-warning strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--red);
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+}
+.agent-data-warning-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.agent-data-warning-links button {
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  background: transparent;
+  color: var(--amber);
+  padding: 0;
+  font-family: var(--font-display);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+.agent-data-warning-links button:hover { color: var(--amber-hot); }
+
 .btn {
   border: 1px solid var(--line-hi);
   background: var(--bg2);

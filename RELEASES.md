@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.25.1
+
+Tag: `chromux-v0.25.1`
+
+- Display a prominent data-security warning whenever Grok Build is selected for a new session, noting that the CLI may transmit codebase files, Git history, and secrets to xAI-controlled infrastructure, with direct links to the reproducible wire-level research, independent reporting, and xAI's current privacy guidance.
+- Advise users handling proprietary, regulated, or sensitive code to review xAI's current data controls and consult a cybersecurity or data-security professional before use.
+- Document that Chromux launches the separately installed Grok CLI unchanged and cannot verify, restrict, or audit its provider-side transfers.
+
 ## GBlockParty Chromux v0.25.0
 
 Tag: `chromux-v0.25.0`
