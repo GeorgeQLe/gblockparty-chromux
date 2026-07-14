@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.26.0
+
+Tag: `chromux-v0.26.0`
+
+- Add four complete, clickable Chromux appearance directions—Blueprint, Retro-OS, Streak, and Liquid Glass—while preserving the shared terminal, browser, queue, capture, and settings behavior.
+- Add a visual theme picker to Settings with instant switching, a clear selected state, and local persistence across app restarts.
+- Match the embedded terminal palette to the selected cockpit theme, add Electron interaction coverage for selection and persistence, and provide a deterministic four-theme screenshot capture command for visual review.
+
 ## GBlockParty Chromux v0.25.1
 
 Tag: `chromux-v0.25.1`

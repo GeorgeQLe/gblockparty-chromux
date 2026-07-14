@@ -90,18 +90,50 @@
     </div>
     <div class="sb-right">
       <button id="btn-log" class="sb-btn">DELIVERY LOG</button>
-      <span class="sb-ver">chromux 0.22.0</span>
+      <span class="sb-ver">chromux 0.26.0</span>
     </div>
   </footer>
 
   <!-- ══ settings modal ══ -->
   <div id="modal-settings" class="overlay hidden">
-    <div class="modal">
+    <div class="modal modal-settings">
       <div class="modal-head">
         <span class="microlabel">SETTINGS</span>
         <button class="modal-x" data-close="modal-settings">✕</button>
       </div>
       <div class="modal-body">
+        <section class="appearance-settings" aria-labelledby="appearance-heading">
+          <div class="settings-section-head">
+            <div>
+              <div id="appearance-heading" class="microlabel">APPEARANCE</div>
+              <div class="settings-section-copy">Choose a cockpit direction. Changes apply instantly and stay selected after restart.</div>
+            </div>
+            <span id="settings-theme-current" class="settings-theme-current">BLUEPRINT</span>
+          </div>
+          <div id="settings-theme-grid" class="theme-grid" role="group" aria-label="Chromux theme">
+            <button class="theme-card" type="button" data-theme-option="blueprint" aria-pressed="false">
+              <span class="theme-swatch swatch-blueprint" aria-hidden="true"><i></i><b>DWG 01</b></span>
+              <span class="theme-card-copy"><strong>Blueprint</strong><small>Cyanotype grid · drafting lines</small></span>
+              <span class="theme-check" aria-hidden="true">✓</span>
+            </button>
+            <button class="theme-card" type="button" data-theme-option="retro-os" aria-pressed="false">
+              <span class="theme-swatch swatch-retro" aria-hidden="true"><i></i><b>SYS 7</b></span>
+              <span class="theme-card-copy"><strong>Retro-OS</strong><small>Platinum chrome · crisp bevels</small></span>
+              <span class="theme-check" aria-hidden="true">✓</span>
+            </button>
+            <button class="theme-card" type="button" data-theme-option="streak" aria-pressed="false">
+              <span class="theme-swatch swatch-streak" aria-hidden="true"><i></i><b>+24 XP</b></span>
+              <span class="theme-card-copy"><strong>Streak</strong><small>Playful color · tactile controls</small></span>
+              <span class="theme-check" aria-hidden="true">✓</span>
+            </button>
+            <button class="theme-card" type="button" data-theme-option="liquid-glass" aria-pressed="false">
+              <span class="theme-swatch swatch-glass" aria-hidden="true"><i></i><b>GLASS</b></span>
+              <span class="theme-card-copy"><strong>Liquid Glass</strong><small>Optical layers · spectral light</small></span>
+              <span class="theme-check" aria-hidden="true">✓</span>
+            </button>
+          </div>
+        </section>
+        <div class="settings-divider" aria-hidden="true"></div>
         <div class="settings-block">
           <div class="settings-row">
             <span class="microlabel">CURRENT VERSION</span>

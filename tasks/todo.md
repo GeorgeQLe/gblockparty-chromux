@@ -6,6 +6,7 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Add four clickable Chromux themes—Blueprint, Retro-OS, Streak, and Liquid Glass—with an instant, locally persisted picker in Settings and a matching terminal palette. _(source: user request; evidence: `prototype/renderer/index.html`, `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`, `prototype/scripts/test-themes-renderer.js`, `prototype/scripts/capture-themes.js`)_
 - [x] Warn before launching Grok Build that the CLI may transmit codebase files, Git history, and secrets to xAI-controlled infrastructure; link the reproducible research, independent reporting, and xAI privacy policy; recommend professional cybersecurity/data-security review for sensitive repositories. _(source: user request; evidence: `prototype/renderer/index.html`, `prototype/renderer/renderer.js`, `prototype/docs/privacy-and-local-data.md`, `prototype/scripts/test-grok-warning-renderer.js`)_
 - [x] Compile the Chromux landing page and 15 design-refresh prototypes into a production-safe static website, publish the gallery at `/designs/`, and configure Vercel deployment. _(source: user request; evidence: `scripts/build-website.sh`, `vercel.json`, `landing/index.html`, `design-prototypes/`)_
 - [x] Add the "Liquid Glass" 16th design-refresh prototype and wire it into the gallery as Batch 3. _(source: user request; evidence: `design-prototypes/16-liquid-glass.html`, `design-prototypes/index.html`, `design-prototypes/README.md`)_

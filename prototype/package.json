@@ -1,6 +1,6 @@
 {
   "name": "chromux",
-  "version": "0.25.1",
+  "version": "0.26.0",
   "description": "OSS desktop front-end for local and GBlockParty-managed agent/browser workspaces.",
   "main": "main.js",
   "private": false,
@@ -16,6 +16,7 @@
   "scripts": {
     "start": "electron .",
     "smoke": "electron . --smoke",
+    "capture:themes": "node scripts/capture-themes.js",
     "test:detect-filter-renderer": "node scripts/test-detect-filter-renderer.js",
     "test:attention-signals-renderer": "npm run test:turn-signals-renderer",
     "test:osc-parser": "node scripts/test-osc-parser.js",
@@ -36,6 +37,7 @@
     "test:update-queue-renderer": "node scripts/test-update-queue-renderer.js",
     "test:shell-adoption-renderer": "node scripts/test-shell-adoption-renderer.js",
     "test:grok-warning-renderer": "node scripts/test-grok-warning-renderer.js",
+    "test:themes-renderer": "node scripts/test-themes-renderer.js",
     "package": "electron-packager . Chromux --platform=darwin --arch=arm64 --icon=build/icon --app-bundle-id=dev.georgele.chromux --overwrite --out=dist --ignore='^/dist' --ignore='^/build/icon.iconset' --asar.unpack='**/node_modules/node-pty/**'",
     "install-app": "npm run package && node scripts/record-install-source.js && rm -rf /Applications/Chromux.app && cp -R dist/Chromux-darwin-arm64/Chromux.app /Applications/Chromux.app",
     "rebuild": "electron-rebuild -f -w node-pty",

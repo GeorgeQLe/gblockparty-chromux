@@ -38,6 +38,13 @@ the same as in Terminal even when launched from Finder.
 
 Then complete the loop:
 
+### Appearance themes
+
+Open **SETTINGS** and choose **Blueprint**, **Retro-OS**, **Streak**, or **Liquid Glass**. The
+selection applies immediately to the full cockpit and its terminal palette, then persists locally
+for the next launch. Run `npm run capture:themes -- /tmp/chromux-theme-shots` to generate a
+deterministic screenshot of the open theme picker in every direction.
+
 1. **Start a session** — `+ NEW`, pick your project directory, choose CLAUDE CODE / CODEX /
    GROK BUILD / SHELL ONLY. Chromux spawns your login shell and launches the agent CLI
    *unchanged* — it wraps the CLIs, never modifies them.

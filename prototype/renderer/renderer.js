@@ -6,6 +6,22 @@
 
 const $ = (sel) => document.querySelector(sel);
 
+const THEME_STORAGE_KEY = 'chromux.theme';
+const THEME_IDS = new Set(['blueprint', 'retro-os', 'streak', 'liquid-glass']);
+const THEME_LABELS = {
+  blueprint: 'Blueprint',
+  'retro-os': 'Retro-OS',
+  streak: 'Streak',
+  'liquid-glass': 'Liquid Glass',
+};
+
+function storedTheme() {
+  try {
+    const value = window.localStorage.getItem(THEME_STORAGE_KEY);
+    return THEME_IDS.has(value) ? value : 'blueprint';
+  } catch { return 'blueprint'; }
+}
+
 const state = {
   sessions: new Map(), // id -> session
   activeId: null,
@@ -19,6 +35,7 @@ const state = {
   projectConfig: null,
   events: [], // ring buffer of applied events (diagnostics), max EVENT_RING_MAX
   ui: {
+    theme: storedTheme(),
     captureModal: null, // { captureId, pngBase64, payloadBase } while composing/delivering
     dirty: new Set(),
     rafScheduled: false,
@@ -155,21 +172,73 @@ function renderFavoritesPicker(session) {
 // Terminal theme (matches the flight-deck palette)
 // ───────────────────────────────────────────────────────────────────────────
 
-const TERM_THEME = {
-  background: '#08090c',
-  foreground: '#c7d1dd',
-  cursor: '#ffb454',
-  cursorAccent: '#08090c',
-  selectionBackground: 'rgba(255,180,84,0.25)',
-  black: '#1d232e', brightBlack: '#3d4756',
-  red: '#f2707c', brightRed: '#ff8a94',
-  green: '#63d98b', brightGreen: '#8af0ab',
-  yellow: '#ffb454', brightYellow: '#ffcf8a',
-  blue: '#5fc6ff', brightBlue: '#8ad6ff',
-  magenta: '#d2a6ff', brightMagenta: '#e2c4ff',
-  cyan: '#73e0d8', brightCyan: '#98f0e9',
-  white: '#c7d1dd', brightWhite: '#eef3f8',
+const TERM_THEMES = {
+  blueprint: {
+    background: '#061b38', foreground: '#dceeff', cursor: '#7fd8ff', cursorAccent: '#061b38',
+    selectionBackground: 'rgba(127,216,255,0.28)', black: '#082346', brightBlack: '#527ca7',
+    red: '#ff9d86', brightRed: '#ffc0af', green: '#8af0bd', brightGreen: '#b7ffd9',
+    yellow: '#ffd88f', brightYellow: '#ffe8bd', blue: '#7fd8ff', brightBlue: '#b8eaff',
+    magenta: '#c6adff', brightMagenta: '#e0d2ff', cyan: '#8fe7f5', brightCyan: '#c6f6ff',
+    white: '#dceeff', brightWhite: '#ffffff',
+  },
+  'retro-os': {
+    background: '#ffffff', foreground: '#141414', cursor: '#30309a', cursorAccent: '#ffffff',
+    selectionBackground: 'rgba(48,48,154,0.24)', black: '#141414', brightBlack: '#666666',
+    red: '#9b1c1c', brightRed: '#d6393b', green: '#1f7a34', brightGreen: '#37b24d',
+    yellow: '#a05a00', brightYellow: '#e8940a', blue: '#30309a', brightBlue: '#5656c7',
+    magenta: '#7d2c85', brightMagenta: '#a94eb3', cyan: '#0b6a7d', brightCyan: '#18a5c0',
+    white: '#d0d0d0', brightWhite: '#ffffff',
+  },
+  streak: {
+    background: '#172033', foreground: '#f7fbff', cursor: '#58cc02', cursorAccent: '#172033',
+    selectionBackground: 'rgba(88,204,2,0.30)', black: '#172033', brightBlack: '#62708a',
+    red: '#ff5d5d', brightRed: '#ff8b8b', green: '#58cc02', brightGreen: '#8ee83f',
+    yellow: '#ffc800', brightYellow: '#ffe45c', blue: '#1cb0f6', brightBlue: '#70d2ff',
+    magenta: '#ce82ff', brightMagenta: '#e1b3ff', cyan: '#49e5c2', brightCyan: '#94f3de',
+    white: '#dfe8f5', brightWhite: '#ffffff',
+  },
+  'liquid-glass': {
+    background: '#111827', foreground: '#e7edf7', cursor: '#23b7ec', cursorAccent: '#111827',
+    selectionBackground: 'rgba(15,159,214,0.30)', black: '#111827', brightBlack: '#56647a',
+    red: '#ef6a5c', brightRed: '#ff958a', green: '#35c98c', brightGreen: '#72e0b3',
+    yellow: '#e3a02d', brightYellow: '#f3c86f', blue: '#23b7ec', brightBlue: '#71d8ff',
+    magenta: '#9587f4', brightMagenta: '#c0b7ff', cyan: '#52d7e8', brightCyan: '#94eef8',
+    white: '#dbe5f2', brightWhite: '#ffffff',
+  },
 };
+
+function terminalThemeFor(theme = state.ui.theme) {
+  return TERM_THEMES[theme] || TERM_THEMES.blueprint;
+}
+
+function renderThemeControls() {
+  const current = $('#settings-theme-current');
+  if (current) current.textContent = (THEME_LABELS[state.ui.theme] || THEME_LABELS.blueprint).toUpperCase();
+  document.querySelectorAll('[data-theme-option]').forEach((button) => {
+    const active = button.dataset.themeOption === state.ui.theme;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+}
+
+function applyTheme(theme, { persist = true } = {}) {
+  const next = THEME_IDS.has(theme) ? theme : 'blueprint';
+  state.ui.theme = next;
+  document.body.dataset.theme = next;
+  document.documentElement.style.colorScheme = next === 'blueprint' ? 'dark' : 'light';
+  if (persist) {
+    try { window.localStorage.setItem(THEME_STORAGE_KEY, next); } catch { /* unavailable */ }
+  }
+  for (const session of state.sessions.values()) {
+    if (session.term && session.term.term && session.term.term.options) {
+      session.term.term.options.theme = terminalThemeFor(next);
+    }
+  }
+  renderThemeControls();
+  return next;
+}
+
+applyTheme(state.ui.theme, { persist: false });
 
 // ───────────────────────────────────────────────────────────────────────────
 // Preview detection — scan complete terminal lines for localhost URLs and
@@ -2540,7 +2609,7 @@ async function createSession({ name, cwd, agent, initialUrl = null, initialQueue
     cursorBlink: true,
     scrollback: 8000,
     macOptionIsMeta: true,
-    theme: TERM_THEME,
+    theme: terminalThemeFor(),
   });
   const fitAddon = new FitAddon.FitAddon();
   term.loadAddon(fitAddon);
@@ -3586,6 +3655,10 @@ $('#detect-rescan').onclick = () => scanExternal().catch(() => {});
 $('#detect-open-all').onclick = () => openAllDetectedAgents().catch(() => {});
 $('#restore-open-all').onclick = () => openAllRestoredSessions().catch(() => {});
 $('#btn-settings').onclick = openSettings;
+$('#settings-theme-grid').addEventListener('click', (event) => {
+  const option = event.target.closest('[data-theme-option]');
+  if (option) applyTheme(option.dataset.themeOption);
+});
 $('#btn-update-ready').onclick = () => {
   if (updateAvailable() && state.updateQueue.phase === 'idle') queueUpdate();
   else openSettings();
@@ -4696,6 +4769,27 @@ if (window.chromuxTest) {
     text: () => $('#grok-data-warning').textContent.replace(/\s+/g, ' ').trim(),
     resources: () => [...$('#grok-data-warning').querySelectorAll('[data-security-resource]')]
       .map((button) => button.dataset.securityResource),
+  };
+
+  window.chromuxTestThemes = {
+    ids: () => [...THEME_IDS],
+    current: () => state.ui.theme,
+    stored: () => {
+      try { return window.localStorage.getItem(THEME_STORAGE_KEY); } catch { return null; }
+    },
+    select(theme) {
+      const button = document.querySelector(`[data-theme-option="${theme}"]`);
+      if (!button) throw new Error(`Unknown theme: ${theme}`);
+      button.click();
+      return state.ui.theme;
+    },
+    selectedCards: () => [...document.querySelectorAll('[data-theme-option][aria-pressed="true"]')]
+      .map((button) => button.dataset.themeOption),
+    bodyTheme: () => document.body.dataset.theme,
+    reset() {
+      try { window.localStorage.removeItem(THEME_STORAGE_KEY); } catch { /* unavailable */ }
+      return applyTheme('blueprint', { persist: false });
+    },
   };
 
   window.chromuxTestShellAdoption = {
