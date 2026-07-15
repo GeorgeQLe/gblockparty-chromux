@@ -53,6 +53,7 @@ const state = {
   resumeRetryWarning: null,
   lifecyclePrompt: null,
   testInstallUpdateResult: null,
+  testUpdateInstallTrace: null,
   updateQueue: {
     phase: 'idle',
     error: null,
@@ -2687,6 +2688,7 @@ function closeSession(id) {
 
 function setUpdateQueuePhase(phase, patch = {}) {
   if (!UPDATE_QUEUE_PHASES.has(phase)) return;
+  if (state.testUpdateInstallTrace) state.testUpdateInstallTrace.phases.push(phase);
   apply({ type: 'update-queue-phase', phase, patch });
 }
 
@@ -2739,6 +2741,14 @@ function dismissUpdateQueue() {
 function focusFirstUpdateBlocker() {
   const blocker = updateBlockers()[0];
   if (blocker) activateSession(blocker.session.id);
+}
+
+function canInstallIdleWorkspaceImmediately() {
+  if (state.updateQueue.phase !== 'idle') return false;
+  if (!hasManagedInstallSource() || state.sessions.size !== 0) return false;
+  // Project attention before queueUpdate() can introduce an UPDATE READY item.
+  // Any existing user-visible work keeps the normal staged install flow.
+  return attentionItems().length === 0;
 }
 
 function updateStatusMessage(status) {
@@ -2906,7 +2916,8 @@ async function installUpdate({ forceBlockers = false } = {}) {
   const statusEl = $('#settings-update-status');
   const command = $('#settings-update-command');
   if (!updateAvailable() || state.updateQueue.phase === 'running') return;
-  if (state.updateQueue.phase === 'idle') {
+  const installIdleWorkspaceImmediately = canInstallIdleWorkspaceImmediately();
+  if (state.updateQueue.phase === 'idle' && !installIdleWorkspaceImmediately) {
     queueUpdate();
     return;
   }
@@ -2916,13 +2927,17 @@ async function installUpdate({ forceBlockers = false } = {}) {
     focusFirstUpdateBlocker();
     return;
   }
-  if (blockers.length === 0) setUpdateQueuePhase('ready');
-  if (!state.testInstallUpdateResult) {
-    if (!(await showLifecyclePrompt('update-install'))) return;
-    await window.chromux.saveRestoreSnapshot({
-      reason: 'update-install',
-      sessions: snapshotOpenSessions(),
-    });
+  if (blockers.length === 0 && !installIdleWorkspaceImmediately) setUpdateQueuePhase('ready');
+  if (!installIdleWorkspaceImmediately) {
+    if (state.testUpdateInstallTrace) state.testUpdateInstallTrace.lifecyclePrompts += 1;
+    if (!state.testInstallUpdateResult && !(await showLifecyclePrompt('update-install'))) return;
+    if (state.testUpdateInstallTrace) state.testUpdateInstallTrace.restoreSnapshots += 1;
+    if (!state.testInstallUpdateResult) {
+      await window.chromux.saveRestoreSnapshot({
+        reason: 'update-install',
+        sessions: snapshotOpenSessions(),
+      });
+    }
   }
   setUpdateQueuePhase('running', {
     error: null,
@@ -3660,7 +3675,7 @@ $('#settings-theme-grid').addEventListener('click', (event) => {
   if (option) applyTheme(option.dataset.themeOption);
 });
 $('#btn-update-ready').onclick = () => {
-  if (updateAvailable() && state.updateQueue.phase === 'idle') queueUpdate();
+  if (updateAvailable() && state.updateQueue.phase === 'idle') installUpdate().catch(showUpdateInstallError);
   else openSettings();
 };
 
@@ -4164,6 +4179,17 @@ if (window.chromuxTest) {
     setInstallResult(result) {
       state.testInstallUpdateResult = result;
     },
+    resetInstallTrace() {
+      state.testUpdateInstallTrace = {
+        lifecyclePrompts: 0,
+        restoreSnapshots: 0,
+        phases: [state.updateQueue.phase],
+      };
+    },
+    installTrace: () => ({
+      ...(state.testUpdateInstallTrace || {}),
+      phases: [...(state.testUpdateInstallTrace?.phases || [])],
+    }),
     addSession: async (opts) => addFakeSession(opts),
     setSession(id, patch = {}) {
       const session = testSession(id);

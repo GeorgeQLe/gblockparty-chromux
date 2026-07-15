@@ -25,6 +25,11 @@ fs.writeFileSync(e2ePath, `
     if (index === -1) throw new Error('Missing attention kind ' + kind + ' in ' + list.join(','));
     return index;
   };
+  const settle = async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    q.flushRender();
+  };
 
   await new Promise((resolve) => setTimeout(resolve, 100));
   q.setStatus({
@@ -35,13 +40,99 @@ fs.writeFileSync(e2ePath, `
       command: 'npm run install-app',
     },
   });
+
+  // Explicit queue state, including a failed retry, must retain the protected
+  // lifecycle/snapshot path even in an otherwise empty workspace.
   q.queue();
   expect(q.phase() === 'ready', 'zero sessions should queue as ready, got ' + q.phase());
   expect(q.attentionKinds()[0] === 'UPDATE READY', 'ready update should be first attention item');
   expect(q.installButtonText() === 'INSTALL UPDATE', 'ready settings action should install update');
+  q.resetInstallTrace();
+  q.setInstallResult({ ok: false, message: 'empty fixture failure', output: 'empty fixture log' });
+  document.querySelector('#settings-install-update').click();
+  await settle();
+  expect(q.phase() === 'failed', 'explicitly queued empty-workspace install should preserve failed state');
+  expect(q.installTrace().lifecyclePrompts === 1, 'explicit ready install should enter lifecycle protection');
+  expect(q.installTrace().restoreSnapshots === 1, 'explicit ready install should write a restore snapshot');
+  q.resetInstallTrace();
+  q.setInstallResult({ ok: true, output: 'empty fixture retry started' });
+  document.querySelector('#settings-install-update').click();
+  await settle();
+  expect(q.phase() === 'running', 'failed retry should install from its existing queue state');
+  expect(q.installTrace().lifecyclePrompts === 1, 'failed retry must not use the idle-workspace bypass');
+  expect(q.installTrace().restoreSnapshots === 1, 'failed retry should retain snapshot protection');
+
+  // The first click in a truly idle workspace should install immediately,
+  // without projecting an UPDATE READY row or protecting an empty snapshot.
+  q.setStatus({ updateAvailable: false });
+  q.setStatus({
+    updateAvailable: true,
+    managedInstall: {
+      available: true,
+      sourceDir: '/tmp/chromux-source',
+      command: 'npm run install-app',
+    },
+  });
+  q.resetInstallTrace();
+  q.setInstallResult({ ok: true, output: 'idle fast install started' });
+  document.querySelector('#btn-update-ready').click();
+  await settle();
+  expect(q.phase() === 'running', 'idle empty workspace should install on the first top-level click');
+  expect([...new Set(q.installTrace().phases)].join(',') === 'idle,running', 'top-level fast path should transition directly idle to running');
+  expect(!q.attentionKinds().includes('UPDATE READY'), 'idle fast path must not expose UPDATE READY');
+  expect(q.installTrace().lifecyclePrompts === 0, 'idle fast path should skip the lifecycle modal');
+  expect(q.installTrace().restoreSnapshots === 0, 'idle fast path should skip the empty restore snapshot');
+
+  q.setStatus({ updateAvailable: false });
+  q.setStatus({
+    updateAvailable: true,
+    managedInstall: {
+      available: true,
+      sourceDir: '/tmp/chromux-source',
+      command: 'npm run install-app',
+    },
+  });
+  q.resetInstallTrace();
+  document.querySelector('#settings-install-update').click();
+  await settle();
+  expect(q.phase() === 'running', 'idle empty workspace should also install on the first Settings click');
+  expect([...new Set(q.installTrace().phases)].join(',') === 'idle,running', 'Settings fast path should transition directly idle to running');
+  expect(!q.attentionKinds().includes('UPDATE READY'), 'Settings fast path must not expose UPDATE READY');
+  expect(q.installTrace().lifecyclePrompts === 0, 'Settings fast path should skip lifecycle confirmation');
+  expect(q.installTrace().restoreSnapshots === 0, 'Settings fast path should skip the empty snapshot');
+
+  // Without a managed source, the same click retains the manual update flow.
+  q.setStatus({ updateAvailable: false });
+  q.setStatus({
+    updateAvailable: true,
+    managedInstall: {
+      available: false,
+      reason: 'missing-source',
+      message: 'No managed install source is recorded for this app.',
+    },
+  });
+  q.resetInstallTrace();
+  document.querySelector('#btn-update-ready').click();
+  await settle();
+  expect(q.phase() === 'ready', 'missing managed source should queue for the manual update flow');
+  expect(q.attentionKinds().includes('UPDATE READY'), 'manual update flow should retain UPDATE READY');
+  expect(q.installTrace().lifecyclePrompts === 0, 'manual update queueing should not open lifecycle confirmation');
+  expect(q.installTrace().restoreSnapshots === 0, 'manual update queueing should not write a snapshot');
+
+  q.setStatus({ updateAvailable: false });
+  q.setStatus({
+    updateAvailable: true,
+    managedInstall: {
+      available: true,
+      sourceDir: '/tmp/chromux-source',
+      command: 'npm run install-app',
+    },
+  });
+  q.setInstallResult(null);
 
   const liveId = await q.addSession({ name: 'live-unknown' });
-  q.queue();
+  document.querySelector('#btn-update-ready').click();
+  q.flushRender();
   expect(q.phase() === 'waiting', 'live unknown-turn session should block, got ' + q.phase());
   expect(q.blockers().join(',') === 'live-unknown', 'expected live-unknown blocker');
   expect(q.attentionKinds()[0] === 'UPDATE WAITING', 'waiting update should be first attention item');
@@ -78,6 +169,7 @@ fs.writeFileSync(e2ePath, `
   expect(q.attentionKinds()[0] === 'UPDATE WAITING', 're-queued waiting update should return to attention');
 
   q.setInstallResult({ ok: true, output: 'fixture install started' });
+  q.resetInstallTrace();
   q.clickAttentionPrimary('UPDATE WAITING');
   q.flushRender();
   expect(q.phase() === 'waiting', 'attention UPDATE WAITING primary should not install');
@@ -97,6 +189,8 @@ fs.writeFileSync(e2ePath, `
   await new Promise((resolve) => setTimeout(resolve, 50));
   q.flushRender();
   expect(q.phase() === 'running', 'settings INSTALL ANYWAY should enter install path with blockers, got ' + q.phase());
+  expect(q.installTrace().lifecyclePrompts === 1, 'open-session install should retain lifecycle confirmation');
+  expect(q.installTrace().restoreSnapshots === 1, 'open-session install should retain restore snapshots');
   q.setInstallResult(null);
   q.setStatus({ updateAvailable: false });
   q.setStatus({

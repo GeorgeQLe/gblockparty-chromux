@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.26.2
+
+Tag: `chromux-v0.26.2`
+
+- Install an available managed update immediately when Chromux has no open sessions and no projected attention items.
+- Skip the intermediate `UPDATE READY` queue item, restart confirmation, and empty restore snapshot for that idle-workspace fast path.
+- Preserve staged updates, blocker focus, restart protection, restore snapshots, retries, and manual-release handling whenever the workspace is not eligible for immediate installation.
+
 ## GBlockParty Chromux v0.26.1
 
 Tag: `chromux-v0.26.1`
