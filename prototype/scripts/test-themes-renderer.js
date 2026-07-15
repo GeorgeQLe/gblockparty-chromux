@@ -15,6 +15,36 @@ fs.writeFileSync(e2ePath, `
   const themes = window.chromuxTestThemes;
   const expect = (condition, message) => { if (!condition) throw new Error(message); };
   const expected = ['blueprint', 'retro-os', 'streak', 'liquid-glass'];
+  const rgb = (value) => {
+    const channels = value.match(/[\\d.]+/g);
+    if (!channels || channels.length < 3) throw new Error('unparseable color: ' + value);
+    return channels.slice(0, 3).map(Number);
+  };
+  const luminance = (value) => rgb(value)
+    .map((channel) => {
+      const normalized = channel / 255;
+      return normalized <= .04045 ? normalized / 12.92 : Math.pow((normalized + .055) / 1.055, 2.4);
+    })
+    .reduce((sum, channel, index) => sum + channel * [.2126, .7152, .0722][index], 0);
+  const contrast = (foreground, background) => {
+    const values = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
+    return (values[0] + .05) / (values[1] + .05);
+  };
+  const expectContrast = (element, label) => {
+    const style = getComputedStyle(element);
+    const ratio = contrast(style.color, style.backgroundColor);
+    expect(ratio >= 4.5, label + ' contrast should meet WCAG AA; got ' + ratio.toFixed(2));
+  };
+
+  const fixtures = document.createElement('div');
+  fixtures.innerHTML = [
+    '<button class="head-btn armed">ARMED</button>',
+    '<button class="nav-btn favorite-btn armed">★</button>',
+    '<span class="q-badge">2</span>',
+    '<span class="shortcut-chip matched">MATCHED</span>',
+    '<button class="session-tab active">ACTIVE</button>',
+  ].join('');
+  document.body.appendChild(fixtures);
 
   themes.reset();
   expect(JSON.stringify(themes.ids()) === JSON.stringify(expected), 'all four theme ids should be registered');
@@ -27,12 +57,28 @@ fs.writeFileSync(e2ePath, `
     expect(themes.bodyTheme() === theme, theme + ' should update the body theme');
     expect(themes.stored() === theme, theme + ' should persist to localStorage');
     expect(JSON.stringify(themes.selectedCards()) === JSON.stringify([theme]), theme + ' should be the only pressed card');
+    expectContrast(document.querySelector('#settings-check-updates'), theme + ' primary button');
+    expectContrast(document.querySelector('[data-theme-option="' + theme + '"] .theme-check'), theme + ' selected-theme check');
   }
+
+  themes.select('blueprint');
+  expectContrast(document.querySelector('#btn-update-ready'), 'blueprint update-ready button');
+  expectContrast(fixtures.querySelector('.head-btn.armed'), 'blueprint armed header button');
+  expectContrast(fixtures.querySelector('.favorite-btn.armed'), 'blueprint armed favorite button');
+  expectContrast(fixtures.querySelector('.q-badge'), 'blueprint queue badge');
+  expectContrast(fixtures.querySelector('.shortcut-chip.matched'), 'blueprint matched shortcut chip');
+
+  themes.select('streak');
+  expectContrast(document.querySelector('.brand-sub'), 'streak brand badge');
+  expectContrast(document.querySelector('#settings-theme-current'), 'streak current-theme badge');
+  expectContrast(fixtures.querySelector('.session-tab.active'), 'streak active session tab');
+  expectContrast(fixtures.querySelector('.q-badge'), 'streak queue badge');
 
   let rejected = false;
   try { themes.select('unknown-theme'); } catch { rejected = true; }
   expect(rejected, 'unknown themes should be rejected');
   themes.reset();
+  fixtures.remove();
   return JSON.stringify({ ok: true });
 })()
 `);

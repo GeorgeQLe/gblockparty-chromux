@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.26.1
+
+Tag: `chromux-v0.26.1`
+
+- Restore Blueprint filled-control backgrounds so dark on-accent labels no longer render directly over blue surfaces.
+- Centralize on-accent foreground colors and improve contrast for Streak selected, badge, and active-session states plus Liquid Glass selected-theme checks.
+- Add WCAG AA contrast regression coverage for primary buttons, update/armed controls, queue and shortcut badges, theme selection, and active-session surfaces across all four themes.
+
 ## GBlockParty Chromux v0.26.0
 
 Tag: `chromux-v0.26.0`
