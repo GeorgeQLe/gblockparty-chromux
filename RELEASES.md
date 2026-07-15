@@ -1,5 +1,12 @@
 # Release Notes
 
+## GBlockParty Chromux v0.26.3
+
+Tag: `chromux-v0.26.3`
+
+- Use the canonical three-node Chromux logo on the starting screen instead of the unrelated triangle glyph.
+- Remove the Agent Cockpit badge from the top header.
+
 ## GBlockParty Chromux v0.26.2
 
 Tag: `chromux-v0.26.2`

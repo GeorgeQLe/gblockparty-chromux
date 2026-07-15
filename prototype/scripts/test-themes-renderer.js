@@ -47,6 +47,9 @@ fs.writeFileSync(e2ePath, `
   document.body.appendChild(fixtures);
 
   themes.reset();
+  expect(!document.querySelector('.brand-sub'), 'top header should not render the Agent Cockpit badge');
+  expect(document.querySelector('.brand-mark use')?.getAttribute('href') === '#chromux-mark', 'header should use the canonical Chromux mark');
+  expect(document.querySelector('.empty-mark use')?.getAttribute('href') === '#chromux-mark', 'starting screen should use the canonical Chromux mark');
   expect(JSON.stringify(themes.ids()) === JSON.stringify(expected), 'all four theme ids should be registered');
   expect(themes.current() === 'blueprint', 'blueprint should be the default theme');
   expect(themes.bodyTheme() === 'blueprint', 'default theme should be applied to the body');
@@ -69,7 +72,6 @@ fs.writeFileSync(e2ePath, `
   expectContrast(fixtures.querySelector('.shortcut-chip.matched'), 'blueprint matched shortcut chip');
 
   themes.select('streak');
-  expectContrast(document.querySelector('.brand-sub'), 'streak brand badge');
   expectContrast(document.querySelector('#settings-theme-current'), 'streak current-theme badge');
   expectContrast(fixtures.querySelector('.session-tab.active'), 'streak active session tab');
   expectContrast(fixtures.querySelector('.q-badge'), 'streak queue badge');

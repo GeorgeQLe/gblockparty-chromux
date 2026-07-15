@@ -88,14 +88,6 @@ body {
   letter-spacing: 0.34em;
   color: var(--text);
 }
-.brand-sub {
-  font-family: var(--font-display);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.22em;
-  color: var(--faint);
-}
-
 .titlebar-gauges { display: flex; gap: 18px; -webkit-app-region: no-drag; }
 .gauge {
   font-family: var(--font-display);
@@ -486,8 +478,8 @@ body {
   gap: 14px;
   text-align: center;
 }
-.empty-mark { font-size: 44px; color: var(--amber); text-shadow: 0 0 30px rgba(255,180,84,0.5); animation: emberPulse 3.2s ease-in-out infinite; }
-@keyframes emberPulse { 50% { text-shadow: 0 0 46px rgba(255,180,84,0.75); } }
+.empty-mark { width: 64px; height: 64px; color: var(--text); filter: drop-shadow(0 0 15px rgba(255,180,84,0.4)); animation: emberPulse 3.2s ease-in-out infinite; }
+@keyframes emberPulse { 50% { filter: drop-shadow(0 0 23px rgba(255,180,84,0.65)); } }
 .empty-title {
   font-family: var(--font-display);
   font-size: 34px; font-weight: 700; letter-spacing: 0.45em;
@@ -1449,7 +1441,7 @@ body[data-theme="blueprint"] .favorite-btn.armed {
 }
 body[data-theme="blueprint"] .btn-amber:hover { background: var(--amber-hot); }
 body[data-theme="blueprint"] .session-tab.active { background: rgba(127, 216, 255, .10); box-shadow: inset 0 -2px var(--text); }
-body[data-theme="blueprint"] .empty-mark { text-shadow: none; }
+body[data-theme="blueprint"] .empty-mark { filter: none; }
 body[data-theme="blueprint"] .empty-title { text-shadow: 1px 1px 0 rgba(127, 216, 255, .25); }
 body[data-theme="blueprint"] .modal { box-shadow: 12px 12px 0 rgba(3, 14, 30, .40); }
 
@@ -1488,7 +1480,6 @@ body[data-theme="retro-os"] #titlebar {
   box-shadow: inset 1px 1px #fff;
 }
 body[data-theme="retro-os"] .brand { background: #ccc; padding: 0 12px; border-left: 1px solid #1c1c1c; border-right: 1px solid #1c1c1c; }
-body[data-theme="retro-os"] .brand-sub { border: 1px solid #7d7d7d; background: #ddd; padding: 2px 5px; }
 body[data-theme="retro-os"] #app { padding: 8px; gap: 8px; border: 1px solid #1c1c1c; background: #ccc; }
 body[data-theme="retro-os"] #rail,
 body[data-theme="retro-os"] #workspace { border: 1px solid #1c1c1c; box-shadow: 2px 2px 0 rgba(0,0,0,.65); }
@@ -1532,7 +1523,7 @@ body[data-theme="retro-os"] .queue-panel,
 body[data-theme="retro-os"] .favorites-panel { border-color: #1c1c1c; background: #fff; box-shadow: inset 1px 1px #7d7d7d; }
 body[data-theme="retro-os"] .modal { border: 1px solid #1c1c1c; background: #ccc; box-shadow: 3px 3px 0 rgba(0,0,0,.8); }
 body[data-theme="retro-os"] .overlay { background: rgba(80, 84, 83, .68); backdrop-filter: none; }
-body[data-theme="retro-os"] .empty-mark { color: #30309a; text-shadow: none; animation: none; }
+body[data-theme="retro-os"] .empty-mark { filter: none; animation: none; }
 body[data-theme="retro-os"] .empty-title { letter-spacing: .12em; }
 body[data-theme="retro-os"] .web-placeholder { background: #fff; }
 
@@ -1567,7 +1558,6 @@ body[data-theme="streak"] {
 body[data-theme="streak"] #titlebar { height: 54px; border-bottom: 2px solid var(--line); background: rgba(255,255,255,.94); }
 body[data-theme="streak"] .brand-mark { width: 34px; height: 34px; justify-content: center; border-radius: 12px; background: #efffe5; border-bottom: 3px solid #c9e9b0; }
 body[data-theme="streak"] .brand-name { letter-spacing: .12em; color: #20283a; }
-body[data-theme="streak"] .brand-sub { padding: 4px 9px; border-radius: 999px; background: #ce82ff; color: var(--on-brand); }
 body[data-theme="streak"] .gauge { border: 2px solid var(--line); border-bottom-width: 4px; border-radius: 999px; background: #fff; padding: 5px 10px 4px; }
 body[data-theme="streak"] .top-btn,
 body[data-theme="streak"] .btn,
@@ -1615,7 +1605,7 @@ body[data-theme="streak"] .theme-card.active { border-color: var(--green); box-s
 body[data-theme="streak"] .theme-card.active .theme-check { border-color: #3da600; background: var(--green); color: var(--on-green); }
 body[data-theme="streak"] .settings-theme-current { border: 0; border-bottom: 4px solid #3da600; border-radius: 999px; background: var(--green); color: var(--on-green); }
 body[data-theme="streak"] #statusbar { height: 30px; border-top: 2px solid var(--line); background: #fff; }
-body[data-theme="streak"] .empty-mark { color: var(--green); text-shadow: 0 5px 0 #d8f4c5; }
+body[data-theme="streak"] .empty-mark { filter: drop-shadow(0 5px 0 #d8f4c5); }
 
 /* Liquid Glass — illuminated desk, translucent layers, bright edge light. */
 body[data-theme="liquid-glass"] {
@@ -1650,7 +1640,6 @@ body[data-theme="liquid-glass"] #titlebar {
   box-shadow: inset 0 1px #fff, 0 18px 40px -28px rgba(38,52,76,.55);
 }
 body[data-theme="liquid-glass"] .brand-name { letter-spacing: .02em; }
-body[data-theme="liquid-glass"] .brand-sub { letter-spacing: .16em; }
 body[data-theme="liquid-glass"] .brand-mark { width: 30px; height: 28px; justify-content: center; border-radius: 10px; background: rgba(255,255,255,.62); box-shadow: inset 0 1px #fff, 0 8px 16px -10px #26344c; }
 body[data-theme="liquid-glass"] .gauge,
 body[data-theme="liquid-glass"] .top-btn { border-radius: 999px; background: rgba(255,255,255,.42); box-shadow: inset 0 1px rgba(255,255,255,.9); }
@@ -1696,7 +1685,7 @@ body[data-theme="liquid-glass"] .settings-theme-current { border-color: rgba(15,
 body[data-theme="liquid-glass"] .modal { color: #172231; background: rgba(248,251,255,.96); backdrop-filter: blur(20px) saturate(135%); box-shadow: inset 0 1px #fff, 0 30px 80px -28px rgba(38,52,76,.72); }
 body[data-theme="liquid-glass"] .overlay { background: rgba(61,75,94,.34); backdrop-filter: blur(8px); }
 body[data-theme="liquid-glass"] #statusbar { margin: 0 12px 8px; border: 1px solid rgba(255,255,255,.82); border-radius: 10px; background: rgba(255,255,255,.48); backdrop-filter: blur(22px); box-shadow: inset 0 1px #fff; }
-body[data-theme="liquid-glass"] .empty-mark { color: var(--cyan); text-shadow: 0 14px 34px rgba(15,159,214,.32); }
+body[data-theme="liquid-glass"] .empty-mark { filter: drop-shadow(0 14px 17px rgba(15,159,214,.32)); }
 
 @media (max-width: 720px) {
   .theme-grid { grid-template-columns: 1fr; }
