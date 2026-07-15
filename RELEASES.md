@@ -1,5 +1,14 @@
 # Release Notes
 
+## GBlockParty Chromux v0.28.0
+
+Tag: `chromux-v0.28.0`
+
+- Add independently selectable and persisted Light and Dark modes to Blueprint, Retro-OS, Streak, and Liquid Glass.
+- Match the embedded terminal palette and native control color scheme to every theme and brightness combination.
+- Make Liquid Glass Light the default appearance for users who have not already selected a theme.
+- Expand theme interaction, contrast, persistence, and screenshot coverage from four appearances to all eight combinations.
+
 ## GBlockParty Chromux v0.27.1
 
 Tag: `chromux-v0.27.1`

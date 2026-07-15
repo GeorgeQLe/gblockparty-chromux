@@ -41,9 +41,10 @@ Then complete the loop:
 ### Appearance themes
 
 Open **SETTINGS** and choose **Blueprint**, **Retro-OS**, **Streak**, or **Liquid Glass**. The
-selection applies immediately to the full cockpit and its terminal palette, then persists locally
-for the next launch. Run `npm run capture:themes -- /tmp/chromux-theme-shots` to generate a
-deterministic screenshot of the open theme picker in every direction.
+selected theme and its independent **Light** or **Dark** mode apply immediately to the full cockpit
+and terminal palette, then persist locally for the next launch. New profiles start with Liquid Glass
+Light. Run `npm run capture:themes -- /tmp/chromux-theme-shots` to generate deterministic
+screenshots of the open theme picker in all eight theme/mode combinations.
 
 1. **Start a session** — `+ NEW`, pick your project directory, choose CLAUDE CODE / CODEX /
    GROK BUILD / SHELL ONLY. Chromux spawns your login shell and launches the agent CLI

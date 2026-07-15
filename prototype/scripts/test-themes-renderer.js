@@ -15,6 +15,7 @@ fs.writeFileSync(e2ePath, `
   const themes = window.chromuxTestThemes;
   const expect = (condition, message) => { if (!condition) throw new Error(message); };
   const expected = ['blueprint', 'retro-os', 'streak', 'liquid-glass'];
+  const modes = ['light', 'dark'];
   const rgb = (value) => {
     const channels = value.match(/[\\d.]+/g);
     if (!channels || channels.length < 3) throw new Error('unparseable color: ' + value);
@@ -52,20 +53,32 @@ fs.writeFileSync(e2ePath, `
   expect(document.querySelector('.brand-mark use')?.getAttribute('href') === '#chromux-mark', 'header should use the canonical Chromux mark');
   expect(document.querySelector('.empty-mark use')?.getAttribute('href') === '#chromux-mark', 'starting screen should use the canonical Chromux mark');
   expect(JSON.stringify(themes.ids()) === JSON.stringify(expected), 'all four theme ids should be registered');
-  expect(themes.current() === 'blueprint', 'blueprint should be the default theme');
-  expect(themes.bodyTheme() === 'blueprint', 'default theme should be applied to the body');
-  expect(JSON.stringify(themes.selectedCards()) === JSON.stringify(['blueprint']), 'exactly one default card should be selected');
+  expect(JSON.stringify(themes.modes()) === JSON.stringify(modes), 'light and dark modes should be registered');
+  expect(themes.current() === 'liquid-glass', 'liquid glass should be the default theme');
+  expect(themes.bodyTheme() === 'liquid-glass', 'default theme should be applied to the body');
+  expect(themes.currentMode() === 'light', 'light should be the default theme mode');
+  expect(themes.bodyMode() === 'light', 'default theme mode should be applied to the body');
+  expect(JSON.stringify(themes.selectedCards()) === JSON.stringify(['liquid-glass']), 'exactly one default card should be selected');
+  expect(JSON.stringify(themes.selectedModes()) === JSON.stringify(['light']), 'exactly one default mode should be selected; got ' + JSON.stringify(themes.selectedModes()));
 
   for (const theme of expected) {
-    expect(themes.select(theme) === theme, theme + ' should be selectable');
-    expect(themes.bodyTheme() === theme, theme + ' should update the body theme');
-    expect(themes.stored() === theme, theme + ' should persist to localStorage');
-    expect(JSON.stringify(themes.selectedCards()) === JSON.stringify([theme]), theme + ' should be the only pressed card');
-    expectContrast(document.querySelector('#settings-check-updates'), theme + ' primary button');
-    expectContrast(document.querySelector('[data-theme-option="' + theme + '"] .theme-check'), theme + ' selected-theme check');
+    for (const mode of modes) {
+      expect(themes.select(theme) === theme, theme + ' should be selectable');
+      expect(themes.selectMode(mode) === mode, theme + ' ' + mode + ' mode should be selectable');
+      expect(themes.bodyTheme() === theme, theme + ' should update the body theme');
+      expect(themes.bodyMode() === mode, mode + ' should update the body mode');
+      expect(themes.stored() === theme, theme + ' should persist to localStorage');
+      expect(themes.storedMode() === mode, mode + ' should persist to localStorage');
+      expect(document.documentElement.style.colorScheme === mode, mode + ' should set the document color scheme');
+      expect(JSON.stringify(themes.selectedCards()) === JSON.stringify([theme]), theme + ' should be the only pressed card');
+      expect(JSON.stringify(themes.selectedModes()) === JSON.stringify([mode]), mode + ' should be the only pressed mode');
+      expectContrast(document.querySelector('#settings-check-updates'), theme + ' ' + mode + ' primary button');
+      expectContrast(document.querySelector('[data-theme-option="' + theme + '"] .theme-check'), theme + ' ' + mode + ' selected-theme check');
+    }
   }
 
   themes.select('blueprint');
+  themes.selectMode('dark');
   expectContrast(document.querySelector('#btn-update-ready'), 'blueprint update-ready button');
   expectContrast(fixtures.querySelector('.head-btn.armed'), 'blueprint armed header button');
   expectContrast(fixtures.querySelector('.favorite-btn.armed'), 'blueprint armed favorite button');
@@ -73,6 +86,7 @@ fs.writeFileSync(e2ePath, `
   expectContrast(fixtures.querySelector('.shortcut-chip.matched'), 'blueprint matched shortcut chip');
 
   themes.select('streak');
+  themes.selectMode('light');
   expectContrast(document.querySelector('#settings-theme-current'), 'streak current-theme badge');
   expectContrast(fixtures.querySelector('.session-tab.active'), 'streak active session tab');
   expectContrast(fixtures.querySelector('.q-badge'), 'streak queue badge');
@@ -89,6 +103,14 @@ fs.writeFileSync(e2ePath, `
   let rejected = false;
   try { themes.select('unknown-theme'); } catch { rejected = true; }
   expect(rejected, 'unknown themes should be rejected');
+  let modeRejected = false;
+  try { themes.selectMode('unknown-mode'); } catch { modeRejected = true; }
+  expect(modeRejected, 'unknown theme modes should be rejected');
+  localStorage.removeItem('chromux.themeMode');
+  localStorage.setItem('chromux.theme', 'blueprint');
+  expect(themes.modeFromStorage() === 'dark', 'legacy Blueprint selection should migrate to dark mode');
+  localStorage.setItem('chromux.theme', 'liquid-glass');
+  expect(themes.modeFromStorage() === 'light', 'legacy non-Blueprint selections should migrate to light mode');
   themes.reset();
   fixtures.remove();
   return JSON.stringify({ ok: true });

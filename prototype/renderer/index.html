@@ -115,7 +115,13 @@
               <div id="appearance-heading" class="microlabel">APPEARANCE</div>
               <div class="settings-section-copy">Choose a cockpit direction. Changes apply instantly and stay selected after restart.</div>
             </div>
-            <span id="settings-theme-current" class="settings-theme-current">BLUEPRINT</span>
+            <div class="appearance-controls">
+              <span id="settings-theme-current" class="settings-theme-current">LIQUID GLASS</span>
+              <div id="settings-theme-mode" class="theme-mode-toggle" role="group" aria-label="Theme brightness">
+                <button type="button" data-theme-mode="light" aria-pressed="false"><span aria-hidden="true">☀</span> Light</button>
+                <button type="button" data-theme-mode="dark" aria-pressed="false"><span aria-hidden="true">◐</span> Dark</button>
+              </div>
+            </div>
           </div>
           <div id="settings-theme-grid" class="theme-grid" role="group" aria-label="Chromux theme">
             <button class="theme-card" type="button" data-theme-option="blueprint" aria-pressed="false">

@@ -7,7 +7,9 @@
 const $ = (sel) => document.querySelector(sel);
 
 const THEME_STORAGE_KEY = 'chromux.theme';
+const THEME_MODE_STORAGE_KEY = 'chromux.themeMode';
 const THEME_IDS = new Set(['blueprint', 'retro-os', 'streak', 'liquid-glass']);
+const THEME_MODE_IDS = new Set(['light', 'dark']);
 const THEME_LABELS = {
   blueprint: 'Blueprint',
   'retro-os': 'Retro-OS',
@@ -18,8 +20,18 @@ const THEME_LABELS = {
 function storedTheme() {
   try {
     const value = window.localStorage.getItem(THEME_STORAGE_KEY);
-    return THEME_IDS.has(value) ? value : 'blueprint';
-  } catch { return 'blueprint'; }
+    return THEME_IDS.has(value) ? value : 'liquid-glass';
+  } catch { return 'liquid-glass'; }
+}
+
+function storedThemeMode() {
+  try {
+    const value = window.localStorage.getItem(THEME_MODE_STORAGE_KEY);
+    if (THEME_MODE_IDS.has(value)) return value;
+    // Preserve the original Blueprint appearance for users upgrading from the
+    // single-mode theme picker. New installs still begin with Liquid Glass Light.
+    return window.localStorage.getItem(THEME_STORAGE_KEY) === 'blueprint' ? 'dark' : 'light';
+  } catch { return 'light'; }
 }
 
 const state = {
@@ -36,6 +48,7 @@ const state = {
   events: [], // ring buffer of applied events (diagnostics), max EVENT_RING_MAX
   ui: {
     theme: storedTheme(),
+    themeMode: storedThemeMode(),
     captureModal: null, // { captureId, pngBase64, payloadBase } while composing/delivering
     dirty: new Set(),
     rafScheduled: false,
@@ -174,7 +187,7 @@ function renderFavoritesPicker(session) {
 // ───────────────────────────────────────────────────────────────────────────
 
 const TERM_THEMES = {
-  blueprint: {
+  'blueprint-dark': {
     background: '#061b38', foreground: '#dceeff', cursor: '#7fd8ff', cursorAccent: '#061b38',
     selectionBackground: 'rgba(127,216,255,0.28)', black: '#082346', brightBlack: '#527ca7',
     red: '#ff9d86', brightRed: '#ffc0af', green: '#8af0bd', brightGreen: '#b7ffd9',
@@ -182,7 +195,15 @@ const TERM_THEMES = {
     magenta: '#c6adff', brightMagenta: '#e0d2ff', cyan: '#8fe7f5', brightCyan: '#c6f6ff',
     white: '#dceeff', brightWhite: '#ffffff',
   },
-  'retro-os': {
+  'blueprint-light': {
+    background: '#f4f9ff', foreground: '#173b62', cursor: '#006d9c', cursorAccent: '#f4f9ff',
+    selectionBackground: 'rgba(0,109,156,0.22)', black: '#173b62', brightBlack: '#6684a3',
+    red: '#a33a2c', brightRed: '#d45747', green: '#13764d', brightGreen: '#239b68',
+    yellow: '#8a5b00', brightYellow: '#b77c0e', blue: '#006d9c', brightBlue: '#218fc0',
+    magenta: '#674fa3', brightMagenta: '#8b70c7', cyan: '#08758a', brightCyan: '#2699ad',
+    white: '#dbe9f6', brightWhite: '#ffffff',
+  },
+  'retro-os-light': {
     background: '#ffffff', foreground: '#141414', cursor: '#30309a', cursorAccent: '#ffffff',
     selectionBackground: 'rgba(48,48,154,0.24)', black: '#141414', brightBlack: '#666666',
     red: '#9b1c1c', brightRed: '#d6393b', green: '#1f7a34', brightGreen: '#37b24d',
@@ -190,7 +211,15 @@ const TERM_THEMES = {
     magenta: '#7d2c85', brightMagenta: '#a94eb3', cyan: '#0b6a7d', brightCyan: '#18a5c0',
     white: '#d0d0d0', brightWhite: '#ffffff',
   },
-  streak: {
+  'retro-os-dark': {
+    background: '#101214', foreground: '#eeeeee', cursor: '#9c9cff', cursorAccent: '#101214',
+    selectionBackground: 'rgba(156,156,255,0.26)', black: '#101214', brightBlack: '#777b80',
+    red: '#ff8585', brightRed: '#ffaaaa', green: '#79d990', brightGreen: '#a4edb4',
+    yellow: '#e8b45a', brightYellow: '#f5d28f', blue: '#9c9cff', brightBlue: '#c0c0ff',
+    magenta: '#d58bdc', brightMagenta: '#ebb4ef', cyan: '#72ccd9', brightCyan: '#a4e5ed',
+    white: '#d6d6d6', brightWhite: '#ffffff',
+  },
+  'streak-dark': {
     background: '#172033', foreground: '#f7fbff', cursor: '#58cc02', cursorAccent: '#172033',
     selectionBackground: 'rgba(88,204,2,0.30)', black: '#172033', brightBlack: '#62708a',
     red: '#ff5d5d', brightRed: '#ff8b8b', green: '#58cc02', brightGreen: '#8ee83f',
@@ -198,7 +227,15 @@ const TERM_THEMES = {
     magenta: '#ce82ff', brightMagenta: '#e1b3ff', cyan: '#49e5c2', brightCyan: '#94f3de',
     white: '#dfe8f5', brightWhite: '#ffffff',
   },
-  'liquid-glass': {
+  'streak-light': {
+    background: '#f7fbff', foreground: '#293244', cursor: '#3f9b00', cursorAccent: '#f7fbff',
+    selectionBackground: 'rgba(88,204,2,0.24)', black: '#293244', brightBlack: '#748096',
+    red: '#c83c3c', brightRed: '#e85c5c', green: '#3f9b00', brightGreen: '#58cc02',
+    yellow: '#9a6900', brightYellow: '#cc9100', blue: '#087eae', brightBlue: '#1cb0f6',
+    magenta: '#8d4eb4', brightMagenta: '#b16bda', cyan: '#087f6b', brightCyan: '#20ad94',
+    white: '#dce5ee', brightWhite: '#ffffff',
+  },
+  'liquid-glass-dark': {
     background: '#111827', foreground: '#e7edf7', cursor: '#23b7ec', cursorAccent: '#111827',
     selectionBackground: 'rgba(15,159,214,0.30)', black: '#111827', brightBlack: '#56647a',
     red: '#ef6a5c', brightRed: '#ff958a', green: '#35c98c', brightGreen: '#72e0b3',
@@ -206,10 +243,18 @@ const TERM_THEMES = {
     magenta: '#9587f4', brightMagenta: '#c0b7ff', cyan: '#52d7e8', brightCyan: '#94eef8',
     white: '#dbe5f2', brightWhite: '#ffffff',
   },
+  'liquid-glass-light': {
+    background: '#f7faff', foreground: '#172231', cursor: '#0f86b3', cursorAccent: '#f7faff',
+    selectionBackground: 'rgba(15,159,214,0.22)', black: '#172231', brightBlack: '#637188',
+    red: '#b83c31', brightRed: '#df5a4d', green: '#137c55', brightGreen: '#26a874',
+    yellow: '#8a5c08', brightYellow: '#bd8215', blue: '#0f78a0', brightBlue: '#199dcc',
+    magenta: '#6656b8', brightMagenta: '#8979dc', cyan: '#0d7886', brightCyan: '#28a2b1',
+    white: '#dbe5f2', brightWhite: '#ffffff',
+  },
 };
 
-function terminalThemeFor(theme = state.ui.theme) {
-  return TERM_THEMES[theme] || TERM_THEMES.blueprint;
+function terminalThemeFor(theme = state.ui.theme, mode = state.ui.themeMode) {
+  return TERM_THEMES[`${theme}-${mode}`] || TERM_THEMES['liquid-glass-light'];
 }
 
 function renderThemeControls() {
@@ -220,19 +265,42 @@ function renderThemeControls() {
     button.classList.toggle('active', active);
     button.setAttribute('aria-pressed', String(active));
   });
+  document.querySelectorAll('button[data-theme-mode]').forEach((button) => {
+    const active = button.dataset.themeMode === state.ui.themeMode;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
 }
 
 function applyTheme(theme, { persist = true } = {}) {
-  const next = THEME_IDS.has(theme) ? theme : 'blueprint';
+  const next = THEME_IDS.has(theme) ? theme : 'liquid-glass';
   state.ui.theme = next;
   document.body.dataset.theme = next;
-  document.documentElement.style.colorScheme = next === 'blueprint' ? 'dark' : 'light';
+  document.body.dataset.themeMode = state.ui.themeMode;
+  document.documentElement.style.colorScheme = state.ui.themeMode;
   if (persist) {
     try { window.localStorage.setItem(THEME_STORAGE_KEY, next); } catch { /* unavailable */ }
   }
   for (const session of state.sessions.values()) {
     if (session.term && session.term.term && session.term.term.options) {
       session.term.term.options.theme = terminalThemeFor(next);
+    }
+  }
+  renderThemeControls();
+  return next;
+}
+
+function applyThemeMode(mode, { persist = true } = {}) {
+  const next = THEME_MODE_IDS.has(mode) ? mode : 'light';
+  state.ui.themeMode = next;
+  document.body.dataset.themeMode = next;
+  document.documentElement.style.colorScheme = next;
+  if (persist) {
+    try { window.localStorage.setItem(THEME_MODE_STORAGE_KEY, next); } catch { /* unavailable */ }
+  }
+  for (const session of state.sessions.values()) {
+    if (session.term && session.term.term && session.term.term.options) {
+      session.term.term.options.theme = terminalThemeFor(state.ui.theme, next);
     }
   }
   renderThemeControls();
@@ -3686,6 +3754,10 @@ $('#settings-theme-grid').addEventListener('click', (event) => {
   const option = event.target.closest('[data-theme-option]');
   if (option) applyTheme(option.dataset.themeOption);
 });
+$('#settings-theme-mode').addEventListener('click', (event) => {
+  const option = event.target.closest('button[data-theme-mode]');
+  if (option) applyThemeMode(option.dataset.themeMode);
+});
 $('#btn-update-ready').onclick = () => {
   if (updateAvailable() && state.updateQueue.phase === 'idle') installUpdate().catch(showUpdateInstallError);
   else openSettings();
@@ -4817,10 +4889,16 @@ if (window.chromuxTest) {
 
   window.chromuxTestThemes = {
     ids: () => [...THEME_IDS],
+    modes: () => [...THEME_MODE_IDS],
     current: () => state.ui.theme,
+    currentMode: () => state.ui.themeMode,
     stored: () => {
       try { return window.localStorage.getItem(THEME_STORAGE_KEY); } catch { return null; }
     },
+    storedMode: () => {
+      try { return window.localStorage.getItem(THEME_MODE_STORAGE_KEY); } catch { return null; }
+    },
+    modeFromStorage: () => storedThemeMode(),
     select(theme) {
       const button = document.querySelector(`[data-theme-option="${theme}"]`);
       if (!button) throw new Error(`Unknown theme: ${theme}`);
@@ -4829,10 +4907,23 @@ if (window.chromuxTest) {
     },
     selectedCards: () => [...document.querySelectorAll('[data-theme-option][aria-pressed="true"]')]
       .map((button) => button.dataset.themeOption),
+    selectMode(mode) {
+      const button = document.querySelector(`button[data-theme-mode="${mode}"]`);
+      if (!button) throw new Error(`Unknown theme mode: ${mode}`);
+      button.click();
+      return state.ui.themeMode;
+    },
+    selectedModes: () => [...document.querySelectorAll('button[data-theme-mode][aria-pressed="true"]')]
+      .map((button) => button.dataset.themeMode),
     bodyTheme: () => document.body.dataset.theme,
+    bodyMode: () => document.body.dataset.themeMode,
     reset() {
-      try { window.localStorage.removeItem(THEME_STORAGE_KEY); } catch { /* unavailable */ }
-      return applyTheme('blueprint', { persist: false });
+      try {
+        window.localStorage.removeItem(THEME_STORAGE_KEY);
+        window.localStorage.removeItem(THEME_MODE_STORAGE_KEY);
+      } catch { /* unavailable */ }
+      applyThemeMode('light', { persist: false });
+      return applyTheme('liquid-glass', { persist: false });
     },
   };
 
