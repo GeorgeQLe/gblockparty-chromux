@@ -239,12 +239,13 @@
     if (!updateStatus || !updateStatus.updateAvailable || !updateQueue) return null;
     const createdAt = updateQueue.lastAttemptAt || 0;
     if (updateQueue.phase === 'ready') {
+      const canExecute = Boolean(updateStatus.managedInstall && updateStatus.managedInstall.available);
       return updateItem({
         type: 'updateReady',
         kind: 'UPDATE READY',
         detail: 'All sessions are safe. Install the update from the managed local source.',
         cls: 'update completed',
-        primaryAction: 'INSTALL',
+        primaryAction: canExecute ? 'EXECUTE' : 'DETAILS',
         createdAt,
       });
     }
@@ -269,12 +270,13 @@
       });
     }
     if (updateQueue.phase === 'waiting') {
+      const canExecute = Boolean(updateStatus.managedInstall && updateStatus.managedInstall.available);
       return updateItem({
         type: 'updateWaiting',
         kind: 'UPDATE WAITING',
         detail: `${blockers.length} live session${blockers.length === 1 ? '' : 's'} must complete, ask for input, or exit before installing the update.`,
         cls: 'update waiting',
-        primaryAction: 'FOCUS',
+        primaryAction: canExecute ? 'EXECUTE' : 'DETAILS',
         createdAt,
       });
     }

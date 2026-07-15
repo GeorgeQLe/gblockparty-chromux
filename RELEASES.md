@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.27.1
+
+Tag: `chromux-v0.27.1`
+
+- Execute a queued managed update directly from the attention queue instead of focusing a blocker session.
+- Require explicit warning confirmation before executing or dismissing a queued update.
+- Accept the first click while the macOS window is inactive so attention actions do not require a second click.
+
 ## GBlockParty Chromux v0.27.0
 
 Tag: `chromux-v0.27.0`

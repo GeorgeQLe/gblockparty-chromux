@@ -843,6 +843,7 @@ function createWindow() {
     minWidth: 1100,
     minHeight: 640,
     title: 'Chromux',
+    acceptFirstMouse: true,
     backgroundColor: '#0b0e11',
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 14, y: 14 },

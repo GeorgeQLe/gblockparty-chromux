@@ -30,6 +30,16 @@ fs.writeFileSync(e2ePath, `
     await new Promise((resolve) => setTimeout(resolve, 50));
     q.flushRender();
   };
+  const warning = () => ({
+    visible: !document.querySelector('#modal-lifecycle').classList.contains('hidden'),
+    title: document.querySelector('#lifecycle-title').textContent,
+    copy: document.querySelector('#lifecycle-copy').textContent,
+    confirm: document.querySelector('#lifecycle-confirm').textContent,
+  });
+  const answerWarning = async (answer) => {
+    document.querySelector(answer ? '#lifecycle-confirm' : '#lifecycle-cancel').click();
+    await settle();
+  };
 
   await new Promise((resolve) => setTimeout(resolve, 100));
   q.setStatus({
@@ -46,10 +56,13 @@ fs.writeFileSync(e2ePath, `
   q.queue();
   expect(q.phase() === 'ready', 'zero sessions should queue as ready, got ' + q.phase());
   expect(q.attentionKinds()[0] === 'UPDATE READY', 'ready update should be first attention item');
+  expect(q.attentionButtons('UPDATE READY').includes('EXECUTE'), 'ready update should expose EXECUTE');
   expect(q.installButtonText() === 'INSTALL UPDATE', 'ready settings action should install update');
   q.resetInstallTrace();
   q.setInstallResult({ ok: false, message: 'empty fixture failure', output: 'empty fixture log' });
   document.querySelector('#settings-install-update').click();
+  expect(warning().visible && warning().confirm === 'EXECUTE UPDATE', 'queued install should require execute confirmation');
+  await answerWarning(true);
   await settle();
   expect(q.phase() === 'failed', 'explicitly queued empty-workspace install should preserve failed state');
   expect(q.installTrace().lifecyclePrompts === 1, 'explicit ready install should enter lifecycle protection');
@@ -57,6 +70,8 @@ fs.writeFileSync(e2ePath, `
   q.resetInstallTrace();
   q.setInstallResult({ ok: true, output: 'empty fixture retry started' });
   document.querySelector('#settings-install-update').click();
+  expect(warning().visible, 'failed retry should require execute confirmation');
+  await answerWarning(true);
   await settle();
   expect(q.phase() === 'running', 'failed retry should install from its existing queue state');
   expect(q.installTrace().lifecyclePrompts === 1, 'failed retry must not use the idle-workspace bypass');
@@ -116,6 +131,7 @@ fs.writeFileSync(e2ePath, `
   await settle();
   expect(q.phase() === 'ready', 'missing managed source should queue for the manual update flow');
   expect(q.attentionKinds().includes('UPDATE READY'), 'manual update flow should retain UPDATE READY');
+  expect(q.attentionButtons('UPDATE READY').includes('DETAILS'), 'manual update flow should expose DETAILS instead of an unavailable execute action');
   expect(q.installTrace().lifecyclePrompts === 0, 'manual update queueing should not open lifecycle confirmation');
   expect(q.installTrace().restoreSnapshots === 0, 'manual update queueing should not write a snapshot');
 
@@ -136,7 +152,7 @@ fs.writeFileSync(e2ePath, `
   expect(q.phase() === 'waiting', 'live unknown-turn session should block, got ' + q.phase());
   expect(q.blockers().join(',') === 'live-unknown', 'expected live-unknown blocker');
   expect(q.attentionKinds()[0] === 'UPDATE WAITING', 'waiting update should be first attention item');
-  expect(q.attentionButtons('UPDATE WAITING').includes('FOCUS'), 'waiting update should expose FOCUS');
+  expect(q.attentionButtons('UPDATE WAITING').includes('EXECUTE'), 'waiting managed update should expose EXECUTE');
   expect(q.attentionButtons('UPDATE WAITING').includes('DISMISS'), 'waiting update should expose DISMISS');
   expect(q.installButtonText() === 'INSTALL ANYWAY', 'waiting settings action should allow managed override');
   expect(/install anyway/i.test(q.statusText()), 'waiting settings copy should explain managed override');
@@ -150,6 +166,7 @@ fs.writeFileSync(e2ePath, `
     },
   });
   expect(q.phase() === 'waiting', 'no-source status should keep waiting blockers');
+  expect(q.attentionButtons('UPDATE WAITING').includes('DETAILS'), 'waiting update without a managed source should expose DETAILS');
   expect(q.installButtonText() === 'FOCUS BLOCKER', 'waiting without managed source should not offer override');
   q.setStatus({
     updateAvailable: true,
@@ -162,6 +179,13 @@ fs.writeFileSync(e2ePath, `
   expect(q.installButtonText() === 'INSTALL ANYWAY', 'managed source should restore waiting override');
 
   q.dismissItem('UPDATE WAITING');
+  expect(q.phase() === 'waiting', 'dismiss must not apply before confirmation');
+  expect(warning().visible && warning().title === 'DISMISS QUEUED UPDATE?', 'dismiss should open its warning confirmation');
+  expect(/without installing/i.test(warning().copy), 'dismiss warning should explain that the update stays uninstalled');
+  await answerWarning(false);
+  expect(q.phase() === 'waiting', 'canceling dismiss should keep the update queued');
+  q.dismissItem('UPDATE WAITING');
+  await answerWarning(true);
   expect(q.phase() === 'idle', 'dismissing waiting update should return queue to idle');
   expect(!q.attentionKinds().includes('UPDATE WAITING'), 'dismissed waiting update should leave attention queue');
   q.queue();
@@ -172,23 +196,15 @@ fs.writeFileSync(e2ePath, `
   q.resetInstallTrace();
   q.clickAttentionPrimary('UPDATE WAITING');
   q.flushRender();
-  expect(q.phase() === 'waiting', 'attention UPDATE WAITING primary should not install');
-  expect(q.activeName() === 'live-unknown', 'attention UPDATE WAITING primary should focus blocker');
-  q.setStatus({
-    updateAvailable: true,
-    managedInstall: {
-      available: true,
-      sourceDir: '/tmp/chromux-source',
-      command: 'npm run install-app',
-    },
-  });
-  q.queue();
-  expect(q.installButtonText() === 'INSTALL ANYWAY', 'managed source should be active before override click');
-  await document.querySelector('#settings-install-update').click();
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  await new Promise((resolve) => setTimeout(resolve, 50));
-  q.flushRender();
-  expect(q.phase() === 'running', 'settings INSTALL ANYWAY should enter install path with blockers, got ' + q.phase());
+  expect(q.phase() === 'waiting', 'attention EXECUTE should wait for confirmation');
+  expect(warning().visible && warning().title === 'EXECUTE CHROMUX UPDATE?', 'attention EXECUTE should open an update warning');
+  expect(/stop live PTYs/i.test(warning().copy), 'execute warning should explain the live-session impact');
+  await answerWarning(false);
+  expect(q.phase() === 'waiting', 'canceling execute should keep the update queued');
+  q.resetInstallTrace();
+  q.clickAttentionPrimary('UPDATE WAITING');
+  await answerWarning(true);
+  expect(q.phase() === 'running', 'confirmed attention EXECUTE should enter the install path, got ' + q.phase());
   expect(q.installTrace().lifecyclePrompts === 1, 'open-session install should retain lifecycle confirmation');
   expect(q.installTrace().restoreSnapshots === 1, 'open-session install should retain restore snapshots');
   q.setInstallResult(null);
@@ -208,6 +224,8 @@ fs.writeFileSync(e2ePath, `
   q.setSession(liveId, { turnState: 'completed' });
   expect(q.phase() === 'ready', 'completed turn should make queued update ready');
   q.dismissItem('UPDATE READY');
+  expect(q.phase() === 'ready', 'ready dismissal should wait for confirmation');
+  await answerWarning(true);
   expect(q.phase() === 'idle', 'dismissing ready update should return queue to idle');
   expect(!q.attentionKinds().includes('UPDATE READY'), 'dismissed ready update should leave attention queue');
   q.queue();
@@ -249,6 +267,8 @@ fs.writeFileSync(e2ePath, `
 
   q.setInstallResult({ ok: false, message: 'fixture failure', output: 'fixture log' });
   await document.querySelector('#settings-install-update').click();
+  expect(warning().visible, 'ready install should require execute confirmation');
+  await answerWarning(true);
   await new Promise((resolve) => setTimeout(resolve, 0));
   await new Promise((resolve) => setTimeout(resolve, 50));
   q.flushRender();
@@ -257,6 +277,8 @@ fs.writeFileSync(e2ePath, `
   expect(q.attentionButtons('UPDATE FAILED').includes('DISMISS'), 'failed update should expose DISMISS');
   expect(q.installButtonText() === 'RETRY INSTALL', 'failed settings action should retry');
   q.dismissItem('UPDATE FAILED');
+  expect(q.phase() === 'failed', 'failed dismissal should wait for confirmation');
+  await answerWarning(true);
   expect(q.phase() === 'idle', 'dismissing failed update should return queue to idle');
   expect(!q.attentionKinds().includes('UPDATE FAILED'), 'dismissed failed update should leave attention queue');
   q.queue();

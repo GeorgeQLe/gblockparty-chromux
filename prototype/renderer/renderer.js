@@ -2476,9 +2476,13 @@ function attentionAction(item) {
     if (item.type === 'updateReady' || item.type === 'updateFailed') {
       const blockers = updateBlockers();
       if (item.type === 'updateFailed' && blockers.length > 0) return openSettings;
+      if (!hasManagedInstallSource()) return openSettings;
       return () => installUpdate().catch(showUpdateInstallError);
     }
-    if (item.type === 'updateWaiting') return focusFirstUpdateBlocker;
+    if (item.type === 'updateWaiting') {
+      if (!hasManagedInstallSource()) return openSettings;
+      return () => installUpdate({ forceBlockers: true }).catch(showUpdateInstallError);
+    }
     return openSettings;
   }
   return () => {
@@ -2735,7 +2739,8 @@ function queueUpdate() {
   setUpdateQueuePhase(updateBlockers().length === 0 ? 'ready' : 'waiting', { error: null, output: '' });
 }
 
-function dismissUpdateQueue() {
+async function dismissUpdateQueue() {
+  if (!(await showLifecyclePrompt('update-dismiss'))) return;
   apply({ type: 'update-queue-dismissed' });
 }
 
@@ -2871,22 +2876,26 @@ function liveSessions() {
 function showLifecyclePrompt(reason) {
   const live = liveSessions();
   const alwaysConfirm = reason === 'app-quit';
-  if (live.length === 0 && reason !== 'update-install' && !alwaysConfirm) return Promise.resolve(true);
+  const isUpdateInstall = reason === 'update-install';
+  const isUpdateDismiss = reason === 'update-dismiss';
+  if (live.length === 0 && !isUpdateInstall && !isUpdateDismiss && !alwaysConfirm) return Promise.resolve(true);
   if (state.lifecyclePrompt) return state.lifecyclePrompt.promise;
 
-  const isUpdate = reason === 'update-install';
   const isQuit = reason === 'app-quit';
-  $('#lifecycle-title').textContent = isUpdate
-    ? 'INSTALL UPDATE WITH LIVE SESSIONS'
-    : (isQuit ? 'QUIT CHROMUX?' : 'CLOSE CHROMUX WITH LIVE SESSIONS');
-  $('#lifecycle-copy').textContent = isUpdate
+  $('#lifecycle-title').textContent = isUpdateInstall
+    ? 'EXECUTE CHROMUX UPDATE?'
+    : (isUpdateDismiss ? 'DISMISS QUEUED UPDATE?'
+      : (isQuit ? 'QUIT CHROMUX?' : 'CLOSE CHROMUX WITH LIVE SESSIONS'));
+  $('#lifecycle-copy').textContent = isUpdateInstall
     ? 'Continuing will stop live PTYs, save a workspace snapshot, install the update, and reopen the sessions after restart using Claude/Codex resume where possible.'
+    : (isUpdateDismiss
+      ? 'This removes the queued update from the attention list without installing it. The available update remains visible in Settings and can be queued again later.'
     : (live.length === 0
       ? 'Chromux will close after you confirm.'
-      : 'Continuing will stop live PTYs and save a workspace snapshot. When Chromux opens again, it will reopen the sessions using Claude/Codex resume where possible.');
+      : 'Continuing will stop live PTYs and save a workspace snapshot. When Chromux opens again, it will reopen the sessions using Claude/Codex resume where possible.'));
   const host = $('#lifecycle-list');
   host.innerHTML = '';
-  for (const session of live) {
+  for (const session of isUpdateDismiss ? [] : live) {
     const row = document.createElement('div');
     row.className = 'lifecycle-item';
     const name = document.createElement('b');
@@ -2897,7 +2906,9 @@ function showLifecyclePrompt(reason) {
     row.append(name, detail);
     host.appendChild(row);
   }
-  $('#lifecycle-confirm').textContent = isUpdate ? 'SAVE & INSTALL' : (isQuit ? 'QUIT' : 'SAVE & CLOSE');
+  $('#lifecycle-confirm').textContent = isUpdateInstall
+    ? 'EXECUTE UPDATE'
+    : (isUpdateDismiss ? 'DISMISS UPDATE' : (isQuit ? 'QUIT' : 'SAVE & CLOSE'));
 
   let resolvePrompt;
   const promise = new Promise((resolve) => { resolvePrompt = resolve; });
@@ -2931,7 +2942,7 @@ async function installUpdate({ forceBlockers = false } = {}) {
   if (blockers.length === 0 && !installIdleWorkspaceImmediately) setUpdateQueuePhase('ready');
   if (!installIdleWorkspaceImmediately) {
     if (state.testUpdateInstallTrace) state.testUpdateInstallTrace.lifecyclePrompts += 1;
-    if (!state.testInstallUpdateResult && !(await showLifecyclePrompt('update-install'))) return;
+    if (!(await showLifecyclePrompt('update-install'))) return;
     if (state.testUpdateInstallTrace) state.testUpdateInstallTrace.restoreSnapshots += 1;
     if (!state.testInstallUpdateResult) {
       await window.chromux.saveRestoreSnapshot({
