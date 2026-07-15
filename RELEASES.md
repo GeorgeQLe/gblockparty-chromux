@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.28.1
+
+Tag: `chromux-v0.28.1`
+
+- Give Streak theme buttons a tactile half-press on hover and a full press while active.
+- Apply the interaction consistently to primary, toolbar, queue, session-tab, and theme-card controls while leaving disabled buttons still.
+- Respect reduced-motion preferences by keeping the visual states while removing their transitions.
+
 ## GBlockParty Chromux v0.28.0
 
 Tag: `chromux-v0.28.0`

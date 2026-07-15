@@ -34,7 +34,7 @@ fs.writeFileSync(e2ePath, `
   const expectContrast = (element, label) => {
     const style = getComputedStyle(element);
     const ratio = contrast(style.color, style.backgroundColor);
-    expect(ratio >= 4.5, label + ' contrast should meet WCAG AA; got ' + ratio.toFixed(2));
+    expect(ratio >= 4.5, label + ' contrast should meet WCAG AA; got ' + ratio.toFixed(2) + ' from ' + style.color + ' on ' + style.backgroundColor);
   };
 
   const fixtures = document.createElement('div');
@@ -85,8 +85,24 @@ fs.writeFileSync(e2ePath, `
   expectContrast(fixtures.querySelector('.q-badge'), 'blueprint queue badge');
   expectContrast(fixtures.querySelector('.shortcut-chip.matched'), 'blueprint matched shortcut chip');
 
-  themes.select('streak');
+  expect(themes.select('streak') === 'streak', 'streak should remain selectable after interaction styles load; got ' + themes.current());
   themes.selectMode('light');
+  expect(document.body.matches('body[data-theme="streak"][data-theme-mode="light"]'), 'streak light should be applied before interaction checks; got ' + themes.bodyTheme() + ' ' + themes.bodyMode());
+  const styleRules = [...document.styleSheets]
+    .flatMap((sheet) => [...sheet.cssRules])
+    .filter((rule) => rule.type === CSSRule.STYLE_RULE);
+  const streakHoverRule = styleRules.find((rule) => rule.selectorText?.includes('.top-btn:not(:disabled):hover'));
+  const streakPressRule = styleRules.find((rule) => rule.selectorText?.includes('.top-btn:not(:disabled):active'));
+  expect(streakHoverRule?.style.transform === 'translateY(1px)', 'streak buttons should move halfway down on hover');
+  expect(streakHoverRule?.style.borderBottomWidth === '3px', 'streak buttons should retain half their tactile edge on hover');
+  expect(streakPressRule?.style.transform === 'translateY(2px)', 'streak buttons should move fully down while pressed');
+  expect(streakPressRule?.style.borderBottomWidth === '2px', 'streak buttons should flatten their tactile edge while pressed');
+  for (const selector of ['.qi-btn:not(:disabled):hover', '.session-tab:not(:disabled):hover', '.theme-card:not(:disabled):hover']) {
+    expect(streakHoverRule?.selectorText.includes(selector), selector + ' should share the streak half-press interaction');
+  }
+  for (const selector of ['.qi-btn:not(:disabled):active', '.session-tab:not(:disabled):active', '.theme-card:not(:disabled):active']) {
+    expect(streakPressRule?.selectorText.includes(selector), selector + ' should share the streak press interaction');
+  }
   expectContrast(document.querySelector('#settings-theme-current'), 'streak current-theme badge');
   expectContrast(fixtures.querySelector('.session-tab.active'), 'streak active session tab');
   expectContrast(fixtures.querySelector('.q-badge'), 'streak queue badge');
