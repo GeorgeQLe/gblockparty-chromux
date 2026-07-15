@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.26.4
+
+Tag: `chromux-v0.26.4`
+
+- Add a consistent left gutter between the Streak terminal stage and attention queue rail.
+- Match the Streak Settings header button height to the neighboring status gauges.
+- Keep Chromux form styling off xterm's hidden helper textarea so it no longer overlaps the terminal scrollbar.
+
 ## GBlockParty Chromux v0.26.3
 
 Tag: `chromux-v0.26.3`

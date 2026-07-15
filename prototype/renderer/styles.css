@@ -937,7 +937,7 @@ body.dragging webview { pointer-events: none; }
 .saved-project-use { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--text); text-align: left; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .field-row input { flex: 1; }
 
-input[type="text"], textarea, select {
+input[type="text"], textarea:not(.xterm-helper-textarea), select {
   border: 1px solid var(--line);
   background: var(--bg0);
   color: var(--text);
@@ -946,7 +946,7 @@ input[type="text"], textarea, select {
   outline: none;
   resize: vertical;
 }
-input[type="text"]:focus, textarea:focus, select:focus { border-color: var(--amber); box-shadow: var(--glow-amber); }
+input[type="text"]:focus, textarea:not(.xterm-helper-textarea):focus, select:focus { border-color: var(--amber); box-shadow: var(--glow-amber); }
 
 .segmented { display: flex; border: 1px solid var(--line); }
 .segmented button {
@@ -1567,6 +1567,7 @@ body[data-theme="streak"] .qi-btn {
   border: 2px solid var(--line-hi); border-bottom-width: 4px; border-radius: 12px; background: #fff; color: var(--dim);
   transition: transform .1s ease, filter .1s ease;
 }
+body[data-theme="streak"] .top-btn { height: 32px; }
 body[data-theme="streak"] .top-btn:active,
 body[data-theme="streak"] .btn:active,
 body[data-theme="streak"] .head-btn:active,
@@ -1589,7 +1590,7 @@ body[data-theme="streak"] .rail-foot { border: 2px solid var(--line); border-rad
 body[data-theme="streak"] #session-tabs { height: 48px; gap: 8px; padding: 8px 12px 4px; border: 0; background: transparent; }
 body[data-theme="streak"] .session-tab { height: 36px; border: 2px solid var(--line); border-bottom-width: 4px; border-radius: 999px; background: #fff; }
 body[data-theme="streak"] .session-tab.active { border-color: #3da600; background: var(--green); color: var(--on-green); }
-body[data-theme="streak"] #stage { margin: 0 12px 10px 0; border: 2px solid var(--line); border-bottom-width: 5px; border-radius: 20px; overflow: hidden; background: #fff; }
+body[data-theme="streak"] #stage { margin: 0 12px 10px; border: 2px solid var(--line); border-bottom-width: 5px; border-radius: 20px; overflow: hidden; background: #fff; }
 body[data-theme="streak"] .pane-head { height: 42px; border-bottom: 2px solid var(--line); background: #f7faf3; }
 body[data-theme="streak"] .term-pane { background: #172033; }
 body[data-theme="streak"] .web-pane { background: #fff; }

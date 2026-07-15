@@ -43,6 +43,7 @@ fs.writeFileSync(e2ePath, `
     '<span class="q-badge">2</span>',
     '<span class="shortcut-chip matched">MATCHED</span>',
     '<button class="session-tab active">ACTIVE</button>',
+    '<div class="xterm"><textarea class="xterm-helper-textarea"></textarea></div>',
   ].join('');
   document.body.appendChild(fixtures);
 
@@ -75,6 +76,15 @@ fs.writeFileSync(e2ePath, `
   expectContrast(document.querySelector('#settings-theme-current'), 'streak current-theme badge');
   expectContrast(fixtures.querySelector('.session-tab.active'), 'streak active session tab');
   expectContrast(fixtures.querySelector('.q-badge'), 'streak queue badge');
+  const settingsHeight = document.querySelector('#btn-settings').getBoundingClientRect().height;
+  const gaugeHeight = document.querySelector('.gauge').getBoundingClientRect().height;
+  expect(Math.abs(settingsHeight - gaugeHeight) <= 1, 'streak settings button should match header gauge height; got ' + settingsHeight + ' vs ' + gaugeHeight);
+  expect(getComputedStyle(document.querySelector('#stage')).marginLeft === '12px', 'streak stage should have a left gutter beside the attention rail');
+
+  const helperStyle = getComputedStyle(fixtures.querySelector('.xterm-helper-textarea'));
+  expect(helperStyle.paddingLeft === '0px' && helperStyle.paddingRight === '0px', 'xterm helper input should retain zero horizontal padding');
+  expect(helperStyle.borderLeftWidth === '0px' && helperStyle.borderRightWidth === '0px', 'xterm helper input should retain zero horizontal border');
+  expect(helperStyle.resize === 'none', 'xterm helper input should not expose a resize control over the terminal scrollbar');
 
   let rejected = false;
   try { themes.select('unknown-theme'); } catch { rejected = true; }
