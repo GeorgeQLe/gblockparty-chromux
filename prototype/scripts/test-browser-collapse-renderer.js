@@ -31,6 +31,7 @@ fs.writeFileSync(e2ePath, `
     name: 'second-browser',
     url: 'http://localhost:4173/other',
   });
+  const linkId = b.addSession({ name: 'terminal-link-browser' });
 
   b.focus(firstId);
   let first = b.state(firstId);
@@ -108,6 +109,14 @@ fs.writeFileSync(e2ePath, `
   first = b.state(firstId);
   expect(!first.collapsed, 'opening a URL should restore a shut browser');
   expect(first.currentUrl === 'http://localhost:5173/approved', 'open should navigate the paired pane');
+
+  // A normal terminal link click opens in the paired pane without a modifier.
+  const prevented = b.clickTerminalLink(linkId, 'http://localhost:5173/from-terminal-link');
+  const linkBrowser = b.state(linkId);
+  expect(prevented, 'terminal link activation should consume the click');
+  expect(!linkBrowser.collapsed, 'terminal link click should restore the paired browser');
+  expect(linkBrowser.currentUrl === 'http://localhost:5173/from-terminal-link',
+    'terminal link click should navigate the paired browser');
   expect(first.queueCount === 1, 'open must preserve queue state');
 
   return JSON.stringify({

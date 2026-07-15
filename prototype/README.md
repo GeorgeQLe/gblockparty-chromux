@@ -61,7 +61,7 @@ deterministic screenshot of the open theme picker in every direction.
 2. **Approve the preview** — run your dev server (or ask the agent to). When the terminal
    prints `http://localhost:5173` (or any loopback URL, or an absolute `/path/to/page.html`),
    Chromux queues it in the badged **QUEUE** — nothing auto-opens. Approve with queue
-   **OPEN**, **⌘-click** a terminal link, or type a URL in the browser bar and hit ⏎.
+   **OPEN**, click a terminal link, or type a URL in the browser bar and hit ⏎.
    Opening a URL also restores a shut browser. New sessions start with the paired browser
    shut; use **RESTORE** / **COLLAPSE** or `Command+Shift+B` to open/shut it. Re-emitting
    the same already-open URL auto-refreshes the pane (throttled). Popups queue too.

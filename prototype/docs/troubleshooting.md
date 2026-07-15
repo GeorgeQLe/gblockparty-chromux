@@ -34,7 +34,7 @@ If the same URL is printed again, Chromux refreshes the pane instead of adding a
 
 Chromux detects absolute `.html` and `.htm` paths only after confirming the file exists. The resulting preview loads through `file://`.
 
-For terminal link clicks, Chromux also supports existing relative paths such as `./index.html`, `../page.html`, and `~/path/page.html`. Use Command-click in the terminal to open one of these links.
+For terminal link clicks, Chromux also supports existing relative paths such as `./index.html`, `../page.html`, and `~/path/page.html`. Click the link in the terminal to open it in that session's paired browser.
 
 If a file preview did not open:
 
@@ -45,7 +45,7 @@ If a file preview did not open:
 
 ## Review queue
 
-Chromux never auto-opens a detected preview. Every localhost / loopback / local `.html` hit and every popup goes to QUEUE until you approve it. Opening a queued (or typed / ⌘-clicked) URL loads the paired pane and restores the browser if it was shut.
+Chromux never auto-opens a detected preview. Every localhost / loopback / local `.html` hit and every popup goes to QUEUE until you approve it. Opening a queued, typed, or clicked URL loads the paired pane and restores the browser if it was shut.
 
 Use QUEUE to open the next preview intentionally. Command-J reveals and focuses the next queued OPEN button without opening it. If a page seems stale, check whether the updated URL is waiting in QUEUE.
 

@@ -500,7 +500,7 @@ function feedDetector(session, chunk) {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// Terminal links — ⌘-click (ctrl-click) a URL or .html path in the terminal
+// Terminal links — click a URL or .html path in the terminal
 // to open it in the paired browser pane. Detects http(s) URLs plus absolute,
 // ~/, and cwd-relative .html paths; paths must exist on disk to become links.
 // ───────────────────────────────────────────────────────────────────────────
@@ -521,6 +521,11 @@ function normalizeLocalPath(p) {
 
 function fileUrlFor(p) {
   return 'file://' + encodeURI(p).replace(/#/g, '%23');
+}
+
+function activateTerminalLink(session, url, event) {
+  event.preventDefault();
+  openInPane(session, url);
 }
 
 // Assemble the logical (unwrapped) line containing bufferRow. Each buffer row
@@ -621,11 +626,7 @@ function registerTerminalLinks(session) {
             },
             decorations: { pointerCursor: true, underline: true },
             activate(event) {
-              // Plain clicks stay with the terminal app (mouse-mode TUIs); only
-              // ⌘/ctrl-click routes to the paired pane.
-              if (!event.metaKey && !event.ctrlKey) return;
-              event.preventDefault();
-              openInPane(session, url);
+              activateTerminalLink(session, url, event);
             },
           });
         }
@@ -860,7 +861,7 @@ function newSessionShape({ id, name, cwd, agent }) {
       queue: [], consoleBuf: [], consoleTotal: 0, picking: false,
       guestEditableFocused: false,
       // Terminal-first: new sessions start with the paired browser shut.
-      // Detected previews queue until the user opens one (QUEUE OPEN, ⌘-click, URL bar).
+      // Detected previews queue until the user opens one (QUEUE OPEN, link click, URL bar).
       collapsed: true,
       expandedGridTemplate: 'minmax(320px, 46%) 6px minmax(360px, 1fr)',
     },
@@ -882,7 +883,7 @@ function newSessionShape({ id, name, cwd, agent }) {
 // ───────────────────────────────────────────────────────────────────────────
 // Review queue — approval-gated. Detected previews always queue; never auto-
 // open the pane. Refresh only when the pane's own (already open) URL is
-// re-emitted. User opens via QUEUE OPEN, ⌘/Ctrl-click terminal link, or URL bar.
+// re-emitted. User opens via QUEUE OPEN, terminal link click, or URL bar.
 // ───────────────────────────────────────────────────────────────────────────
 
 function routePreview(session, url, source, detail = {}) {
@@ -2238,7 +2239,7 @@ function buildSessionView(session) {
     <div class="wp-title">AWAITING PREVIEW</div>
     <div class="wp-sub">Chromux watches this session's terminal for <em>localhost</em> dev-server URLs
     and local <em>.html</em> paths. Detected previews always land in the badged <em>QUEUE</em> —
-    nothing opens until you approve it.<br/>Open via queue <em>OPEN</em>, <em>⌘-click</em> a
+    nothing opens until you approve it.<br/>Open via queue <em>OPEN</em>, click a
     terminal link, or type a URL here and hit ⏎. Opening a URL also restores a shut browser.</div>`;
   const refreshFlash = document.createElement('div');
   refreshFlash.className = 'refresh-flash';
@@ -4659,6 +4660,12 @@ if (window.chromuxTest) {
       openInPane(testSession(id), url);
       flushRender();
       return true;
+    },
+    clickTerminalLink(id, url) {
+      let prevented = false;
+      activateTerminalLink(testSession(id), url, { preventDefault() { prevented = true; } });
+      flushRender();
+      return prevented;
     },
     webview(id) {
       return testSession(id).browser.webview;

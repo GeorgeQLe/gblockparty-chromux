@@ -1,5 +1,12 @@
 # Release Notes
 
+## GBlockParty Chromux v0.27.0
+
+Tag: `chromux-v0.27.0`
+
+- Open terminal URLs and local HTML links in the same session's paired browser with a normal click; no Command or Control modifier is required.
+- Restore a shut paired browser automatically when a terminal link is clicked.
+
 ## GBlockParty Chromux v0.26.4
 
 Tag: `chromux-v0.26.4`
