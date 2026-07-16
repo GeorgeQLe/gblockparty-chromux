@@ -257,6 +257,21 @@ function terminalThemeFor(theme = state.ui.theme, mode = state.ui.themeMode) {
   return TERM_THEMES[`${theme}-${mode}`] || TERM_THEMES['liquid-glass-light'];
 }
 
+function syncSessionTerminalTheme(session, theme = state.ui.theme, mode = state.ui.themeMode) {
+  try {
+    const terminal = session && session.term && session.term.term;
+    const rows = terminal && Number(terminal.rows);
+    if (!terminal || !terminal.options || typeof terminal.refresh !== 'function'
+      || !Number.isInteger(rows) || rows < 1) return false;
+    terminal.options.theme = { ...terminalThemeFor(theme, mode) };
+    terminal.refresh(0, rows - 1);
+    return true;
+  } catch {
+    // A terminal may be mocked, mid-initialization, or already disposed.
+    return false;
+  }
+}
+
 function renderThemeControls() {
   const current = $('#settings-theme-current');
   if (current) current.textContent = (THEME_LABELS[state.ui.theme] || THEME_LABELS.blueprint).toUpperCase();
@@ -282,9 +297,7 @@ function applyTheme(theme, { persist = true } = {}) {
     try { window.localStorage.setItem(THEME_STORAGE_KEY, next); } catch { /* unavailable */ }
   }
   for (const session of state.sessions.values()) {
-    if (session.term && session.term.term && session.term.term.options) {
-      session.term.term.options.theme = terminalThemeFor(next);
-    }
+    syncSessionTerminalTheme(session, next, state.ui.themeMode);
   }
   renderThemeControls();
   return next;
@@ -299,9 +312,7 @@ function applyThemeMode(mode, { persist = true } = {}) {
     try { window.localStorage.setItem(THEME_MODE_STORAGE_KEY, next); } catch { /* unavailable */ }
   }
   for (const session of state.sessions.values()) {
-    if (session.term && session.term.term && session.term.term.options) {
-      session.term.term.options.theme = terminalThemeFor(state.ui.theme, next);
-    }
+    syncSessionTerminalTheme(session, state.ui.theme, next);
   }
   renderThemeControls();
   return next;
@@ -4917,6 +4928,63 @@ if (window.chromuxTest) {
       .map((button) => button.dataset.themeMode),
     bodyTheme: () => document.body.dataset.theme,
     bodyMode: () => document.body.dataset.themeMode,
+    addTerminalSession({
+      rows = 24,
+      content = '',
+      inputBuffer = '',
+      focused = false,
+      turnState = 'unknown',
+      complete = true,
+      disposed = false,
+    } = {}) {
+      state.counter += 1;
+      const session = newSessionShape({ id: 's' + state.counter, name: 'theme-test', cwd: '/tmp', agent: 'codex' });
+      const assignments = [];
+      const refreshes = [];
+      const options = {};
+      Object.defineProperty(options, 'theme', {
+        configurable: true,
+        get: () => assignments.at(-1),
+        set(value) {
+          if (disposed) throw new Error('disposed terminal');
+          assignments.push(value);
+        },
+      });
+      session.term.typedInputBuf = inputBuffer;
+      session.turn.state = turnState;
+      session.term.term = complete ? {
+        options,
+        rows,
+        refresh(start, end) {
+          if (disposed) throw new Error('disposed terminal');
+          refreshes.push([start, end]);
+        },
+      } : { options };
+      session._themeTest = { assignments, refreshes, content, focused };
+      state.sessions.set(session.id, session);
+      return session.id;
+    },
+    terminalSession(id) {
+      const session = testSession(id);
+      const test = session._themeTest;
+      return {
+        assignments: test.assignments.map((palette) => ({ ...palette })),
+        distinctAssignments: new Set(test.assignments).size,
+        refreshes: test.refreshes.map((range) => [...range]),
+        rows: Number(session.term.term.rows) || 0,
+        content: test.content,
+        inputBuffer: session.term.typedInputBuf,
+        focused: test.focused,
+        turnState: session.turn.state,
+      };
+    },
+    clearTerminalEvents() {
+      for (const session of state.sessions.values()) {
+        if (!session._themeTest) continue;
+        session._themeTest.assignments.length = 0;
+        session._themeTest.refreshes.length = 0;
+      }
+    },
     reset() {
       try {
         window.localStorage.removeItem(THEME_STORAGE_KEY);

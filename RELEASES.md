@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.28.2
+
+Tag: `chromux-v0.28.2`
+
+- Repaint every live terminal viewport immediately after changing the theme or Light/Dark mode so the active prompt, typed input, and cursor use the selected palette.
+- Preserve terminal contents, scrollback, input, focus, session state, and PTY/TUI processes while applying the visual update.
+- Ignore incomplete, mocked, or disposed terminal sessions safely during theme changes.
+
 ## GBlockParty Chromux v0.28.1
 
 Tag: `chromux-v0.28.1`

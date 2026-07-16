@@ -6,6 +6,7 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Repaint every live xterm viewport after theme-family or Light/Dark switching so the active terminal input row adopts the selected palette without resetting terminal or session state. _(source: user report; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-themes-renderer.js`, `RELEASES.md`)_
 - [x] Add tactile half-press hover and full-press active interactions to Streak theme button surfaces, with disabled and reduced-motion safeguards. _(source: user request; evidence: `prototype/renderer/styles.css`, `prototype/scripts/test-themes-renderer.js`, `RELEASES.md`)_
 - [x] Add independently persisted Light and Dark modes to all four app themes and make Liquid Glass Light the clean-profile default while preserving legacy Blueprint's original dark appearance. _(source: user request; evidence: `prototype/renderer/index.html`, `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`, `prototype/scripts/test-themes-renderer.js`, `prototype/scripts/capture-themes.js`, `prototype/README.md`)_
 - [x] Polish Streak theme layout by adding a terminal-stage gutter beside the attention rail, matching the Settings header button to the status gauges, and preventing xterm's hidden helper textarea from overlapping the terminal scrollbar. _(source: user request; evidence: `prototype/renderer/styles.css`, `prototype/scripts/test-themes-renderer.js`, `RELEASES.md`)_
