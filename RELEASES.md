@@ -1,5 +1,12 @@
 # Release Notes
 
+## GBlockParty Chromux v0.28.3
+
+Tag: `chromux-v0.28.3`
+
+- Keep active terminal-tab labels readable in Streak Dark by preserving the high-contrast active background.
+- Align the Streak attention-queue heading with its empty-state card.
+
 ## GBlockParty Chromux v0.28.2
 
 Tag: `chromux-v0.28.2`

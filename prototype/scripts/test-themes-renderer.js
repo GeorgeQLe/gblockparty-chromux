@@ -57,6 +57,9 @@ fs.writeFileSync(e2ePath, `
     '<div class="xterm"><textarea class="xterm-helper-textarea"></textarea></div>',
   ].join('');
   document.body.appendChild(fixtures);
+  const attentionEmptyFixture = document.createElement('div');
+  attentionEmptyFixture.className = 'attention-empty';
+  document.querySelector('#attention-list').appendChild(attentionEmptyFixture);
 
   themes.reset();
   expect(!document.querySelector('.brand-sub'), 'top header should not render the Agent Cockpit badge');
@@ -157,6 +160,11 @@ fs.writeFileSync(e2ePath, `
   expectContrast(document.querySelector('#settings-theme-current'), 'streak current-theme badge');
   expectContrast(fixtures.querySelector('.session-tab.active'), 'streak active session tab');
   expectContrast(fixtures.querySelector('.q-badge'), 'streak queue badge');
+  themes.selectMode('dark');
+  expectContrast(fixtures.querySelector('.session-tab.active'), 'streak dark active session tab');
+  const attentionHeadingLeft = document.querySelector('.rail-head .microlabel').getBoundingClientRect().left;
+  const attentionEmptyLeft = attentionEmptyFixture.getBoundingClientRect().left;
+  expect(Math.abs(attentionHeadingLeft - attentionEmptyLeft) <= 1, 'streak attention heading should align with the empty queue card; got ' + attentionHeadingLeft + ' vs ' + attentionEmptyLeft);
   const settingsHeight = document.querySelector('#btn-settings').getBoundingClientRect().height;
   const gaugeHeight = document.querySelector('.gauge').getBoundingClientRect().height;
   expect(Math.abs(settingsHeight - gaugeHeight) <= 1, 'streak settings button should match header gauge height; got ' + settingsHeight + ' vs ' + gaugeHeight);
@@ -179,6 +187,7 @@ fs.writeFileSync(e2ePath, `
   localStorage.setItem('chromux.theme', 'liquid-glass');
   expect(themes.modeFromStorage() === 'light', 'legacy non-Blueprint selections should migrate to light mode');
   themes.reset();
+  attentionEmptyFixture.remove();
   fixtures.remove();
   return JSON.stringify({ ok: true });
 })()

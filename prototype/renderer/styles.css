@@ -1599,7 +1599,7 @@ body[data-theme="streak"] .theme-card:not(:disabled):active { transform: transla
 body[data-theme="streak"] .btn-amber,
 body[data-theme="streak"] .head-btn.armed { border-color: #d87600; background: var(--amber); color: var(--on-amber); }
 body[data-theme="streak"] #rail { width: 248px; border-right: 2px solid var(--line); background: transparent; padding: 12px 10px; gap: 8px; }
-body[data-theme="streak"] .rail-head { border: 0; padding: 0; }
+body[data-theme="streak"] .rail-head { border: 0; padding: 0 2px; }
 body[data-theme="streak"] #attention-list { padding: 2px; gap: 9px; }
 body[data-theme="streak"] .attention-item,
 body[data-theme="streak"] .theme-card,
@@ -1822,6 +1822,7 @@ body[data-theme="streak"][data-theme-mode="dark"] .settings-status,
 body[data-theme="streak"][data-theme-mode="dark"] .settings-command,
 body[data-theme="streak"][data-theme-mode="dark"] .rail-foot,
 body[data-theme="streak"][data-theme-mode="dark"] .session-tab { background: #1d2638; }
+body[data-theme="streak"][data-theme-mode="dark"] .session-tab.active { background: var(--green); color: var(--on-green); }
 body[data-theme="streak"][data-theme-mode="dark"] .btn-amber,
 body[data-theme="streak"][data-theme-mode="dark"] .head-btn.armed { background: var(--amber); }
 body[data-theme="streak"][data-theme-mode="dark"] #stage,
