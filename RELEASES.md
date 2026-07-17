@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.28.4
+
+Tag: `chromux-v0.28.4`
+
+- Keep the focused terminal input helper visually transparent so it cannot cover xterm's scrollbar.
+- Scope textarea form styling directly to capture notes while preserving normal terminal keyboard, IME, selection, and context-menu behavior.
+- Exercise a real focused xterm with scrollback across all four themes in Light and Dark modes.
+
 ## GBlockParty Chromux v0.28.3
 
 Tag: `chromux-v0.28.3`

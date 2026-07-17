@@ -6,6 +6,7 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Keep the real focused xterm helper textarea visually transparent without changing xterm-managed geometry or input behavior, and verify scrollback across all eight theme appearances. _(source: user report; evidence: `prototype/renderer/styles.css`, `prototype/scripts/test-themes-renderer.js`, `RELEASES.md`)_
 - [x] Restore readable active terminal-tab text in Streak Dark and align the attention-queue heading with its empty-state card. _(source: user report; evidence: `prototype/renderer/styles.css`, `prototype/scripts/test-themes-renderer.js`, `RELEASES.md`)_
 - [x] Repaint every live xterm viewport after theme-family or Light/Dark switching so the active terminal input row adopts the selected palette without resetting terminal or session state. _(source: user report; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-themes-renderer.js`, `RELEASES.md`)_
 - [x] Add tactile half-press hover and full-press active interactions to Streak theme button surfaces, with disabled and reduced-motion safeguards. _(source: user request; evidence: `prototype/renderer/styles.css`, `prototype/scripts/test-themes-renderer.js`, `RELEASES.md`)_

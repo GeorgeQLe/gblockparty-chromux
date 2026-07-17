@@ -11,7 +11,7 @@ const e2ePath = path.join(tmpDir, 'themes-e2e.js');
 const e2eOutPath = path.join(tmpDir, 'e2e.out');
 
 fs.writeFileSync(e2ePath, `
-(() => {
+(async () => {
   const themes = window.chromuxTestThemes;
   const expect = (condition, message) => { if (!condition) throw new Error(message); };
   const expected = ['blueprint', 'retro-os', 'streak', 'liquid-glass'];
@@ -60,6 +60,67 @@ fs.writeFileSync(e2ePath, `
   const attentionEmptyFixture = document.createElement('div');
   attentionEmptyFixture.className = 'attention-empty';
   document.querySelector('#attention-list').appendChild(attentionEmptyFixture);
+
+  const realTerminalHost = document.createElement('div');
+  realTerminalHost.className = 'term-host';
+  realTerminalHost.style.cssText = 'position:fixed;left:20px;top:120px;width:420px;height:180px;z-index:10000;background:var(--bg0)';
+  document.body.appendChild(realTerminalHost);
+  const realTerminal = new Terminal({
+    fontFamily: '"SF Mono", Menlo, monospace',
+    fontSize: 12.5,
+    lineHeight: 1.25,
+    scrollback: 200,
+    theme: terminalPalettes['liquid-glass-light'],
+  });
+  const realFitAddon = new FitAddon.FitAddon();
+  realTerminal.loadAddon(realFitAddon);
+  realTerminal.open(realTerminalHost);
+  realFitAddon.fit();
+  await new Promise((resolve) => realTerminal.write(
+    Array.from({ length: realTerminal.rows + 30 }, (_, index) => 'scrollback line ' + index + '\\r\\n').join(''),
+    resolve,
+  ));
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  const realHelper = realTerminalHost.querySelector('.xterm-helper-textarea');
+  const realViewport = realTerminalHost.querySelector('.xterm-viewport');
+  const realScreen = realTerminalHost.querySelector('.xterm-screen');
+  expect(realHelper instanceof HTMLTextAreaElement, 'real xterm should create its helper textarea');
+  expect(realTerminal.buffer.active.baseY > 0, 'real xterm should retain written scrollback rows');
+  expect(realViewport.scrollHeight > realViewport.clientHeight, 'real xterm should render scrollback in a scrollable viewport');
+
+  const terminalGeometry = () => ({
+    cols: realTerminal.cols,
+    rows: realTerminal.rows,
+    hostWidth: realTerminalHost.getBoundingClientRect().width,
+    hostHeight: realTerminalHost.getBoundingClientRect().height,
+    viewportWidth: realViewport.getBoundingClientRect().width,
+    screenWidth: realScreen.getBoundingClientRect().width,
+    gutter: realViewport.getBoundingClientRect().right - realScreen.getBoundingClientRect().right,
+  });
+  const assertRealTerminalPresentation = (theme, mode) => {
+    const label = theme + ' ' + mode;
+    const before = terminalGeometry();
+    expect(before.gutter > 0, label + ' real xterm should retain a nonzero scrollbar gutter; got ' + before.gutter);
+    realTerminal.focus();
+    expect(document.activeElement === realHelper, label + ' should focus the actual xterm helper textarea');
+    const helperStyle = getComputedStyle(realHelper);
+    expect(helperStyle.backgroundColor === 'rgba(0, 0, 0, 0)', label + ' focused xterm helper background should be transparent; got ' + helperStyle.backgroundColor);
+    expect(helperStyle.color === 'rgba(0, 0, 0, 0)', label + ' focused xterm helper text should be transparent; got ' + helperStyle.color);
+    expect(helperStyle.borderTopWidth === '0px' && helperStyle.borderRightWidth === '0px' && helperStyle.borderBottomWidth === '0px' && helperStyle.borderLeftWidth === '0px', label + ' focused xterm helper should have zero border');
+    expect(helperStyle.paddingTop === '0px' && helperStyle.paddingRight === '0px' && helperStyle.paddingBottom === '0px' && helperStyle.paddingLeft === '0px', label + ' focused xterm helper should have zero padding');
+    expect(helperStyle.marginTop === '0px' && helperStyle.marginRight === '0px' && helperStyle.marginBottom === '0px' && helperStyle.marginLeft === '0px', label + ' focused xterm helper should have zero margin');
+    expect(helperStyle.outlineStyle === 'none', label + ' focused xterm helper should have no outline; got ' + helperStyle.outlineStyle);
+    expect(helperStyle.boxShadow === 'none', label + ' focused xterm helper should have no shadow; got ' + helperStyle.boxShadow);
+    expect(helperStyle.resize === 'none', label + ' focused xterm helper should have no resize affordance');
+    expect(helperStyle.appearance === 'none', label + ' focused xterm helper should disable native textarea appearance; got ' + helperStyle.appearance);
+    let typed = '';
+    const disposable = realTerminal.onData((data) => { typed += data; });
+    realTerminal.input('x');
+    disposable.dispose();
+    expect(typed === 'x', label + ' focused real xterm should still accept keyboard input');
+    const after = terminalGeometry();
+    expect(JSON.stringify(after) === JSON.stringify(before), label + ' focus and typing should preserve terminal dimensions and scrollbar gutter; before=' + JSON.stringify(before) + ' after=' + JSON.stringify(after));
+  };
 
   themes.reset();
   expect(!document.querySelector('.brand-sub'), 'top header should not render the Agent Cockpit badge');
@@ -128,8 +189,15 @@ fs.writeFileSync(e2ePath, `
       expect(JSON.stringify(themes.selectedModes()) === JSON.stringify([mode]), mode + ' should be the only pressed mode');
       expectContrast(document.querySelector('#settings-check-updates'), theme + ' ' + mode + ' primary button');
       expectContrast(document.querySelector('[data-theme-option="' + theme + '"] .theme-check'), theme + ' ' + mode + ' selected-theme check');
+      assertRealTerminalPresentation(theme, mode);
     }
   }
+
+  const captureNotesStyle = getComputedStyle(document.querySelector('#cap-notes'));
+  expect(captureNotesStyle.backgroundColor !== 'rgba(0, 0, 0, 0)', 'capture notes textarea should retain a visible form background');
+  expect(captureNotesStyle.borderTopWidth === '1px', 'capture notes textarea should retain its form border');
+  expect(parseFloat(captureNotesStyle.paddingLeft) > 0, 'capture notes textarea should retain form padding');
+  expect(captureNotesStyle.resize === 'vertical', 'capture notes textarea should retain vertical resize styling');
 
   themes.select('blueprint');
   themes.selectMode('dark');
@@ -162,6 +230,7 @@ fs.writeFileSync(e2ePath, `
   expectContrast(fixtures.querySelector('.q-badge'), 'streak queue badge');
   themes.selectMode('dark');
   expectContrast(fixtures.querySelector('.session-tab.active'), 'streak dark active session tab');
+  document.querySelector('#attention-list').appendChild(attentionEmptyFixture);
   const attentionHeadingLeft = document.querySelector('.rail-head .microlabel').getBoundingClientRect().left;
   const attentionEmptyLeft = attentionEmptyFixture.getBoundingClientRect().left;
   expect(Math.abs(attentionHeadingLeft - attentionEmptyLeft) <= 1, 'streak attention heading should align with the empty queue card; got ' + attentionHeadingLeft + ' vs ' + attentionEmptyLeft);
@@ -187,6 +256,8 @@ fs.writeFileSync(e2ePath, `
   localStorage.setItem('chromux.theme', 'liquid-glass');
   expect(themes.modeFromStorage() === 'light', 'legacy non-Blueprint selections should migrate to light mode');
   themes.reset();
+  realTerminal.dispose();
+  realTerminalHost.remove();
   attentionEmptyFixture.remove();
   fixtures.remove();
   return JSON.stringify({ ok: true });

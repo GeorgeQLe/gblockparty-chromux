@@ -1,5 +1,11 @@
 # Lessons
 
+## 2026-07-16 — Terminal presentation tests need real focused xterm DOM
+
+- A synthetic `.xterm-helper-textarea` cannot prove that xterm's generated input layer remains invisible or that its scrollbar stays usable under real focus and scrollback.
+- For terminal presentation regressions, mount `Terminal` with the production addon/CSS, write enough rows to create scrollback, focus the generated helper, and verify both computed presentation and terminal geometry before and after input.
+- Correction enforcement: `prototype/scripts/test-themes-renderer.js` now exercises a real `Terminal` and `FitAddon` across all eight appearances, requires a positive scrollbar gutter, and separately proves capture notes retain normal form styling.
+
 ## 2026-07-15 — Update attention should resolve the update decision
 
 - Avoid routing a queued update's primary action to a blocker session when the user is deciding what to do with the update; focusing an already active blocker is visibly inert.

@@ -937,7 +937,7 @@ body.dragging webview { pointer-events: none; }
 .saved-project-use { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--text); text-align: left; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .field-row input { flex: 1; }
 
-input[type="text"], textarea:not(.xterm-helper-textarea), select {
+input[type="text"], #cap-notes, select {
   border: 1px solid var(--line);
   background: var(--bg0);
   color: var(--text);
@@ -946,7 +946,21 @@ input[type="text"], textarea:not(.xterm-helper-textarea), select {
   outline: none;
   resize: vertical;
 }
-input[type="text"]:focus, textarea:not(.xterm-helper-textarea):focus, select:focus { border-color: var(--amber); box-shadow: var(--glow-amber); }
+input[type="text"]:focus, #cap-notes:focus, select:focus { border-color: var(--amber); box-shadow: var(--glow-amber); }
+
+.xterm .xterm-helper-textarea,
+.xterm .xterm-helper-textarea:focus {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: transparent;
+  margin: 0;
+  outline: none;
+  padding: 0;
+  resize: none;
+}
 
 .segmented { display: flex; border: 1px solid var(--line); }
 .segmented button {
