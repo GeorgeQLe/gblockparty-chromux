@@ -1,5 +1,14 @@
 # Release Notes
 
+## GBlockParty Chromux v0.29.0
+
+Tag: `chromux-v0.29.0`
+
+- Show an animated spinner in each live session tab while its agent turn is working and a checkmark when the turn completes.
+- Keep exited sessions red and all other attention states on the existing lifecycle dot, with activity indicators visible on active and background tabs.
+- Add an enabled-by-default, locally persisted “Show tab activity indicators” switch in Settings.
+- Respect reduced-motion preferences and expose each tab's activity status through its accessible label and tooltip.
+
 ## GBlockParty Chromux v0.28.4
 
 Tag: `chromux-v0.28.4`

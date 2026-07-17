@@ -331,9 +331,29 @@ body {
   font-size: 18px;
   line-height: 1;
 }
-.tab-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.tab-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; box-sizing: border-box; }
 .tab-dot.live { background: var(--green); box-shadow: 0 0 6px var(--green); }
 .tab-dot.dead { background: var(--red); box-shadow: none; }
+.tab-dot.working {
+  width: 10px;
+  height: 10px;
+  border: 2px solid color-mix(in srgb, var(--cyan) 28%, transparent);
+  border-top-color: var(--cyan);
+  background: transparent;
+  box-shadow: none;
+  animation: tabActivitySpin .8s linear infinite;
+}
+.tab-dot.completed {
+  width: 10px;
+  height: 10px;
+  border-radius: 0;
+  color: var(--green);
+  background: transparent;
+  box-shadow: none;
+  font: 800 11px/10px var(--font-mono);
+}
+.tab-dot.completed::before { content: "✓"; }
+@keyframes tabActivitySpin { to { transform: rotate(360deg); } }
 .tab-label-wrap {
   flex: 1;
   min-width: 0;
@@ -368,6 +388,7 @@ body {
   to { transform: translateX(var(--tab-scroll-distance, 0)); }
 }
 @media (prefers-reduced-motion: reduce) {
+  .tab-dot.working { animation: none; }
   .session-tab.marquee .tab-label,
   .session-tab.hover-scroll .tab-label {
     display: block;
@@ -1362,6 +1383,20 @@ input[type="text"]:focus, #cap-notes:focus, select:focus { border-color: var(--a
 .theme-mode-toggle button.active { background: var(--bg3); color: var(--text); box-shadow: inset 0 0 0 1px var(--line-hi); }
 .theme-mode-toggle button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 1px; }
 .settings-divider { height: 1px; background: var(--line); }
+.settings-preferences { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.settings-switch { flex: none; display: flex; align-items: center; gap: 9px; color: var(--text); cursor: pointer; font-size: 10.5px; }
+.settings-switch input { position: absolute; opacity: 0; pointer-events: none; }
+.settings-switch-track {
+  width: 32px; height: 18px; padding: 2px; border: 1px solid var(--line-hi); border-radius: 10px;
+  background: var(--bg0); transition: background .15s ease, border-color .15s ease;
+}
+.settings-switch-track span { display: block; width: 12px; height: 12px; border-radius: 50%; background: var(--dim); transition: transform .15s ease, background .15s ease; }
+.settings-switch input:checked + .settings-switch-track { border-color: var(--green); background: color-mix(in srgb, var(--green) 18%, var(--bg0)); }
+.settings-switch input:checked + .settings-switch-track span { transform: translateX(14px); background: var(--green); }
+.settings-switch input:focus-visible + .settings-switch-track { outline: 2px solid var(--cyan); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .settings-switch-track, .settings-switch-track span { transition: none; }
+}
 .theme-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
 .theme-card {
   position: relative;

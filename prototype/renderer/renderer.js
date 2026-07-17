@@ -8,6 +8,7 @@ const $ = (sel) => document.querySelector(sel);
 
 const THEME_STORAGE_KEY = 'chromux.theme';
 const THEME_MODE_STORAGE_KEY = 'chromux.themeMode';
+const TAB_ACTIVITY_STORAGE_KEY = 'chromux.tabActivityIndicators';
 const THEME_IDS = new Set(['blueprint', 'retro-os', 'streak', 'liquid-glass']);
 const THEME_MODE_IDS = new Set(['light', 'dark']);
 const THEME_LABELS = {
@@ -34,6 +35,12 @@ function storedThemeMode() {
   } catch { return 'light'; }
 }
 
+function storedTabActivityIndicators() {
+  try {
+    return window.localStorage.getItem(TAB_ACTIVITY_STORAGE_KEY) !== 'false';
+  } catch { return true; }
+}
+
 const state = {
   sessions: new Map(), // id -> session
   activeId: null,
@@ -49,6 +56,7 @@ const state = {
   ui: {
     theme: storedTheme(),
     themeMode: storedThemeMode(),
+    tabActivityIndicators: storedTabActivityIndicators(),
     captureModal: null, // { captureId, pngBase64, payloadBase } while composing/delivering
     dirty: new Set(),
     rafScheduled: false,
@@ -287,6 +295,21 @@ function renderThemeControls() {
   });
 }
 
+function renderTabActivityControls() {
+  const toggle = $('#settings-tab-activity-indicators');
+  if (toggle) toggle.checked = state.ui.tabActivityIndicators;
+}
+
+function applyTabActivityIndicators(enabled, { persist = true } = {}) {
+  state.ui.tabActivityIndicators = Boolean(enabled);
+  if (persist) {
+    try { window.localStorage.setItem(TAB_ACTIVITY_STORAGE_KEY, String(state.ui.tabActivityIndicators)); } catch { /* unavailable */ }
+  }
+  renderTabActivityControls();
+  renderTabs();
+  return state.ui.tabActivityIndicators;
+}
+
 function applyTheme(theme, { persist = true } = {}) {
   const next = THEME_IDS.has(theme) ? theme : 'liquid-glass';
   state.ui.theme = next;
@@ -319,6 +342,7 @@ function applyThemeMode(mode, { persist = true } = {}) {
 }
 
 applyTheme(state.ui.theme, { persist: false });
+applyTabActivityIndicators(state.ui.tabActivityIndicators, { persist: false });
 
 // ───────────────────────────────────────────────────────────────────────────
 // Preview detection — scan complete terminal lines for localhost URLs and
@@ -740,10 +764,11 @@ function captureRecordOf(event) {
 function apply(event) {
   const session = event.sessionId ? state.sessions.get(event.sessionId) : null;
   let recorded = false;
+  let tabStateChanged = false;
   switch (event.type) {
     case 'turn-signal':
       if (session) {
-        window.chromuxAttention.applyTurnSignal(
+        tabStateChanged = window.chromuxAttention.applyTurnSignal(
           session.turn, event.signal, event.detail, Date.now(), event.envelope || null,
         );
       }
@@ -753,11 +778,13 @@ function apply(event) {
       recorded = true;
       if (session) trackTypedPreviewSuppressions(session, event.data);
       if (session && window.chromuxAttention.applyUserInputTurnTransition(session, event.data, Date.now())) {
+        tabStateChanged = true;
         recordEvent({ type: 'user-input', sessionId: session.id, turnState: session.turn.state });
       }
       break;
     case 'session-exited':
       if (session) {
+        tabStateChanged = session.lifecycle.alive;
         session.lifecycle.alive = false;
         session.lifecycle.exitCode = Number.isFinite(event.exitCode) ? event.exitCode : null;
         session.lifecycle.exitedAt = Date.now();
@@ -880,7 +907,7 @@ function apply(event) {
       break;
   }
   if (!recorded) recordEvent(event);
-  invalidate('attention', 'update', 'badges', 'captureChips');
+  invalidate('attention', 'update', 'badges', 'captureChips', ...(tabStateChanged ? ['tabs'] : []));
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -2418,15 +2445,35 @@ function sessionDisplayLabel(session) {
 function sessionTabTooltip(session) {
   const label = sessionDisplayLabel(session);
   const cwd = session.cwd || '~';
-  return session.term && session.term.title && session.term.title !== session.name
+  const base = session.term && session.term.title && session.term.title !== session.name
     ? `${label} — ${cwd}\nLaunch name: ${session.name}`
     : `${label} — ${cwd}`;
+  return `${base}\n${sessionTabIndicator(session).status}`;
+}
+
+function sessionTabIndicator(session) {
+  if (!session.lifecycle.alive) return { kind: 'dead', status: 'Session exited' };
+  if (state.ui.tabActivityIndicators && session.turn.state === 'working') {
+    return { kind: 'working', status: 'Agent working' };
+  }
+  if (state.ui.tabActivityIndicators && session.turn.state === 'completed') {
+    return { kind: 'completed', status: 'Turn completed' };
+  }
+  return { kind: 'live', status: 'Session live' };
+}
+
+function updateSessionTabIndicator(session) {
+  const indicator = sessionTabIndicator(session);
+  session.els.dot.className = `tab-dot ${indicator.kind}`;
+  session.els.dot.setAttribute('aria-hidden', 'true');
+  session.els.tab.setAttribute('aria-label', `${sessionDisplayLabel(session)}. ${indicator.status}. ${session.cwd || '~'}`);
 }
 
 function updateSessionTabText(session) {
   if (!session || !session.els || !session.els.tab) return;
   const label = sessionDisplayLabel(session);
   session.els.tab.title = sessionTabTooltip(session);
+  updateSessionTabIndicator(session);
   if (session.els.tabLabel && session.els.tabLabel.textContent !== label) {
     session.els.tabLabel.textContent = label;
   }
@@ -2498,6 +2545,7 @@ function buildSessionTab(session) {
   tab.className = 'session-tab';
   tab.title = sessionTabTooltip(session);
   const dot = document.createElement('span'); dot.className = 'tab-dot live';
+  dot.setAttribute('aria-hidden', 'true');
   const labelWrap = document.createElement('span'); labelWrap.className = 'tab-label-wrap';
   const label = document.createElement('span'); label.className = 'tab-label'; label.textContent = sessionDisplayLabel(session);
   labelWrap.appendChild(label);
@@ -3130,7 +3178,7 @@ function handlePtyData(id, data) {
   if (res.clean) {
     s.term.term.write(res.clean);
     if (window.chromuxAttention.applyCodexOutputCompletionFallback(s, res.clean, Date.now())) {
-      invalidate('update', 'attention', 'badges');
+      invalidate('update', 'attention', 'badges', 'tabs');
     }
     feedDetector(s, res.clean);
   }
@@ -3207,8 +3255,6 @@ function handlePtyExit({ id, exitCode }) {
   const s = state.sessions.get(id);
   if (!s) return;
   apply({ type: 'session-exited', sessionId: id, exitCode });
-  s.els.dot.classList.remove('live');
-  s.els.dot.classList.add('dead');
   s.term.term.write(`\r\n\x1b[38;5;210m── session exited (${exitCode}) ──\x1b[0m\r\n`);
   if (isQuickCodexResumeExit(s)) showResumeRetryWarning(s, exitCode);
 }
@@ -3769,6 +3815,9 @@ $('#settings-theme-mode').addEventListener('click', (event) => {
   const option = event.target.closest('button[data-theme-mode]');
   if (option) applyThemeMode(option.dataset.themeMode);
 });
+$('#settings-tab-activity-indicators').addEventListener('change', (event) => {
+  applyTabActivityIndicators(event.target.checked);
+});
 $('#btn-update-ready').onclick = () => {
   if (updateAvailable() && state.updateQueue.phase === 'idle') installUpdate().catch(showUpdateInstallError);
   else openSettings();
@@ -4147,9 +4196,11 @@ if (window.chromuxTest) {
     return session.id;
   };
 
-  const addRenderableTestSession = ({ name = 'tab-test', agent = 'codex', cwd = '/tmp' } = {}) => {
+  const addRenderableTestSession = ({ name = 'tab-test', agent = 'codex', cwd = '/tmp', turnState = 'unknown', alive = true } = {}) => {
     state.counter += 1;
     const session = newSessionShape({ id: 's' + state.counter, name, cwd, agent });
+    session.turn.state = turnState;
+    session.lifecycle.alive = alive;
     const viewEls = buildSessionView(session);
     const tabEls = buildSessionTab(session);
     const written = [];
@@ -4170,6 +4221,18 @@ if (window.chromuxTest) {
     addSession: addRenderableTestSession,
     feed(id, chunk) {
       handlePtyData(id, chunk);
+      flushRender();
+    },
+    emitSignal(id, event, detail = null) {
+      apply({ type: 'turn-signal', sessionId: id, signal: event, detail });
+      flushRender();
+    },
+    typeInput(id, data = 'x') {
+      apply({ type: 'user-input', sessionId: id, data });
+      flushRender();
+    },
+    exit(id, exitCode = 0) {
+      apply({ type: 'session-exited', sessionId: id, exitCode });
       flushRender();
     },
     focus(id) {
@@ -4196,6 +4259,18 @@ if (window.chromuxTest) {
     label: (id) => testSession(id).els.tabLabel.textContent,
     terminalTitle: (id) => testSession(id).term.title,
     tooltip: (id) => testSession(id).els.tab.title,
+    attentionKinds: () => [...document.querySelectorAll('#attention-list .attention-kind')].map((el) => el.textContent),
+    activityPreference: () => state.ui.tabActivityIndicators,
+    activityPreferenceStored: () => {
+      try { return window.localStorage.getItem(TAB_ACTIVITY_STORAGE_KEY); } catch { return null; }
+    },
+    activityToggleState: () => $('#settings-tab-activity-indicators').checked,
+    setActivityPreference(enabled) {
+      const toggle = $('#settings-tab-activity-indicators');
+      toggle.checked = Boolean(enabled);
+      toggle.dispatchEvent(new Event('change', { bubbles: true }));
+      flushRender();
+    },
     written: (id) => (testSession(id)._written || []).join(''),
     state(id) {
       const session = testSession(id);
@@ -4208,8 +4283,10 @@ if (window.chromuxTest) {
         marquee: tab.classList.contains('marquee'),
         paused: tab.classList.contains('paused'),
         hoverScroll: tab.classList.contains('hover-scroll'),
+        indicator: ['dead', 'working', 'completed', 'live'].find((kind) => session.els.dot.classList.contains(kind)) || 'unknown',
         label: label.textContent,
         title: tab.title,
+        ariaLabel: tab.getAttribute('aria-label') || '',
         wrapWidth: wrap.clientWidth,
         labelWidth: label.scrollWidth,
       };
