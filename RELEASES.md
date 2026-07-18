@@ -1,5 +1,11 @@
 # Release Notes
 
+## GBlockParty Chromux v0.30.2
+
+Tag: `chromux-v0.30.2`
+
+- Add breathing room between the add-session button and the session tab immediately to its left while preserving theme-specific tab spacing.
+
 ## GBlockParty Chromux v0.30.1
 
 Tag: `chromux-v0.30.1`

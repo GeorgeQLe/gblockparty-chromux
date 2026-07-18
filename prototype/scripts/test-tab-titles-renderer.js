@@ -34,8 +34,8 @@ fs.writeFileSync(e2ePath, `
   const firstTab = addButton.previousElementSibling;
   expect(firstTab === tabList.firstElementChild, 'first session tab should be inserted before the add-session button');
   expect(firstTab.nextElementSibling === addButton, 'add-session button should sit directly after the right-most tab');
-  expect(Math.abs(addButton.getBoundingClientRect().left - firstTab.getBoundingClientRect().right) < 1,
-    'add-session button should render flush with the right-most tab');
+  expect(Math.abs(addButton.getBoundingClientRect().left - firstTab.getBoundingClientRect().right - 6) < 1,
+    'add-session button should render with a 6px gap after the right-most tab');
   expect(tabs.label(first) === 'launch-a', 'new tab should fall back to launch name');
   expect(tabs.tooltip(first).includes('/tmp/chromux-a'), 'fallback tooltip should retain cwd');
 

@@ -331,6 +331,7 @@ body {
   font-size: 18px;
   line-height: 1;
 }
+.session-tab.add-tab:not(:first-child) { margin-left: 6px; }
 .tab-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; box-sizing: border-box; }
 .tab-dot.live { background: var(--green); box-shadow: 0 0 6px var(--green); }
 .tab-dot.dead { background: var(--red); box-shadow: none; }
