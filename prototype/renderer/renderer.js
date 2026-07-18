@@ -2569,7 +2569,7 @@ function buildSessionTab(session) {
     state.ui.hoverTabSessionId = null;
     renderTabs();
   });
-  $('#tab-list').appendChild(tab);
+  $('#tab-list').insertBefore(tab, $('#btn-new-session'));
   return { tab, dot, tabLabelWrap: labelWrap, tabLabel: label, tabBadge: badge };
 }
 

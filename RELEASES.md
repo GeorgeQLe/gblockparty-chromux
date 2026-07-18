@@ -1,5 +1,12 @@
 # Release Notes
 
+## GBlockParty Chromux v0.30.0
+
+Tag: `chromux-v0.30.0`
+
+- Keep the add-session button directly beside the right-most session tab instead of pinning it to the far edge of the window.
+- Place the add-session button at the left edge of the tab strip when no sessions are open.
+
 ## GBlockParty Chromux v0.29.0
 
 Tag: `chromux-v0.29.0`
