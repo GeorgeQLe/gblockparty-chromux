@@ -1,5 +1,12 @@
 # Release Notes
 
+## GBlockParty Chromux v0.30.1
+
+Tag: `chromux-v0.30.1`
+
+- Keep completed and waiting agent sessions idle when terminal focus reporting, navigation keys, tabs, mouse sequences, or unsubmitted typing emit input.
+- Start input-inferred working activity only after a prompt is submitted with Enter, while preserving native Claude and Grok turn-start signals.
+
 ## GBlockParty Chromux v0.30.0
 
 Tag: `chromux-v0.30.0`

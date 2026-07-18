@@ -76,6 +76,8 @@
   function applyUserInputTurnTransition(session, input, now) {
     const turn = session && session.turn;
     if (!turn) return false;
+    const submitted = /[\r\n]/.test(input || '');
+    if (!submitted) return false;
     if (['needsInput', 'permission', 'authentication', 'rateLimited', 'toolFailed', 'completed'].includes(turn.state)) {
       turn.state = 'working';
       turn.detail = null;
@@ -86,7 +88,7 @@
       turn.turnId = null;
       return true;
     }
-    if (session.agent === 'codex' && turn.state === 'unknown' && /\r/.test(input || '')) {
+    if (session.agent === 'codex' && turn.state === 'unknown') {
       turn.state = 'working';
       turn.since = now;
       turn.acknowledged = false;

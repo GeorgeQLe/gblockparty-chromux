@@ -44,8 +44,17 @@ fs.writeFileSync(e2ePath, `
   expect(tabs.state(background).indicator === 'completed', 'background completed turn should show checkmark');
   expect(tabs.state(background).title.includes('Turn completed'), 'completed status should appear in tooltip');
 
+  for (const input of ['\\x1b[I', '\\x1b[O', '\\x1b[A', '\\x1b[B', '\\t', '\\x1b[<0;12;8M', 'draft']) {
+    tabs.typeInput(background, input);
+    expect(tabs.state(background).indicator === 'completed',
+      'control input and unsubmitted typing should not activate the spinner: ' + JSON.stringify(input));
+  }
   tabs.typeInput(background, 'continue\\r');
-  expect(tabs.state(background).indicator === 'working', 'user input should return completed tab to spinner');
+  expect(tabs.state(background).indicator === 'working', 'submitted input should return completed tab to spinner');
+
+  const grok = tabs.addSession({ name: 'grok-agent', agent: 'grok', turnState: 'completed' });
+  tabs.emitSignal(grok, 'turn-start');
+  expect(tabs.state(grok).indicator === 'working', 'Grok turn-start signal should activate the spinner');
 
   const input = tabs.addSession({ name: 'input-agent', agent: 'claude' });
   const permission = tabs.addSession({ name: 'permission-agent', agent: 'claude' });

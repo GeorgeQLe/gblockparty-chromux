@@ -115,9 +115,30 @@ fs.writeFileSync(e2ePath, `
   expect(itemsFor('COMPLETED', 'codex-submit').length === 0,
     'new Codex input clears fallback completed attention');
 
-  // 4 — typing answers in-terminal; stale text cannot resurrect COMPLETED.
-  sig.typeInput(a, 'y');
-  expect(sig.turnState(a).state === 'working', 'user input after completed → working');
+  // 4 — control input and unsubmitted typing cannot start a turn.
+  const idleInputs = [
+    ['focus-in', '\\x1b[I'],
+    ['focus-out', '\\x1b[O'],
+    ['arrow-up', '\\x1b[A'],
+    ['arrow-down', '\\x1b[B'],
+    ['arrow-right', '\\x1b[C'],
+    ['arrow-left', '\\x1b[D'],
+    ['tab', '\\t'],
+    ['mouse', '\\x1b[<0;12;8M'],
+    ['unsubmitted typing', 'draft response'],
+  ];
+  for (const [label, input] of idleInputs) {
+    sig.typeInput(a, input);
+    expect(sig.turnState(a).state === 'completed', label + ' must leave a completed turn idle');
+    expect(itemsFor('COMPLETED', 'claude-a').length === 1,
+      label + ' must preserve completed attention');
+  }
+  sig.typeInput(b, 'approval response');
+  expect(sig.turnState(b).state === 'needsInput', 'unsubmitted typing must preserve a waiting turn');
+
+  // Submitted answers resume work; stale text cannot resurrect COMPLETED.
+  sig.typeInput(a, 'y\\r');
+  expect(sig.turnState(a).state === 'working', 'submitted user input after completed → working');
   expect(itemsFor('COMPLETED', 'claude-a').length === 0, 'COMPLETED item gone after typing');
   sig.feedPtyChunk(a, 'done! all set.\\r\\n');
   expect(sig.turnState(a).state === 'working', 'stale phrases must not resurrect completion');
