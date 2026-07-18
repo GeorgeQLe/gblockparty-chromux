@@ -115,6 +115,47 @@ fs.writeFileSync(e2ePath, `
   expect(itemsFor('COMPLETED', 'codex-submit').length === 0,
     'new Codex input clears fallback completed attention');
 
+  const codexV2Recovery = sig.addFakeSession({ name: 'codex-v2-recovery', agent: 'codex' });
+  sig.setSignalToken(codexV2Recovery, 'codex-secret');
+  sig.typeInput(codexV2Recovery, 'first turn\\r');
+  const codexBase = { v: 2, sessionId: codexV2Recovery, token: 'codex-secret', agent: 'codex',
+    reason: null, message: 'First turn complete', turnId: 'codex-turn-1', eventId: 'codex-event-1',
+    sequence: 7, timestamp: Date.now() + 10, source: 'codex:agent-turn-complete',
+    confidence: 'high', stopped: true };
+  sig.feedPtyChunk(codexV2Recovery, oscV2({ ...codexBase, event: 'turn-completed' }));
+  expect(sig.turnState(codexV2Recovery).state === 'completed', 'Codex v2 should complete the first turn');
+  expect(sig.turnState(codexV2Recovery).hasV2 === true, 'first turn should record v2 authority');
+  sig.typeInput(codexV2Recovery, 'second turn\\r');
+  expect(sig.turnState(codexV2Recovery).state === 'working', 'second submitted turn should start working');
+  expect(sig.turnState(codexV2Recovery).hasV2 === false,
+    'new turn must clear prior-turn v2 authority without clearing session history');
+  expect(sig.turnState(codexV2Recovery).sequence === 7,
+    'new turn must retain the accepted session event sequence');
+  expect(sig.turnState(codexV2Recovery).eventIds.includes('codex-event-1'),
+    'new turn must retain session event deduplication history');
+  sig.feedPtyChunk(codexV2Recovery, '\\x1b[?25l\\x1b[2K\\r\\x1b[38;5;245m');
+  expect(sig.turnState(codexV2Recovery).state === 'working',
+    'partial ANSI-rich idle redraw must not complete early');
+  sig.feedPtyChunk(codexV2Recovery, '\\x1b[0m\\x1b[?25h\\u203a ');
+  expect(sig.turnState(codexV2Recovery).state === 'completed',
+    'chunk-split ANSI-rich Codex composer redraw should recover missed completion');
+  expect(itemsFor('COMPLETED', 'codex-v2-recovery').length === 1,
+    'recovered second turn should project the existing completed attention state');
+
+  const activeCodex = sig.addFakeSession({ name: 'codex-active', agent: 'codex' });
+  sig.typeInput(activeCodex, 'keep working\\r');
+  sig.feedPtyChunk(activeCodex, '\\x1b[32mRunning tests and editing files...\\x1b[0m\\r\\n');
+  expect(sig.turnState(activeCodex).state === 'working',
+    'active Codex output without an idle composer must continue working');
+
+  const beforeLate = JSON.stringify(sig.turnState(codexV2Recovery));
+  sig.feedPtyChunk(codexV2Recovery, oscV2({
+    ...codexBase, event: 'turn-completed', eventId: 'codex-event-late', sequence: 6,
+    timestamp: Date.now() + 20,
+  }));
+  expect(JSON.stringify(sig.turnState(codexV2Recovery)) === beforeLate,
+    'late completion with a stale sequence must not mutate the recovered turn');
+
   // 4 — control input and unsubmitted typing cannot start a turn.
   const idleInputs = [
     ['focus-in', '\\x1b[I'],
@@ -127,11 +168,15 @@ fs.writeFileSync(e2ePath, `
     ['mouse', '\\x1b[<0;12;8M'],
     ['unsubmitted typing', 'draft response'],
   ];
+  const idleCodex = sig.addFakeSession({ name: 'codex-idle-inputs', agent: 'codex' });
   for (const [label, input] of idleInputs) {
     sig.typeInput(a, input);
     expect(sig.turnState(a).state === 'completed', label + ' must leave a completed turn idle');
     expect(itemsFor('COMPLETED', 'claude-a').length === 1,
       label + ' must preserve completed attention');
+    sig.typeInput(idleCodex, input);
+    expect(sig.turnState(idleCodex).state === 'unknown',
+      label + ' must not infer a new Codex turn without submission');
   }
   sig.typeInput(b, 'approval response');
   expect(sig.turnState(b).state === 'needsInput', 'unsubmitted typing must preserve a waiting turn');

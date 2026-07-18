@@ -34,6 +34,36 @@
 
   const V2_EVENTS = new Set(['turn-started', 'turn-completed', 'input-required',
     'permission-required', 'authentication-required', 'rate-limited', 'tool-failed']);
+  const CODEX_OUTPUT_BUFFER_MAX = 4096;
+
+  function resetTurnProtocol(turn, now) {
+    turn.protocol = null;
+    turn.authoritative = false;
+    turn.hasV2 = false;
+    turn.inputAt = now;
+    turn.reason = null;
+    turn.source = null;
+    turn.confidence = null;
+    turn.turnId = null;
+    turn.eventId = null;
+    turn.stopped = false;
+    turn.authoritativeAt = 0;
+    turn.outputBuf = '';
+  }
+
+  function normalizeTerminalOutput(output) {
+    return String(output || '')
+      // OSC/DCS/APC strings, including an incomplete string at the buffer end.
+      .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\|$)/g, '')
+      .replace(/\x1b[PX^_][\s\S]*?(?:\x1b\\|$)/g, '')
+      // CSI and remaining two-byte escape sequences.
+      .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '')
+      .replace(/\x1b[@-_]/g, '')
+      // A carriage-return redraw starts a fresh visible line for our bounded
+      // prompt check. Other C0 controls do not carry composer text.
+      .replace(/\r\n?/g, '\n')
+      .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '');
+  }
 
   function applyTurnSignal(turn, signal, detail, now, envelope = null) {
     const next = TURN_SIGNAL_STATES[signal];
@@ -83,15 +113,15 @@
       turn.detail = null;
       turn.since = now;
       turn.acknowledged = false;
-      turn.authoritative = false;
-      turn.inputAt = now;
-      turn.turnId = null;
+      resetTurnProtocol(turn, now);
       return true;
     }
     if (session.agent === 'codex' && turn.state === 'unknown') {
       turn.state = 'working';
+      turn.detail = null;
       turn.since = now;
       turn.acknowledged = false;
+      resetTurnProtocol(turn, now);
       return true;
     }
     return false;
@@ -99,15 +129,18 @@
 
   function applyCodexOutputCompletionFallback(session, output, now) {
     const turn = session && session.turn;
-    if (!turn || turn.hasV2 || session.agent !== 'codex' || turn.state !== 'working') return false;
-    const text = String(output || '');
-    const reachedIdle = /(?:^|\n)\s*(?:›|❯|>)\s*$/.test(text)
-      || /(?:rate limit|usage limit|limit resets|try again later|wait until)/i.test(text);
+    if (!turn || session.agent !== 'codex' || turn.state !== 'working') return false;
+    turn.outputBuf = `${turn.outputBuf || ''}${String(output || '')}`.slice(-CODEX_OUTPUT_BUFFER_MAX);
+    const text = normalizeTerminalOutput(turn.outputBuf);
+    const reachedIdle = /(?:^|\n)\s*(?:›|❯|>)\s*$/.test(text);
     if (!reachedIdle) return false;
     turn.state = 'completed';
     turn.detail = 'Codex turn finished';
     turn.since = now;
     turn.acknowledged = false;
+    turn.protocol = 'output';
+    turn.source = 'codex:terminal-idle';
+    turn.confidence = 'low';
     return true;
   }
 

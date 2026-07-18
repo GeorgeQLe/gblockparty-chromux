@@ -960,7 +960,7 @@ function newSessionShape({ id, name, cwd, agent }) {
       acknowledged: false, // explicit DISMISS — hides the item, keeps the state
       token: null, protocol: null, authoritative: false, hasV2: false, inputAt: 0, reason: null,
       source: null, confidence: null, turnId: null, eventId: null,
-      eventIds: [], sequence: -1, stopped: false, authoritativeAt: 0,
+      eventIds: [], sequence: -1, stopped: false, authoritativeAt: 0, outputBuf: '',
     },
     browser: {
       webview: null, webContentsId: null, currentUrl: null, lastReload: 0,

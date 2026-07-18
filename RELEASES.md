@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.30.3
+
+Tag: `chromux-v0.30.3`
+
+- Stop Codex tab spinners when a missed notifier is followed by an ANSI-rich composer redraw, including redraws split across terminal chunks.
+- Reset completion authority between submitted Codex turns while preserving authenticated event ordering and duplicate rejection across the session.
+- Fall back to the legacy completion signal only when Codex notification classification or terminal delivery fails; malformed and unrelated notifications remain ignored.
+
 ## GBlockParty Chromux v0.30.2
 
 Tag: `chromux-v0.30.2`

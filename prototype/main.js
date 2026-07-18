@@ -441,12 +441,15 @@ const agent = process.argv[2] || '';
 const nativeEvent = process.argv[3] || '';
 let raw = process.argv[4] || '';
 if (!raw) { try { raw = fs.readFileSync(0, 'utf8'); } catch {} }
+const ignored = () => process.exit(agent === 'codex' ? 20 : 0);
+if (raw.length > 65536) ignored();
 let payload = {};
-try { payload = raw ? JSON.parse(raw) : {}; } catch { process.exit(0); }
-if (agent === 'codex' && payload.type !== 'agent-turn-complete') process.exit(0);
+try { payload = raw ? JSON.parse(raw) : {}; } catch { ignored(); }
+if (agent === 'codex' && payload.type !== 'agent-turn-complete') ignored();
 const sessionId = process.env.CHROMUX_SESSION_ID || '';
 const token = process.env.CHROMUX_SIGNAL_TOKEN || '';
-if (!sessionId || !token || !['claude','codex','grok'].includes(agent)) process.exit(0);
+if (!['claude','codex','grok'].includes(agent)) process.exit(0);
+if (!sessionId || !token) process.exit(agent === 'codex' ? 1 : 0);
 const text = [payload.message, payload.title, payload.notification_type, payload.type,
   payload.reason, payload.error, payload.last_assistant_message].filter((v) => typeof v === 'string').join(' ').slice(0, 4096);
 const lower = text.toLowerCase();
@@ -465,16 +468,25 @@ else if (nativeEvent === 'Notification') {
 const stateDir = process.env.CHROMUX_STATE_DIR || path.dirname(__filename);
 const statePath = path.join(stateDir, 'signal-' + crypto.createHash('sha256').update(sessionId + token).digest('hex').slice(0, 24) + '.json');
 let state = { sequence: -1, turnId: null };
-try { state = Object.assign(state, JSON.parse(fs.readFileSync(statePath, 'utf8'))); } catch {}
+try {
+  const saved = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+  if (Number.isSafeInteger(saved.sequence) && saved.sequence >= -1) state.sequence = saved.sequence;
+  if (typeof saved.turnId === 'string' && saved.turnId.length <= 128) state.turnId = saved.turnId;
+} catch {}
 state.sequence += 1;
-if (event === 'turn-started' || !state.turnId) state.turnId = String(payload.turn_id || payload.turnId || crypto.randomUUID());
+const requestedTurnId = payload.turn_id ?? payload.turnId;
+const boundedTurnId = (typeof requestedTurnId === 'string' || typeof requestedTurnId === 'number')
+  ? String(requestedTurnId).slice(0, 128) : '';
+if (event === 'turn-started' || !state.turnId) state.turnId = boundedTurnId || crypto.randomUUID();
 const envelope = { v: 2, sessionId, token, agent, event, reason,
   message: text.slice(0, 1024) || null, turnId: state.turnId, eventId: crypto.randomUUID(),
   sequence: state.sequence, timestamp: Date.now(), source: agent + ':' + nativeEvent,
   confidence: event === 'unknown-notification' ? 'low' : 'high', stopped };
-try { fs.writeFileSync(statePath, JSON.stringify(state), { mode: 0o600 }); } catch {}
+try { fs.writeFileSync(statePath, JSON.stringify(state), { mode: 0o600 }); }
+catch { process.exit(1); }
 const encoded = Buffer.from(JSON.stringify(envelope)).toString('base64url');
-try { fs.writeFileSync('/dev/tty', '\x1b]777;chromux;v2;' + encoded + '\x07'); } catch {}
+try { fs.writeFileSync('/dev/tty', '\x1b]777;chromux;v2;' + encoded + '\x07'); }
+catch { process.exit(1); }
 `;
   fs.writeFileSync(SIGNAL_CLASSIFIER, source, { mode: 0o700 });
   fs.chmodSync(SIGNAL_CLASSIFIER, 0o700);
@@ -560,7 +572,14 @@ function writeCodexNotifyScript() {
       'esac',
     ]),
     hookInstall.helper
-      ? `${classifierCommand('codex', 'agent-turn-complete', '"$1"')} >/dev/null 2>&1 || true`
+      ? [
+        `${classifierCommand('codex', 'agent-turn-complete', '"$1"')} >/dev/null 2>&1`,
+        'status=$?',
+        'case "$status" in',
+        '  0|20) exit 0 ;; # delivered or intentionally ignored',
+        '  *) printf \'\\033]777;chromux;v1;turn-end;%s\\007\' "$CHROMUX_SESSION_ID" > /dev/tty 2>/dev/null || true ;;',
+        'esac',
+      ].join('\n')
       : 'printf \'\\033]777;chromux;v1;turn-end;%s\\007\' "$CHROMUX_SESSION_ID" > /dev/tty 2>/dev/null || true',
     '',
   ].join('\n');
