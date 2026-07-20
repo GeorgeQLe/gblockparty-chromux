@@ -41,10 +41,20 @@ fs.writeFileSync(e2ePath, `
     const values = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
     return (values[0] + .05) / (values[1] + .05);
   };
+  const alpha = (value) => {
+    const channels = value.match(/[\\d.]+/g);
+    if (!channels || channels.length < 3) throw new Error('unparseable color: ' + value);
+    return channels.length >= 4 ? Number(channels[3]) : 1;
+  };
   const expectContrast = (element, label) => {
     const style = getComputedStyle(element);
     const ratio = contrast(style.color, style.backgroundColor);
     expect(ratio >= 4.5, label + ' contrast should meet WCAG AA; got ' + ratio.toFixed(2) + ' from ' + style.color + ' on ' + style.backgroundColor);
+  };
+  const expectContrastOn = (element, background, label) => {
+    const foreground = getComputedStyle(element).color;
+    const ratio = contrast(foreground, background);
+    expect(ratio >= 4.5, label + ' contrast should meet WCAG AA; got ' + ratio.toFixed(2) + ' from ' + foreground + ' on ' + background);
   };
 
   const fixtures = document.createElement('div');
@@ -135,6 +145,10 @@ fs.writeFileSync(e2ePath, `
   expect(JSON.stringify(themes.selectedCards()) === JSON.stringify(['liquid-glass']), 'exactly one default card should be selected');
   expect(JSON.stringify(themes.selectedModes()) === JSON.stringify(['light']), 'exactly one default mode should be selected; got ' + JSON.stringify(themes.selectedModes()));
 
+  const contextMenuSessionId = await themes.addContextMenuSession();
+  const contextMenuTab = themes.sessionTab(contextMenuSessionId);
+  expect(contextMenuTab instanceof HTMLButtonElement, 'context-menu coverage should use a real session tab');
+
   const terminalIds = [
     themes.addTerminalSession({ rows: 17, content: 'first prompt', inputBuffer: 'typed input', focused: true, turnState: 'working' }),
     themes.addTerminalSession({ rows: 29, content: 'second prompt', inputBuffer: 'other input', focused: false, turnState: 'needsInput' }),
@@ -190,9 +204,31 @@ fs.writeFileSync(e2ePath, `
       expectContrast(document.querySelector('#settings-check-updates'), theme + ' ' + mode + ' primary button');
       expectContrast(document.querySelector('[data-theme-option="' + theme + '"] .theme-check'), theme + ' ' + mode + ' selected-theme check');
       assertRealTerminalPresentation(theme, mode);
+
+      contextMenuTab.dispatchEvent(new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        button: 2,
+        clientX: 40,
+        clientY: 40,
+      }));
+      const contextMenu = document.querySelector('.session-menu');
+      expect(contextMenu, theme + ' ' + mode + ' synthetic right-click should open the real tab menu');
+      const menuBackground = getComputedStyle(contextMenu).backgroundColor;
+      const expectedForeground = mode === 'light' ? 'rgb(0, 0, 0)' : 'rgb(255, 255, 255)';
+      expect(alpha(menuBackground) === 1, theme + ' ' + mode + ' context-menu background alpha should be exactly 1; got ' + menuBackground);
+      const items = [...contextMenu.querySelectorAll('.session-menu-item')];
+      expect(items.length >= 3, theme + ' ' + mode + ' menu should include duplicate, cross-agent, and close actions');
+      for (const [index, item] of items.entries()) {
+        const label = item.querySelector('.smi-label');
+        const detail = item.querySelector('.smi-detail');
+        expect(getComputedStyle(label).color === expectedForeground, theme + ' ' + mode + ' menu label ' + index + ' should use ' + expectedForeground);
+        expect(getComputedStyle(detail).color === expectedForeground, theme + ' ' + mode + ' menu detail ' + index + ' should use ' + expectedForeground);
+        expectContrastOn(label, menuBackground, theme + ' ' + mode + ' menu label ' + index);
+        expectContrastOn(detail, menuBackground, theme + ' ' + mode + ' menu detail ' + index);
+      }
     }
   }
-
   const captureNotesStyle = getComputedStyle(document.querySelector('#cap-notes'));
   expect(captureNotesStyle.backgroundColor !== 'rgba(0, 0, 0, 0)', 'capture notes textarea should retain a visible form background');
   expect(captureNotesStyle.borderTopWidth === '1px', 'capture notes textarea should retain its form border');

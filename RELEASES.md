@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.30.4
+
+Tag: `chromux-v0.30.4`
+
+- Give the shared tab context menu a fully opaque, theme-specific surface in all four themes and both brightness modes.
+- Render duplicate, cross-agent, and close action labels and details in black for Light mode and white for Dark mode.
+- Verify real right-click menus across all eight appearances for opaque backgrounds and WCAG AA text contrast.
+
 ## GBlockParty Chromux v0.30.3
 
 Tag: `chromux-v0.30.3`

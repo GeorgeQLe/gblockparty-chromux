@@ -2556,7 +2556,7 @@ function buildSessionTab(session) {
   tab.onclick = () => activateSession(session.id);
   tab.oncontextmenu = (e) => {
     e.preventDefault();
-    activateSession(session.id);
+    if (session.id !== state.activeId) activateSession(session.id);
     openSessionContextMenu(session, e.clientX, e.clientY);
   };
   tab.addEventListener('mouseenter', () => {
@@ -5005,6 +5005,15 @@ if (window.chromuxTest) {
       .map((button) => button.dataset.themeMode),
     bodyTheme: () => document.body.dataset.theme,
     bodyMode: () => document.body.dataset.themeMode,
+    async addContextMenuSession() {
+      const session = await createSession({
+        name: 'context-menu-test',
+        cwd: '/tmp/chromux-context-menu',
+        agent: 'codex',
+      });
+      return session.id;
+    },
+    sessionTab: (id) => testSession(id).els.tab,
     addTerminalSession({
       rows = 24,
       content = '',
