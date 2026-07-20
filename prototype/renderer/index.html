@@ -198,6 +198,19 @@
           </label>
         </section>
         <div class="settings-divider" aria-hidden="true"></div>
+        <section class="settings-preferences" aria-labelledby="prevent-sleep-heading">
+          <div>
+            <div id="prevent-sleep-heading" class="microlabel">PREVENT SLEEP</div>
+            <div class="settings-section-copy">Keep this Mac awake while Chromux is open by running <code>caffeinate -dims</code>.</div>
+            <div id="settings-prevent-sleep-status" class="settings-preference-status" aria-live="polite">OFF</div>
+          </div>
+          <label class="settings-switch">
+            <input id="settings-prevent-sleep" type="checkbox">
+            <span class="settings-switch-track" aria-hidden="true"><span></span></span>
+            <span>Keep Mac awake</span>
+          </label>
+        </section>
+        <div class="settings-divider" aria-hidden="true"></div>
         <section class="settings-preferences" aria-labelledby="developer-mode-heading">
           <div>
             <div id="developer-mode-heading" class="microlabel">DEVELOPER MODE</div>

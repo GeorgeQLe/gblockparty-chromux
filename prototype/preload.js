@@ -48,6 +48,8 @@ contextBridge.exposeInMainWorld('chromux', {
   setWindowButtonPosition: (position) => ipcRenderer.send('set-window-button-position', position),
   getEnv: () => ipcRenderer.invoke('get-env'),
   restartWithDevMode: (opts) => ipcRenderer.invoke('restart-with-dev-mode', opts || {}),
+  setPreventSleep: (enabled) => ipcRenderer.invoke('prevent-sleep-set', enabled),
+  onPreventSleepStatus: (cb) => ipcRenderer.on('prevent-sleep-status', (_e, status) => cb(status)),
   checkUpdates: (opts) => ipcRenderer.invoke('check-updates', opts || {}),
   openUpdateRelease: (opts) => ipcRenderer.invoke('open-update-release', opts || {}),
   openSecurityResource: (resource) => ipcRenderer.invoke('open-security-resource', resource),

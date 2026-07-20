@@ -14,6 +14,7 @@ const yaml = require('js-yaml');
 const { checkForUpdates } = require('./update-checker');
 const { createDevModeRestart, resolveDevMode, restartArgs } = require('./dev-mode');
 const { BrokerClient } = require('./resource-broker/client');
+const { createPreventSleepController } = require('./prevent-sleep');
 const {
   CHROMUX_SHORTCUT_ACTIONS,
   chromuxShortcutAction,
@@ -69,6 +70,7 @@ let win = null;
 const ptys = new Map(); // sessionId -> IPty
 const deliveries = new Map(); // deliveryId -> ChildProcess
 let closeConfirmed = false;
+let preventSleepController = null;
 const shortcutFocusContexts = new Map(); // webContentsId -> { focusKind }
 const shortcutRouteLog = [];
 const resourceClient = new BrokerClient({ client: {
@@ -82,20 +84,29 @@ if (SMOKE && !process.env.CHROMUX_KEEP_USER_DATA) {
   app.setPath('userData', fs.mkdtempSync(path.join(os.tmpdir(), 'chromux-smoke-user-data-')));
 }
 
-function readDevModePreference() {
+function readPreferences() {
   try {
     const payload = JSON.parse(fs.readFileSync(PREFERENCES_FILE, 'utf8'));
-    return typeof payload.devMode === 'boolean' ? payload.devMode : null;
-  } catch { return null; }
+    return payload && typeof payload === 'object' && !Array.isArray(payload) ? payload : {};
+  } catch { return {}; }
+}
+
+function writePreference(name, value) {
+  ensureDirs();
+  const payload = readPreferences();
+  const temporary = `${PREFERENCES_FILE}.${process.pid}.tmp`;
+  fs.writeFileSync(temporary, JSON.stringify({ ...payload, [name]: value }, null, 2) + '\n', { mode: 0o600 });
+  fs.renameSync(temporary, PREFERENCES_FILE);
+  try { fs.chmodSync(PREFERENCES_FILE, 0o600); } catch { /* best effort */ }
+}
+
+function readDevModePreference() {
+  const payload = readPreferences();
+  return typeof payload.devMode === 'boolean' ? payload.devMode : null;
 }
 
 function writeDevModePreference(enabled) {
-  ensureDirs();
-  let payload = {};
-  try { payload = JSON.parse(fs.readFileSync(PREFERENCES_FILE, 'utf8')) || {}; } catch { payload = {}; }
-  const temporary = `${PREFERENCES_FILE}.${process.pid}.tmp`;
-  fs.writeFileSync(temporary, JSON.stringify({ ...payload, devMode: enabled }, null, 2) + '\n');
-  fs.renameSync(temporary, PREFERENCES_FILE);
+  writePreference('devMode', enabled);
 }
 
 const DEV_MODE = resolveDevMode({
@@ -252,6 +263,18 @@ function replaceProjects(records) {
 
 function send(channel, payload) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
+}
+
+function initializePreventSleep() {
+  const persisted = readPreferences().preventSleep === true;
+  preventSleepController = createPreventSleepController({
+    onStatus(status) {
+      try { writePreference('preventSleep', status.enabled); } catch (err) { console.error('prevent sleep preference write failed:', err.message); }
+      send('prevent-sleep-status', status);
+    },
+  });
+  if (persisted) preventSleepController.setEnabled(true);
+  return preventSleepController.status();
 }
 
 function shortcutDebugModifierActive(input, name) {
@@ -1645,8 +1668,19 @@ ipcMain.handle('get-env', () => ({
   grokHooksPath: hookInstall.grok ? HOOKS_GROK : null,
   version: currentVersion(),
   devMode: DEV_MODE,
+  preventSleep: preventSleepController ? preventSleepController.status() : {
+    available: process.platform === 'darwin', enabled: false, running: false, pid: null, error: null,
+  },
   resourceBroker: { cooperativeComputerUse: true, socketPath: resourceClient.socketPath },
 }));
+
+ipcMain.handle('prevent-sleep-set', (event, enabled) => {
+  if (!win || win.isDestroyed() || event.sender !== win.webContents) {
+    throw new Error('Prevent Sleep is only available to the active Chromux window');
+  }
+  if (!preventSleepController) throw new Error('Prevent Sleep is not initialized');
+  return preventSleepController.setEnabled(enabled);
+});
 
 const restartWithDevMode = createDevModeRestart({
   persist: writeDevModePreference,
@@ -1761,6 +1795,7 @@ ipcMain.handle('install-update', async (_e, opts = {}) => {
 
 app.whenReady().then(() => {
   ensureDirs();
+  initializePreventSleep();
   resourceClient.connect().catch((err) => console.error('resource broker unavailable:', err.message));
   installAppMenu();
   try { writeSignalClassifier(); hookInstall.helper = true; } catch (err) { console.error('signal classifier write failed; using legacy hooks:', err.message); }
@@ -1779,4 +1814,7 @@ app.on('window-all-closed', () => {
   app.quit();
 });
 
-app.on('before-quit', () => resourceClient.close());
+app.on('before-quit', () => {
+  if (preventSleepController) preventSleepController.shutdown();
+  resourceClient.close();
+});

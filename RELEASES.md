@@ -1,5 +1,12 @@
 # Release Notes
 
+## GBlockParty Chromux v0.34.0
+
+Tag: `chromux-v0.34.0`
+
+- Add a persistent Prevent Sleep switch in Settings that runs macOS `caffeinate -dims` while enabled.
+- Tie the managed assertion to the Chromux process, stop it when the switch is disabled or Chromux quits, and report launch failures in Settings.
+
 ## GBlockParty Chromux v0.33.3
 
 Tag: `chromux-v0.33.3`

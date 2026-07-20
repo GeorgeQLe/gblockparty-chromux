@@ -1429,6 +1429,10 @@ input[type="text"]:focus, #cap-notes:focus, select:focus { border-color: var(--a
 .appearance-settings { display: flex; flex-direction: column; gap: 12px; }
 .settings-section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
 .settings-section-copy { margin-top: 5px; max-width: 460px; color: var(--dim); font-size: 10.5px; line-height: 1.5; }
+.settings-section-copy code { color: var(--text); font: inherit; }
+.settings-preference-status { margin-top: 6px; color: var(--dim); font: 700 9px/1.3 var(--font-display); letter-spacing: .1em; }
+.settings-preference-status.running { color: var(--green); }
+.settings-preference-status.fail { color: var(--red); }
 .settings-theme-current {
   flex: none;
   border: 1px solid var(--amber);

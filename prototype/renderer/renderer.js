@@ -304,6 +304,47 @@ function renderTabActivityControls() {
   if (toggle) toggle.checked = state.ui.tabActivityIndicators;
 }
 
+function renderPreventSleepStatus(status = state.env && state.env.preventSleep) {
+  const snapshot = status || { available: false, enabled: false, running: false, error: null };
+  if (state.env) state.env.preventSleep = snapshot;
+  const toggle = $('#settings-prevent-sleep');
+  const label = $('#settings-prevent-sleep-status');
+  if (toggle) {
+    toggle.checked = Boolean(snapshot.enabled);
+    toggle.disabled = !snapshot.available;
+  }
+  if (!label) return snapshot;
+  label.className = 'settings-preference-status';
+  if (snapshot.error) {
+    label.classList.add('fail');
+    label.textContent = snapshot.error;
+  } else if (snapshot.running) {
+    label.classList.add('running');
+    label.textContent = snapshot.pid ? `ACTIVE · PID ${snapshot.pid}` : 'ACTIVE';
+  } else if (!snapshot.available) {
+    label.textContent = 'MACOS ONLY';
+  } else {
+    label.textContent = 'OFF';
+  }
+  return snapshot;
+}
+
+async function changePreventSleep(enabled) {
+  const toggle = $('#settings-prevent-sleep');
+  if (toggle) toggle.disabled = true;
+  try {
+    const status = await window.chromux.setPreventSleep(Boolean(enabled));
+    renderPreventSleepStatus(status);
+    return status;
+  } catch (error) {
+    return renderPreventSleepStatus({
+      available: true, enabled: false, running: false, pid: null, error: error.message,
+    });
+  } finally {
+    if (toggle) toggle.disabled = !Boolean(state.env && state.env.preventSleep && state.env.preventSleep.available);
+  }
+}
+
 function applyTabActivityIndicators(enabled, { persist = true } = {}) {
   state.ui.tabActivityIndicators = Boolean(enabled);
   if (persist) {
@@ -3317,6 +3358,7 @@ function showUpdateInstallError(err) {
 function openSettings() {
   const toggle = $('#settings-developer-mode');
   if (toggle) toggle.checked = Boolean(state.env && state.env.devMode);
+  renderPreventSleepStatus();
   $('#modal-settings').classList.remove('hidden');
   invalidate('shortcutDebug');
   checkUpdates(false).catch(() => {});
@@ -4146,6 +4188,9 @@ $('#settings-theme-mode').addEventListener('click', (event) => {
 });
 $('#settings-tab-activity-indicators').addEventListener('change', (event) => {
   applyTabActivityIndicators(event.target.checked);
+});
+$('#settings-prevent-sleep').addEventListener('change', (event) => {
+  changePreventSleep(event.target.checked);
 });
 $('#settings-developer-mode').addEventListener('change', (event) => {
   changeDeveloperMode(event.target.checked).catch(() => {
@@ -5624,9 +5669,11 @@ setInterval(() => {
   state.env = await window.chromux.getEnv();
   state.restoreSessions = state.env.restoreSessions || null;
   window.chromux.onUpdateStatus((status) => renderUpdateStatus(status));
+  window.chromux.onPreventSleepStatus((status) => renderPreventSleepStatus(status));
   $('#storage-path').textContent = state.env.capturesDir.replace(state.env.home, '~');
   $('.sb-ver').textContent = `chromux ${state.env.version || '0.6.0'} — prototype`;
   $('#settings-developer-mode').checked = Boolean(state.env.devMode);
+  renderPreventSleepStatus();
   renderDeveloperDiagnostics();
   await autoRestoreWorkspace().catch((err) => {
     renderRestoreWarning([{ name: 'restore failed', cwd: err.message, agent: 'chromux' }]);

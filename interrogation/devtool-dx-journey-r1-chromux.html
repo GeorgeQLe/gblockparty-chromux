@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en" data-visual-tier="visual" data-interrogation-status="confirmed" data-interrogation-round="1" data-interrogation-gate="continue">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chromux DX Journey — Interrogation Round 1</title>
+  <style>
+    :root {
+      --bg: #0d1117; --surface: #161b22; --surface2: #1c2333; --border: #30363d;
+      --text: #c9d1d9; --text-muted: #8b949e; --accent: #58a6ff; --green: #3fb950;
+      --red: #f85149; --orange: #d29922; --purple: #bc8cff;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; line-height: 1.55; }
+    main { width: min(100% - 32px, 1080px); max-width: 100%; margin: 0 auto; padding: 32px 0 72px; overflow-wrap: break-word; }
+    h1, h2, h3 { line-height: 1.2; }
+    h1 { margin: .35rem 0 .65rem; color: #fff; font-size: 2.15rem; }
+    h2 { margin-top: 0; color: var(--accent); font-size: 1.3rem; }
+    h3 { color: var(--purple); font-size: 1.05rem; }
+    a { color: var(--accent); }
+    code, textarea { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+    header, section, nav { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; margin: 16px 0; }
+    .eyebrow { color: var(--purple); font-weight: 750; letter-spacing: .06em; text-transform: uppercase; font-size: .78rem; }
+    .lede { max-width: 76ch; color: var(--text-muted); }
+    .badge { display: inline-block; padding: 3px 9px; margin: 2px 5px 2px 0; border: 1px solid var(--border); border-radius: 999px; font-size: .78rem; font-weight: 700; }
+    .badge-purple { color: var(--purple); border-color: var(--purple); }
+    .badge-orange { color: var(--orange); border-color: var(--orange); }
+    .badge-green { color: var(--green); border-color: var(--green); }
+    .muted { color: var(--text-muted); }
+    .notice { border-left: 4px solid var(--orange); padding-left: 14px; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .stat { background: #0f1520; border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+    .stat strong { display: block; color: #fff; font-size: 1.2rem; }
+    .assumption { border-top: 1px solid var(--border); padding: 18px 0; }
+    .assumption:first-of-type { border-top: 0; padding-top: 0; }
+    .source { color: var(--purple); font-weight: 700; }
+    .choices { display: flex; flex-wrap: wrap; gap: 10px 18px; margin: 12px 0; }
+    label { display: inline-flex; align-items: center; gap: 8px; }
+    input[type="radio"] { width: 18px; height: 18px; accent-color: var(--accent); }
+    input[type="text"], textarea { width: 100%; margin-top: 10px; border: 1px solid var(--border); border-radius: 8px; background: #0f1520; color: var(--text); padding: 12px; font: inherit; }
+    textarea { min-height: 132px; resize: vertical; }
+    .correction { min-height: 78px; }
+    .question { background: var(--surface2); border: 1px solid #33456a; border-radius: 10px; padding: 18px; margin: 16px 0; }
+    .question h3 { margin-top: 0; }
+    .recommendation { background: #121a28; border-left: 3px solid var(--green); padding: 10px 12px; border-radius: 6px; }
+    button { min-height: 44px; padding: 10px 16px; border: 1px solid var(--border); border-radius: 8px; background: #0f1520; color: var(--text); font: inherit; cursor: pointer; }
+    button:hover { border-color: var(--accent); }
+    button.primary { border-color: var(--accent); background: #163152; color: #fff; font-weight: 750; }
+    .button-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+    .gate { border-left: 4px solid var(--purple); }
+    .compile-output { min-height: 300px; }
+    .status-line { min-height: 1.5rem; color: var(--green); }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 620px; }
+    th, td { border-bottom: 1px solid var(--border); padding: 10px; text-align: left; vertical-align: top; }
+    th { color: #fff; }
+    @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+    @media (max-width: 560px) { main { width: calc(100vw - 22px); padding-top: 20px; } h1 { font-size: 1.55rem; } header, section, nav { padding: 16px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">Stage 0 · assumptions manifest · round 1</p>
+      <h1>Refresh Chromux’s developer DX journey</h1>
+      <p class="lede">Confirm what the repository already establishes, then supply the decisions and evidence constraints that cannot be inferred. This page does not contain DX findings or recommendations; it prepares the scope gate for a later research pass.</p>
+      <p><span class="badge badge-purple">$devtool-dx-journey</span><span class="badge badge-orange">awaiting answers</span><span class="badge badge-green">visual tier</span></p>
+    </header>
+
+    <nav aria-label="Page sections">
+      <h2>Contents</h2>
+      <ol>
+        <li><a href="#scope-evidence">Scope evidence</a></li>
+        <li><a href="#assumptions">Assumptions to confirm</a></li>
+        <li><a href="#questions">Open decisions</a></li>
+        <li><a href="#gate">Round gate</a></li>
+        <li><a href="#compile">Compile responses</a></li>
+      </ol>
+    </nav>
+
+    <section id="scope-evidence">
+      <h2>Scope evidence</h2>
+      <p class="notice"><strong>Not findings.</strong> These are repository-state signals used only to avoid asking questions the project already answers.</p>
+      <div class="grid">
+        <div class="stat"><strong>v0.30.2</strong><span class="muted">Current package version and Git tag</span></div>
+        <div class="stat"><strong>macOS + Electron</strong><span class="muted">Documented current runtime</span></div>
+        <div class="stat"><strong>2026-07-05</strong><span class="muted">Date of existing canonical DX journey</span></div>
+      </div>
+      <div class="table-wrap" data-tts-narrative="The repository now contains a runnable packaged prototype, while the existing canonical DX journey was written when it described the checkout as pre-implementation. No prior DX interrogation handoff exists for this run.">
+        <table>
+          <thead><tr><th>Available category</th><th>Observed source</th><th>How it may be used later</th></tr></thead>
+          <tbody>
+            <tr><td>Product and quickstart</td><td><code>README.md</code>, <code>prototype/README.md</code>, <code>prototype/package.json</code></td><td>Current install, first-run, and first-success routes</td></tr>
+            <tr><td>Existing DX baseline</td><td><code>research/devtool-dx-journey.md</code> and confirmed alignment record</td><td>Prior assumptions and stale-versus-current comparison</td></tr>
+            <tr><td>Implementation evidence</td><td>Prototype source, renderer tests, docs, and recent release history</td><td>Validate claimed paths and recovery surfaces</td></tr>
+            <tr><td>External/user evidence</td><td>Not supplied in this invocation</td><td>Requires an explicit source or approved expansion</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="assumptions">
+      <h2>Assumptions to confirm</h2>
+      <p class="muted">Choose confirm, correct, or flag for each. Add detail whenever the repository view is incomplete or misleading.</p>
+
+      <div class="assumption" data-assumption data-id="product_identity" data-source="from repo">
+        <p><span class="source">[from repo]</span> Chromux is currently an OSS macOS Electron/Chromium desktop front-end that pairs terminal-native agent sessions with embedded browser panes and browser-evidence capture.</p>
+        <div class="choices">
+          <label><input type="radio" name="assumption_product_identity" value="confirm"> Confirm</label>
+          <label><input type="radio" name="assumption_product_identity" value="correct"> Correct</label>
+          <label><input type="radio" name="assumption_product_identity" value="flag"> Flag</label>
+        </div>
+        <textarea class="correction" data-assumption-note aria-label="Correction or flag detail for product identity" placeholder="Required when correcting or flagging; optional context otherwise."></textarea>
+      </div>
+
+      <div class="assumption" data-assumption data-id="maturity" data-source="from git">
+        <p><span class="source">[from git]</span> This run should assess a working, frequently released v0.30.2 prototype—not the pre-implementation concept described by the July 5 DX baseline.</p>
+        <div class="choices">
+          <label><input type="radio" name="assumption_maturity" value="confirm"> Confirm</label>
+          <label><input type="radio" name="assumption_maturity" value="correct"> Correct</label>
+          <label><input type="radio" name="assumption_maturity" value="flag"> Flag</label>
+        </div>
+        <textarea class="correction" data-assumption-note aria-label="Correction or flag detail for maturity" placeholder="Describe the maturity level the journey should use."></textarea>
+      </div>
+
+      <div class="assumption" data-assumption data-id="journey_shape" data-source="from research">
+        <p><span class="source">[from research]</span> The canonical output should continue to cover discovery, install, quickstart, first success, error recovery, production adoption, team rollout, and retention, while updating their substance for the current product.</p>
+        <div class="choices">
+          <label><input type="radio" name="assumption_journey_shape" value="confirm"> Confirm</label>
+          <label><input type="radio" name="assumption_journey_shape" value="correct"> Correct</label>
+          <label><input type="radio" name="assumption_journey_shape" value="flag"> Flag</label>
+        </div>
+        <textarea class="correction" data-assumption-note aria-label="Correction or flag detail for journey shape" placeholder="Name journeys to add, remove, merge, or treat as non-goals."></textarea>
+      </div>
+
+      <div class="assumption" data-assumption data-id="first_success" data-source="from repo">
+        <p><span class="source">[from repo]</span> The current first-success loop is: start or resume an agent session, approve a detected preview, inspect it in the paired browser, capture evidence, and send or file-drop the payload.</p>
+        <div class="choices">
+          <label><input type="radio" name="assumption_first_success" value="confirm"> Confirm</label>
+          <label><input type="radio" name="assumption_first_success" value="correct"> Correct</label>
+          <label><input type="radio" name="assumption_first_success" value="flag"> Flag</label>
+        </div>
+        <textarea class="correction" data-assumption-note aria-label="Correction or flag detail for first success" placeholder="Correct the loop or identify the actual success moment."></textarea>
+      </div>
+
+      <div class="assumption" data-assumption data-id="evidence_base" data-source="from repo">
+        <p><span class="source">[from repo]</span> The initial approved evidence base should be repository docs, code, tests, release history, and existing research; telemetry, support logs, and external user feedback have not been supplied for this run.</p>
+        <div class="choices">
+          <label><input type="radio" name="assumption_evidence_base" value="confirm"> Confirm</label>
+          <label><input type="radio" name="assumption_evidence_base" value="correct"> Correct</label>
+          <label><input type="radio" name="assumption_evidence_base" value="flag"> Flag</label>
+        </div>
+        <textarea class="correction" data-assumption-note aria-label="Correction or flag detail for evidence base" placeholder="Point to additional evidence or restrictions."></textarea>
+      </div>
+
+      <div class="assumption" data-assumption data-id="output_intent" data-source="inferred">
+        <p><span class="source">[inferred]</span> This invocation requests an evidence-backed DX analysis and canonical research refresh, not implementation changes to the Chromux app.</p>
+        <div class="choices">
+          <label><input type="radio" name="assumption_output_intent" value="confirm"> Confirm</label>
+          <label><input type="radio" name="assumption_output_intent" value="correct"> Correct</label>
+          <label><input type="radio" name="assumption_output_intent" value="flag"> Flag</label>
+        </div>
+        <textarea class="correction" data-assumption-note aria-label="Correction or flag detail for output intent" placeholder="Explain what decision or artifact this run must support."></textarea>
+      </div>
+    </section>
+
+    <section id="questions">
+      <h2>Open decisions</h2>
+
+      <div class="question" data-open-question data-id="decision_horizon">
+        <h3>1. What decision should this DX journey enable, and over what horizon?</h3>
+        <p data-recommended-answer><strong>Recommended:</strong> use the next 30–60 days to identify the highest-friction gaps between source install and repeated daily use, then turn only verified gaps into a prioritized DX backlog.</p>
+        <span data-agent-recommended-answer hidden>Use a 30–60 day horizon. The report should identify and prioritize verified friction between source install, first successful paired preview/capture, recovery from common failures, and repeated daily use; it should not become a broad product roadmap.</span>
+        <p><span class="badge badge-orange" data-agent-confidence="medium">Agent confidence: medium</span></p>
+        <textarea data-open-input aria-label="Decision and horizon" placeholder="Accept the recommendation or state the concrete decision, deadline, and audience for the report."></textarea>
+        <p class="button-row"><button type="button" data-apply-recommended>Apply recommended</button><button type="button" data-clarify-copy>Need clarification</button><span data-apply-recommended-status class="muted"></span><span data-clarify-status class="muted"></span></p>
+      </div>
+
+      <div class="question" data-open-question data-id="persona_environment_boundaries">
+        <h3>2. Which developer and environment should be the primary route, and what must remain out of scope?</h3>
+        <p data-recommended-answer><strong>Recommended:</strong> prioritize a technical solo builder on Apple Silicon macOS, using Node 22+, terminal-native Claude/Codex/Grok sessions, localhost or local HTML previews, and a locally built unsigned app. Treat managed cloud workspaces, Windows/Linux, org administration, and team collaboration as boundary checks rather than primary journeys.</p>
+        <span data-agent-recommended-answer hidden>Primary route: a technical solo builder on Apple Silicon macOS with Node 22+, Xcode command-line tools, and terminal-native Claude Code, Codex, or Grok Build workflows. Include localhost and file previews plus local capture delivery. Keep managed cloud execution, Windows/Linux support, enterprise administration, and multi-user collaboration out of the primary current-state journey unless the evidence shows they are now required.</span>
+        <p><span class="badge badge-green" data-agent-confidence="high">Agent confidence: high</span></p>
+        <textarea data-open-input aria-label="Persona environment and boundaries" placeholder="Accept or override the persona, environment, route boundaries, and non-goals."></textarea>
+        <p class="button-row"><button type="button" data-apply-recommended>Apply recommended</button><button type="button" data-clarify-copy>Need clarification</button><span data-apply-recommended-status class="muted"></span><span data-clarify-status class="muted"></span></p>
+      </div>
+
+      <div class="question" data-open-question data-id="evidence_failures_risk">
+        <h3>3. What extra evidence, observed failure states, or riskiest assumption must shape the analysis?</h3>
+        <p data-recommended-answer><strong>Recommended:</strong> begin with repo-verifiable paths and treat “the quickstart and core loop work for a fresh developer, not only the builder’s configured machine” as the riskiest assumption. Add any install notes, support conversations, screenshots, failed sessions, or usage observations you want included; name evidence that must stay excluded.</p>
+        <span data-agent-recommended-answer hidden>Use repository docs, implementation, tests, and releases as the initial evidence set. Treat fresh-machine reproducibility—from prerequisites and install through preview approval, capture, delivery, and recovery—as the riskiest DX assumption. No external research is authorized yet. Incorporate any supplied support notes, observed failures, telemetry, or user feedback, and explicitly label absent evidence as a gap.</span>
+        <p><span class="badge badge-orange" data-agent-confidence="medium">Agent confidence: medium</span></p>
+        <textarea data-open-input aria-label="Evidence failures and riskiest assumption" placeholder="List evidence paths or observations, missing failure states, restrictions, and the assumption you most want challenged."></textarea>
+        <p class="button-row"><button type="button" data-apply-recommended>Apply recommended</button><button type="button" data-clarify-copy>Need clarification</button><span data-apply-recommended-status class="muted"></span><span data-clarify-status class="muted"></span></p>
+      </div>
+    </section>
+
+    <section id="gate" class="gate">
+      <h2>Round gate</h2>
+      <p>This is not scope approval. It tells the agent whether to evaluate these answers against the confidence gate or prepare another guided interrogation round.</p>
+      <div class="choices" data-gate-question data-id="round_readiness">
+        <label><input type="radio" name="round_readiness" value="assess-confidence"> Assess these answers for coverage and confidence</label>
+        <label><input type="radio" name="round_readiness" value="continue-interrogation"> Continue interrogation before assessing coverage</label>
+      </div>
+    </section>
+
+    <section id="compile" data-answer-sidecar="research/_working/interrogation-devtool-dx-journey-r1.yaml">
+      <h2>Compile responses</h2>
+      <p class="muted">Answer as much as you can. Partial YAML is valid and can be pasted back for clarification or a revised round.</p>
+      <p class="button-row"><button type="button" class="primary" id="compile-button">Compile Responses</button><button type="button" id="copy-button">Copy YAML</button></p>
+      <p id="compile-status" class="status-line" role="status"></p>
+      <textarea id="yaml-output" class="compile-output" readonly aria-label="Compiled interrogation response YAML"></textarea>
+    </section>
+  </main>
+
+  <script>
+  (() => {
+    const pagePath = "interrogation/devtool-dx-journey-r1-chromux.html";
+    const sidecarPath = "research/_working/interrogation-devtool-dx-journey-r1.yaml";
+    const command = "$devtool-dx-journey";
+    const output = document.getElementById("yaml-output");
+    const status = document.getElementById("compile-status");
+
+    const yamlString = (value) => `"${String(value ?? "").replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r?\n/g, "\\n")}"`;
+
+    async function copyText(text, fallback) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch {
+        fallback.focus(); fallback.select();
+        return false;
+      }
+    }
+
+    function compile() {
+      const assumptions = [...document.querySelectorAll("[data-assumption]")].map((block) => {
+        const selected = block.querySelector('input[type="radio"]:checked');
+        return { id: block.dataset.id, source: block.dataset.source, decision: selected?.value || "unanswered", correction: block.querySelector("[data-assumption-note]").value.trim() };
+      });
+      const answers = [...document.querySelectorAll("[data-open-question]")].map((block) => ({
+        id: block.dataset.id,
+        answer: block.querySelector("[data-open-input]").value.trim(),
+        recommended: block.querySelector("[data-recommended-answer]").textContent.replace(/^Recommended:\s*/i, "").trim(),
+        agentRecommended: block.querySelector("[data-agent-recommended-answer]").textContent.trim(),
+        confidence: block.querySelector("[data-agent-confidence]").dataset.agentConfidence
+      }));
+      const gate = document.querySelector('input[name="round_readiness"]:checked')?.value || "unanswered";
+      const assumptionIncomplete = assumptions.some((item) => item.decision === "unanswered" || (["correct", "flag"].includes(item.decision) && !item.correction));
+      const answerIncomplete = answers.some((item) => !item.answer);
+      const complete = !assumptionIncomplete && !answerIncomplete && gate !== "unanswered";
+      const lines = [
+        `# Invoke with: ${command}`,
+        `command: ${yamlString(command)}`,
+        `interrogation_page: ${pagePath}`,
+        "round: 1",
+        `round_status: ${complete ? "complete" : "partial"}`,
+        "gate_state: continue",
+        "assumptions:"
+      ];
+      assumptions.forEach((item) => {
+        lines.push(`  - id: ${item.id}`, `    source: ${yamlString(item.source)}`, `    decision: ${item.decision}`);
+        if (item.correction) lines.push(`    correction: ${yamlString(item.correction)}`);
+      });
+      lines.push("open_answers:");
+      answers.forEach((item) => {
+        lines.push(
+          `  - id: ${item.id}`,
+          `    answer: ${yamlString(item.answer)}`,
+          `    recommended_answer: ${yamlString(item.recommended)}`,
+          `    agent_recommended_answer: ${yamlString(item.agentRecommended)}`,
+          `    agent_confidence: ${item.confidence}`
+        );
+      });
+      lines.push("gate_answers:", "  - id: round_readiness", `    answer: ${gate}`, "agent_routing:", "  workflow: interrogation-loop", "  parent_skill: devtool-dx-journey", `  command: ${yamlString(command)}`, "  gate_owner: parent-orchestrator", "  gate_type: interrogation-round", "  round: 1", `  answer_sidecar: ${sidecarPath}`, "  next_resolution: parent-resolves-from-yaml-and-filesystem");
+      output.value = `${lines.join("\n")}\n`;
+      status.textContent = complete ? "Complete response compiled. Copying YAML…" : "Partial response compiled. Copying YAML…";
+      copyText(output.value, output).then((copied) => { status.textContent = `${complete ? "Complete" : "Partial"} response compiled. ${copied ? "YAML copied." : "Select the YAML and copy it manually."}`; });
+    }
+
+    document.addEventListener("click", async (event) => {
+      const apply = event.target.closest("[data-apply-recommended]");
+      if (apply) {
+        const block = apply.closest("[data-open-question]");
+        const source = block?.querySelector("[data-agent-recommended-answer]");
+        const input = block?.querySelector("[data-open-input]");
+        const recommended = source?.textContent?.trim() || "";
+        if (!input || !recommended) return;
+        if (input.value.trim() && !window.confirm("Replace your current answer with the recommended answer?")) return;
+        input.value = recommended;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+        const applyStatus = block.querySelector("[data-apply-recommended-status]");
+        if (applyStatus) applyStatus.textContent = "Recommended answer applied.";
+        return;
+      }
+      const clarify = event.target.closest("[data-clarify-copy]");
+      if (clarify) {
+        const block = clarify.closest("[data-open-question]");
+        const question = block?.querySelector("h3")?.textContent?.trim() || "Open question";
+        const payload = `Question: "${question.replace(/"/g, '\\"')}"\nI need clarification on what this is asking before I can answer.`;
+        const helper = block.querySelector("[data-open-input]");
+        const copied = await copyText(payload, helper);
+        const clarifyStatus = block.querySelector("[data-clarify-status]");
+        if (clarifyStatus) clarifyStatus.textContent = copied ? "Clarification request copied." : "Clarification request selected; copy it manually.";
+      }
+    });
+
+    document.getElementById("compile-button").addEventListener("click", compile);
+    document.getElementById("copy-button").addEventListener("click", async () => {
+      if (!output.value) compile();
+      const copied = await copyText(output.value, output);
+      status.textContent = copied ? "YAML copied." : "Select the YAML and copy it manually.";
+    });
+  })();
+  </script>
+  <script src="../scripts/alignment-tts-kokoro.js"></script>
+  <script src="../scripts/alignment-question-nav.js"></script>
+</body>
+</html>

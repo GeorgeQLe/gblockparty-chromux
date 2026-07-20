@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en" data-visual-tier="visual" data-interrogation-status="confirmed" data-interrogation-round="1" data-interrogation-gate="continue">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gigachadd Process in Chromux — Interrogation Round 1</title>
+  <style>
+    :root{--bg:#0d1117;--surface:#161b22;--border:#30363d;--text:#c9d1d9;--text-muted:#8b949e;--accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922;--purple:#bc8cff;--question:#1c2333}
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.55}
+    main{width:min(1120px,calc(100% - 32px));margin:0 auto;padding:32px 0 56px;max-width:100%;overflow-wrap:break-word}
+    h1,h2,h3{color:#fff;line-height:1.2} h1{margin-bottom:8px} h2{margin-top:32px;color:var(--accent)} h3{color:var(--purple)} a{color:var(--accent)} code{color:#a5d6ff}
+    .summary,.toc,.panel,.compile,.assumption,.question{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:18px;margin:16px 0}
+    .question{background:var(--question);border-color:var(--purple)} .meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:10px;margin:16px 0}
+    .pill,.confidence{display:inline-flex;align-items:center;min-height:32px;padding:4px 10px;border:1px solid var(--border);border-radius:999px;background:#0f1624;color:var(--text-muted)}
+    .confidence{color:var(--orange);background:#1f1a10}.toc ul{margin:0;padding-left:20px}.table-wrap{overflow-x:auto} table{width:100%;border-collapse:collapse;margin:12px 0;min-width:720px}
+    th,td{border:1px solid var(--border);padding:10px;text-align:left;vertical-align:top}th{background:#1c2333;color:#fff}.controls{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+    label.option{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:10px 16px;border:1px solid var(--border);border-radius:8px;background:#0f1624;cursor:pointer}
+    textarea,input[type="text"]{width:100%;min-height:88px;background:#0b1220;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:10px} textarea[data-open-input]{min-height:128px}
+    .recommendation{border-left:3px solid var(--accent);padding:10px 12px;background:#111a2b;margin:12px 0}.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px}
+    button{min-height:44px;padding:10px 16px;border:1px solid var(--border);border-radius:8px;background:#1f6feb;color:#fff;cursor:pointer;font:inherit}button.secondary{background:#21262d}.status{color:var(--text-muted)}
+    .compile textarea{min-height:280px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9rem}.muted{color:var(--text-muted)}
+    @media(max-width:860px){main{width:min(100% - 24px,1120px);padding-top:22px}} @media(max-width:560px){.controls,.actions{flex-direction:column}label.option,button{width:100%;justify-content:center}}
+  </style>
+</head>
+<body>
+<main>
+  <h1>Gigachadd Process in Chromux — Interrogation Round 1</h1>
+  <p class="summary">This page confirms what “Gigachadd” means and what kind of incorporation you want before external research is synthesized. Everything below is scope evidence or an assumption—not a conclusion or implementation recommendation.</p>
+
+  <div class="meta" aria-label="Round metadata">
+    <span class="pill">Skill: <code>$devtool-integration-map</code></span><span class="pill">Round: 1</span><span class="pill">Topic: gigachadd-process</span><span class="pill">Status: answers consumed</span>
+  </div>
+
+  <nav class="toc" aria-label="Table of contents">
+    <h2>Table of Contents</h2>
+    <ul><li><a href="#scope-evidence">Scope Evidence</a></li><li><a href="#assumptions">Assumptions Manifest</a></li><li><a href="#open-questions">Open Questions</a></li><li><a href="#compile">Compile Responses</a></li></ul>
+  </nav>
+
+  <section id="scope-evidence">
+    <h2>Scope Evidence</h2>
+    <p>Minimal discovery identified these candidate sources and Chromux surfaces. They establish what can be researched; they do not yet establish the answer.</p>
+    <div class="table-wrap" data-tts-narrative="The scope evidence identifies the likely Gigachadd repository and public portfolio description, plus Chromux's session, browser, capture, and attention surfaces that could host a debate process.">
+      <table><thead><tr><th>Category</th><th>Observed source or surface</th><th>Possible role in research</th></tr></thead><tbody>
+        <tr><td>Likely primary project</td><td><code>GeorgeQLe/gigachadd-v0</code></td><td>Public repository named by LeXCorp launch-readiness data; proposed primary source for README, code, CLI contracts, and git history.</td></tr>
+        <tr><td>Public product description</td><td>LeXCorp portfolio and 6eorge.com</td><td>Describe GIGACHADD as a Rust CLI adversarial AI debate tool; useful as positioning evidence, not a substitute for source inspection.</td></tr>
+        <tr><td>Chromux session layer</td><td><code>prototype/main.js</code>, terminal sessions, Claude/Codex/Grok launch and resume</td><td>Potential orchestration surface if the process uses multiple roles, rounds, or agent participants.</td></tr>
+        <tr><td>Chromux review layer</td><td>Paired browser, preview queue, evidence capture, attention protocol</td><td>Potential UI surface for arguments, judge decisions, round state, and human approval.</td></tr>
+        <tr><td>Existing boundary</td><td><code>docs/gblockparty-iaas-integration.md</code></td><td>Constrains whether a future process stays local, invokes an external CLI, or becomes managed execution.</td></tr>
+      </tbody></table>
+    </div>
+  </section>
+
+  <section id="assumptions">
+    <h2>Assumptions Manifest</h2>
+    <p>Confirm, correct, or flag each assumption. Corrections will determine whether another interrogation round is needed.</p>
+
+    <article class="assumption" data-assumption-id="project-identity" data-source="[from public scope evidence]">
+      <strong>Assumption 1 — Project identity:</strong> “Gigachadd” refers to <code>GeorgeQLe/gigachadd-v0</code>, the Rust CLI adversarial AI debate project in your LeXCorp portfolio.
+      <div class="controls"><label class="option"><input type="radio" name="assumption_project_identity" value="confirm"> Confirm</label><label class="option"><input type="radio" name="assumption_project_identity" value="correct"> Correct</label><label class="option"><input type="radio" name="assumption_project_identity" value="flag"> Flag</label></div>
+      <textarea data-assumption-note="project-identity" placeholder="If correcting or flagging, provide the intended project or URL."></textarea>
+    </article>
+
+    <article class="assumption" data-assumption-id="research-goal" data-source="[from prompt]">
+      <strong>Assumption 2 — Research goal:</strong> The primary goal is to understand Gigachadd’s underlying decision process—not merely its command list—and identify a useful Chromux-native form of that process.
+      <div class="controls"><label class="option"><input type="radio" name="assumption_research_goal" value="confirm"> Confirm</label><label class="option"><input type="radio" name="assumption_research_goal" value="correct"> Correct</label><label class="option"><input type="radio" name="assumption_research_goal" value="flag"> Flag</label></div>
+      <textarea data-assumption-note="research-goal" placeholder="What outcome matters more, if different?"></textarea>
+    </article>
+
+    <article class="assumption" data-assumption-id="chromux-fit" data-source="[from repo]">
+      <strong>Assumption 3 — Chromux fit:</strong> Any incorporated process should preserve Chromux as a local-first cockpit around unchanged agent CLIs, with explicit review and human control.
+      <div class="controls"><label class="option"><input type="radio" name="assumption_chromux_fit" value="confirm"> Confirm</label><label class="option"><input type="radio" name="assumption_chromux_fit" value="correct"> Correct</label><label class="option"><input type="radio" name="assumption_chromux_fit" value="flag"> Flag</label></div>
+      <textarea data-assumption-note="chromux-fit" placeholder="Name any architectural boundary you want changed or waived."></textarea>
+    </article>
+
+    <article class="assumption" data-assumption-id="integration-options" data-source="[inferred]">
+      <strong>Assumption 4 — Candidate integration forms:</strong> Research should compare three forms: invoke Gigachadd as an external CLI, port its debate state machine/process into Chromux, or recreate only selected roles/rounds in Chromux UI.
+      <div class="controls"><label class="option"><input type="radio" name="assumption_integration_options" value="confirm"> Confirm</label><label class="option"><input type="radio" name="assumption_integration_options" value="correct"> Correct</label><label class="option"><input type="radio" name="assumption_integration_options" value="flag"> Flag</label></div>
+      <textarea data-assumption-note="integration-options" placeholder="Add or remove integration forms."></textarea>
+    </article>
+
+    <article class="assumption" data-assumption-id="source-plan" data-source="[inferred]">
+      <strong>Assumption 5 — Evidence plan:</strong> Repository code/docs/history should be authoritative for mechanics; public portfolio pages should supply current product status; close substitutes should be used only to test whether the process is differentiated or composable.
+      <div class="controls"><label class="option"><input type="radio" name="assumption_source_plan" value="confirm"> Confirm</label><label class="option"><input type="radio" name="assumption_source_plan" value="correct"> Correct</label><label class="option"><input type="radio" name="assumption_source_plan" value="flag"> Flag</label></div>
+      <textarea data-assumption-note="source-plan" placeholder="Name private docs, branches, demos, or sources that should be included or excluded."></textarea>
+    </article>
+  </section>
+
+  <section id="open-questions">
+    <h2>Open Questions</h2>
+
+    <article class="question" data-open-question data-question-id="product-outcome">
+      <h3>1. What should the incorporated process improve for a Chromux user?</h3>
+      <span class="confidence" data-agent-confidence="medium">Agent confidence: medium</span>
+      <p class="recommendation" data-recommended-answer>Recommended default: improve decision quality before implementation by letting multiple agent perspectives argue from the same repo/browser evidence, then produce one reviewable verdict and next action.</p>
+      <span data-agent-recommended-answer hidden>Improve decision quality before implementation: let multiple agent perspectives argue from the same repository and browser evidence, then synthesize one reviewable verdict with an explicit next action.</span>
+      <textarea data-open-input placeholder="Accept the recommendation or describe the desired user outcome."></textarea>
+      <div class="actions"><button type="button" data-apply-recommended>Apply recommended</button><button type="button" class="secondary" data-clarify-copy>Need clarification (copy)</button><span class="status" data-question-status></span></div>
+    </article>
+
+    <article class="question" data-open-question data-question-id="workflow-trigger">
+      <h3>2. Where should the process enter the Chromux workflow?</h3>
+      <span class="confidence" data-agent-confidence="low">Agent confidence: low</span>
+      <p class="recommendation" data-recommended-answer>Recommended default: begin as an explicit “Debate / Challenge” action on a task, plan, capture, or proposed change—not an automatic step on every prompt.</p>
+      <span data-agent-recommended-answer hidden>Start as an explicit Debate / Challenge action that can be launched for a task, plan, browser capture, or proposed change. Do not run it automatically on every prompt.</span>
+      <textarea data-open-input placeholder="Describe the trigger and the objects it should accept."></textarea>
+      <div class="actions"><button type="button" data-apply-recommended>Apply recommended</button><button type="button" class="secondary" data-clarify-copy>Need clarification (copy)</button><span class="status" data-question-status></span></div>
+    </article>
+
+    <article class="question" data-open-question data-question-id="integration-constraints">
+      <h3>3. What constraints or ecosystem targets must the research honor?</h3>
+      <span class="confidence" data-agent-confidence="medium">Agent confidence: medium</span>
+      <p class="recommendation" data-recommended-answer>Recommended default: macOS/Electron, local-first storage, existing Claude/Codex/Grok auth, no required cloud account, bounded context payloads, explicit user approval before execution, and a path to optional GBlockParty-managed workspaces later.</p>
+      <span data-agent-recommended-answer hidden>Honor macOS/Electron, local-first storage, existing Claude/Codex/Grok authentication, no required cloud account, bounded context payloads, explicit user approval before execution, and optional future GBlockParty-managed execution.</span>
+      <textarea data-open-input placeholder="Add, remove, or correct integrations, auth models, formats, deployment targets, or compatibility constraints."></textarea>
+      <div class="actions"><button type="button" data-apply-recommended>Apply recommended</button><button type="button" class="secondary" data-clarify-copy>Need clarification (copy)</button><span class="status" data-question-status></span></div>
+    </article>
+
+    <article class="question" data-open-question data-question-id="risk-priority">
+      <h3>4. Which integration risk should the research resolve first?</h3>
+      <span class="confidence" data-agent-confidence="medium">Agent confidence: medium</span>
+      <p class="recommendation" data-recommended-answer>Recommended default: determine whether Gigachadd’s value lives in a reusable engine/state machine or mainly in prompt/role design; that decides whether Chromux should integrate, port, or imitate.</p>
+      <span data-agent-recommended-answer hidden>Resolve whether Gigachadd's value is primarily in a reusable engine and state machine or in prompt and role design. This determines whether Chromux should integrate the CLI, port mechanics, or recreate the workflow.</span>
+      <textarea data-open-input placeholder="Name the riskiest dependency or decision you want answered first."></textarea>
+      <div class="actions"><button type="button" data-apply-recommended>Apply recommended</button><button type="button" class="secondary" data-clarify-copy>Need clarification (copy)</button><span class="status" data-question-status></span></div>
+    </article>
+  </section>
+
+  <section class="compile" id="compile" data-answer-sidecar="research/_working/interrogation-devtool-integration-map-r1.yaml">
+    <h2>Compile Responses</h2>
+    <p>Answer the assumptions and open questions, then compile the YAML. Paste it into a fresh Codex session so the research scope can continue without losing your decisions.</p>
+    <div class="actions"><button type="button" id="compileResponses">Compile Responses</button><button type="button" class="secondary" id="copyYaml" hidden>Copy YAML</button><span class="status" id="compileStatus"></span></div>
+    <textarea id="compiledYaml" readonly hidden aria-label="Compiled response YAML"></textarea>
+  </section>
+</main>
+
+<script>
+const q = (s, root=document) => root.querySelector(s);
+const qa = (s, root=document) => [...root.querySelectorAll(s)];
+const yamlString = value => JSON.stringify(String(value ?? ""));
+async function copyText(value, fallback) {
+  try { await navigator.clipboard.writeText(value); return "Copied"; }
+  catch { fallback.hidden = false; fallback.focus(); fallback.select(); return "Select text to copy"; }
+}
+document.addEventListener("click", async event => {
+  const apply = event.target.closest("[data-apply-recommended]");
+  if (apply) {
+    const block = apply.closest("[data-open-question]");
+    const input = q("[data-open-input]", block); const source = q("[data-agent-recommended-answer]", block);
+    if (input.value.trim() && !window.confirm("Replace your current answer with the recommended answer?")) return;
+    input.value = source.textContent.trim(); input.dispatchEvent(new Event("input", {bubbles:true})); input.dispatchEvent(new Event("change", {bubbles:true}));
+    q("[data-question-status]", block).textContent = "Recommended answer applied."; return;
+  }
+  const clarify = event.target.closest("[data-clarify-copy]");
+  if (clarify) {
+    const block = clarify.closest("[data-open-question]"); const question = q("h3", block).textContent.replace(/^\d+\.\s*/, "").trim();
+    const payload = `Question: ${JSON.stringify(question)}\nI need clarification on what this is asking before I can answer.`;
+    q("[data-question-status]", block).textContent = await copyText(payload, q("[data-open-input]", block));
+  }
+});
+function compileResponses() {
+  const command = "$devtool-integration-map gigachadd-process";
+  const assumptions = qa("[data-assumption-id]").map(block => {
+    const picked = q('input[type="radio"]:checked', block); if (!picked) return null;
+    const note = q("[data-assumption-note]", block).value.trim();
+    return {source:block.dataset.source, id:block.dataset.assumptionId, decision:picked.value, correction:note};
+  }).filter(Boolean);
+  const openAnswers = qa("[data-open-question]").map(block => ({
+    id:block.dataset.questionId, answer:q("[data-open-input]", block).value.trim(),
+    recommended:q("[data-recommended-answer]", block).textContent.replace(/^Recommended default:\s*/, "").trim(),
+    agentRecommended:q("[data-agent-recommended-answer]", block).textContent.trim(),
+    confidence:q("[data-agent-confidence]", block).dataset.agentConfidence
+  })).filter(item => item.answer);
+  const assumptionTotal = qa("[data-assumption-id]").length, openTotal = qa("[data-open-question]").length;
+  const complete = assumptions.length === assumptionTotal && openAnswers.length === openTotal;
+  const lines = [
+    `# Invoke with: ${command}`, `command: ${yamlString(command)}`,
+    `interrogation_page: ${yamlString("interrogation/devtool-integration-map-r1-gigachadd-process.html")}`,
+    `round: 1`, `round_status: ${complete ? "complete" : "partial"}`, `gate_state: continue`, `assumptions:`
+  ];
+  if (!assumptions.length) lines.push("  []"); else assumptions.forEach(item => { lines.push(`  - source: ${yamlString(item.source)}`, `    id: ${yamlString(item.id)}`, `    decision: ${item.decision}`); if (item.correction) lines.push(`    correction: ${yamlString(item.correction)}`); });
+  lines.push("open_answers:");
+  if (!openAnswers.length) lines.push("  []"); else openAnswers.forEach(item => lines.push(`  - id: ${yamlString(item.id)}`, `    answer: ${yamlString(item.answer)}`, `    recommended_answer: ${yamlString(item.recommended)}`, `    agent_recommended_answer: ${yamlString(item.agentRecommended)}`, `    agent_confidence: ${item.confidence}`));
+  lines.push("gate_answers: []", "agent_routing:", "  workflow: interrogation-loop", "  parent_skill: devtool-integration-map", `  command: ${yamlString(command)}`, "  gate_owner: parent-orchestrator", "  gate_type: interrogation-round", "  round: 1", `  answer_sidecar: ${yamlString("research/_working/interrogation-devtool-integration-map-r1.yaml")}`, "  next_resolution: parent-resolves-from-yaml-and-filesystem");
+  const output = lines.join("\n") + "\n"; const area = q("#compiledYaml"); area.value = output; area.hidden = false; q("#copyYaml").hidden = false;
+  q("#compileStatus").textContent = complete ? "Complete round YAML compiled." : `Partial YAML compiled (${assumptions.length}/${assumptionTotal} assumptions, ${openAnswers.length}/${openTotal} open answers).`;
+  copyText(output, area).then(status => q("#compileStatus").textContent += ` ${status}.`);
+}
+q("#compileResponses").addEventListener("click", compileResponses);
+q("#copyYaml").addEventListener("click", async () => { q("#compileStatus").textContent = await copyText(q("#compiledYaml").value, q("#compiledYaml")); });
+</script>
+<script src="../scripts/alignment-tts-kokoro.js"></script>
+<script src="../scripts/alignment-question-nav.js"></script>
+</body>
+</html>

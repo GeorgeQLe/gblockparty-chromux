@@ -14,6 +14,12 @@ npm start
 
 For the full prototype guide, see [`prototype/README.md`](prototype/README.md).
 
+## Architecture
+
+See [`docs/gblockparty-iaas-integration.md`](docs/gblockparty-iaas-integration.md)
+for the proposed boundary between the local-first Chromux cockpit and optional
+GBlockParty-managed workspace execution, persistence, and cross-device access.
+
 ## Releases
 
 Chromux checks GitHub Releases at:
