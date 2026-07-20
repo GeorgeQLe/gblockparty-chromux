@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Reserve stable scrollbar clearance beneath session tabs across every theme without changing tab dimensions or terminal-stage positioning, and ship the fix as v0.33.1. _(source: user-approved implementation plan; evidence: `prototype/renderer/styles.css`, `prototype/scripts/test-tab-titles-renderer.js`, `RELEASES.md`)_
+
 - [x] Add and ship a host-wide Chromux resource broker with atomic FIFO leases, Codex MCP tools, cooperative Computer Use guidance, simulator capacity/admission and validated operations, a Resources UI, isolated per-session browser profiles, crash recovery, and parallel-client/browser verification as v0.33.0. _(source: user implementation plan; version advanced after the separately landed diagnostics feature claimed v0.32.0; evidence: `prototype/resource-broker/`, `prototype/renderer/`, `prototype/scripts/test-resource-*`, `prototype/scripts/test-browser-isolation-smoke.js`, `prototype/docs/resource-broker.md`, `RELEASES.md`)_
 
 - [x] Add restart-gated Developer Mode and an always-expanded, read-only attention-queue diagnostics strip with independent session inspection, projection/tab mismatch detection, and sanitized event history. _(source: user-approved plan; evidence: `prototype/dev-mode.js`, `prototype/renderer/attention.js`, `prototype/renderer/renderer.js`, `prototype/scripts/test-attention-diagnostics-renderer.js`, `RELEASES.md`)_

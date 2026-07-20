@@ -26,6 +26,9 @@ fs.writeFileSync(e2ePath, `
 
   const tabList = document.querySelector('#tab-list');
   const addButton = document.querySelector('#btn-new-session');
+  const workspace = document.querySelector('#workspace');
+  const sessionTabs = document.querySelector('#session-tabs');
+  const stage = document.querySelector('#stage');
   expect(tabList.firstElementChild === addButton, 'add-session button should be left-aligned when there are no tabs');
   expect(Math.abs(addButton.getBoundingClientRect().left - tabList.getBoundingClientRect().left) < 1,
     'empty add-session button should render at the left edge of the tab strip');
@@ -110,6 +113,63 @@ fs.writeFileSync(e2ePath, `
   expect(!shortState.truncated, 'short inactive tab should not be marked truncated');
   expect(!shortState.hoverScroll, 'hovering non-truncated inactive tab should do nothing');
   expect(!activeState.paused, 'hovering non-truncated inactive tab should not pause active marquee');
+
+  const themes = window.chromuxTestThemes;
+  expect(themes, 'missing theme test API');
+  const expectedStripHeights = {
+    blueprint: 45,
+    'retro-os': 45,
+    streak: 57,
+    'liquid-glass': 53,
+  };
+  const geometry = () => {
+    const stripRect = sessionTabs.getBoundingClientRect();
+    const listRect = tabList.getBoundingClientRect();
+    const tabBottom = Math.max(...[...tabList.children].map((tab) => tab.getBoundingClientRect().bottom));
+    return {
+      stripHeight: stripRect.height,
+      stageTop: stage.getBoundingClientRect().top,
+      clearance: listRect.bottom - tabBottom,
+      overflows: tabList.scrollWidth > tabList.clientWidth,
+    };
+  };
+
+  for (const [theme, expectedStripHeight] of Object.entries(expectedStripHeights)) {
+    themes.select(theme);
+    workspace.style.flex = '';
+    workspace.style.width = '';
+    await tick();
+    const before = geometry();
+    expect(!before.overflows, theme + ' tab list should begin without horizontal overflow');
+    expect(Math.abs(before.stripHeight - expectedStripHeight) < 1,
+      theme + ' tab strip should reserve the expected scrollbar zone');
+    expect(before.clearance >= 9,
+      theme + ' tabs should leave at least 9px below their bounds without overflow; got ' + before.clearance);
+
+    workspace.style.flex = '0 0 400px';
+    workspace.style.width = '400px';
+    await tick();
+    const during = geometry();
+    expect(during.overflows, theme + ' tab list should overflow horizontally at the forced narrow width');
+    expect(during.clearance >= 9,
+      theme + ' scrollbar should remain below tab bounds during overflow; got ' + during.clearance);
+    expect(Math.abs(during.stripHeight - before.stripHeight) < 1,
+      theme + ' tab strip height should not change when overflow appears');
+    expect(Math.abs(during.stageTop - before.stageTop) < 1,
+      theme + ' terminal stage should not move when overflow appears');
+
+    workspace.style.flex = '';
+    workspace.style.width = '';
+    await tick();
+    const after = geometry();
+    expect(!after.overflows, theme + ' tab list should stop overflowing after width is restored');
+    expect(Math.abs(after.clearance - before.clearance) < 1,
+      theme + ' reserved clearance should remain stable after overflow disappears');
+    expect(Math.abs(after.stripHeight - before.stripHeight) < 1,
+      theme + ' tab strip height should remain stable after overflow disappears');
+    expect(Math.abs(after.stageTop - before.stageTop) < 1,
+      theme + ' terminal stage should return to the same position after overflow disappears');
+  }
 
   return JSON.stringify({
     ok: true,

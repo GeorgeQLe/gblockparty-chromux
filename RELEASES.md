@@ -1,5 +1,12 @@
 # Release Notes
 
+## GBlockParty Chromux v0.33.1
+
+Tag: `chromux-v0.33.1`
+
+- Reserve a permanent 9px lane beneath session tabs for the existing horizontal scrollbar.
+- Keep tab dimensions and terminal-stage positioning stable as horizontal overflow appears or disappears across all four theme families.
+
 ## GBlockParty Chromux v0.33.0
 
 Tag: `chromux-v0.33.0`
