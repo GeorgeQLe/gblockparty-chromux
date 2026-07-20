@@ -60,6 +60,14 @@ fs.writeFileSync(e2ePath, `
 
   const active = tabs.addSession({ name: 'active-long', cwd: '/tmp/active', agent: 'codex' });
   const inactive = tabs.addSession({ name: 'inactive-long', cwd: '/tmp/inactive', agent: 'codex' });
+  const activeTab = firstTab.nextElementSibling;
+  const inactiveTab = activeTab.nextElementSibling;
+  expect(Math.abs(activeTab.getBoundingClientRect().left - firstTab.getBoundingClientRect().right - 6) < 1,
+    'neighboring session tabs should render with a 6px gap');
+  expect(Math.abs(inactiveTab.getBoundingClientRect().left - activeTab.getBoundingClientRect().right - 6) < 1,
+    'every neighboring session tab should retain the 6px gap');
+  expect(Math.abs(addButton.getBoundingClientRect().left - inactiveTab.getBoundingClientRect().right - 6) < 1,
+    'add-session button should retain the same 6px gap as session tabs');
   tabs.forceTabWidth(active, 120);
   tabs.forceTabWidth(inactive, 120);
   tabs.feed(active, titleOsc('0', 'Active session title with enough detail to overflow the tab label area'));

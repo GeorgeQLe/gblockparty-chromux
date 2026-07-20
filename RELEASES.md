@@ -1,5 +1,12 @@
 # Release Notes
 
+## GBlockParty Chromux v0.30.5
+
+Tag: `chromux-v0.30.5`
+
+- Add a consistent 6px gap between neighboring session tabs and the add-session button.
+- Preserve the add-session button's left alignment when the tab strip is empty.
+
 ## GBlockParty Chromux v0.30.4
 
 Tag: `chromux-v0.30.4`
