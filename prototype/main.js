@@ -60,6 +60,7 @@ const PROJECTS_MAX = 100;
 const PROJECTS_FILE_BYTES_MAX = 1024 * 1024;
 const PROJECT_NAME_MAX = 100;
 const PACKAGE_JSON_BYTES_MAX = 1024 * 1024;
+const WINDOW_BUTTON_COORD_MAX = 200;
 
 let win = null;
 const ptys = new Map(); // sessionId -> IPty
@@ -325,6 +326,25 @@ ipcMain.on('shortcut-focus-context', (event, payload = {}) => {
   shortcutFocusContexts.set(webContentsId, {
     focusKind: classifyShortcutFocusContext(payload && (payload.focusKind || payload)),
   });
+});
+
+function validWindowButtonPosition(position) {
+  return Boolean(position)
+    && Number.isFinite(position.x)
+    && Number.isFinite(position.y)
+    && Number.isInteger(position.x)
+    && Number.isInteger(position.y)
+    && position.x >= 0
+    && position.y >= 0
+    && position.x <= WINDOW_BUTTON_COORD_MAX
+    && position.y <= WINDOW_BUTTON_COORD_MAX;
+}
+
+ipcMain.on('set-window-button-position', (event, position) => {
+  if (!win || win.isDestroyed() || event.sender !== win.webContents) return;
+  if (!validWindowButtonPosition(position)) return;
+  if (process.platform !== 'darwin' || typeof win.setWindowButtonPosition !== 'function') return;
+  win.setWindowButtonPosition({ x: position.x, y: position.y });
 });
 
 function handleShellShortcutInput(event, input, source = 'host', webContentsId = null) {

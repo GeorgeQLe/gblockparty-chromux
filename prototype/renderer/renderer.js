@@ -56,6 +56,7 @@ const state = {
   ui: {
     theme: storedTheme(),
     themeMode: storedThemeMode(),
+    windowButtonPosition: null,
     tabActivityIndicators: storedTabActivityIndicators(),
     captureModal: null, // { captureId, pngBase64, payloadBase } while composing/delivering
     dirty: new Set(),
@@ -311,6 +312,19 @@ function applyTabActivityIndicators(enabled, { persist = true } = {}) {
   return state.ui.tabActivityIndicators;
 }
 
+function syncWindowButtonPosition() {
+  const titlebar = $('#titlebar');
+  if (!titlebar || typeof window.chromux?.setWindowButtonPosition !== 'function') return null;
+  const rect = titlebar.getBoundingClientRect();
+  const position = {
+    x: 14,
+    y: 14 + Math.round(rect.top + (rect.height - 44) / 2),
+  };
+  state.ui.windowButtonPosition = position;
+  window.chromux.setWindowButtonPosition(position);
+  return position;
+}
+
 function applyTheme(theme, { persist = true } = {}) {
   const next = THEME_IDS.has(theme) ? theme : 'liquid-glass';
   state.ui.theme = next;
@@ -324,6 +338,7 @@ function applyTheme(theme, { persist = true } = {}) {
     syncSessionTerminalTheme(session, next, state.ui.themeMode);
   }
   renderThemeControls();
+  syncWindowButtonPosition();
   return next;
 }
 
@@ -5079,6 +5094,7 @@ if (window.chromuxTest) {
       .map((button) => button.dataset.themeMode),
     bodyTheme: () => document.body.dataset.theme,
     bodyMode: () => document.body.dataset.themeMode,
+    windowButtonPosition: () => state.ui.windowButtonPosition && { ...state.ui.windowButtonPosition },
     async addContextMenuSession() {
       const session = await createSession({
         name: 'context-menu-test',

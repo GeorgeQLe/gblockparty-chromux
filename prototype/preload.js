@@ -41,6 +41,7 @@ contextBridge.exposeInMainWorld('chromux', {
   fileExists: (p) => ipcRenderer.invoke('file-exists', p),
   pickDirectory: () => ipcRenderer.invoke('pick-directory'),
   revealPath: (p) => ipcRenderer.send('reveal-path', { p }),
+  setWindowButtonPosition: (position) => ipcRenderer.send('set-window-button-position', position),
   getEnv: () => ipcRenderer.invoke('get-env'),
   checkUpdates: (opts) => ipcRenderer.invoke('check-updates', opts || {}),
   openUpdateRelease: (opts) => ipcRenderer.invoke('open-update-release', opts || {}),

@@ -15,6 +15,7 @@ fs.writeFileSync(e2ePath, `
   const themes = window.chromuxTestThemes;
   const expect = (condition, message) => { if (!condition) throw new Error(message); };
   const expected = ['blueprint', 'retro-os', 'streak', 'liquid-glass'];
+  const expectedWindowButtonY = { blueprint: 14, 'retro-os': 22, streak: 19, 'liquid-glass': 22 };
   const modes = ['light', 'dark'];
   const terminalPalettes = {
     'blueprint-light': { background: '#f4f9ff', foreground: '#173b62', cursor: '#006d9c', black: '#173b62', brightBlack: '#6684a3', red: '#a33a2c', brightRed: '#d45747', green: '#13764d', brightGreen: '#239b68', yellow: '#8a5b00', brightYellow: '#b77c0e', blue: '#006d9c', brightBlue: '#218fc0', magenta: '#674fa3', brightMagenta: '#8b70c7', cyan: '#08758a', brightCyan: '#2699ad', white: '#dbe9f6', brightWhite: '#ffffff' },
@@ -175,8 +176,10 @@ fs.writeFileSync(e2ePath, `
   for (const theme of expected) {
     themes.clearTerminalEvents();
     themes.select(theme);
+    expect(JSON.stringify(themes.windowButtonPosition()) === JSON.stringify({ x: 14, y: expectedWindowButtonY[theme] }), theme + ' should vertically center native window controls; got ' + JSON.stringify(themes.windowButtonPosition()));
     assertTerminalSync(theme, 'light');
     themes.selectMode('dark');
+    expect(JSON.stringify(themes.windowButtonPosition()) === JSON.stringify({ x: 14, y: expectedWindowButtonY[theme] }), theme + ' mode switching should preserve the native window-control position');
     assertTerminalSync(theme, 'dark');
     themes.selectMode('light');
     assertTerminalSync(theme, 'light');

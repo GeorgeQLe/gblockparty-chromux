@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.31.1
+
+Tag: `chromux-v0.31.1`
+
+- Vertically center the native macOS traffic-light controls with the Chromux brand row across Blueprint, Retro-OS, Streak, and Liquid Glass.
+- Recalculate the native-control position when switching theme families while preserving every theme's existing header geometry and spacing.
+- Validate renderer-provided window-button coordinates before applying them through Electron's macOS window API.
+
 ## GBlockParty Chromux v0.31.0
 
 Tag: `chromux-v0.31.0`
