@@ -120,7 +120,11 @@ Chromux stores local artifacts under your home directory:
 | Delivery log | `~/.chromux/delivery-log.jsonl` |
 | Global favorites | `~/.chromux/favorites.json` |
 | Hook settings and notify scripts | `~/.chromux/` |
-| Browser profile | Electron partition `persist:chromux` |
+| Browser profiles | Session-specific Electron partitions `persist:chromux-<session ID>` |
+
+### Resource broker unavailable or stuck
+
+Open **RESOURCES** and use **REFRESH** first. The daemon normally starts on demand at `~/.chromux/resource-broker.sock`. If MCP tools are missing, run `/mcp` in Codex and follow the registration steps in [`resource-broker.md`](resource-broker.md). A queued request advances automatically when its owner releases, disconnects, or reaches TTL. Use **FORCE RELEASE** only after confirming the displayed owner is stale; it cannot stop an operation that already escaped the wrapper.
 
 Chromux does not currently expire capture directories. To reclaim disk space, delete old directories under `~/.chromux/captures/`. To clear delivery history, delete `~/.chromux/delivery-log.jsonl`.
 

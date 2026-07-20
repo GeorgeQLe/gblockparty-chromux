@@ -74,7 +74,8 @@ retention and sharing, and dispose of data that is no longer needed.
 | Update cache | Startup or manual update check. | `~/.chromux/update-cache.json` | Rewritten after checks; non-manual checks use a one-day cache. | GitHub receives the update-check request. Capture data and project paths are not included in the request. |
 | Update source | `npm run install-app` records the local install source. | `~/.chromux/update-source.json` | Kept until deleted or overwritten by a later install. | Not sent by Chromux. |
 | Update install log | Managed update install runs from the recorded source. | `~/.chromux/update-install.log` | Overwritten by each managed install attempt. | Not sent by Chromux. |
-| Browser profile | Embedded browser panes use Electron partition `persist:chromux`. | Chromium-managed Electron app data for the Chromux app, outside `~/.chromux`. | Kept until the user clears or deletes the app profile. | Pages loaded in the browser can make their own network requests and store cookies/local storage/cache. |
+| Browser profiles | Embedded browser panes use session-specific Electron partitions `persist:chromux-<session ID>`. | Chromium-managed Electron app data for the Chromux app, outside `~/.chromux`. | Kept until the user clears or deletes the app profile. | Pages loaded in each browser can make their own network requests and store isolated cookies/local storage/cache. |
+| Resource broker | Unix socket, singleton lock, and lease-recovery state under `~/.chromux/resource-broker.*`. | Client display names, process/session IDs, resource IDs, lease timing, and simulator capacity override. | Active state is replaced locally; the socket and lock exist only while the daemon runs. | The broker opens no network listener. Simulator actions explicitly requested through MCP invoke local `xcrun simctl`. |
 | External terminal detection metadata | User clicks `DETECT`. | Read from local process tables, cwd lookup, and Terminal/iTerm tab titles; not stored unless the user opens sessions and later saves a restore snapshot. | Detection results are runtime UI state. | Not sent by Chromux. |
 | Terminal output preview hints | Session terminal prints localhost URLs or local HTML paths. | Held in renderer memory for preview routing; queued URLs may be stored in `restore-sessions.json`. | In-memory unless saved in a restore snapshot. | Not sent by Chromux. |
 
@@ -190,7 +191,7 @@ Do not delete a capture directory until you no longer need its `payload.yaml` or
 `screenshot.png` for manual retry, debugging, or audit.
 
 The browser profile is Chromium-managed Electron app data for the
-`persist:chromux` partition. The exact macOS path can vary between development
+session-specific `persist:chromux-<session ID>` partitions. The exact macOS path can vary between development
 and packaged builds. Quit Chromux before deleting profile data, and delete only
 the Chromux app profile directory, not shared browser or unrelated app data.
 

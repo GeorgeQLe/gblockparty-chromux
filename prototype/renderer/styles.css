@@ -2021,6 +2021,29 @@ body[data-theme="liquid-glass"][data-theme-mode="dark"] .settings-theme-current 
   .appearance-controls { align-items: flex-start; }
 }
 
+.modal-resources { width: min(820px, calc(100vw - 40px)); max-height: min(780px, calc(100vh - 40px)); }
+.resource-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.resource-summary > div { border: 1px solid var(--line); background: var(--bg2); padding: 12px; display: flex; flex-direction: column; gap: 4px; }
+.resource-summary strong { color: var(--cyan); font-size: 18px; }
+.resource-summary span { color: var(--faint); font-size: 10px; letter-spacing: .08em; }
+.resource-advisory { border-left: 3px solid var(--amber); background: var(--amber-dim); color: var(--dim); padding: 10px 12px; font-size: 11px; line-height: 1.5; }
+.resource-capacity-control { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--faint); font-size: 10px; letter-spacing: .08em; }
+.resource-capacity-control select { width: auto; min-width: 150px; }
+.resource-list { display: flex; flex-direction: column; gap: 8px; }
+.resource-card { border: 1px solid var(--line); background: var(--bg1); padding: 10px; display: grid; grid-template-columns: 1fr auto; gap: 7px 10px; align-items: center; }
+.resource-card.leased { border-color: var(--amber); }
+.resource-card-head { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.resource-card code { color: var(--faint); font-size: 10px; overflow: hidden; text-overflow: ellipsis; }
+.resource-status { font-size: 9px; letter-spacing: .08em; color: var(--green); }
+.resource-status.busy { color: var(--amber); }
+.resource-owner { color: var(--dim); font-size: 11px; }
+.resource-queue-row { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-top: 7px; display: flex; justify-content: space-between; align-items: center; color: var(--dim); font-size: 11px; }
+.qi-btn.danger { color: var(--red); border-color: var(--red); }
+
+@media (max-width: 720px) {
+  .resource-summary { grid-template-columns: 1fr; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .theme-card,
   body[data-theme="streak"] .attention-item,

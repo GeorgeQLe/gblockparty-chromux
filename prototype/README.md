@@ -55,6 +55,10 @@ Packaged launches hide the strip by default. Use **SETTINGS → DEVELOPER MODE**
 setting; Chromux confirms when sessions are open, saves a restore snapshot, and restarts to apply it.
 The `--dev-mode` and `--no-dev-mode` flags take precedence over the saved preference.
 
+### Host resources and parallel agents
+
+Open **RESOURCES** to inspect host-wide owners, FIFO queues, lease expiry, wait time, and iOS Simulator capacity. Chromux uses a background Unix-socket broker shared by the app and Codex MCP clients. See [`docs/resource-broker.md`](docs/resource-broker.md) for MCP registration, the optional LaunchAgent, global Computer Use guidance, and simulator wrapper contract. Prefer Codex's built-in Browser for web-app testing; native macOS and foreground Simulator work must lease `macos:foreground-input`.
+
 1. **Start a session** — `+ NEW`, pick your project directory, choose CLAUDE CODE / CODEX /
    GROK BUILD / SHELL ONLY. Chromux spawns your login shell and launches the agent CLI
    *unchanged* — it wraps the CLIs, never modifies them.
@@ -139,6 +143,7 @@ See [`docs/troubleshooting.md`](docs/troubleshooting.md) for the full support gu
 | Saved projects | `~/.chromux/projects.json` |
 | Update cache/source/install log | `~/.chromux/update-cache.json`, `~/.chromux/update-source.json`, `~/.chromux/update-install.log` |
 | Hook settings and notify scripts | `~/.chromux/hooks-claude.json`, `~/.chromux/codex-notify.sh`, `~/.chromux/hooks-grok.json`, `~/.chromux/grok-hook.sh`, and `~/.grok/hooks/chromux-turn-signals.json` |
+| Resource broker | `~/.chromux/resource-broker.sock`, `~/.chromux/resource-broker.lock`, `~/.chromux/resource-broker-state.json`, and optional `~/.chromux/resource-broker.log` |
 
 ## Agent attention protocol
 
@@ -156,7 +161,7 @@ completion callbacks. Codex provides native completion while start is inferred
 from submitted Enter; its actionable notification capabilities are unavailable.
 Unknown native notifications are retained in local diagnostics and never create
 an attention row. Chromux does not post macOS Notification Center alerts.
-| Browser pane profile | Electron partition `persist:chromux` |
+| Browser pane profiles | Session-specific Electron partitions `persist:chromux-<session ID>` |
 
 Chromux has no account, cloud sync, Chromux-hosted capture upload, or product
 telemetry in the current prototype. Browser pages, update checks, agent CLIs,

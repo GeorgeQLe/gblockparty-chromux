@@ -34,6 +34,7 @@
       <span class="gauge"><i class="gdot g-green"></i><b id="g-sessions">0</b> SESSIONS</span>
       <span class="gauge"><i class="gdot g-amber"></i><b id="g-queued">0</b> QUEUED</span>
       <span class="gauge"><i class="gdot g-cyan"></i><b id="g-captures">0</b> SENT</span>
+      <button id="btn-resources" class="top-btn" title="Host resource leases and queues">RESOURCES</button>
       <button id="btn-settings" class="top-btn" title="Settings">SETTINGS</button>
     </div>
   </header>
@@ -109,9 +110,35 @@
     </div>
     <div class="sb-right">
       <button id="btn-log" class="sb-btn">DELIVERY LOG</button>
-      <span class="sb-ver">chromux 0.32.0</span>
+      <span class="sb-ver">chromux 0.33.0</span>
     </div>
   </footer>
+
+  <!-- ══ host resources modal ══ -->
+  <div id="modal-resources" class="overlay hidden">
+    <div class="modal modal-resources">
+      <div class="modal-head">
+        <span class="microlabel">HOST RESOURCE BROKER</span>
+        <button class="modal-x" data-close="modal-resources">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="resource-summary">
+          <div><strong id="resource-active-count">0</strong><span>ACTIVE LEASES</span></div>
+          <div><strong id="resource-queue-count">0</strong><span>QUEUED AGENTS</span></div>
+          <div><strong id="resource-simulator-capacity">AUTO</strong><span>SIMULATOR CAPACITY</span></div>
+        </div>
+        <label class="resource-capacity-control"><span>CAPACITY OVERRIDE</span><select id="resource-capacity-select"><option value="auto">Auto</option><option value="1">1 simulator</option><option value="2">2 simulators</option><option value="3">3 simulators</option></select></label>
+        <div class="resource-advisory">Computer Use is cooperatively gated. Sessions that bypass the broker cannot be intercepted and are labeled unbrokered. Prefer Codex Browser for web testing; it uses explicit tabs without taking macOS foreground input.</div>
+        <div id="resource-error" class="settings-status fail hidden"></div>
+        <div id="resource-list" class="resource-list"></div>
+      </div>
+      <div class="modal-foot">
+        <span id="resource-updated" class="microlabel">NOT CONNECTED</span>
+        <button class="btn" data-close="modal-resources">CLOSE</button>
+        <button id="resources-refresh" class="btn btn-amber">REFRESH</button>
+      </div>
+    </div>
+  </div>
 
   <!-- ══ settings modal ══ -->
   <div id="modal-settings" class="overlay hidden">

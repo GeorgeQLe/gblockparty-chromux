@@ -1,5 +1,16 @@
 # Release Notes
 
+## GBlockParty Chromux v0.33.0
+
+Tag: `chromux-v0.33.0`
+
+- Add a host-wide, user-only Unix-socket resource broker shared by Chromux and local Codex sessions, with on-demand startup and an optional LaunchAgent.
+- Add MCP tools for resource state, atomic FIFO acquisition, queued-request waiting and cancellation, lease renewal and release, editable external-client names, and lease-validated Simulator operations.
+- Recover abandoned work on disconnect, TTL expiry, or daemon restart without resurrecting unverifiable leases; serialize multi-resource requests without blocking unrelated resources.
+- Add a Resources view with owners, expirations, queued agents, wait times, simulator capacity overrides, cancellation, force release, and cooperative-enforcement warnings.
+- Apply conservative elastic Simulator admission and idle-drain hysteresis, and isolate every paired browser in a unique persistent partition.
+- Add global Codex guidance for preferring the built-in Browser and acquiring `macos:foreground-input` before Computer Use.
+
 ## GBlockParty Chromux v0.32.0
 
 Tag: `chromux-v0.32.0`

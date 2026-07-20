@@ -13,6 +13,7 @@ const pty = require('node-pty');
 const yaml = require('js-yaml');
 const { checkForUpdates } = require('./update-checker');
 const { createDevModeRestart, resolveDevMode, restartArgs } = require('./dev-mode');
+const { BrokerClient } = require('./resource-broker/client');
 const {
   CHROMUX_SHORTCUT_ACTIONS,
   chromuxShortcutAction,
@@ -70,6 +71,12 @@ const deliveries = new Map(); // deliveryId -> ChildProcess
 let closeConfirmed = false;
 const shortcutFocusContexts = new Map(); // webContentsId -> { focusKind }
 const shortcutRouteLog = [];
+const resourceClient = new BrokerClient({ client: {
+  clientId: `chromux-app:${process.pid}`,
+  displayName: 'Chromux desktop app',
+  pid: process.pid,
+  cooperative: true,
+} });
 
 if (SMOKE && !process.env.CHROMUX_KEEP_USER_DATA) {
   app.setPath('userData', fs.mkdtempSync(path.join(os.tmpdir(), 'chromux-smoke-user-data-')));
@@ -1000,6 +1007,10 @@ ipcMain.handle('pty-create', (_e, { id, cwd, command, cols, rows }) => {
       CHROMUX_SIGNAL_TOKEN: signalToken, CHROMUX_STATE_DIR: CHROMUX_HOME },
   });
   ptys.set(id, p);
+  resourceClient.request('resource.register', {
+    resourceId: `browser:${id}`,
+    details: { kind: 'browser', label: `Chromux browser ${id}`, sessionId: id, explicitTarget: true, exclusive: false },
+  }).catch(() => {});
   p.onData((data) => send('pty-data', { id, data }));
   p.onExit(({ exitCode }) => {
     ptys.delete(id);
@@ -1572,6 +1583,7 @@ ipcMain.handle('get-env', () => ({
   grokHooksPath: hookInstall.grok ? HOOKS_GROK : null,
   version: currentVersion(),
   devMode: DEV_MODE,
+  resourceBroker: { cooperativeComputerUse: true, socketPath: resourceClient.socketPath },
 }));
 
 const restartWithDevMode = createDevModeRestart({
@@ -1594,6 +1606,11 @@ ipcMain.handle('restart-with-dev-mode', (event, payload = {}) => {
   }
   return restartWithDevMode(payload);
 });
+
+ipcMain.handle('resources-list', () => resourceClient.request('resources.list'));
+ipcMain.handle('resources-cancel', (_e, requestId) => resourceClient.request('request.cancel', { requestId, force: true }));
+ipcMain.handle('resources-force-release', (_e, leaseId) => resourceClient.request('lease.release', { leaseId, force: true }));
+ipcMain.handle('resources-set-capacity', (_e, value) => resourceClient.request('capacity.set', { value }));
 
 ipcMain.handle('favorites-read', () => readFavorites());
 ipcMain.handle('favorites-replace', (_e, records) => replaceFavorites(records));
@@ -1682,6 +1699,7 @@ ipcMain.handle('install-update', async (_e, opts = {}) => {
 
 app.whenReady().then(() => {
   ensureDirs();
+  resourceClient.connect().catch((err) => console.error('resource broker unavailable:', err.message));
   installAppMenu();
   try { writeSignalClassifier(); hookInstall.helper = true; } catch (err) { console.error('signal classifier write failed; using legacy hooks:', err.message); }
   try { writeClaudeHooksSettings(); hookInstall.claude = true; } catch (err) { console.error('hooks settings write failed:', err.message); }
@@ -1698,3 +1716,5 @@ app.on('window-all-closed', () => {
   for (const p of ptys.values()) p.kill();
   app.quit();
 });
+
+app.on('before-quit', () => resourceClient.close());

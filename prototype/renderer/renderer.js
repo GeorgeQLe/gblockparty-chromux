@@ -984,6 +984,9 @@ function newSessionShape({ id, name, cwd, agent }) {
     },
     browser: {
       webview: null, webContentsId: null, currentUrl: null, lastReload: 0,
+      partitionId: globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function'
+        ? globalThis.crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
       queue: [], consoleBuf: [], consoleTotal: 0, picking: false,
       guestEditableFocused: false,
       // Terminal-first: new sessions start with the paired browser shut.
@@ -1510,7 +1513,9 @@ function openInPane(session, url) {
   invalidate('captureChips');
   if (!b.webview) {
     const wv = document.createElement('webview');
-    wv.setAttribute('partition', 'persist:chromux');
+    // Each paired browser is an explicit target with isolated cookies/storage.
+    // This prevents two sessions from inheriting a shared "current browser".
+    wv.setAttribute('partition', `persist:chromux-${session.browser.partitionId}`);
     wv.setAttribute('preload', window.chromux.webviewPreloadPath);
     wv.setAttribute('src', url);
     wv.dataset.sessionId = session.id;
@@ -3329,6 +3334,98 @@ async function changeDeveloperMode(enabled) {
   return true;
 }
 
+function formatResourceWait(ms) {
+  const seconds = Math.max(0, Math.floor(Number(ms || 0) / 1000));
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+}
+
+function resourceOwnerName(owner) {
+  return owner && owner.displayName ? owner.displayName : 'Unknown agent';
+}
+
+function renderResourceState(snapshot) {
+  const resources = Array.isArray(snapshot && snapshot.resources) ? snapshot.resources : [];
+  const leases = Array.isArray(snapshot && snapshot.leases) ? snapshot.leases : [];
+  const queued = new Set(resources.flatMap((resource) => (resource.queue || []).map((request) => request.id))).size;
+  $('#resource-active-count').textContent = String(leases.length);
+  $('#resource-queue-count').textContent = String(queued);
+  const simulator = resources.find((resource) => resource.kind === 'ios-simulator');
+  const capacity = simulator && simulator.capacity;
+  $('#resource-simulator-capacity').textContent = capacity
+    ? `${String(capacity.mode || 'auto').toUpperCase()} · ${capacity.booted}/${capacity.hardLimit}`
+    : 'AUTO · NO XCODE';
+  if (capacity) $('#resource-capacity-select').value = String(capacity.mode || 'auto');
+  $('#resource-updated').textContent = `UPDATED ${new Date(snapshot.now || Date.now()).toLocaleTimeString()}`;
+  const host = $('#resource-list');
+  host.innerHTML = '';
+  for (const resource of resources) {
+    const row = document.createElement('section');
+    row.className = `resource-card${resource.lease ? ' leased' : ''}`;
+    const head = document.createElement('div');
+    head.className = 'resource-card-head';
+    const title = document.createElement('strong');
+    title.textContent = resource.label || resource.id;
+    const status = document.createElement('span');
+    status.className = `resource-status ${resource.lease ? 'busy' : 'free'}`;
+    status.textContent = resource.lease ? 'LEASED' : (resource.exclusive === false ? 'TARGET' : 'AVAILABLE');
+    head.append(title, status);
+    const idLine = document.createElement('code');
+    idLine.textContent = resource.id;
+    row.append(head, idLine);
+    if (resource.lease) {
+      const lease = document.createElement('div');
+      lease.className = 'resource-owner';
+      lease.textContent = `${resourceOwnerName(resource.lease.owner)} · expires ${new Date(resource.lease.expiresAt).toLocaleTimeString()}${resource.lease.operationPid ? ` · PID ${resource.lease.operationPid}` : ''}`;
+      const force = document.createElement('button');
+      force.className = 'qi-btn danger';
+      force.textContent = 'FORCE RELEASE';
+      force.onclick = async () => {
+        if (!window.confirm(`Force release ${resource.id}? The operation may still be running.`)) return;
+        await window.chromux.resourcesForceRelease(resource.lease.id);
+        await refreshResources();
+      };
+      row.append(lease, force);
+    }
+    for (const request of resource.queue || []) {
+      const queue = document.createElement('div');
+      queue.className = 'resource-queue-row';
+      const copy = document.createElement('span');
+      copy.textContent = `${resourceOwnerName(request.owner)} · waiting ${formatResourceWait(request.waitMs)}`;
+      const cancel = document.createElement('button');
+      cancel.className = 'qi-btn';
+      cancel.textContent = 'CANCEL';
+      cancel.onclick = async () => { await window.chromux.resourcesCancel(request.id); await refreshResources(); };
+      queue.append(copy, cancel);
+      row.append(queue);
+    }
+    host.appendChild(row);
+  }
+  if (!resources.length) {
+    const empty = document.createElement('div');
+    empty.className = 'attention-empty';
+    empty.textContent = 'No resources have registered yet.';
+    host.appendChild(empty);
+  }
+}
+
+async function refreshResources() {
+  try {
+    const snapshot = await window.chromux.resourcesList();
+    $('#resource-error').classList.add('hidden');
+    renderResourceState(snapshot);
+  } catch (error) {
+    $('#resource-error').textContent = `Resource broker unavailable: ${error.message}`;
+    $('#resource-error').classList.remove('hidden');
+  }
+}
+
+function openResources() {
+  $('#modal-resources').classList.remove('hidden');
+  invalidate('shortcutDebug');
+  refreshResources().catch(() => {});
+}
+
 function applyTerminalTitleUpdates(session, data) {
   const res = window.chromuxSignals.extractTerminalTitles(session.term.titleBuf, data);
   session.term.titleBuf = res.buf;
@@ -4012,6 +4109,12 @@ $('#detect-rescan').onclick = () => scanExternal().catch(() => {});
 $('#detect-open-all').onclick = () => openAllDetectedAgents().catch(() => {});
 $('#restore-open-all').onclick = () => openAllRestoredSessions().catch(() => {});
 $('#btn-settings').onclick = openSettings;
+$('#btn-resources').onclick = openResources;
+$('#resources-refresh').onclick = () => refreshResources().catch(() => {});
+$('#resource-capacity-select').onchange = async (event) => {
+  await window.chromux.resourcesSetCapacity(event.target.value);
+  await refreshResources();
+};
 $('#settings-theme-grid').addEventListener('click', (event) => {
   const option = event.target.closest('[data-theme-option]');
   if (option) applyTheme(option.dataset.themeOption);
@@ -5448,6 +5551,7 @@ document.addEventListener('keydown', (e) => {
     noteShortcutDebugInput(shortcutDebugInputFromDomEvent(e, 'renderer'));
     closeSessionContextMenu();
     $('#modal-settings').classList.add('hidden');
+    $('#modal-resources').classList.add('hidden');
     $('#modal-new').classList.add('hidden');
     $('#modal-detect').classList.add('hidden');
     $('#drawer-log').classList.add('hidden');
@@ -5469,6 +5573,10 @@ window.addEventListener('blur', () => {
 setInterval(() => {
   scanPtyAgentDescendants(false).catch(() => {});
 }, SHELL_ADOPTION_SCAN_MS);
+
+setInterval(() => {
+  if (!$('#modal-resources').classList.contains('hidden')) refreshResources().catch(() => {});
+}, 2000);
 
 setInterval(() => {
   if (state.env && state.env.devMode) invalidate('diagnostics');

@@ -1,6 +1,6 @@
 {
   "name": "chromux",
-  "version": "0.32.0",
+  "version": "0.33.0",
   "description": "OSS desktop front-end for local and GBlockParty-managed agent/browser workspaces.",
   "main": "main.js",
   "private": false,
@@ -13,10 +13,20 @@
   "engines": {
     "node": ">=22.12.0"
   },
+  "bin": {
+    "chromux-resource-broker-mcp": "resource-broker/mcp-server.js",
+    "chromux-resource-broker": "resource-broker/daemon.js"
+  },
   "scripts": {
     "start": "electron .",
     "smoke": "electron . --smoke --dev-mode",
     "capture:themes": "node scripts/capture-themes.js",
+    "broker:install": "node scripts/install-resource-broker.js",
+    "test:resource-broker": "node scripts/test-resource-broker.js && node scripts/test-resource-broker-integration.js && node scripts/test-resource-mcp-contract.js",
+    "test:simulator-policy": "node scripts/test-simulator-policy.js",
+    "test:resource-ui-renderer": "node scripts/test-resource-ui-renderer.js",
+    "test:browser-isolation-smoke": "node scripts/test-browser-isolation-smoke.js",
+    "smoke:simulator-broker": "node scripts/smoke-simulator-broker.js",
     "test:detect-filter-renderer": "node scripts/test-detect-filter-renderer.js",
     "test:attention-signals-renderer": "npm run test:turn-signals-renderer",
     "test:attention-diagnostics": "node scripts/test-attention-diagnostics.js && node scripts/test-attention-diagnostics-renderer.js",

@@ -28,6 +28,10 @@ contextBridge.exposeInMainWorld('chromux', {
   projectsRead: () => ipcRenderer.invoke('projects-read'),
   projectsReplace: (records) => ipcRenderer.invoke('projects-replace', records),
   projectConfig: (cwd) => ipcRenderer.invoke('project-config', cwd),
+  resourcesList: () => ipcRenderer.invoke('resources-list'),
+  resourcesCancel: (requestId) => ipcRenderer.invoke('resources-cancel', requestId),
+  resourcesForceRelease: (leaseId) => ipcRenderer.invoke('resources-force-release', leaseId),
+  resourcesSetCapacity: (value) => ipcRenderer.invoke('resources-set-capacity', value),
 
   // popups intercepted in main → review queue
   onWebviewPopup: (cb) => ipcRenderer.on('webview-popup', (_e, m) => cb(m)),
