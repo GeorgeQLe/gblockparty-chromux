@@ -83,6 +83,17 @@
     </div>
   </div>
 
+  <!-- ══ developer diagnostics (runtime-gated) ══ -->
+  <section id="developer-diagnostics" class="developer-diagnostics hidden" aria-label="Attention queue developer diagnostics">
+    <div class="diagnostic-toolbar">
+      <span class="diagnostic-mode">DEVELOPER</span>
+      <label for="diagnostic-session">INSPECT</label>
+      <select id="diagnostic-session" aria-label="Inspected session"></select>
+    </div>
+    <div id="diagnostic-groups" class="diagnostic-groups"></div>
+    <div id="diagnostic-events" class="diagnostic-events" aria-label="Recent inspected-session events"></div>
+  </section>
+
   <!-- ══ status bar ══ -->
   <footer id="statusbar">
     <div class="sb-left">
@@ -98,7 +109,7 @@
     </div>
     <div class="sb-right">
       <button id="btn-log" class="sb-btn">DELIVERY LOG</button>
-      <span class="sb-ver">chromux 0.29.0</span>
+      <span class="sb-ver">chromux 0.32.0</span>
     </div>
   </footer>
 
@@ -157,6 +168,18 @@
             <input id="settings-tab-activity-indicators" type="checkbox">
             <span class="settings-switch-track" aria-hidden="true"><span></span></span>
             <span>Show tab activity indicators</span>
+          </label>
+        </section>
+        <div class="settings-divider" aria-hidden="true"></div>
+        <section class="settings-preferences" aria-labelledby="developer-mode-heading">
+          <div>
+            <div id="developer-mode-heading" class="microlabel">DEVELOPER MODE</div>
+            <div class="settings-section-copy">Show read-only attention diagnostics. Changing this setting restarts Chromux and restores resumable sessions.</div>
+          </div>
+          <label class="settings-switch">
+            <input id="settings-developer-mode" type="checkbox">
+            <span class="settings-switch-track" aria-hidden="true"><span></span></span>
+            <span>Enable Developer Mode</span>
           </label>
         </section>
         <div class="settings-divider" aria-hidden="true"></div>

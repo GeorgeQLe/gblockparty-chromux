@@ -788,6 +788,40 @@ body.dragging webview { pointer-events: none; }
 
 /* ── status bar ───────────────────────────────────────────────────────── */
 
+.developer-diagnostics {
+  flex: none;
+  height: 146px;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 150px minmax(760px, 1fr) minmax(260px, .55fr);
+  gap: 8px;
+  padding: 7px 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-top: 1px solid var(--line-hi);
+  background: color-mix(in srgb, var(--bg1) 94%, var(--cyan));
+  font-size: 9px;
+}
+.diagnostic-toolbar { min-width: 140px; display: flex; flex-direction: column; gap: 5px; }
+.diagnostic-mode { color: var(--cyan); font-family: var(--font-display); font-weight: 800; letter-spacing: .18em; }
+.diagnostic-toolbar label, .diagnostic-cell span { color: var(--dim); font-family: var(--font-display); letter-spacing: .11em; }
+.diagnostic-toolbar select { width: 140px; border: 1px solid var(--line-hi); background: var(--bg0); color: var(--text); font: 9px var(--font-mono); padding: 4px; }
+.diagnostic-groups { min-width: 760px; display: grid; grid-template-columns: repeat(4, minmax(180px, 1fr)); gap: 6px; }
+.diagnostic-group { min-width: 0; overflow: hidden; border-left: 1px solid var(--line-hi); padding-left: 7px; }
+.diagnostic-group h3 { margin: 0 0 3px; color: var(--amber); font: 700 9px var(--font-display); letter-spacing: .15em; }
+.diagnostic-cell { min-width: 0; display: grid; grid-template-columns: 68px minmax(0, 1fr); gap: 4px; line-height: 1.35; }
+.diagnostic-cell b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-weight: 500; }
+.diagnostic-cell.mismatch { background: color-mix(in srgb, var(--red) 22%, transparent); outline: 1px solid var(--red); }
+.diagnostic-cell.mismatch b { color: var(--red); font-weight: 800; }
+.diagnostic-events { min-width: 260px; display: flex; align-items: stretch; gap: 5px; overflow-x: auto; overflow-y: hidden; }
+.diagnostic-event { flex: 0 0 112px; min-width: 0; display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--line); background: var(--bg0); padding: 5px; }
+.diagnostic-event b { color: var(--cyan); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.diagnostic-event span { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.diagnostic-event time { color: var(--dim); margin-top: auto; }
+body[data-theme="retro-os"] .developer-diagnostics { background: #ccc; border-color: #1c1c1c; }
+body[data-theme="retro-os"] .diagnostic-group { border-color: #777; }
+body[data-theme="streak"] .developer-diagnostics { border-top: 2px solid var(--line); }
+
 #statusbar {
   height: 26px; flex: none;
   display: flex; align-items: center; justify-content: space-between;

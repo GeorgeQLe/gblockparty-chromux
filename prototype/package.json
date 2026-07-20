@@ -1,6 +1,6 @@
 {
   "name": "chromux",
-  "version": "0.31.1",
+  "version": "0.32.0",
   "description": "OSS desktop front-end for local and GBlockParty-managed agent/browser workspaces.",
   "main": "main.js",
   "private": false,
@@ -15,10 +15,12 @@
   },
   "scripts": {
     "start": "electron .",
-    "smoke": "electron . --smoke",
+    "smoke": "electron . --smoke --dev-mode",
     "capture:themes": "node scripts/capture-themes.js",
     "test:detect-filter-renderer": "node scripts/test-detect-filter-renderer.js",
     "test:attention-signals-renderer": "npm run test:turn-signals-renderer",
+    "test:attention-diagnostics": "node scripts/test-attention-diagnostics.js && node scripts/test-attention-diagnostics-renderer.js",
+    "test:dev-mode": "node scripts/test-dev-mode.js && node scripts/test-dev-mode-renderer.js",
     "test:osc-parser": "node scripts/test-osc-parser.js",
     "test:turn-signals-renderer": "node scripts/test-turn-signals-renderer.js",
     "test:tab-activity-indicators-renderer": "node scripts/test-tab-activity-indicators-renderer.js",

@@ -12,6 +12,7 @@ const { spawn, execFile } = require('child_process');
 const pty = require('node-pty');
 const yaml = require('js-yaml');
 const { checkForUpdates } = require('./update-checker');
+const { createDevModeRestart, resolveDevMode, restartArgs } = require('./dev-mode');
 const {
   CHROMUX_SHORTCUT_ACTIONS,
   chromuxShortcutAction,
@@ -35,6 +36,7 @@ const UPDATE_CACHE = path.join(CHROMUX_HOME, 'update-cache.json');
 const UPDATE_SOURCE = path.join(CHROMUX_HOME, 'update-source.json');
 const UPDATE_INSTALL_LOG = path.join(CHROMUX_HOME, 'update-install.log');
 const RESTORE_SESSIONS = path.join(CHROMUX_HOME, 'restore-sessions.json');
+const PREFERENCES_FILE = path.join(CHROMUX_HOME, 'preferences.json');
 const FAVORITES_FILE = path.join(CHROMUX_HOME, 'favorites.json');
 const PROJECTS_FILE = path.join(CHROMUX_HOME, 'projects.json');
 const HOOKS_CLAUDE = path.join(CHROMUX_HOME, 'hooks-claude.json');
@@ -72,6 +74,28 @@ const shortcutRouteLog = [];
 if (SMOKE && !process.env.CHROMUX_KEEP_USER_DATA) {
   app.setPath('userData', fs.mkdtempSync(path.join(os.tmpdir(), 'chromux-smoke-user-data-')));
 }
+
+function readDevModePreference() {
+  try {
+    const payload = JSON.parse(fs.readFileSync(PREFERENCES_FILE, 'utf8'));
+    return typeof payload.devMode === 'boolean' ? payload.devMode : null;
+  } catch { return null; }
+}
+
+function writeDevModePreference(enabled) {
+  ensureDirs();
+  let payload = {};
+  try { payload = JSON.parse(fs.readFileSync(PREFERENCES_FILE, 'utf8')) || {}; } catch { payload = {}; }
+  const temporary = `${PREFERENCES_FILE}.${process.pid}.tmp`;
+  fs.writeFileSync(temporary, JSON.stringify({ ...payload, devMode: enabled }, null, 2) + '\n');
+  fs.renameSync(temporary, PREFERENCES_FILE);
+}
+
+const DEV_MODE = resolveDevMode({
+  argv: process.argv,
+  persisted: readDevModePreference(),
+  isPackaged: app.isPackaged,
+});
 
 if (SMOKE) {
   ipcMain.handle('test-send-host-input', (_e, input) => {
@@ -1547,7 +1571,29 @@ ipcMain.handle('get-env', () => ({
   // diagnostics/tests; launch always uses bare `grok` / `grok --resume`.
   grokHooksPath: hookInstall.grok ? HOOKS_GROK : null,
   version: currentVersion(),
+  devMode: DEV_MODE,
 }));
+
+const restartWithDevMode = createDevModeRestart({
+  persist: writeDevModePreference,
+  snapshot: ({ reason, sessions }) => writeRestoreSnapshot({
+    reason,
+    sessions: sessions.slice(0, 100).map(sanitizeRestoreSession).filter(Boolean),
+  }),
+  relaunch: (enabled) => app.relaunch({ args: restartArgs(process.argv.slice(1), enabled) }),
+  quit: () => {
+    closeConfirmed = true;
+    for (const p of ptys.values()) p.kill();
+    app.exit(0);
+  },
+});
+
+ipcMain.handle('restart-with-dev-mode', (event, payload = {}) => {
+  if (!win || win.isDestroyed() || event.sender !== win.webContents) {
+    throw new Error('Developer Mode restart is only available to the active Chromux window');
+  }
+  return restartWithDevMode(payload);
+});
 
 ipcMain.handle('favorites-read', () => readFavorites());
 ipcMain.handle('favorites-replace', (_e, records) => replaceFavorites(records));

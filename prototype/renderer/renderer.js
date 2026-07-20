@@ -63,6 +63,7 @@ const state = {
     rafScheduled: false,
     lastQueueShortcutFocus: null,
     hoverTabSessionId: null,
+    diagnosticSessionId: null,
   },
   lastCwd: null,
   contextMenu: null,
@@ -309,6 +310,7 @@ function applyTabActivityIndicators(enabled, { persist = true } = {}) {
   }
   renderTabActivityControls();
   renderTabs();
+  if (state.env && state.env.devMode) invalidate('diagnostics');
   return state.ui.tabActivityIndicators;
 }
 
@@ -923,7 +925,8 @@ function apply(event) {
       break;
   }
   if (!recorded) recordEvent(event);
-  invalidate('attention', 'update', 'badges', 'captureChips', ...(tabStateChanged ? ['tabs'] : []));
+  invalidate('attention', 'update', 'badges', 'captureChips',
+    ...(state.env && state.env.devMode ? ['diagnostics'] : []), ...(tabStateChanged ? ['tabs'] : []));
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -950,6 +953,7 @@ function flushRender() {
   if (dirty.has('badges')) updateBadges();
   if (dirty.has('captureChips')) renderCaptureChips();
   if (dirty.has('shortcutDebug')) renderShortcutDebug();
+  if (dirty.has('diagnostics')) renderDeveloperDiagnostics();
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -2627,6 +2631,129 @@ function renderTabs() {
   updateTabOverflowState();
 }
 
+function diagnosticText(value, fallback = '—') {
+  if (value === null || value === undefined || value === '') return fallback;
+  return String(value).replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, 160);
+}
+
+function relativeAge(timestamp) {
+  const age = Math.max(0, Date.now() - Number(timestamp || 0));
+  if (age < 1000) return 'now';
+  if (age < 60000) return `${Math.floor(age / 1000)}s`;
+  if (age < 3600000) return `${Math.floor(age / 60000)}m`;
+  return `${Math.floor(age / 3600000)}h`;
+}
+
+function diagnosticCell(label, value, mismatch = false) {
+  const cell = document.createElement('div');
+  cell.className = `diagnostic-cell${mismatch ? ' mismatch' : ''}`;
+  const key = document.createElement('span'); key.textContent = label;
+  const val = document.createElement('b'); val.textContent = diagnosticText(value);
+  cell.append(key, val);
+  return cell;
+}
+
+function diagnosticGroup(label, cells) {
+  const group = document.createElement('section'); group.className = 'diagnostic-group';
+  const title = document.createElement('h3'); title.textContent = label;
+  group.append(title, ...cells);
+  return group;
+}
+
+function actualTabIndicator(session) {
+  if (!session.els || !session.els.dot) return 'missing';
+  return ['dead', 'working', 'completed', 'live'].find((kind) => session.els.dot.classList.contains(kind)) || 'unknown';
+}
+
+function renderDeveloperDiagnostics() {
+  const root = $('#developer-diagnostics');
+  if (!root) return;
+  const enabled = Boolean(state.env && state.env.devMode);
+  root.classList.toggle('hidden', !enabled);
+  document.body.classList.toggle('developer-mode', enabled);
+  if (!enabled) return;
+
+  const sessions = orderedSessions();
+  let inspected = state.ui.diagnosticSessionId && state.sessions.get(state.ui.diagnosticSessionId);
+  if (!inspected) inspected = state.sessions.get(state.activeId) || sessions[0] || null;
+  state.ui.diagnosticSessionId = inspected ? inspected.id : null;
+  const selector = $('#diagnostic-session');
+  selector.innerHTML = '';
+  for (const session of sessions) {
+    const option = document.createElement('option');
+    option.value = session.id;
+    option.textContent = `${sessionDisplayLabel(session)}${session.lifecycle.alive ? '' : ' (exited)'}`;
+    option.selected = Boolean(inspected && inspected.id === session.id);
+    selector.appendChild(option);
+  }
+  selector.disabled = sessions.length === 0;
+  const groups = $('#diagnostic-groups'); groups.innerHTML = '';
+  const events = $('#diagnostic-events'); events.innerHTML = '';
+  if (!inspected) {
+    groups.appendChild(diagnosticGroup('EXPECTED', [diagnosticCell('SESSION', 'No open sessions')]));
+    return;
+  }
+
+  const projection = window.chromuxAttention.projectAttentionDiagnostic({
+    session: inspected, sessions, activeId: state.activeId, captures: state.captures.values(),
+    updateQueue: state.updateQueue, updateStatus: state.updateStatus,
+    activityIndicators: state.ui.tabActivityIndicators,
+  });
+  const actualKinds = [...document.querySelectorAll(`#attention-list .attention-item[data-session-id="${CSS.escape(inspected.id)}"] .attention-kind`)]
+    .map((element) => element.textContent);
+  const expectedKinds = projection.projectedKinds;
+  const indicator = actualTabIndicator(inspected);
+  const expectedIndicator = projection.expectedTabIndicator;
+  const tab = inspected.els && inspected.els.tab;
+  const expectedStatus = sessionTabIndicator(inspected).status;
+  groups.append(
+    diagnosticGroup('EXPECTED', [
+      diagnosticCell('OUTCOME', projection.expectedItem ? projection.expectedItem.kind : `SUPPRESS ${projection.suppression}`),
+      diagnosticCell('TAB', expectedIndicator),
+      diagnosticCell('UPDATE SAFE', `${projection.safety.safe ? 'YES' : 'NO'} · ${projection.safety.reason}`),
+    ]),
+    diagnosticGroup('TRACKED', [
+      diagnosticCell('AGENT', inspected.agent || 'shell'),
+      diagnosticCell('LIFECYCLE', inspected.lifecycle.alive ? 'alive' : `exit ${inspected.lifecycle.exitCode ?? '?'}`),
+      diagnosticCell('TURN', inspected.turn.state),
+      diagnosticCell('ACK', inspected.turn.acknowledged ? 'yes' : 'no'),
+      diagnosticCell('PROTOCOL', inspected.turn.protocol),
+      diagnosticCell('SOURCE', inspected.turn.source),
+      diagnosticCell('CONFIDENCE', inspected.turn.confidence),
+      diagnosticCell('SEQUENCE', inspected.turn.sequence),
+      diagnosticCell('AGE', relativeAge(inspected.turn.since)),
+    ]),
+    diagnosticGroup('ATTENTION', [
+      diagnosticCell('EXPECTED', expectedKinds.join(' → ') || 'none'),
+      diagnosticCell('ACTUAL', actualKinds.join(' → ') || 'none', expectedKinds.join('|') !== actualKinds.join('|')),
+      diagnosticCell('BROWSER QUEUE', projection.queueCount),
+      diagnosticCell('HEAD', projection.queueHead),
+      diagnosticCell('UPDATE PHASE', projection.updatePhase),
+    ]),
+    diagnosticGroup('TAB', [
+      diagnosticCell('EXPECTED', expectedIndicator),
+      diagnosticCell('DOM CLASS', indicator, indicator !== expectedIndicator),
+      diagnosticCell('FOCUS', inspected.id === state.activeId ? 'active' : 'background'),
+      diagnosticCell('PREFERENCE', state.ui.tabActivityIndicators ? 'on' : 'off'),
+      diagnosticCell('ARIA', tab && tab.getAttribute('aria-label')),
+      diagnosticCell('TOOLTIP', tab && tab.title),
+      diagnosticCell('STATUS', expectedStatus),
+    ]),
+  );
+
+  const recent = state.events.filter((event) => event.sessionId === inspected.id).slice(-20).reverse();
+  if (recent.length === 0) events.appendChild(diagnosticCell('EVENTS', 'none'));
+  for (const event of recent) {
+    const chip = document.createElement('div'); chip.className = 'diagnostic-event';
+    const type = document.createElement('b'); type.textContent = diagnosticText(event.type);
+    const result = event.signal || event.turnState || event.state || event.phase || event.exitCode;
+    const detail = document.createElement('span');
+    detail.textContent = [result, event.source].filter((value) => value !== null && value !== undefined && value !== '').map(diagnosticText).join(' · ') || 'applied';
+    const age = document.createElement('time'); age.textContent = relativeAge(event.ts);
+    chip.append(type, detail, age); events.appendChild(chip);
+  }
+}
+
 function attentionItems() {
   reconcileUpdateQueue();
   return window.chromuxAttention.projectAttentionItems({
@@ -2692,6 +2819,7 @@ function renderAttentionQueue() {
   for (const { session, item } of items) {
     const row = document.createElement('div');
     row.className = `attention-item ${item.cls || ''}`;
+    if (item.sessionId) row.dataset.sessionId = item.sessionId;
     const action = attentionAction(item);
     row.onclick = action;
     const top = document.createElement('div');
@@ -2827,6 +2955,7 @@ async function createSession({ name, cwd, agent, initialUrl = null, initialQueue
 }
 
 function activateSession(id) {
+  if (!state.ui.diagnosticSessionId || !state.sessions.has(state.ui.diagnosticSessionId)) state.ui.diagnosticSessionId = id;
   apply({ type: 'session-focused', sessionId: id });
   for (const s of state.sessions.values()) {
     const active = s.id === id;
@@ -2841,7 +2970,7 @@ function activateSession(id) {
   }
   $('#empty-state').classList.toggle('hidden', state.sessions.size > 0);
   renderTabs();
-  invalidate('shortcutDebug');
+  invalidate('shortcutDebug', ...(state.env && state.env.devMode ? ['diagnostics'] : []));
 }
 
 function closeSession(id) {
@@ -2858,9 +2987,13 @@ function closeSession(id) {
     state.activeId = next.done ? null : next.value;
     if (state.activeId) activateSession(state.activeId);
   }
+  if (state.ui.diagnosticSessionId === id) {
+    state.ui.diagnosticSessionId = state.sessions.has(state.activeId)
+      ? state.activeId : (state.sessions.keys().next().value || null);
+  }
   $('#empty-state').classList.toggle('hidden', state.sessions.size > 0);
   renderTabs();
-  invalidate('shortcutDebug');
+  invalidate('shortcutDebug', ...(state.env && state.env.devMode ? ['diagnostics'] : []));
 }
 
 function setUpdateQueuePhase(phase, patch = {}) {
@@ -3047,27 +3180,32 @@ function liveSessions() {
 
 function showLifecyclePrompt(reason) {
   const live = liveSessions();
-  const alwaysConfirm = reason === 'app-quit';
+  const isDevModeRestart = reason === 'dev-mode-restart';
+  const alwaysConfirm = reason === 'app-quit' || (isDevModeRestart && state.sessions.size > 0);
   const isUpdateInstall = reason === 'update-install';
   const isUpdateDismiss = reason === 'update-dismiss';
   if (live.length === 0 && !isUpdateInstall && !isUpdateDismiss && !alwaysConfirm) return Promise.resolve(true);
   if (state.lifecyclePrompt) return state.lifecyclePrompt.promise;
 
   const isQuit = reason === 'app-quit';
-  $('#lifecycle-title').textContent = isUpdateInstall
+  $('#lifecycle-title').textContent = isDevModeRestart
+    ? 'RESTART FOR DEVELOPER MODE?'
+    : (isUpdateInstall
     ? 'EXECUTE CHROMUX UPDATE?'
     : (isUpdateDismiss ? 'DISMISS QUEUED UPDATE?'
-      : (isQuit ? 'QUIT CHROMUX?' : 'CLOSE CHROMUX WITH LIVE SESSIONS'));
-  $('#lifecycle-copy').textContent = isUpdateInstall
+      : (isQuit ? 'QUIT CHROMUX?' : 'CLOSE CHROMUX WITH LIVE SESSIONS')));
+  $('#lifecycle-copy').textContent = isDevModeRestart
+    ? 'Chromux will save the open workspace, restart with the selected Developer Mode setting, and reopen resumable sessions.'
+    : (isUpdateInstall
     ? 'Continuing will stop live PTYs, save a workspace snapshot, install the update, and reopen the sessions after restart using Claude/Codex resume where possible.'
     : (isUpdateDismiss
       ? 'This removes the queued update from the attention list without installing it. The available update remains visible in Settings and can be queued again later.'
     : (live.length === 0
       ? 'Chromux will close after you confirm.'
-      : 'Continuing will stop live PTYs and save a workspace snapshot. When Chromux opens again, it will reopen the sessions using Claude/Codex resume where possible.'));
+      : 'Continuing will stop live PTYs and save a workspace snapshot. When Chromux opens again, it will reopen the sessions using Claude/Codex resume where possible.')));
   const host = $('#lifecycle-list');
   host.innerHTML = '';
-  for (const session of isUpdateDismiss ? [] : live) {
+  for (const session of isUpdateDismiss ? [] : (isDevModeRestart ? orderedSessions() : live)) {
     const row = document.createElement('div');
     row.className = 'lifecycle-item';
     const name = document.createElement('b');
@@ -3078,9 +3216,11 @@ function showLifecyclePrompt(reason) {
     row.append(name, detail);
     host.appendChild(row);
   }
-  $('#lifecycle-confirm').textContent = isUpdateInstall
+  $('#lifecycle-confirm').textContent = isDevModeRestart
+    ? 'SAVE & RESTART'
+    : (isUpdateInstall
     ? 'EXECUTE UPDATE'
-    : (isUpdateDismiss ? 'DISMISS UPDATE' : (isQuit ? 'QUIT' : 'SAVE & CLOSE'));
+    : (isUpdateDismiss ? 'DISMISS UPDATE' : (isQuit ? 'QUIT' : 'SAVE & CLOSE')));
 
   let resolvePrompt;
   const promise = new Promise((resolve) => { resolvePrompt = resolve; });
@@ -3165,9 +3305,28 @@ function showUpdateInstallError(err) {
 }
 
 function openSettings() {
+  const toggle = $('#settings-developer-mode');
+  if (toggle) toggle.checked = Boolean(state.env && state.env.devMode);
   $('#modal-settings').classList.remove('hidden');
   invalidate('shortcutDebug');
   checkUpdates(false).catch(() => {});
+}
+
+async function changeDeveloperMode(enabled) {
+  const toggle = $('#settings-developer-mode');
+  const current = Boolean(state.env && state.env.devMode);
+  if (Boolean(enabled) === current) return false;
+  if (!(await showLifecyclePrompt('dev-mode-restart'))) {
+    if (toggle) toggle.checked = current;
+    return false;
+  }
+  const payload = { enabled: Boolean(enabled), sessions: snapshotOpenSessions() };
+  if (state.testDevModeRestart) {
+    state.testDevModeRestart.calls.push(payload);
+    return true;
+  }
+  await window.chromux.restartWithDevMode(payload);
+  return true;
 }
 
 function applyTerminalTitleUpdates(session, data) {
@@ -3863,6 +4022,15 @@ $('#settings-theme-mode').addEventListener('click', (event) => {
 });
 $('#settings-tab-activity-indicators').addEventListener('change', (event) => {
   applyTabActivityIndicators(event.target.checked);
+});
+$('#settings-developer-mode').addEventListener('change', (event) => {
+  changeDeveloperMode(event.target.checked).catch(() => {
+    event.target.checked = Boolean(state.env && state.env.devMode);
+  });
+});
+$('#diagnostic-session').addEventListener('change', (event) => {
+  if (state.sessions.has(event.target.value)) state.ui.diagnosticSessionId = event.target.value;
+  invalidate('diagnostics');
 });
 $('#btn-update-ready').onclick = () => {
   if (updateAvailable() && state.updateQueue.phase === 'idle') installUpdate().catch(showUpdateInstallError);
@@ -5202,6 +5370,36 @@ if (window.chromuxTest) {
     turnState: (id) => ({ ...testSession(id).turn }),
     events: () => state.events.map((event) => ({ ...event })),
   };
+
+  window.chromuxTestDiagnostics = {
+    addSession: addRenderableTestSession,
+    focus(id) { activateSession(id); flushRender(); },
+    select(id) {
+      const selector = $('#diagnostic-session');
+      selector.value = id;
+      selector.dispatchEvent(new Event('change', { bubbles: true }));
+      flushRender();
+    },
+    selected: () => state.ui.diagnosticSessionId,
+    close(id) { closeSession(id); flushRender(); },
+    exit(id, exitCode = 0) { apply({ type: 'session-exited', sessionId: id, exitCode }); flushRender(); },
+    emit(id, event, detail = null) { apply({ type: 'turn-signal', sessionId: id, signal: event, detail }); flushRender(); },
+    queue(id, url) { apply({ type: 'preview-queued', sessionId: id, url, source: 'TERM' }); renderQueue(testSession(id)); flushRender(); },
+    setUpdatePhase(phase) { setUpdateQueuePhase(phase); flushRender(); },
+    injectTabIndicator(id, kind) { testSession(id).els.dot.className = `tab-dot ${kind}`; invalidate('diagnostics'); flushRender(); },
+    visible: () => !$('#developer-diagnostics').classList.contains('hidden'),
+    groupText: () => $('#diagnostic-groups').textContent,
+    mismatches: () => document.querySelectorAll('#diagnostic-groups .mismatch').length,
+    events: () => [...document.querySelectorAll('#diagnostic-events .diagnostic-event')].map((node) => node.textContent),
+    selectorLabels: () => [...$('#diagnostic-session').options].map((option) => option.textContent),
+    enableRestartMock() { state.testDevModeRestart = { calls: [] }; },
+    restartCalls: () => state.testDevModeRestart ? state.testDevModeRestart.calls.map((call) => ({ ...call })) : [],
+    toggleDevMode(enabled) {
+      const toggle = $('#settings-developer-mode'); toggle.checked = Boolean(enabled);
+      toggle.dispatchEvent(new Event('change', { bubbles: true }));
+    },
+    flushRender,
+  };
 }
 
 function fakeSessionEls() {
@@ -5272,6 +5470,10 @@ setInterval(() => {
   scanPtyAgentDescendants(false).catch(() => {});
 }, SHELL_ADOPTION_SCAN_MS);
 
+setInterval(() => {
+  if (state.env && state.env.devMode) invalidate('diagnostics');
+}, 1000);
+
 // boot
 (async () => {
   state.favoritesReady = window.chromux.favoritesRead().then((favorites) => {
@@ -5285,6 +5487,8 @@ setInterval(() => {
   window.chromux.onUpdateStatus((status) => renderUpdateStatus(status));
   $('#storage-path').textContent = state.env.capturesDir.replace(state.env.home, '~');
   $('.sb-ver').textContent = `chromux ${state.env.version || '0.6.0'} — prototype`;
+  $('#settings-developer-mode').checked = Boolean(state.env.devMode);
+  renderDeveloperDiagnostics();
   await autoRestoreWorkspace().catch((err) => {
     renderRestoreWarning([{ name: 'restore failed', cwd: err.message, agent: 'chromux' }]);
   });

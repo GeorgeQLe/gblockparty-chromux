@@ -153,7 +153,7 @@
     if (turnState === 'permission') return { safe: true, reason: 'waiting for permission' };
     if (turnState === 'authentication') return { safe: true, reason: 'waiting for authentication' };
     if (turnState === 'rateLimited' || turnState === 'toolFailed') {
-      return turn.stopped
+      return session.turn.stopped
         ? { safe: true, reason: turnState === 'rateLimited' ? 'rate limited and stopped' : 'tool failed and stopped' }
         : { safe: false, reason: 'nonterminal agent failure' };
     }
@@ -340,11 +340,45 @@
     return items;
   }
 
+  function expectedTabIndicator(session, activityIndicators = true) {
+    if (!session || !session.lifecycle || !session.lifecycle.alive) return 'dead';
+    if (activityIndicators && session.turn && session.turn.state === 'working') return 'working';
+    if (activityIndicators && session.turn && session.turn.state === 'completed') return 'completed';
+    return 'live';
+  }
+
+  function projectAttentionDiagnostic({ session, sessions, activeId, captures, updateQueue,
+    updateStatus, activityIndicators = true }) {
+    if (!session) return null;
+    const projected = projectAttentionItems({ sessions, activeId, captures, updateQueue, updateStatus });
+    const sessionItems = projected.filter((item) => item.sessionId === session.id);
+    let suppression = null;
+    if (session.id === activeId) suppression = 'active-session';
+    else if (!session.lifecycle || !session.lifecycle.alive) suppression = 'exited';
+    else if (session.turn && session.turn.acknowledged
+      && ['completed', 'needsInput', 'permission', 'authentication', 'rateLimited', 'toolFailed'].includes(session.turn.state)) {
+      suppression = 'acknowledged';
+    } else if (sessionItems.length === 0) suppression = 'no-actionable-state';
+    return {
+      expectedItem: sessionItems[0] || null,
+      suppression,
+      safety: sessionUpdateSafety(session),
+      expectedTabIndicator: expectedTabIndicator(session, activityIndicators),
+      projectedKinds: sessionItems.map((item) => item.kind),
+      projectedOrder: projected.map((item) => item.id),
+      queueCount: session.browser && Array.isArray(session.browser.queue) ? session.browser.queue.length : 0,
+      queueHead: session.browser && Array.isArray(session.browser.queue) && session.browser.queue[0]
+        ? session.browser.queue[0].url : null,
+      updatePhase: updateQueue && updateQueue.phase || 'idle',
+    };
+  }
+
   const api = {
     applyTurnSignal,
     applyUserInputTurnTransition,
     applyCodexOutputCompletionFallback,
     projectAttentionItems,
+    projectAttentionDiagnostic,
     sessionUpdateSafety,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

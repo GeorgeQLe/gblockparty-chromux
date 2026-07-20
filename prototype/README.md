@@ -46,6 +46,15 @@ and terminal palette, then persist locally for the next launch. New profiles sta
 Light. Run `npm run capture:themes -- /tmp/chromux-theme-shots` to generate deterministic
 screenshots of the open theme picker in all eight theme/mode combinations.
 
+### Developer diagnostics
+
+Interactive source launches show a read-only diagnostics strip above the shortcut status bar. It can
+inspect any open or exited session independently of tab focus and compares the attention projection,
+tracked turn state, rendered tab indicator, update safety, browser queue, and recent sanitized events.
+Packaged launches hide the strip by default. Use **SETTINGS → DEVELOPER MODE** to change the persisted
+setting; Chromux confirms when sessions are open, saves a restore snapshot, and restarts to apply it.
+The `--dev-mode` and `--no-dev-mode` flags take precedence over the saved preference.
+
 1. **Start a session** — `+ NEW`, pick your project directory, choose CLAUDE CODE / CODEX /
    GROK BUILD / SHELL ONLY. Chromux spawns your login shell and launches the agent CLI
    *unchanged* — it wraps the CLIs, never modifies them.

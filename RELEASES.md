@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.32.0
+
+Tag: `chromux-v0.32.0`
+
+- Add an always-expanded, read-only attention diagnostics strip with independent session inspection, expected/tracked/queue/tab comparisons, mismatch highlighting, and a sanitized newest-first event trail.
+- Keep stable packaged launches in standard mode by default while enabling diagnostics for interactive unpackaged development; explicit runtime flags override the persisted Developer Mode preference.
+- Add a Developer Mode switch in Settings that confirms when sessions are open, saves a restore snapshot, restarts Chromux with the selected mode, and restores resumable sessions through the existing startup flow.
+
 ## GBlockParty Chromux v0.31.1
 
 Tag: `chromux-v0.31.1`
