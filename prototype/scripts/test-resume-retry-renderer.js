@@ -60,6 +60,15 @@ fs.writeFileSync(e2ePath, `
   q.exit(late, 1);
   expect(q.warning().hidden, 'resume exit after startup window should not show retry footer');
 
+  q.clear();
+  q.showRestoreWarning([], [{ name: 'legacy-tab', cwd: '/tmp/shared', agent: 'claude', resumeId }]);
+  warning = q.warning();
+  expect(!warning.hidden, 'legacy inferred restore should show startup warning');
+  expect(warning.title === 'Some saved sessions used best-effort matches',
+    'unexpected inferred warning title: ' + warning.title);
+  expect(warning.detail.includes('legacy-tab') && warning.detail.includes('inferred distinct recent conversations'),
+    'inferred warning should disclose the affected tab and matching behavior');
+
   return JSON.stringify({ ok: true });
 })()
 `);

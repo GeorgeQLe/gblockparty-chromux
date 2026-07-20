@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.33.3
+
+Tag: `chromux-v0.33.3`
+
+- Preserve each tab's exact Claude, Codex, or Grok conversation across app, update, and Developer Mode restarts, including multiple tabs in the same directory.
+- Reserve exact conversation IDs before assigning distinct newest-first candidates to legacy snapshots, and disclose every best-effort match at startup.
+- Validate provider identity fields inside authenticated turn-signal envelopes and persist them in backward-compatible restore snapshot schema v3.
+
 ## GBlockParty Chromux v0.33.2
 
 Tag: `chromux-v0.33.2`

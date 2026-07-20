@@ -73,6 +73,7 @@ const state = {
   detectQuery: '',
   restoreSessions: null,
   restoreWarningRows: [],
+  restoreInferredRows: [],
   restoreWarningDismissed: false,
   resumeRetryWarning: null,
   lifecyclePrompt: null,
@@ -969,7 +970,7 @@ function newSessionShape({ id, name, cwd, agent }) {
     '': { turnStarted: 'unavailable', inputRequired: 'unavailable', permissionRequired: 'unavailable', authenticationRequired: 'unavailable', rateLimited: 'unavailable', toolFailed: 'unavailable', turnCompleted: 'unavailable' },
   }[agent];
   return {
-    id, name, cwd, agent,
+    id, name, cwd, agent, resumeId: null,
     capabilities,
     lifecycle: { alive: true, exitCode: null, exitedAt: null, resumeLaunch: null },
     turn: {
@@ -2151,8 +2152,10 @@ function rewriteShellLaunchInput(session, data) {
 }
 
 function resumeIdForRow(row) {
-  const id = row && row.resume && typeof row.resume.id === 'string' ? row.resume.id : null;
-  return id && /^[0-9a-f-]+$/i.test(id) ? id : null;
+  const id = row && typeof row.resumeId === 'string'
+    ? row.resumeId
+    : (row && row.resume && typeof row.resume.id === 'string' ? row.resume.id : null);
+  return id && /^[0-9a-f][0-9a-f-]{15,127}$/i.test(id) ? id : null;
 }
 
 function resumeLaunchForRow(row, { name = null, command = null, source = 'detect', autoRestored = false } = {}) {
@@ -2906,6 +2909,7 @@ async function createSession({ name, cwd, agent, initialUrl = null, initialQueue
       sessionName: resumeLaunch.sessionName || name,
       cwd: resumeLaunch.cwd || cwd || null,
     };
+    session.resumeId = resumeLaunch.resumeId || null;
   }
 
   const viewEls = buildSessionView(session);
@@ -3166,6 +3170,7 @@ function snapshotOpenSessions() {
     name: session.name,
     cwd: session.cwd,
     agent: session.agent || '',
+    resumeId: session.resumeId || null,
     alive: Boolean(session.lifecycle.alive),
     currentUrl: session.browser.currentUrl || null,
     queue: session.browser.queue.map((item) => ({
@@ -3462,6 +3467,8 @@ function handlePtyData(id, data) {
       && typeof env.source === 'string' && env.source.length <= 64
       && ['high', 'medium', 'low'].includes(env.confidence)
       && typeof env.stopped === 'boolean'
+      && (env.resumeId === null || env.resumeId === undefined
+        || (typeof env.resumeId === 'string' && /^[0-9a-f][0-9a-f-]{15,127}$/i.test(env.resumeId)))
     );
     if (sig.malformed || sig.sessionId !== id || !validV2) {
       apply({
@@ -3471,8 +3478,10 @@ function handlePtyData(id, data) {
         claimedSessionId: sig.sessionId || null,
       });
     } else if (env && env.event === 'unknown-notification') {
+      if (env.resumeId) s.resumeId = env.resumeId;
       apply({ type: 'signal-unknown', sessionId: id, source: env.source, eventId: env.eventId });
     } else {
+      if (env && env.resumeId) s.resumeId = env.resumeId;
       apply({ type: 'turn-signal', sessionId: id, signal: sig.event, detail: sig.detail, envelope: env });
     }
   }
@@ -4007,7 +4016,8 @@ function renderWorkspaceWarning() {
   }
 
   const rows = Array.isArray(state.restoreWarningRows) ? state.restoreWarningRows : [];
-  if (rows.length === 0 || state.restoreWarningDismissed) {
+  const inferred = Array.isArray(state.restoreInferredRows) ? state.restoreInferredRows : [];
+  if ((rows.length === 0 && inferred.length === 0) || state.restoreWarningDismissed) {
     host.classList.add('hidden');
     return;
   }
@@ -4015,11 +4025,21 @@ function renderWorkspaceWarning() {
   main.className = 'rw-main';
   const title = document.createElement('div');
   title.className = 'rw-title';
-  title.textContent = 'Some saved sessions reopened fresh';
+  title.textContent = rows.length > 0
+    ? 'Some saved sessions reopened fresh'
+    : 'Some saved sessions used best-effort matches';
   const detail = document.createElement('div');
   detail.className = 'rw-detail';
-  const names = rows.map((row) => `${row.name || row.agent} (${row.cwd || '~'})`);
-  detail.textContent = `Chromux could not match ${rows.length} Claude/Codex saved conversation${rows.length === 1 ? '' : 's'}: ${names.join('; ')}`;
+  const unresolvedNames = rows.map((row) => `${row.name || row.agent} (${row.cwd || '~'})`);
+  const inferredNames = inferred.map((row) => `${row.name || row.agent} (${row.cwd || '~'})`);
+  const messages = [];
+  if (rows.length > 0) {
+    messages.push(`Chromux could not match ${rows.length} saved conversation${rows.length === 1 ? '' : 's'}: ${unresolvedNames.join('; ')}`);
+  }
+  if (inferred.length > 0) {
+    messages.push(`Chromux inferred distinct recent conversations for ${inferred.length} legacy tab${inferred.length === 1 ? '' : 's'}: ${inferredNames.join('; ')}`);
+  }
+  detail.textContent = messages.join(' ');
   detail.title = detail.textContent;
   main.append(title, detail);
   const dismiss = document.createElement('button');
@@ -4033,8 +4053,9 @@ function renderWorkspaceWarning() {
   host.classList.remove('hidden');
 }
 
-function renderRestoreWarning(unresolved) {
+function renderRestoreWarning(unresolved, inferred = []) {
   state.restoreWarningRows = Array.isArray(unresolved) ? unresolved : [];
+  state.restoreInferredRows = Array.isArray(inferred) ? inferred : [];
   renderWorkspaceWarning();
 }
 
@@ -4076,7 +4097,7 @@ async function autoRestoreWorkspace() {
   });
   state.restoreSessions = consumed || snapshot;
   renderRestoreSessions();
-  renderRestoreWarning(res.unresolved || []);
+  renderRestoreWarning(res.unresolved || [], res.inferred || []);
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -4705,6 +4726,8 @@ if (window.chromuxTest) {
       flushRender();
     },
     turnState: (id) => ({ ...testSession(id).turn }),
+    resumeId: (id) => testSession(id).resumeId,
+    snapshot: () => snapshotOpenSessions().map((row) => ({ ...row })),
     capabilities: (id) => ({ ...testSession(id).capabilities }),
     setSignalToken(id, token) { testSession(id).turn.token = token; },
     markUserInput(id) {
@@ -4742,6 +4765,8 @@ if (window.chromuxTest) {
       flushRender();
     },
     turnState: (id) => ({ ...testSession(id).turn }),
+    resumeId: (id) => testSession(id).resumeId,
+    snapshot: () => snapshotOpenSessions().map((row) => ({ ...row })),
     activeId: () => state.activeId,
     written: (id) => (testSession(id)._written || []).join(''),
     attentionItems: () => [...document.querySelectorAll('#attention-list .attention-item')].map((el) => ({
@@ -4828,9 +4853,15 @@ if (window.chromuxTest) {
     },
     ptyInputs: (id) => (testSession(id)._ptyInputs || []).join(''),
     startupWindowMs: () => BOUNDS.resumeStartupExitMs,
+    showRestoreWarning(unresolved = [], inferred = []) {
+      state.restoreWarningDismissed = false;
+      renderRestoreWarning(unresolved, inferred);
+      flushRender();
+    },
     clear() {
       state.resumeRetryWarning = null;
       state.restoreWarningRows = [];
+      state.restoreInferredRows = [];
       state.restoreWarningDismissed = false;
       renderWorkspaceWarning();
       flushRender();

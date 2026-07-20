@@ -74,6 +74,28 @@ function runNotifier(notifyPath, payload) {
   });
 }
 
+function runClassifier(classifierPath, agent, event, payload) {
+  return new Promise((resolve, reject) => {
+    let output = '';
+    const terminal = pty.spawn(process.execPath, [classifierPath, agent, event, JSON.stringify(payload)], {
+      name: 'xterm-256color', cols: 120, rows: 24, cwd: appDir,
+      env: {
+        ...process.env,
+        ELECTRON_RUN_AS_NODE: '1',
+        HOME: homeDir,
+        CHROMUX_STATE_DIR: path.join(homeDir, '.chromux'),
+        CHROMUX_SESSION_ID: sessionId,
+        CHROMUX_SIGNAL_TOKEN: token,
+      },
+    });
+    terminal.onData((data) => { output += data; });
+    terminal.onExit(({ exitCode, signal }) => {
+      if (exitCode !== 0 || signal) reject(new Error(`classifier exited ${exitCode} signal ${signal}`));
+      else resolve(output);
+    });
+  });
+}
+
 function parsedSignals(output) {
   const result = signals.extractChromuxSignals('', output);
   return result.signals;
@@ -93,6 +115,7 @@ function expectFallback(output, label) {
   const classifierPath = path.join(homeDir, '.chromux', 'signal-classifier.js');
   const official = JSON.stringify({
     type: 'agent-turn-complete',
+    'thread-id': 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
     turn_id: 'official-turn',
     last_assistant_message: 'Implemented the requested fix.',
   });
@@ -104,8 +127,27 @@ function expectFallback(output, label) {
   }
   const envelope = valid[0].envelope;
   if (envelope.sessionId !== sessionId || envelope.token !== token || envelope.agent !== 'codex'
-    || envelope.event !== 'turn-completed' || envelope.turnId !== 'official-turn') {
+    || envelope.event !== 'turn-completed' || envelope.turnId !== 'official-turn'
+    || envelope.resumeId !== 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee') {
     throw new Error(`valid payload emitted incorrect authenticated envelope: ${JSON.stringify(envelope)}`);
+  }
+
+  const claude = parsedSignals(await runClassifier(classifierPath, 'claude', 'Stop', {
+    session_id: '11111111-2222-4333-8444-555555555555',
+  }))[0];
+  const grok = parsedSignals(await runClassifier(classifierPath, 'grok', 'Stop', {
+    session_id: '019f4ef1-dcd0-7440-beef-aec69c74a111',
+  }))[0];
+  if (!claude || claude.envelope.resumeId !== '11111111-2222-4333-8444-555555555555'
+    || !grok || grok.envelope.resumeId !== '019f4ef1-dcd0-7440-beef-aec69c74a111') {
+    throw new Error(`provider resume IDs were not extracted: ${JSON.stringify({ claude, grok })}`);
+  }
+
+  const malformedResume = parsedSignals(await runClassifier(classifierPath, 'claude', 'Stop', {
+    session_id: '../not-a-session',
+  }))[0];
+  if (!malformedResume || malformedResume.envelope.resumeId !== null) {
+    throw new Error(`malformed provider resume ID must be discarded: ${JSON.stringify(malformedResume)}`);
   }
 
   for (const name of fs.readdirSync(path.join(homeDir, '.chromux'))) {

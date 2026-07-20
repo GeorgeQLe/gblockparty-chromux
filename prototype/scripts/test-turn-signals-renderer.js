@@ -38,15 +38,23 @@ fs.writeFileSync(e2ePath, `
   const secure = sig.addFakeSession({ name: 'secure', agent: 'claude' });
   sig.setSignalToken(secure, 'secret');
   const base = { v: 2, sessionId: secure, token: 'secret', agent: 'claude',
+    resumeId: '11111111-2222-4333-8444-555555555555',
     reason: 'permission', message: 'Allow command?', turnId: 'turn-1', eventId: 'event-1',
     sequence: 1, timestamp: Date.now(), source: 'claude:Notification', confidence: 'high', stopped: false };
   sig.feedPtyChunk(secure, oscV2({ ...base, event: 'permission-required' }));
   expect(sig.turnState(secure).state === 'permission', 'v2 permission should create distinct state');
   expect(itemsFor('PERMISSION', 'secure').length === 1, 'v2 permission should create attention');
+  expect(sig.resumeId(secure) === base.resumeId, 'authenticated provider ID should attach to the signaled tab');
+  expect(sig.snapshot().find((row) => row.name === 'secure').resumeId === base.resumeId,
+    'snapshot should include the live tab provider ID');
+  const other = sig.addFakeSession({ name: 'other-secure', agent: 'claude' });
+  expect(sig.resumeId(other) === null, 'provider ID must not leak to another tab');
   sig.feedPtyChunk(secure, oscV2({ ...base, token: 'wrong', eventId: 'event-2', sequence: 2, event: 'turn-completed' }));
   expect(sig.turnState(secure).state === 'permission', 'wrong token must not mutate state');
   sig.feedPtyChunk(secure, oscV2({ ...base, event: 'permission-required' }));
   expect(sig.turnState(secure).sequence === 1, 'duplicate event must not advance state');
+  sig.feedPtyChunk(secure, oscV2({ ...base, resumeId: '../bad', eventId: 'event-bad', sequence: 2 }));
+  expect(sig.resumeId(secure) === base.resumeId, 'malformed provider ID must not replace stored identity');
 
   // 1 — regex heuristics are dead: plain "complete" prose does nothing…
   const a = sig.addFakeSession({ name: 'claude-a', agent: 'claude' });

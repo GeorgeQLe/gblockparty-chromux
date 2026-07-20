@@ -528,11 +528,14 @@ state.sequence += 1;
 const requestedTurnId = payload.turn_id ?? payload.turnId;
 const boundedTurnId = (typeof requestedTurnId === 'string' || typeof requestedTurnId === 'number')
   ? String(requestedTurnId).slice(0, 128) : '';
+const requestedResumeId = agent === 'codex' ? payload['thread-id'] : payload.session_id;
+const resumeId = typeof requestedResumeId === 'string'
+  && /^[0-9a-f][0-9a-f-]{15,127}$/i.test(requestedResumeId) ? requestedResumeId : null;
 if (event === 'turn-started' || !state.turnId) state.turnId = boundedTurnId || crypto.randomUUID();
 const envelope = { v: 2, sessionId, token, agent, event, reason,
   message: text.slice(0, 1024) || null, turnId: state.turnId, eventId: crypto.randomUUID(),
   sequence: state.sequence, timestamp: Date.now(), source: agent + ':' + nativeEvent,
-  confidence: event === 'unknown-notification' ? 'low' : 'high', stopped };
+  confidence: event === 'unknown-notification' ? 'low' : 'high', stopped, resumeId };
 try { fs.writeFileSync(statePath, JSON.stringify(state), { mode: 0o600 }); }
 catch { process.exit(1); }
 const encoded = Buffer.from(JSON.stringify(envelope)).toString('base64url');
@@ -589,6 +592,12 @@ function writeClaudeHooksSettings() {
 // written successfully. When false, agents launch uninstrumented instead of
 // pointing --settings/notify at a path that was never written.
 const hookInstall = { helper: false, claude: false, codex: false, grok: false };
+
+const RESUME_ID_RE = /^[0-9a-f][0-9a-f-]{15,127}$/i;
+
+function sanitizeResumeId(value) {
+  return typeof value === 'string' && RESUME_ID_RE.test(value) ? value : null;
+}
 
 // POSIX single-quoting: close the quote, emit an escaped ', reopen. Safe for
 // any byte the filesystem allows (spaces, quotes, backslashes).
@@ -735,6 +744,7 @@ function sanitizeRestoreSession(session) {
     name: String(session.name || path.basename(cwd) || 'session').slice(0, 80),
     cwd,
     agent,
+    resumeId: sanitizeResumeId(session.resumeId),
     alive: session.alive !== false,
     currentUrl: typeof session.currentUrl === 'string' && session.currentUrl ? session.currentUrl : null,
     queue,
@@ -748,7 +758,7 @@ function writeRestoreSnapshot({ sessions, reason = 'manual', restoreId = null, s
   ensureDirs();
   const clean = Array.isArray(sessions) ? sessions.map(sanitizeRestoreSession).filter(Boolean) : [];
   const payload = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     restoreId: restoreId || `restore-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     reason,
     savedAt: savedAt || new Date().toISOString(),
@@ -802,28 +812,68 @@ function agentResumeCommand(agent, resumeId) {
 }
 
 function resolveRestoreSessions(sessions) {
-  const codexIndex = codexSessionIndex();
+  const cleanSessions = (Array.isArray(sessions) ? sessions : [])
+    .map(sanitizeRestoreSession).filter(Boolean);
+  const candidateCache = new Map();
+  const codexCandidates = codexSessionIndex();
+  const used = new Set();
+  const exactOwners = new Map();
+  cleanSessions.forEach((session, index) => {
+    const id = sanitizeResumeId(session.resumeId);
+    const key = id && session.agent ? `${session.agent}:${id}` : null;
+    if (key && !exactOwners.has(key)) exactOwners.set(key, index);
+  });
   const resolved = [];
   const unresolved = [];
-  for (const raw of Array.isArray(sessions) ? sessions : []) {
-    const session = sanitizeRestoreSession(raw);
-    if (!session) continue;
+  const inferred = [];
+  const candidatesFor = (agent, cwd) => {
+    const key = `${agent}\n${cwd}`;
+    if (candidateCache.has(key)) return candidateCache.get(key);
+    let candidates = [];
+    if (agent === 'claude') candidates = claudeSessions(cwd);
+    else if (agent === 'codex') candidates = codexCandidates.get(cwd) || [];
+    else if (agent === 'grok') candidates = grokSessions(cwd);
+    candidateCache.set(key, candidates);
+    return candidates;
+  };
+  cleanSessions.forEach((session, index) => {
     let resume = null;
-    if (session.agent === 'claude') resume = latestClaudeSession(session.cwd);
-    else if (session.agent === 'codex') resume = codexIndex.get(session.cwd) || null;
-    else if (session.agent === 'grok') resume = latestGrokSession(session.cwd);
+    let inferredMatch = false;
+    const savedId = sanitizeResumeId(session.resumeId);
+    const savedKey = savedId ? `${session.agent}:${savedId}` : null;
+    if (session.agent && savedId && exactOwners.get(savedKey) === index) {
+      resume = { id: savedId, ts: null, exact: true };
+    } else if (session.agent) {
+      resume = candidatesFor(session.agent, session.cwd)
+        .find((candidate) => {
+          const key = `${session.agent}:${candidate.id}`;
+          return !used.has(key) && !exactOwners.has(key);
+        }) || null;
+      inferredMatch = Boolean(resume);
+    }
+    if (resume) used.add(`${session.agent}:${resume.id}`);
     const command = agentResumeCommand(session.agent, resume && resume.id);
-    const row = { ...session, resume, command };
+    const row = { ...session, resumeId: resume ? resume.id : session.resumeId, resume, command };
     resolved.push(row);
+    if (inferredMatch) {
+      inferred.push({
+        name: session.name,
+        cwd: session.cwd,
+        agent: session.agent,
+        resumeId: resume.id,
+        reason: savedId ? 'duplicate-resume-id' : 'missing-resume-id',
+      });
+    }
     if (session.agent && !command) {
       unresolved.push({
         name: session.name,
         cwd: session.cwd,
         agent: session.agent,
+        resumeId: savedId,
       });
     }
-  }
-  return { sessions: resolved, unresolved };
+  });
+  return { sessions: resolved, unresolved, inferred };
 }
 
 function currentVersion() {
@@ -1333,36 +1383,40 @@ async function listTerminalTabs() {
 
 // Latest saved claude session for a project dir: ~/.claude/projects stores one
 // dir per cwd (path munged to dashes) with one <session-uuid>.jsonl per session.
-function latestClaudeSession(cwd) {
+function claudeSessions(cwd) {
   const munged = cwd.replace(/[^a-zA-Z0-9]/g, '-');
   const dir = path.join(os.homedir(), '.claude', 'projects', munged);
-  let best = null;
+  const sessions = [];
   try {
     for (const f of fs.readdirSync(dir)) {
       if (!f.endsWith('.jsonl')) continue;
       const id = f.slice(0, -6);
-      if (!/^[0-9a-f-]{16,}$/i.test(id)) continue;
+      if (!sanitizeResumeId(id)) continue;
       const mtimeMs = fs.statSync(path.join(dir, f)).mtimeMs;
-      if (!best || mtimeMs > best.ts) best = { id, ts: mtimeMs };
+      sessions.push({ id, ts: mtimeMs });
     }
   } catch { /* no sessions for this project */ }
-  return best;
+  return sessions.sort((a, b) => b.ts - a.ts);
+}
+
+function latestClaudeSession(cwd) {
+  return claudeSessions(cwd)[0] || null;
 }
 
 // Latest saved Grok Build session for a project dir.
 // Layout: ~/.grok/sessions/<url-encoded-cwd>/<session-id>/summary.json
 // (GROK_HOME overrides ~/.grok). Long paths may use a slug+hash group with a
 // `.cwd` file recording the original path — we resolve that as a fallback.
-function latestGrokSession(cwd) {
-  if (!cwd || typeof cwd !== 'string') return null;
+function grokSessions(cwd) {
+  if (!cwd || typeof cwd !== 'string') return [];
   const root = path.join(grokHomeDir(), 'sessions');
-  let best = null;
+  const sessions = new Map();
 
   const considerGroup = (groupDir) => {
     let names;
     try { names = fs.readdirSync(groupDir); } catch { return; }
     for (const name of names) {
-      if (!/^[0-9a-f-]{16,}$/i.test(name)) continue;
+      if (!sanitizeResumeId(name)) continue;
       const sessionDir = path.join(groupDir, name);
       const summaryPath = path.join(sessionDir, 'summary.json');
       let ts = 0;
@@ -1379,12 +1433,13 @@ function latestGrokSession(cwd) {
       } catch {
         try { ts = fs.statSync(sessionDir).mtimeMs; } catch { continue; }
       }
-      if (!best || ts > best.ts) best = { id: name, ts };
+      const existing = sessions.get(name);
+      if (!existing || ts > existing.ts) sessions.set(name, { id: name, ts });
     }
   };
 
   considerGroup(path.join(root, encodeURIComponent(cwd)));
-  if (best) return best;
+  if (sessions.size > 0) return [...sessions.values()].sort((a, b) => b.ts - a.ts);
 
   // Fallback: hashed long-path groups (and any encoding mismatch) via .cwd or
   // a summary.json info.cwd match. Capped walk — DETECT only needs "latest".
@@ -1400,7 +1455,7 @@ function latestGrokSession(cwd) {
       if (!matched) {
         try {
           for (const name of fs.readdirSync(groupDir)) {
-            if (!/^[0-9a-f-]{16,}$/i.test(name)) continue;
+            if (!sanitizeResumeId(name)) continue;
             const summary = readJson(path.join(groupDir, name, 'summary.json'));
             const summaryCwd = summary && summary.info && summary.info.cwd;
             if (summaryCwd === cwd) { matched = true; break; }
@@ -1410,7 +1465,11 @@ function latestGrokSession(cwd) {
       if (matched) considerGroup(groupDir);
     }
   } catch { /* no grok sessions root */ }
-  return best;
+  return [...sessions.values()].sort((a, b) => b.ts - a.ts);
+}
+
+function latestGrokSession(cwd) {
+  return grokSessions(cwd)[0] || null;
 }
 
 function readFirstLine(file, cap = 262144) {
@@ -1429,7 +1488,7 @@ function readFirstLine(file, cap = 262144) {
   }
 }
 
-// cwd -> latest codex session. Rollout files live under
+// cwd -> newest-first Codex sessions. Rollout files live under
 // ~/.codex/sessions/YYYY/MM/DD/rollout-<ts>-<uuid>.jsonl; the first line is a
 // session_meta record carrying the session id and cwd. Newest-first walk,
 // capped — old sessions aren't worth resuming from a "what's open now" scan.
@@ -1457,9 +1516,12 @@ function codexSessionIndex(fileCap = 400) {
       const meta = JSON.parse(readFirstLine(file));
       const p = meta && meta.type === 'session_meta' ? meta.payload : null;
       const id = p && (p.id || p.session_id);
-      if (!p || !p.cwd || !id || !/^[0-9a-f-]{16,}$/i.test(id)) continue;
-      if (!index.has(p.cwd)) {
-        index.set(p.cwd, { id, ts: Date.parse(meta.timestamp) || fs.statSync(file).mtimeMs });
+      if (!p || !p.cwd || !sanitizeResumeId(id)) continue;
+      const rows = index.get(p.cwd) || [];
+      if (!rows.some((row) => row.id === id)) {
+        rows.push({ id, ts: Date.parse(meta.timestamp) || fs.statSync(file).mtimeMs });
+        rows.sort((a, b) => b.ts - a.ts);
+        index.set(p.cwd, rows);
       }
     } catch { /* unreadable rollout */ }
   }
@@ -1510,7 +1572,7 @@ ipcMain.handle('detect-external', async () => {
     row.cwd = cwds.get(row.pid) || null;
     if (!row.cwd) continue;
     if (row.agent === 'claude') row.resume = latestClaudeSession(row.cwd);
-    else if (row.agent === 'codex') row.resume = codexIndex.get(row.cwd) || null;
+    else if (row.agent === 'codex') row.resume = (codexIndex.get(row.cwd) || [])[0] || null;
     else if (row.agent === 'grok') row.resume = latestGrokSession(row.cwd);
   }
 
