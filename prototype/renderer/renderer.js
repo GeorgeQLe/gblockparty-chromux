@@ -65,6 +65,7 @@ const state = {
   },
   lastCwd: null,
   contextMenu: null,
+  grokContextAction: null,
   updateStatus: null,
   detect: null, // last external-terminal scan
   detectQuery: '',
@@ -2198,6 +2199,24 @@ function closeSessionContextMenu() {
   state.contextMenu = null;
 }
 
+function closeGrokContextAdvisory() {
+  $('#modal-grok-advisory').classList.add('hidden');
+  $('#grok-context-enable').checked = false;
+  $('#grok-context-confirm').disabled = true;
+  state.grokContextAction = null;
+}
+
+function openGrokContextAdvisory(session, mode = 'other') {
+  state.grokContextAction = { sessionId: session.id, mode };
+  $('#grok-context-enable').checked = false;
+  $('#grok-context-confirm').disabled = true;
+  $('#grok-advisory-target').textContent = mode === 'same'
+    ? `Duplicate ${session.name} as a Grok Build session · ${session.cwd}`
+    : `Open ${session.name} in Grok Build · ${session.cwd}`;
+  $('#modal-grok-advisory').classList.remove('hidden');
+  $('#grok-context-enable').focus();
+}
+
 function openSessionContextMenu(session, x, y) {
   closeSessionContextMenu();
 
@@ -2206,12 +2225,20 @@ function openSessionContextMenu(session, x, y) {
   menu.style.left = `${x}px`;
   menu.style.top = `${y}px`;
 
-  const addItem = (label, detail, action, danger = false) => {
+  const addItem = (label, detail, action, danger = false, warning = false) => {
     const item = document.createElement('button');
-    item.className = 'session-menu-item' + (danger ? ' danger' : '');
+    item.className = 'session-menu-item' + (danger ? ' danger' : '') + (warning ? ' warning' : '');
     const text = document.createElement('span');
     text.className = 'smi-label';
-    text.textContent = label;
+    if (warning) {
+      const icon = document.createElement('span');
+      icon.className = 'smi-warning-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.textContent = '⚠';
+      text.append(icon, document.createTextNode(label));
+    } else {
+      text.textContent = label;
+    }
     const hint = document.createElement('span');
     hint.className = 'smi-detail';
     hint.textContent = detail;
@@ -2223,13 +2250,16 @@ function openSessionContextMenu(session, x, y) {
     menu.appendChild(item);
   };
 
+  const duplicatesGrok = session.agent === 'grok';
   addItem('Duplicate session', agentLabel(session.agent), () => {
-    duplicateSession(session, session.agent, 'same').catch(() => {});
-  });
+    if (duplicatesGrok) openGrokContextAdvisory(session, 'same');
+    else duplicateSession(session, session.agent, 'same').catch(() => {});
+  }, false, duplicatesGrok);
   for (const crossAgent of otherAgents(session.agent)) {
     addItem(`Open in ${agentLabel(crossAgent)}`, session.cwd, () => {
-      duplicateSession(session, crossAgent, 'other').catch(() => {});
-    });
+      if (crossAgent === 'grok') openGrokContextAdvisory(session, 'other');
+      else duplicateSession(session, crossAgent, 'other').catch(() => {});
+    }, false, crossAgent === 'grok');
   }
   addItem('Close session', session.name, () => closeSession(session.id), true);
 
@@ -3785,6 +3815,7 @@ async function autoRestoreWorkspace() {
 function openNewSessionModal() {
   $('#ns-name').value = `session-${state.counter + 1}`;
   $('#ns-cwd').value = state.lastCwd || (state.env ? state.env.home : '');
+  $('#ns-grok-enable').checked = false;
   renderAgentDataWarning();
   $('#modal-new').classList.remove('hidden');
   renderSavedProjects();
@@ -3883,19 +3914,35 @@ $('#ns-agent').addEventListener('click', (e) => {
 
 function renderAgentDataWarning() {
   const selected = $('#ns-agent .on');
-  $('#grok-data-warning').classList.toggle('hidden', !selected || selected.dataset.agent !== 'grok');
+  const grokSelected = Boolean(selected && selected.dataset.agent === 'grok');
+  $('#grok-data-warning').classList.toggle('hidden', !grokSelected);
+  if (!grokSelected) $('#ns-grok-enable').checked = false;
+  $('#ns-create').disabled = grokSelected && !$('#ns-grok-enable').checked;
 }
 
-$('#grok-data-warning').addEventListener('click', (e) => {
-  const link = e.target.closest('[data-security-resource]');
+document.addEventListener('click', (e) => {
+  const link = e.target.closest('.agent-data-warning [data-security-resource]');
   if (link) window.chromux.openSecurityResource(link.dataset.securityResource).catch(() => {});
 });
+
+$('#ns-grok-enable').addEventListener('change', renderAgentDataWarning);
+$('#grok-context-enable').addEventListener('change', (e) => {
+  $('#grok-context-confirm').disabled = !e.target.checked;
+});
+$('#grok-context-confirm').onclick = () => {
+  if (!$('#grok-context-enable').checked || !state.grokContextAction) return;
+  const source = state.sessions.get(state.grokContextAction.sessionId);
+  const mode = state.grokContextAction.mode;
+  closeGrokContextAdvisory();
+  if (source) duplicateSession(source, 'grok', mode).catch(() => {});
+};
 
 $('#ns-create').onclick = async () => {
   const name = $('#ns-name').value.trim() || `session-${state.counter + 1}`;
   let cwd = $('#ns-cwd').value.trim() || (state.env ? state.env.home : '~');
   if (cwd.startsWith('~')) cwd = (state.env ? state.env.home : '') + cwd.slice(1);
   const agent = $('#ns-agent .on').dataset.agent;
+  if (agent === 'grok' && !$('#ns-grok-enable').checked) return;
   $('#modal-new').classList.add('hidden');
   await createSession({ name, cwd, agent });
 };
@@ -3906,6 +3953,7 @@ document.querySelectorAll('[data-close]').forEach((btn) => {
     // Closing the modal drops only the compose context — the capture record
     // survives, so in-flight deliveries still resolve and stay attributable.
     if (btn.dataset.close === 'modal-capture') state.ui.captureModal = null;
+    if (btn.dataset.close === 'modal-grok-advisory') closeGrokContextAdvisory();
     invalidate('shortcutDebug');
   });
 });
@@ -4970,9 +5018,35 @@ if (window.chromuxTest) {
       btn.click();
     },
     visible: () => !$('#grok-data-warning').classList.contains('hidden'),
+    launchEnabled: () => !$('#ns-create').disabled,
+    acknowledgeNewSession(value = true) {
+      $('#ns-grok-enable').checked = value;
+      $('#ns-grok-enable').dispatchEvent(new Event('change', { bubbles: true }));
+    },
     text: () => $('#grok-data-warning').textContent.replace(/\s+/g, ' ').trim(),
     resources: () => [...$('#grok-data-warning').querySelectorAll('[data-security-resource]')]
       .map((button) => button.dataset.securityResource),
+    async openContextMenu(agent = 'codex') {
+      const sessionId = addFakeSession({ name: 'grok-context-source', cwd: '/tmp/grok-context-source', agent });
+      openSessionContextMenu(testSession(sessionId), 40, 40);
+    },
+    contextGrokLabel: () => [...document.querySelectorAll('.session-menu-item')]
+      .find((item) => item.textContent.toUpperCase().includes('OPEN IN GROK BUILD'))?.querySelector('.smi-label')?.textContent || '',
+    openContextAdvisory() {
+      const item = [...document.querySelectorAll('.session-menu-item')]
+        .find((candidate) => candidate.textContent.toUpperCase().includes('OPEN IN GROK BUILD'));
+      if (!item) throw new Error('Missing Grok Build context-menu action');
+      item.click();
+    },
+    contextAdvisoryVisible: () => !$('#modal-grok-advisory').classList.contains('hidden'),
+    contextText: () => $('#grok-context-warning').textContent.replace(/\s+/g, ' ').trim(),
+    contextConfirmEnabled: () => !$('#grok-context-confirm').disabled,
+    acknowledgeContext(value = true) {
+      $('#grok-context-enable').checked = value;
+      $('#grok-context-enable').dispatchEvent(new Event('change', { bubbles: true }));
+    },
+    confirmContext() { $('#grok-context-confirm').click(); },
+    sessionAgents: () => [...state.sessions.values()].map((session) => session.agent),
   };
 
   window.chromuxTestThemes = {

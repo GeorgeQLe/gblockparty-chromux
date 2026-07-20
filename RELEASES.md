@@ -1,5 +1,12 @@
 # Release Notes
 
+## GBlockParty Chromux v0.31.0
+
+Tag: `chromux-v0.31.0`
+
+- Mark the tab context-menu action for Grok Build with a warning triangle and show the full data-security advisory before opening it.
+- Require a fresh, explicit dangerous-action acknowledgement before Grok Build can launch from either the new-session modal or a tab context menu.
+
 ## GBlockParty Chromux v0.30.5
 
 Tag: `chromux-v0.30.5`

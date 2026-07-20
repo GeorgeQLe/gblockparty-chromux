@@ -6,6 +6,7 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Mark Grok Build actions in the tab context menu with a warning triangle, show the full advisory in a popup, and require a fresh explicit acknowledgement before new-session or context-menu Grok launches. _(source: user request; evidence: `prototype/renderer/index.html`, `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`, `prototype/scripts/test-grok-warning-renderer.js`, `prototype/docs/privacy-and-local-data.md`, `RELEASES.md`)_
 - [x] Add enabled-by-default, persisted tab activity indicators that show working spinners and completed checkmarks without replacing exit or attention-state lifecycle behavior. _(source: user request; evidence: `prototype/renderer/index.html`, `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`, `prototype/scripts/test-tab-activity-indicators-renderer.js`, `RELEASES.md`)_
 - [x] Keep the real focused xterm helper textarea visually transparent without changing xterm-managed geometry or input behavior, and verify scrollback across all eight theme appearances. _(source: user report; evidence: `prototype/renderer/styles.css`, `prototype/scripts/test-themes-renderer.js`, `RELEASES.md`)_
 - [x] Restore readable active terminal-tab text in Streak Dark and align the attention-queue heading with its empty-state card. _(source: user report; evidence: `prototype/renderer/styles.css`, `prototype/scripts/test-themes-renderer.js`, `RELEASES.md`)_

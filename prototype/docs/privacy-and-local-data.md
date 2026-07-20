@@ -140,9 +140,11 @@ codebase it can access.
 Before using Grok with proprietary, regulated, or sensitive code, review xAI's
 current data controls and consult a cybersecurity or data-security professional.
 
-Chromux displays this warning whenever Grok Build is selected for a new session.
-Chromux cannot verify, limit, or audit what the separately installed Grok CLI
-sends after launch.
+Chromux displays this warning whenever Grok Build is selected for a new session
+or opened from a tab context menu. Grok launch controls stay disabled until the
+user explicitly acknowledges the warning for that session; the acknowledgement
+is reset for the next Grok launch. Chromux cannot verify, limit, or audit what
+the separately installed Grok CLI sends after launch.
 
 Sources and current provider guidance:
 

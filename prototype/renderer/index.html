@@ -225,7 +225,7 @@
             <button data-agent="">SHELL ONLY</button>
           </div>
           <div id="grok-data-warning" class="agent-data-warning hidden" role="alert">
-            <strong>GROK / XAI DATA-SECURITY WARNING</strong>
+            <strong><span aria-hidden="true">⚠</span> GROK / XAI DATA-SECURITY WARNING</strong>
             <span>Grok Build may transmit codebase contents—including files, Git history, and secrets—to xAI-controlled infrastructure. Before using Grok with proprietary, regulated, or sensitive code, review xAI’s current data controls and consult a cybersecurity or data-security professional.</span>
             <span class="agent-data-warning-links">
               <button type="button" data-security-resource="wire-analysis">WIRE-LEVEL RESEARCH</button>
@@ -233,12 +233,47 @@
               <button type="button" data-security-resource="independent-report">INDEPENDENT REPORT</button>
               <button type="button" data-security-resource="xai-privacy">XAI DATA &amp; PRIVACY</button>
             </span>
+            <label class="grok-enable-control">
+              <input id="ns-grok-enable" type="checkbox">
+              <span>I understand this risk. Enable Grok Build for this session.</span>
+            </label>
           </div>
         </div>
       </div>
       <div class="modal-foot">
         <button class="btn" data-close="modal-new">CANCEL</button>
         <button id="ns-create" class="btn btn-amber">LAUNCH SESSION</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Grok Build advisory modal ══ -->
+  <div id="modal-grok-advisory" class="overlay hidden">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="grok-advisory-title">
+      <div class="modal-head">
+        <span id="grok-advisory-title" class="microlabel"><span aria-hidden="true">⚠</span> DANGEROUS ACTION — GROK BUILD</span>
+        <button class="modal-x" data-close="modal-grok-advisory" aria-label="Close Grok Build advisory">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="grok-context-warning" class="agent-data-warning" role="alert">
+          <strong><span aria-hidden="true">⚠</span> GROK / XAI DATA-SECURITY WARNING</strong>
+          <span>Grok Build may transmit codebase contents—including files, Git history, and secrets—to xAI-controlled infrastructure. Before using Grok with proprietary, regulated, or sensitive code, review xAI’s current data controls and consult a cybersecurity or data-security professional.</span>
+          <span class="agent-data-warning-links">
+            <button type="button" data-security-resource="wire-analysis">WIRE-LEVEL RESEARCH</button>
+            <button type="button" data-security-resource="reproduction-kit">REPRODUCTION KIT</button>
+            <button type="button" data-security-resource="independent-report">INDEPENDENT REPORT</button>
+            <button type="button" data-security-resource="xai-privacy">XAI DATA &amp; PRIVACY</button>
+          </span>
+        </div>
+        <div id="grok-advisory-target" class="grok-advisory-target"></div>
+        <label class="grok-enable-control">
+          <input id="grok-context-enable" type="checkbox">
+          <span>I understand this risk. Enable Grok Build for this session.</span>
+        </label>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" data-close="modal-grok-advisory">CANCEL</button>
+        <button id="grok-context-confirm" class="btn btn-red" disabled>ENABLE AND OPEN</button>
       </div>
     </div>
   </div>
