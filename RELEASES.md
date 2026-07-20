@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.33.2
+
+Tag: `chromux-v0.33.2`
+
+- Keep Streak attention cards and their `VIEW`/`DISMISS` hit-test rectangles fixed while hovered or pressed.
+- Preserve tactile action feedback with stable border depth, border-color changes, and inset shadows instead of geometric translation.
+- Cover boundary clicks with native Electron pointer input so background activation and dismissal complete on the first click.
+
 ## GBlockParty Chromux v0.33.1
 
 Tag: `chromux-v0.33.1`

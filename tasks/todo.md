@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Stabilize Streak attention-card and `VIEW`/`DISMISS` click targets so hover and active feedback cannot cancel a first boundary click, and ship the fix as v0.33.2. _(source: user-approved implementation plan; evidence: `prototype/renderer/styles.css`, `prototype/scripts/test-streak-attention-click-targets-renderer.js`, `prototype/scripts/test-themes-renderer.js`, `RELEASES.md`)_
+
 - [x] Reserve stable scrollbar clearance beneath session tabs across every theme without changing tab dimensions or terminal-stage positioning, and ship the fix as v0.33.1. _(source: user-approved implementation plan; evidence: `prototype/renderer/styles.css`, `prototype/scripts/test-tab-titles-renderer.js`, `RELEASES.md`)_
 
 - [x] Add and ship a host-wide Chromux resource broker with atomic FIFO leases, Codex MCP tools, cooperative Computer Use guidance, simulator capacity/admission and validated operations, a Resources UI, isolated per-session browser profiles, crash recovery, and parallel-client/browser verification as v0.33.0. _(source: user implementation plan; version advanced after the separately landed diagnostics feature claimed v0.32.0; evidence: `prototype/resource-broker/`, `prototype/renderer/`, `prototype/scripts/test-resource-*`, `prototype/scripts/test-browser-isolation-smoke.js`, `prototype/docs/resource-broker.md`, `RELEASES.md`)_

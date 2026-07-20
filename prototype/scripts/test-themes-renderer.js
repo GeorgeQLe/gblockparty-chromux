@@ -254,16 +254,29 @@ fs.writeFileSync(e2ePath, `
     .filter((rule) => rule.type === CSSRule.STYLE_RULE);
   const streakHoverRule = styleRules.find((rule) => rule.selectorText?.includes('.top-btn:not(:disabled):hover'));
   const streakPressRule = styleRules.find((rule) => rule.selectorText?.includes('.top-btn:not(:disabled):active'));
+  const streakQueueHoverRule = styleRules.find((rule) => rule.selectorText === 'body[data-theme="streak"] .qi-btn:not(:disabled):hover');
+  const streakQueuePressRule = styleRules.find((rule) => rule.selectorText === 'body[data-theme="streak"] .qi-btn:not(:disabled):active');
+  const streakAttentionHoverRule = styleRules.find((rule) => rule.selectorText === 'body[data-theme="streak"] .attention-item:hover');
   expect(streakHoverRule?.style.transform === 'translateY(1px)', 'streak buttons should move halfway down on hover');
   expect(streakHoverRule?.style.borderBottomWidth === '3px', 'streak buttons should retain half their tactile edge on hover');
   expect(streakPressRule?.style.transform === 'translateY(2px)', 'streak buttons should move fully down while pressed');
   expect(streakPressRule?.style.borderBottomWidth === '2px', 'streak buttons should flatten their tactile edge while pressed');
-  for (const selector of ['.qi-btn:not(:disabled):hover', '.session-tab:not(:disabled):hover', '.theme-card:not(:disabled):hover']) {
+  for (const selector of ['.session-tab:not(:disabled):hover', '.theme-card:not(:disabled):hover']) {
     expect(streakHoverRule?.selectorText.includes(selector), selector + ' should share the streak half-press interaction');
   }
-  for (const selector of ['.qi-btn:not(:disabled):active', '.session-tab:not(:disabled):active', '.theme-card:not(:disabled):active']) {
+  for (const selector of ['.session-tab:not(:disabled):active', '.theme-card:not(:disabled):active']) {
     expect(streakPressRule?.selectorText.includes(selector), selector + ' should share the streak press interaction');
   }
+  expect(!streakHoverRule?.selectorText.includes('.qi-btn'), 'streak queue buttons should not share hover translation');
+  expect(!streakPressRule?.selectorText.includes('.qi-btn'), 'streak queue buttons should not share active translation');
+  expect(streakQueueHoverRule?.style.transform === '', 'streak queue-button hover should not transform its hit target');
+  expect(streakQueueHoverRule?.style.borderBottomWidth === '', 'streak queue-button hover should preserve border geometry');
+  expect(streakQueueHoverRule?.style.boxShadow.includes('inset'), 'streak queue-button hover should retain tactile inset depth');
+  expect(streakQueuePressRule?.style.transform === '', 'streak queue-button active state should not transform its hit target');
+  expect(streakQueuePressRule?.style.borderBottomWidth === '', 'streak queue-button active state should preserve border geometry');
+  expect(streakQueuePressRule?.style.boxShadow.includes('inset'), 'streak queue-button active state should retain tactile inset depth');
+  expect(streakAttentionHoverRule?.style.transform === '', 'streak attention-card hover should not transform its hit target');
+  expect(streakAttentionHoverRule?.style.borderColor !== '', 'streak attention-card hover should retain border feedback');
   expectContrast(document.querySelector('#settings-theme-current'), 'streak current-theme badge');
   expectContrast(fixtures.querySelector('.session-tab.active'), 'streak active session tab');
   expectContrast(fixtures.querySelector('.q-badge'), 'streak queue badge');

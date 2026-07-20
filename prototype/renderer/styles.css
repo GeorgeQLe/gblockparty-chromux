@@ -1708,21 +1708,32 @@ body[data-theme="streak"] .qi-btn {
   border: 2px solid var(--line-hi); border-bottom-width: 4px; border-radius: 12px; background: #fff; color: var(--dim);
   transition: transform .1s ease, border-bottom-width .1s ease, filter .1s ease;
 }
+body[data-theme="streak"] .qi-btn {
+  box-shadow: inset 0 -2px 0 rgba(111, 125, 103, .16);
+  transition: border-color .1s ease, box-shadow .1s ease, filter .1s ease;
+}
 body[data-theme="streak"] .top-btn { height: 32px; }
 body[data-theme="streak"] .top-btn:not(:disabled):hover,
 body[data-theme="streak"] .btn:not(:disabled):hover,
 body[data-theme="streak"] .head-btn:not(:disabled):hover,
 body[data-theme="streak"] .nav-btn:not(:disabled):hover,
-body[data-theme="streak"] .qi-btn:not(:disabled):hover,
 body[data-theme="streak"] .session-tab:not(:disabled):hover,
 body[data-theme="streak"] .theme-card:not(:disabled):hover { transform: translateY(1px); border-bottom-width: 3px; }
 body[data-theme="streak"] .top-btn:not(:disabled):active,
 body[data-theme="streak"] .btn:not(:disabled):active,
 body[data-theme="streak"] .head-btn:not(:disabled):active,
 body[data-theme="streak"] .nav-btn:not(:disabled):active,
-body[data-theme="streak"] .qi-btn:not(:disabled):active,
 body[data-theme="streak"] .session-tab:not(:disabled):active,
 body[data-theme="streak"] .theme-card:not(:disabled):active { transform: translateY(2px); border-bottom-width: 2px; transition-duration: .05s; }
+body[data-theme="streak"] .qi-btn:not(:disabled):hover {
+  border-color: #9faf94;
+  box-shadow: inset 0 -1px 0 rgba(111, 125, 103, .18);
+}
+body[data-theme="streak"] .qi-btn:not(:disabled):active {
+  border-color: #87977c;
+  box-shadow: inset 0 2px 3px rgba(111, 125, 103, .2);
+  transition-duration: .05s;
+}
 body[data-theme="streak"] .btn-amber,
 body[data-theme="streak"] .head-btn.armed { border-color: #d87600; background: var(--amber); color: var(--on-amber); }
 body[data-theme="streak"] #rail { width: 248px; border-right: 2px solid var(--line); background: transparent; padding: 12px 10px; gap: 8px; }
@@ -1735,7 +1746,8 @@ body[data-theme="streak"] .settings-status,
 body[data-theme="streak"] .settings-command {
   border: 2px solid var(--line); border-bottom-width: 4px; border-radius: 16px; background: #fff;
 }
-body[data-theme="streak"] .attention-item:hover { transform: translateY(-2px); }
+body[data-theme="streak"] .attention-item { transition: border-color .1s ease; }
+body[data-theme="streak"] .attention-item:hover { border-color: var(--line-hi); }
 body[data-theme="streak"] .rail-foot { border: 2px solid var(--line); border-radius: 14px; background: #fff; }
 body[data-theme="streak"] #session-tabs { height: 57px; gap: 8px; padding: 8px 12px 4px; border: 0; background: transparent; }
 body[data-theme="streak"] .session-tab { height: 36px; border: 2px solid var(--line); border-bottom-width: 4px; border-radius: 999px; background: #fff; transition: transform .1s ease, border-bottom-width .1s ease; }
