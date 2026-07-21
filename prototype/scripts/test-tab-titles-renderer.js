@@ -164,21 +164,35 @@ fs.writeFileSync(e2ePath, `
   const themes = window.chromuxTestThemes;
   expect(themes, 'missing theme test API');
   const expectedStripHeights = {
-    blueprint: 45,
-    'retro-os': 45,
-    streak: 57,
-    'liquid-glass': 53,
+    blueprint: 51,
+    'retro-os': 51,
+    streak: 59,
+    'liquid-glass': 52,
   };
   const geometry = () => {
     const stripRect = sessionTabs.getBoundingClientRect();
     const listRect = tabList.getBoundingClientRect();
+    const stripStyle = getComputedStyle(sessionTabs);
     const tabBottom = Math.max(...[...tabList.children].map((tab) => tab.getBoundingClientRect().bottom));
+    const scrollbarHeight = 9;
+    const scrollbarTop = listRect.bottom - scrollbarHeight;
+    const stripContentBottom = stripRect.bottom - parseFloat(stripStyle.borderBottomWidth || '0');
     return {
       stripHeight: stripRect.height,
       stageTop: stage.getBoundingClientRect().top,
-      clearance: listRect.bottom - tabBottom,
+      upperScrollbarGap: scrollbarTop - tabBottom,
+      lowerScrollbarGap: stripContentBottom - listRect.bottom,
       overflows: tabList.scrollWidth > tabList.clientWidth,
     };
+  };
+
+  const expectCenteredScrollbar = (theme, state, measurements) => {
+    expect(Math.abs(measurements.upperScrollbarGap - 3) <= 1,
+      theme + ' scrollbar should have a 3px upper gap ' + state
+        + '; got ' + measurements.upperScrollbarGap);
+    expect(Math.abs(measurements.lowerScrollbarGap - 3) <= 1,
+      theme + ' scrollbar should have a 3px lower gap ' + state
+        + '; got ' + measurements.lowerScrollbarGap);
   };
 
   for (const [theme, expectedStripHeight] of Object.entries(expectedStripHeights)) {
@@ -190,16 +204,14 @@ fs.writeFileSync(e2ePath, `
     expect(!before.overflows, theme + ' tab list should begin without horizontal overflow');
     expect(Math.abs(before.stripHeight - expectedStripHeight) < 1,
       theme + ' tab strip should reserve the expected scrollbar zone');
-    expect(before.clearance >= 9,
-      theme + ' tabs should leave at least 9px below their bounds without overflow; got ' + before.clearance);
+    expectCenteredScrollbar(theme, 'before overflow', before);
 
     workspace.style.flex = '0 0 400px';
     workspace.style.width = '400px';
     await tick();
     const during = geometry();
     expect(during.overflows, theme + ' tab list should overflow horizontally at the forced narrow width');
-    expect(during.clearance >= 9,
-      theme + ' scrollbar should remain below tab bounds during overflow; got ' + during.clearance);
+    expectCenteredScrollbar(theme, 'during overflow', during);
     expect(Math.abs(during.stripHeight - before.stripHeight) < 1,
       theme + ' tab strip height should not change when overflow appears');
     expect(Math.abs(during.stageTop - before.stageTop) < 1,
@@ -210,8 +222,7 @@ fs.writeFileSync(e2ePath, `
     await tick();
     const after = geometry();
     expect(!after.overflows, theme + ' tab list should stop overflowing after width is restored');
-    expect(Math.abs(after.clearance - before.clearance) < 1,
-      theme + ' reserved clearance should remain stable after overflow disappears');
+    expectCenteredScrollbar(theme, 'after overflow', after);
     expect(Math.abs(after.stripHeight - before.stripHeight) < 1,
       theme + ' tab strip height should remain stable after overflow disappears');
     expect(Math.abs(after.stageTop - before.stageTop) < 1,

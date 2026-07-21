@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.36.1
+
+Tag: `chromux-v0.36.1`
+
+- Vertically center the 9px horizontal session scrollbar with approximately 3px of visible clearance above and below it across every theme.
+- Keep the scrollbar lane permanently reserved so tab-strip and terminal geometry remain stable as horizontal overflow appears and disappears.
+- Preserve session-tab heights, sticky search/add actions, horizontal scrolling behavior, and all vertical scrollbar styling.
+
 ## GBlockParty Chromux v0.36.0
 
 Tag: `chromux-v0.36.0`

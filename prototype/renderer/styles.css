@@ -306,10 +306,11 @@ body {
 .rail-status.live::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
 
 #session-tabs {
-  height: 45px;
+  height: 51px;
   flex: none;
   display: flex;
   align-items: stretch;
+  padding-bottom: 3px;
   border-bottom: 1px solid var(--line);
   background: linear-gradient(180deg, var(--bg1), var(--bg0));
   min-width: 0;
@@ -381,7 +382,7 @@ body {
   gap: 6px;
   overflow-x: auto;
   overflow-y: hidden;
-  padding-bottom: 9px;
+  padding-bottom: 12px;
 }
 
 #tab-actions {
@@ -1860,7 +1861,7 @@ body[data-theme="retro-os"] .theme-card.active { outline: 1px solid #1c1c1c; out
 body[data-theme="retro-os"] .btn-amber { color: var(--text); }
 body[data-theme="retro-os"] .gauge { border: 1px solid #7d7d7d; background: #ddd; padding: 3px 7px; box-shadow: inset 1px 1px #fff; }
 body[data-theme="retro-os"] .gdot { border: 1px solid #1c1c1c; box-shadow: inset 1px 1px rgba(255,255,255,.7); }
-body[data-theme="retro-os"] .session-tab { margin: 0 3px 10px; border: 1px solid #1c1c1c; background: #bbb; box-shadow: inset 1px 1px #fff; }
+body[data-theme="retro-os"] .session-tab { margin: 0 3px; border: 1px solid #1c1c1c; background: #bbb; box-shadow: inset 1px 1px #fff; }
 body[data-theme="retro-os"] #tab-actions .session-tab { margin: 0; }
 body[data-theme="retro-os"] .session-tab.active { background: #fff; box-shadow: inset 1px 1px #fff, inset -1px -1px #777; }
 body[data-theme="retro-os"] .attention-item,
@@ -1961,7 +1962,7 @@ body[data-theme="streak"] .settings-command {
 body[data-theme="streak"] .attention-item { transition: border-color .1s ease; }
 body[data-theme="streak"] .attention-item:hover { border-color: var(--line-hi); }
 body[data-theme="streak"] .rail-foot { border: 2px solid var(--line); border-radius: 14px; background: #fff; }
-body[data-theme="streak"] #session-tabs { height: 57px; gap: 8px; padding: 8px 12px 4px; border: 0; background: transparent; }
+body[data-theme="streak"] #session-tabs { height: 59px; gap: 8px; padding: 8px 12px 3px; border: 0; background: transparent; }
 body[data-theme="streak"] .session-tab { height: 36px; border: 2px solid var(--line); border-bottom-width: 4px; border-radius: 999px; background: #fff; transition: transform .1s ease, border-bottom-width .1s ease; }
 body[data-theme="streak"] .session-tab.active { border-color: #3da600; background: var(--green); color: var(--on-green); }
 body[data-theme="streak"] #stage { margin: 0 12px 10px; border: 2px solid var(--line); border-bottom-width: 5px; border-radius: 20px; overflow: hidden; background: #fff; }
@@ -2034,7 +2035,7 @@ body[data-theme="liquid-glass"] .drawer {
   overflow: hidden;
 }
 body[data-theme="liquid-glass"] #rail { width: 240px; border-right-color: rgba(96,118,150,.18); }
-body[data-theme="liquid-glass"] #session-tabs { height: 53px; gap: 6px; padding: 7px; border: 0; background: transparent; }
+body[data-theme="liquid-glass"] #session-tabs { height: 52px; gap: 6px; padding: 7px 7px 3px; border: 0; background: transparent; }
 body[data-theme="liquid-glass"] .session-tab { height: 30px; border: 1px solid rgba(255,255,255,.82); border-radius: 10px; background: rgba(255,255,255,.32); }
 body[data-theme="liquid-glass"] .session-tab.active { background: rgba(255,255,255,.82); box-shadow: 0 10px 22px -16px #26344c, inset 0 1px #fff; }
 body[data-theme="liquid-glass"] #stage { margin: 0 7px 7px; border: 1px solid rgba(255,255,255,.82); border-radius: 13px; overflow: hidden; background: rgba(255,255,255,.34); }
