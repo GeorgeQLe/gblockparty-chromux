@@ -153,8 +153,10 @@ See [privacy-and-local-data.md](privacy-and-local-data.md) for the complete loca
 Use the rail's **Attention** icon for actionable items and unseen background completions. Opening a completed
 session removes only that completion from Attention; its tab and Threads/Git row remain Completed. Permission,
 authentication, input, rate-limit, and tool-failure items are not cleared by opening their session. The
-**Threads** view groups exact working directories, while **Git** resolves repository roots and uses a final
-**Not a Git repository** group. New attention changes the Attention badge but does not switch your rail view.
+**Threads** groups live sessions by exact working directory. **Git Changes** resolves the repositories used
+by live sessions and tracks their staged, unstaged, untracked, renamed, and conflicted files. Clean working
+trees remain visible as clean; non-repository sessions are omitted. New attention changes the Attention badge
+but does not switch your rail view.
 
 Chromux regenerates its classifier and installed hook files at startup. New v2
 events are authenticated to one PTY; copied terminal output, callbacks from a

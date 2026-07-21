@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('chromux', {
   projectsReplace: (records) => ipcRenderer.invoke('projects-replace', records),
   projectConfig: (cwd) => ipcRenderer.invoke('project-config', cwd),
   gitRoot: (cwd) => ipcRenderer.invoke('git-root', cwd),
+  gitDiffSummary: (cwd) => ipcRenderer.invoke('git-diff-summary', cwd),
   resourcesList: () => ipcRenderer.invoke('resources-list'),
   resourcesCancel: (requestId) => ipcRenderer.invoke('resources-cancel', requestId),
   resourcesForceRelease: (leaseId) => ipcRenderer.invoke('resources-force-release', leaseId),

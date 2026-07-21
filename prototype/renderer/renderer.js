@@ -69,6 +69,7 @@ const state = {
     tabActivityIndicators: storedTabActivityIndicators(),
     railMode: storedRailMode(),
     gitRoots: new Map(), // exact cwd -> { value: string|null|undefined, promise }
+    gitDiffs: new Map(), // repository root -> { value: summary|null|undefined, promise }
     railExpanded: new Map(),
     captureModal: null, // { captureId, pngBase64, payloadBase } while composing/delivering
     dirty: new Set(),
@@ -2959,7 +2960,8 @@ function renderAttentionQueue() {
   const items = attentionItems();
   renderRailNavigation(items.length);
   if (state.ui.railMode !== 'attention') {
-    renderGroupedSessionRail(host, state.ui.railMode);
+    if (state.ui.railMode === 'git') renderGitDiffRail(host);
+    else renderGroupedSessionRail(host, state.ui.railMode);
     return;
   }
   if (items.length === 0) {
@@ -3016,7 +3018,7 @@ function renderAttentionQueue() {
 function renderRailNavigation(attentionCount) {
   const mode = RAIL_MODES.has(state.ui.railMode) ? state.ui.railMode : 'attention';
   const heading = $('#rail-heading');
-  if (heading) heading.textContent = mode === 'git' ? 'GIT' : mode.toUpperCase();
+  if (heading) heading.textContent = mode === 'git' ? 'GIT CHANGES' : mode.toUpperCase();
   const count = $('#rail-attention-count');
   if (count) {
     count.textContent = String(attentionCount);
@@ -3064,6 +3066,89 @@ function ensureGitRoot(cwd) {
     .finally(() => invalidate('attention'));
   state.ui.gitRoots.set(cwd, entry);
   return entry;
+}
+
+function loadGitDiff(root, { force = false } = {}) {
+  const current = state.ui.gitDiffs.get(root);
+  if (current && !force) return current;
+  if (current && current.pending) return current;
+  const entry = { value: force && current ? current.value : undefined, promise: null, pending: true };
+  entry.promise = Promise.resolve(window.chromux.gitDiffSummary(root))
+    .then((summary) => { entry.value = summary && Array.isArray(summary.files) ? summary : null; })
+    .catch(() => { entry.value = null; })
+    .finally(() => { entry.pending = false; invalidate('attention'); });
+  state.ui.gitDiffs.set(root, entry);
+  return entry;
+}
+
+function gitFileStatus(file) {
+  if (file.index === '?' && file.worktree === '?') return { code: '?', label: 'Untracked', kind: 'untracked' };
+  if (file.index === 'U' || file.worktree === 'U' || (file.index === 'A' && file.worktree === 'A')) {
+    return { code: '!', label: 'Conflict', kind: 'conflict' };
+  }
+  const code = file.worktree !== ' ' ? file.worktree : file.index;
+  const labels = { A: 'Added', C: 'Copied', D: 'Deleted', M: 'Modified', R: 'Renamed', T: 'Type changed' };
+  return { code, label: labels[code] || 'Changed', kind: code === 'A' ? 'added' : code === 'D' ? 'deleted' : 'modified' };
+}
+
+function renderGitDiffRail(host) {
+  const live = orderedSessions().filter((session) => session.lifecycle && session.lifecycle.alive);
+  const roots = new Map();
+  let pending = false;
+  for (const session of live) {
+    const entry = ensureGitRoot(session.cwd || '~');
+    if (entry.value === undefined) pending = true;
+    else if (entry.value) roots.set(entry.value, entry.value);
+  }
+  if (roots.size === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'attention-empty';
+    empty.textContent = pending ? 'Resolving Git repositories…' : 'No Git repositories in live sessions.';
+    host.appendChild(empty);
+    return;
+  }
+  for (const root of [...roots.keys()].sort((a, b) => a.localeCompare(b))) {
+    const entry = loadGitDiff(root);
+    const details = document.createElement('details');
+    details.className = 'rail-group git-diff-group';
+    details.dataset.groupKey = `git:${root}`;
+    details.open = state.ui.railExpanded.get(`git:${root}`) !== false;
+    details.addEventListener('toggle', () => state.ui.railExpanded.set(`git:${root}`, details.open));
+    const summary = document.createElement('summary');
+    summary.title = root;
+    const label = document.createElement('span'); label.className = 'rail-group-label'; label.textContent = directoryBasename(root);
+    const count = document.createElement('span'); count.className = 'rail-group-count';
+    count.textContent = entry.value === undefined ? '…' : String(entry.value?.totals?.files || 0);
+    summary.append(label, count);
+    const rows = document.createElement('div'); rows.className = 'rail-group-rows';
+    if (entry.value === undefined) {
+      const message = document.createElement('div'); message.className = 'git-diff-empty'; message.textContent = 'Scanning changes…'; rows.appendChild(message);
+    } else if (!entry.value) {
+      const message = document.createElement('div'); message.className = 'git-diff-empty error'; message.textContent = 'Could not read Git changes.'; rows.appendChild(message);
+    } else if (entry.value.files.length === 0) {
+      const message = document.createElement('div'); message.className = 'git-diff-empty clean'; message.textContent = 'Working tree clean'; rows.appendChild(message);
+    } else {
+      const totals = document.createElement('div');
+      totals.className = 'git-diff-totals';
+      totals.textContent = `${entry.value.totals.staged} staged · ${entry.value.totals.unstaged} unstaged`;
+      rows.appendChild(totals);
+      for (const file of entry.value.files) {
+        const status = gitFileStatus(file);
+        const row = document.createElement('div');
+        row.className = 'git-diff-row';
+        row.title = file.originalPath ? `${file.originalPath} → ${file.path}` : file.path;
+        row.setAttribute('aria-label', `${status.label}: ${file.path}`);
+        const badge = document.createElement('span'); badge.className = `git-diff-status ${status.kind}`; badge.textContent = status.code; badge.title = status.label;
+        const name = document.createElement('span'); name.className = 'git-diff-path'; name.textContent = file.path;
+        const staged = document.createElement('span'); staged.className = 'git-diff-stage'; staged.textContent = ![' ', '?'].includes(file.index) ? 'S' : '';
+        staged.title = staged.textContent ? 'Has staged changes' : '';
+        row.append(badge, name, staged);
+        rows.appendChild(row);
+      }
+    }
+    details.append(summary, rows);
+    host.appendChild(details);
+  }
 }
 
 function groupedRailSessions(mode) {
@@ -5006,7 +5091,20 @@ if (window.chromuxTest) {
     async waitForGit() {
       await Promise.all([...state.ui.gitRoots.values()].map((entry) => entry.promise));
       flushRender();
+      await Promise.all([...state.ui.gitDiffs.values()].map((entry) => entry.promise));
+      flushRender();
     },
+    gitDiffs: () => [...document.querySelectorAll('#attention-list .git-diff-group')].map((group) => ({
+      title: group.querySelector('summary')?.title || '',
+      count: Number(group.querySelector('.rail-group-count')?.textContent || 0),
+      totals: group.querySelector('.git-diff-totals')?.textContent || '',
+      clean: Boolean(group.querySelector('.git-diff-empty.clean')),
+      files: [...group.querySelectorAll('.git-diff-row')].map((row) => ({
+        path: row.querySelector('.git-diff-path')?.textContent || '',
+        status: row.querySelector('.git-diff-status')?.title || '',
+        staged: row.querySelector('.git-diff-stage')?.textContent === 'S',
+      })),
+    })),
     flushRender,
   };
 
@@ -5982,6 +6080,11 @@ setInterval(() => {
 setInterval(() => {
   if (state.env && state.env.devMode) invalidate('diagnostics');
 }, 1000);
+
+setInterval(() => {
+  if (state.ui.railMode !== 'git') return;
+  for (const root of state.ui.gitDiffs.keys()) loadGitDiff(root, { force: true });
+}, 2000);
 
 // boot
 (async () => {

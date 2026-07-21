@@ -60,9 +60,10 @@ The `--dev-mode` and `--no-dev-mode` flags take precedence over the saved prefer
 The left rail has three persisted icon views while the horizontal tabs remain the primary navigator.
 **Attention** shows actionable items and unseen background completions; opening a completed session marks
 that completion seen without changing its completed tab status. **Threads** groups live sessions by exact
-working directory. **Git** groups them by repository root and puts remaining sessions in **Not a Git
-repository**. Rail rows show Action required, Working, Completed, or Live status and activate the matching
-session. New attention updates the badge without switching the selected rail view.
+working directory. **Git Changes** tracks the working-copy diffs in repositories used by live sessions,
+showing each changed file, its status, whether it has staged changes, and repository-level staged/unstaged
+totals. It refreshes automatically while selected. New attention updates the badge without switching the
+selected rail view.
 
 ### Host resources and parallel agents
 

@@ -304,6 +304,37 @@ body {
 .rail-status.working { border: 2px solid color-mix(in srgb, var(--cyan) 28%, transparent); border-top-color: var(--cyan); border-radius: 50%; animation: tabWorkingSpin .8s linear infinite; }
 .rail-status.completed { color: var(--green); }
 .rail-status.live::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+.git-diff-totals, .git-diff-empty {
+  min-height: 28px;
+  padding: 7px 8px;
+  color: var(--faint);
+  font-size: 9px;
+  letter-spacing: .03em;
+}
+.git-diff-empty.clean { color: var(--green); }
+.git-diff-empty.error { color: var(--red); }
+.git-diff-totals { border-bottom: 1px solid var(--line); text-transform: uppercase; }
+.git-diff-row {
+  min-height: 30px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.git-diff-row:last-child { border-bottom: 0; }
+.git-diff-status {
+  width: 16px;
+  flex: none;
+  text-align: center;
+  color: var(--amber);
+  font: 800 10px/1 var(--font-display);
+}
+.git-diff-status.added { color: var(--green); }
+.git-diff-status.deleted, .git-diff-status.conflict { color: var(--red); }
+.git-diff-status.untracked { color: var(--cyan); }
+.git-diff-path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.git-diff-stage { width: 10px; flex: none; color: var(--green); font: 800 9px/1 var(--font-display); }
 
 #session-tabs {
   height: 51px;

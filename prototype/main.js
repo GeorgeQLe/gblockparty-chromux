@@ -1253,6 +1253,40 @@ async function gitRoot(cwd) {
   } catch { return null; }
 }
 
+async function gitDiffSummary(cwd) {
+  const root = await gitRoot(cwd);
+  if (!root) return null;
+  const output = await new Promise((resolve) => {
+    execFile('/usr/bin/git', [
+      '-C', root, 'status', '--porcelain=v1', '-z', '--untracked-files=all',
+    ], { timeout: 5000, maxBuffer: 8 * 1024 * 1024 }, (err, stdout) => resolve(err ? null : String(stdout)));
+  });
+  if (output === null) return null;
+  const fields = output.split('\0');
+  const files = [];
+  for (let i = 0; i < fields.length; i += 1) {
+    const field = fields[i];
+    if (!field || field.length < 4) continue;
+    const index = field[0];
+    const worktree = field[1];
+    const filePath = field.slice(3);
+    if (!filePath) continue;
+    const renamed = index === 'R' || index === 'C' || worktree === 'R' || worktree === 'C';
+    const originalPath = renamed ? (fields[++i] || null) : null;
+    files.push({ path: filePath, originalPath, index, worktree });
+  }
+  return {
+    root,
+    files,
+    totals: {
+      files: files.length,
+      staged: files.filter((file) => ![' ', '?'].includes(file.index)).length,
+      unstaged: files.filter((file) => file.worktree !== ' ').length,
+      untracked: files.filter((file) => file.index === '?' && file.worktree === '?').length,
+    },
+  };
+}
+
 async function listTtyProcesses() {
   const out = await runCmd('/bin/ps', ['-axo', 'pid=,ppid=,tty=,etime=,command=']);
   const procs = [];
@@ -1732,6 +1766,7 @@ ipcMain.handle('projects-read', () => readProjects());
 ipcMain.handle('projects-replace', (_e, records) => replaceProjects(records));
 ipcMain.handle('project-config', (_e, cwd) => packageProjectConfig(cwd));
 ipcMain.handle('git-root', (_e, cwd) => gitRoot(cwd));
+ipcMain.handle('git-diff-summary', (_e, cwd) => gitDiffSummary(cwd));
 
 ipcMain.handle('check-updates', (_e, opts = {}) => getUpdateStatus(opts));
 

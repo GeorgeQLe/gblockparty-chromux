@@ -17,6 +17,10 @@ const e2eOutPath = path.join(tmpDir, 'e2e.out');
 
 for (const directory of [homeDir, repoAppDir, repoApiDir, looseDir]) fs.mkdirSync(directory, { recursive: true });
 execFileSync('/usr/bin/git', ['init', '-q', repoDir]);
+fs.writeFileSync(path.join(repoDir, 'tracked.txt'), 'staged\n');
+execFileSync('/usr/bin/git', ['-C', repoDir, 'add', 'tracked.txt']);
+fs.appendFileSync(path.join(repoDir, 'tracked.txt'), 'unstaged\n');
+fs.writeFileSync(path.join(repoAppDir, 'new-file.js'), 'export default true;\n');
 const canonicalRepoDir = fs.realpathSync(repoDir);
 
 fs.writeFileSync(e2ePath, `
@@ -92,17 +96,19 @@ fs.writeFileSync(e2ePath, `
 
   rail.select('git');
   await rail.waitForGit();
+  expect(rail.heading() === 'GIT CHANGES', 'Git should identify itself as a change tracker');
   expect(await rail.resolveGitRoot('relative/path') === null, 'gitRoot should reject relative cwd values');
   expect(await rail.resolveGitRoot('x'.repeat(5000)) === null, 'gitRoot should reject oversized cwd values');
   expect(await rail.resolveGitRoot(${JSON.stringify(looseDir)}) === null, 'gitRoot should return null outside a repository');
   expect(rail.gitCacheSize() === 3, 'renderer should cache Git lookup once per exact cwd');
-  const gitGroups = rail.groups();
-  const repoGroup = gitGroups.find((group) => group.title === ${JSON.stringify(canonicalRepoDir)});
-  expect(repoGroup && repoGroup.label === 'fleet-repo' && repoGroup.count === 3,
-    'Git should combine sessions under the exact repository root');
-  expect(gitGroups.at(-1).label === 'Not a Git repository' && gitGroups.at(-1).count === 1,
-    'non-Git sessions should appear in the final fallback group');
-  expect(repoGroup.rows.every((row) => row.ariaLabel.includes(row.status)), 'Git rows need accessible status labels');
+  const gitDiffs = rail.gitDiffs();
+  const repoDiff = gitDiffs.find((group) => group.title === ${JSON.stringify(canonicalRepoDir)});
+  expect(repoDiff && repoDiff.count === 2, 'Git should count changed files rather than sessions');
+  expect(repoDiff.files.some((file) => file.path === 'tracked.txt' && file.status === 'Modified' && file.staged),
+    'Git should expose staged and unstaged state for a tracked file');
+  expect(repoDiff.files.some((file) => file.path === 'apps/web/new-file.js' && file.status === 'Untracked'),
+    'Git should expose untracked files relative to the repository');
+  expect(repoDiff.totals === '1 staged · 2 unstaged', 'Git should summarize staged and unstaged diff counts');
 
   const themes = window.chromuxTestThemes;
   for (const theme of themes.ids()) {
@@ -120,11 +126,11 @@ fs.writeFileSync(e2ePath, `
   }
 
   rail.exit(webTwo, 0);
-  expect(rail.groups().find((group) => group.title === ${JSON.stringify(canonicalRepoDir)}).count === 2,
-    'exited sessions should leave grouped rails immediately');
+  expect(rail.gitDiffs().find((group) => group.title === ${JSON.stringify(canonicalRepoDir)}).count === 2,
+    'Git diff counts should not mirror the number of live sessions');
   expect(rail.mode() === 'git', 'incoming attention and status changes must not auto-switch rail mode');
 
-  return JSON.stringify({ ok: true, threadGroups, gitGroups: rail.groups(), nav });
+  return JSON.stringify({ ok: true, threadGroups, gitDiffs: rail.gitDiffs(), nav });
 })()
 `);
 

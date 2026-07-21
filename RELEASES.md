@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.37.0
+
+Tag: `chromux-v0.37.0`
+
+- Replace the Git session hierarchy with a dedicated working-copy diff tracker grouped only at the repository level.
+- Show changed file paths and statuses, staged markers, and repository staged/unstaged totals, including untracked and conflicted files.
+- Refresh Git changes automatically while the rail view is selected, while keeping Threads responsible for session navigation by working directory.
+
 ## GBlockParty Chromux v0.36.1
 
 Tag: `chromux-v0.36.1`
