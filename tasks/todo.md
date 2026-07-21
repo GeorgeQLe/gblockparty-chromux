@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Replace the toolbar collapse control with a permanent 40px paired-browser side rail labeled BROWSER / COLLAPSE, preserving state, shortcuts, reopening paths, narrow-toolbar access, and ship as v0.40.0. _(source: user-approved implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`, `prototype/scripts/test-browser-collapse-renderer.js`, `prototype/README.md`, `RELEASES.md`)_
+
 - [x] Preserve each tab's exact runtime terminal viewport through activation and every fit path without breaking inactive output, bottom following, alternate-screen applications, or skip-to-bottom behavior; ship as v0.39.1. _(source: user-approved implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-terminal-scroll-bottom-renderer.js`, `RELEASES.md`)_
 
 - [x] Add a read-only live terminal preview popover for inactive Threads rows, linked active-row confirmation cues, fully opaque theme-specific surfaces, accessibility/lifecycle coverage, and v0.39.0 release. _(source: user-approved implementation plan and in-session opacity/padding/readability corrections; evidence: `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`, `prototype/scripts/test-session-rail-renderer.js`, `prototype/README.md`, `RELEASES.md`)_

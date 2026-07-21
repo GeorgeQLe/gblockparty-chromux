@@ -49,7 +49,7 @@ Chromux never auto-opens a detected preview. Every localhost / loopback / local 
 
 Use QUEUE to open the next preview intentionally. Command-J reveals and focuses the next queued OPEN button without opening it. If a page seems stale, check whether the updated URL is waiting in QUEUE.
 
-New sessions start with the paired browser shut so the terminal owns the workspace. Use the browser rail's RESTORE control (or Command-Shift-B) to open it, and COLLAPSE / Command-Shift-B again to shut it. Toggle does not clear URL, queue, or capture state.
+New sessions start with the paired browser shut so the terminal owns the workspace. Use the browser rail's BROWSER control (or Command-Shift-B) to open it, and COLLAPSE / Command-Shift-B again to shut it. Toggle does not clear URL, queue, or capture state.
 
 ## Favorites
 

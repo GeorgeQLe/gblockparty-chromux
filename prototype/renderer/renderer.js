@@ -1682,6 +1682,30 @@ function refitTerminal(session) {
   requestAnimationFrame(() => session.term.fit());
 }
 
+function renderBrowserRailToggle(button, collapsed) {
+  const label = document.createElement('span');
+  label.className = 'browser-rail-label';
+  label.textContent = collapsed ? 'BROWSER' : 'COLLAPSE';
+
+  if (!collapsed) {
+    button.replaceChildren(label);
+    return;
+  }
+
+  const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  icon.classList.add('panel-open-icon');
+  icon.setAttribute('viewBox', '0 0 16 16');
+  icon.setAttribute('fill', 'none');
+  icon.setAttribute('stroke', 'currentColor');
+  icon.setAttribute('stroke-width', '1.5');
+  icon.setAttribute('stroke-linecap', 'round');
+  icon.setAttribute('stroke-linejoin', 'round');
+  icon.setAttribute('aria-hidden', 'true');
+  icon.setAttribute('focusable', 'false');
+  icon.innerHTML = '<rect x="1.75" y="2.25" width="12.5" height="11.5" rx="1.25"></rect><path d="M6 2.5v11"></path><path d="m10.5 5-3 3 3 3"></path>';
+  button.replaceChildren(icon, label);
+}
+
 function applyBrowserLayout(session) {
   if (!session.els) return;
   const collapsed = Boolean(session.browser.collapsed);
@@ -1694,9 +1718,7 @@ function applyBrowserLayout(session) {
   } else {
     session.els.view.style.gridTemplateColumns = session.browser.expandedGridTemplate;
   }
-  // Labels read as open/shut for the paired browser while keeping familiar
-  // COLLAPSE/RESTORE button text used by docs and muscle memory.
-  session.els.collapseBtn.textContent = collapsed ? 'RESTORE' : 'COLLAPSE';
+  renderBrowserRailToggle(session.els.collapseBtn, collapsed);
   session.els.collapseBtn.title = collapsed
     ? 'Open paired browser (⌘⇧B)'
     : 'Shut paired browser (⌘⇧B)';
@@ -2429,6 +2451,8 @@ function buildSessionView(session) {
   // browser pane
   const webPane = document.createElement('div');
   webPane.className = 'pane web-pane';
+  const browserContent = document.createElement('div');
+  browserContent.className = 'browser-content';
   const webHead = document.createElement('div');
   webHead.className = 'pane-head';
   const webLabel = document.createElement('span');
@@ -2440,10 +2464,10 @@ function buildSessionView(session) {
   const back = document.createElement('button'); back.className = 'nav-btn'; back.textContent = '‹'; back.title = 'Back';
   const reload = document.createElement('button'); reload.className = 'nav-btn'; reload.textContent = '⟳'; reload.title = 'Reload';
   const collapseBtn = document.createElement('button');
-  collapseBtn.className = 'head-btn collapse-btn';
-  collapseBtn.textContent = 'RESTORE';
+  collapseBtn.className = 'head-btn browser-rail-toggle collapse-btn';
   collapseBtn.title = 'Open paired browser (⌘⇧B)';
   collapseBtn.setAttribute('aria-label', 'Open paired browser (⌘⇧B)');
+  renderBrowserRailToggle(collapseBtn, true);
   const urlBar = document.createElement('input');
   urlBar.className = 'url-bar'; urlBar.type = 'text'; urlBar.spellcheck = false;
   urlBar.placeholder = 'awaiting preview — or type a URL and hit ⏎';
@@ -2478,7 +2502,7 @@ function buildSessionView(session) {
   captureBtn.className = 'head-btn'; captureBtn.textContent = '⚡ CAPTURE'; captureBtn.disabled = true;
   captureBtn.title = 'Capture page (console + screenshot + URL) without picking an element';
 
-  browserToolbar.append(back, reload, urlBar, favoriteBtn, consoleChip, captureChip, queueBtn, favoritesBtn, pickBtn, captureBtn, collapseBtn);
+  browserToolbar.append(back, reload, urlBar, favoriteBtn, consoleChip, captureChip, queueBtn, favoritesBtn, pickBtn, captureBtn);
   webHead.append(webLabel, browserToolbar);
 
   const queuePanel = document.createElement('div');
@@ -2512,7 +2536,11 @@ function buildSessionView(session) {
   refreshFlash.textContent = 'AUTO-REFRESHED';
   webHost.append(placeholder, refreshFlash);
 
-  webPane.append(webHead, queuePanel, favoritesPanel, webHost);
+  const browserRail = document.createElement('div');
+  browserRail.className = 'browser-rail';
+  browserRail.appendChild(collapseBtn);
+  browserContent.append(webHead, queuePanel, favoritesPanel, webHost);
+  webPane.append(browserContent, browserRail);
   view.append(termPane, divider, webPane);
   $('#views').appendChild(view);
 
@@ -2565,7 +2593,7 @@ function buildSessionView(session) {
   return {
     view, termLabel, termHost, scrollToBottom, urlBar, favoriteBtn, favoritesBtn, favoritesBadge, favoritesPanel, favoritesList, queueBtn, queueBadge, queuePanel, queueList,
     consoleChip, captureChip, pickBtn, captureBtn, webHost, placeholder, refreshFlash,
-    divider, webPane, browserToolbar, collapseBtn,
+    divider, webPane, browserContent, browserRail, browserToolbar, collapseBtn,
   };
 }
 
@@ -6253,7 +6281,8 @@ if (window.chromuxTest) {
       flushRender();
     },
     scrollCaptureIntoView(id) {
-      testSession(id).els.captureBtn.scrollIntoView({ block: 'nearest', inline: 'end' });
+      const session = testSession(id);
+      session.els.browserToolbar.scrollLeft = session.els.browserToolbar.scrollWidth;
       flushRender();
     },
     state(id) {
@@ -6262,6 +6291,9 @@ if (window.chromuxTest) {
       const toolbarStyle = getComputedStyle(toolbar);
       const toolbarRect = toolbar.getBoundingClientRect();
       const captureRect = session.els.captureBtn.getBoundingClientRect();
+      const webPaneRect = session.els.webPane.getBoundingClientRect();
+      const railRect = session.els.browserRail.getBoundingClientRect();
+      const openIcon = session.els.collapseBtn.querySelector('.panel-open-icon');
       return {
         active: state.activeId === id,
         collapsed: session.browser.collapsed,
@@ -6271,6 +6303,14 @@ if (window.chromuxTest) {
         dividerDisabled: session.els.divider.classList.contains('disabled'),
         collapseText: session.els.collapseBtn.textContent,
         collapseTitle: session.els.collapseBtn.title,
+        collapseAriaLabel: session.els.collapseBtn.getAttribute('aria-label'),
+        railWidth: Math.round(railRect.width),
+        railAtFarRight: Math.abs(railRect.right - webPaneRect.right) <= 1,
+        railAfterContent: session.els.webPane.firstElementChild === session.els.browserContent
+          && session.els.browserContent.nextElementSibling === session.els.browserRail,
+        toggleInToolbar: toolbar.contains(session.els.collapseBtn),
+        openIconPresent: Boolean(openIcon),
+        openIconAriaHidden: Boolean(openIcon && openIcon.getAttribute('aria-hidden') === 'true'),
         currentUrl: session.browser.currentUrl,
         urlBar: session.els.urlBar.value,
         queueCount: session.browser.queue.length,
@@ -6278,6 +6318,7 @@ if (window.chromuxTest) {
         fitCount: session._fitCount(),
         toolbarOverflow: toolbar.scrollWidth > toolbar.clientWidth,
         toolbarScrollbarWidth: toolbarStyle.getPropertyValue('scrollbar-width'),
+        toolbarLastControl: toolbar.lastElementChild ? toolbar.lastElementChild.textContent : '',
         captureReachable: captureRect.right <= toolbarRect.right + 1 && captureRect.left >= toolbarRect.left - 1,
       };
     },

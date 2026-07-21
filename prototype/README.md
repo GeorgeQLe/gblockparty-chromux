@@ -92,7 +92,7 @@ Open **RESOURCES** to inspect host-wide owners, FIFO queues, lease expiry, wait 
    Chromux queues it in the badged **QUEUE** — nothing auto-opens. Approve with queue
    **OPEN**, click a terminal link, or type a URL in the browser bar and hit ⏎.
    Opening a URL also restores a shut browser. New sessions start with the paired browser
-   shut; use **RESTORE** / **COLLAPSE** or `Command+Shift+B` to open/shut it. Re-emitting
+   shut; use **BROWSER** / **COLLAPSE** or `Command+Shift+B` to open/shut it. Re-emitting
    the same already-open URL auto-refreshes the pane (throttled). Popups queue too.
 ### Saved projects
 

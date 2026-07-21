@@ -36,16 +36,24 @@ fs.writeFileSync(e2ePath, `
   b.focus(firstId);
   let first = b.state(firstId);
   expect(first.collapsed, 'new sessions should start with the paired browser shut');
-  expect(first.collapseText === 'RESTORE', 'shut browser rail should expose RESTORE (open)');
+  expect(first.collapseText === 'BROWSER', 'shut browser rail should expose BROWSER (open)');
   expect(first.collapseTitle === 'Open paired browser (⌘⇧B)', 'shut browser title should say open: ' + first.collapseTitle);
-  expect(first.grid.includes('40px'), 'new session should start on the narrow restore rail, got ' + first.grid);
+  expect(first.collapseAriaLabel === first.collapseTitle, 'shut browser rail should expose its open action accessibly');
+  expect(first.grid.includes('40px'), 'new session should start on the 40px browser rail, got ' + first.grid);
+  expect(first.railWidth === 40, 'browser rail should remain exactly 40px wide, got ' + first.railWidth);
+  expect(first.railAtFarRight, "browser rail should be the pane's far-right child");
+  expect(first.railAfterContent, 'browser content and rail should be siblings with the rail last');
+  expect(!first.toggleInToolbar, 'browser toggle should not live in the scrolling toolbar');
+  expect(first.openIconPresent, 'shut browser rail should include the panel-open icon');
+  expect(first.openIconAriaHidden, 'panel-open icon should be hidden from assistive technology');
 
   b.restore(firstId);
-  b.narrow(firstId, 245);
+  b.narrow(firstId, 285);
   first = b.state(firstId);
   expect(!first.collapsed, 'restore should open the paired browser for narrow toolbar checks');
   expect(first.toolbarOverflow, 'narrow browser toolbar should horizontally overflow');
   expect(first.toolbarScrollbarWidth === 'none', 'browser toolbar scrollbar should be hidden, got ' + first.toolbarScrollbarWidth);
+  expect(first.toolbarLastControl === '⚡ CAPTURE', "Capture should be the toolbar's final control, got " + first.toolbarLastControl);
   b.scrollCaptureIntoView(firstId);
   await tick();
   first = b.state(firstId);
@@ -58,9 +66,12 @@ fs.writeFileSync(e2ePath, `
   expect(first.webCollapsed, 'collapse should apply collapsed web pane class');
   expect(first.webHostHidden, 'collapse should hide browser content area without clearing state');
   expect(first.dividerDisabled, 'divider should be disabled while browser is collapsed');
-  expect(first.grid.includes('40px'), 'collapsed grid should leave a narrow restore rail, got ' + first.grid);
-  expect(first.collapseText === 'RESTORE', 'collapsed rail should expose restore button');
-  expect(first.collapseTitle === 'Open paired browser (⌘⇧B)', 'restore button should have open title');
+  expect(first.grid.includes('40px'), 'collapsed grid should leave a 40px browser rail, got ' + first.grid);
+  expect(first.railWidth === 40, 'collapsed browser rail should remain exactly 40px wide');
+  expect(first.collapseText === 'BROWSER', 'collapsed rail should expose browser button');
+  expect(first.collapseTitle === 'Open paired browser (⌘⇧B)', 'browser button should have open title');
+  expect(first.collapseAriaLabel === first.collapseTitle, 'browser button should retain its accessible open name');
+  expect(first.openIconPresent && first.openIconAriaHidden, 'collapsed rail should retain its decorative panel-open icon');
   expect(first.currentUrl === 'http://localhost:5173/current', 'collapse must preserve current URL');
   expect(first.urlBar === 'http://localhost:5173/current', 'collapse must preserve URL bar');
   expect(first.queueCount === 1, 'collapse must preserve queue state');
@@ -80,9 +91,12 @@ fs.writeFileSync(e2ePath, `
   expect(!first.webCollapsed, 'restore should show web pane');
   expect(!first.webHostHidden, 'restore should show browser content area');
   expect(!first.dividerDisabled, 'restore should re-enable divider');
-  expect(first.grid.includes('245px'), 'restore should keep the previous split width, got ' + first.grid);
+  expect(first.grid.includes('285px'), 'restore should keep the previous split width, got ' + first.grid);
   expect(first.collapseText === 'COLLAPSE', 'open browser should expose COLLAPSE (shut) button');
   expect(first.collapseTitle === 'Shut paired browser (⌘⇧B)', 'open browser title should say shut');
+  expect(first.collapseAriaLabel === first.collapseTitle, 'open browser rail should expose its shut action accessibly');
+  expect(first.railWidth === 40 && first.railAtFarRight, 'open browser rail should stay 40px at the far-right edge');
+  expect(!first.openIconPresent, 'open-state COLLAPSE rail should not show the panel-open icon');
   expect(first.currentUrl === 'http://localhost:5173/current', 'restore must preserve current URL');
   expect(first.queueCount === 1, 'restore must preserve queue state');
 

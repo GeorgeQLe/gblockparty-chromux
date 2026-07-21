@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.40.0
+
+Tag: `chromux-v0.40.0`
+
+- Replace the browser-toolbar collapse control with a permanent 40px rail at the paired pane's far-right edge in both open and shut states.
+- Label the shut-state rail `BROWSER` with a decorative left-opening panel icon, while retaining accessible open/shut names and `COLLAPSE` in the open state.
+- Preserve per-session browser state, saved split width, divider behavior, terminal refitting, URL-driven and terminal-link reopening, Command+Shift+B, and narrow-toolbar access through Capture.
+
 ## GBlockParty Chromux v0.39.1
 
 Tag: `chromux-v0.39.1`

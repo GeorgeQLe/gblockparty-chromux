@@ -876,7 +876,43 @@ body.dragging webview { pointer-events: none; }
 
 /* ── browser pane ─────────────────────────────────────────────────────── */
 
-.web-pane { position: relative; background: var(--bg1); border-left: 1px solid var(--line); }
+.web-pane {
+  position: relative;
+  flex-direction: row;
+  background: var(--bg1);
+  border-left: 1px solid var(--line);
+}
+.browser-content {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.browser-rail {
+  flex: 0 0 40px;
+  width: 40px;
+  min-width: 40px;
+  min-height: 0;
+  border-left: 1px solid var(--line-hi);
+  background: linear-gradient(180deg, var(--bg2), var(--bg1));
+}
+.browser-rail-toggle {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 8px 0;
+  border: 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: 9px;
+}
+.browser-rail-label {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+.panel-open-icon { width: 16px; height: 16px; flex: none; }
 
 .browser-toolbar {
   flex: 1 1 auto;
@@ -933,43 +969,15 @@ body.dragging webview { pointer-events: none; }
 .head-btn.armed { color: var(--on-amber); background: var(--amber); border-color: var(--amber); box-shadow: var(--glow-amber); }
 .head-btn.attention { color: var(--amber); border-color: var(--amber); }
 .head-btn:disabled { opacity: 0.35; cursor: default; }
-.collapse-btn { min-width: 86px; justify-content: center; }
-
 .web-pane.collapsed {
   min-width: 0;
   border-left-color: var(--line-hi);
 }
-.web-pane.collapsed .pane-head {
-  height: 100%;
-  flex-direction: column;
-  justify-content: center;
-  gap: 10px;
-  padding: 6px 0;
-}
-.web-pane.collapsed .pane-label,
+.web-pane.collapsed .browser-content,
 .web-pane.collapsed .queue-panel,
 .web-pane.collapsed .favorites-panel,
 .web-pane.collapsed .web-host {
   display: none;
-}
-.web-pane.collapsed .browser-toolbar {
-  flex: none;
-  width: 100%;
-  height: 100%;
-  justify-content: center;
-  overflow: hidden;
-}
-.web-pane.collapsed .browser-toolbar > :not(.collapse-btn) {
-  display: none;
-}
-.web-pane.collapsed .collapse-btn {
-  min-width: 0;
-  width: 24px;
-  height: auto;
-  min-height: 92px;
-  padding: 8px 0;
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
 }
 
 .q-badge {
@@ -2365,6 +2373,17 @@ body[data-theme="liquid-glass"][data-theme-mode="dark"] .thread-terminal-preview
 body[data-theme="liquid-glass"][data-theme-mode="dark"] .thread-preview-header,
 body[data-theme="liquid-glass"][data-theme-mode="dark"] .thread-preview-footer { background: #28364e; }
 body[data-theme="liquid-glass"][data-theme-mode="dark"] .thread-preview-viewport { background: #111827; }
+
+/* The browser rail is structural chrome, so theme button press treatments must
+   not shift it away from the pane edge or change its 40px geometry. */
+.browser-rail .browser-rail-toggle,
+.browser-rail .browser-rail-toggle:not(:disabled):hover,
+.browser-rail .browser-rail-toggle:not(:disabled):active {
+  border: 0;
+  border-radius: 0;
+  transform: none;
+  box-shadow: none;
+}
 
 @media (max-width: 720px) {
   .theme-grid { grid-template-columns: 1fr; }
