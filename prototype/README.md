@@ -58,8 +58,9 @@ The `--dev-mode` and `--no-dev-mode` flags take precedence over the saved prefer
 ### Session rail
 
 The left rail has three persisted icon views while the horizontal tabs remain the primary navigator.
-**Attention** shows actionable items and unseen background completions; opening a completed session marks
-that completion seen without changing its completed tab status. **Threads** groups live sessions by exact
+**Attention** shows actionable items and unseen background completions; opening or dismissing a completion
+consumes it to a quiet Idle state, while completions already visible in the active session become Idle
+immediately. **Threads** groups live sessions by exact
 working directory. Click an inactive Threads row to inspect a live, read-only terminal preview without
 changing sessions; click anywhere in the preview (or press Enter/Space) to open that session, and press
 Escape or click outside to close it. Clicking the already-active Threads row confirms the connection with

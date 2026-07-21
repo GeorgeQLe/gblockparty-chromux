@@ -87,17 +87,15 @@ fs.writeFileSync(e2ePath, `
   expect(itemsFor('COMPLETED', 'codex-done').length === 1, 'Codex notify completion creates completed attention');
   sig.focus(codexDone);
   expect(itemsFor('COMPLETED', 'codex-done').length === 0, 'focused completed Codex session is display-hidden');
-  expect(sig.turnState(codexDone).state === 'completed', 'VIEW/focus must not clear completed state');
+  expect(sig.turnState(codexDone).state === 'idle', 'VIEW/focus must consume completed state to idle');
   expect(sig.turnState(codexDone).acknowledged === false, 'VIEW/focus must not acknowledge completion');
-  expect(sig.turnState(codexDone).attentionSeenAt >= sig.turnState(codexDone).since,
-    'VIEW/focus should record completion as seen separately from dismissal');
   sig.focus(holder);
-  expect(itemsFor('COMPLETED', 'codex-done').length === 0, 'seen Codex completion stays hidden after blur');
+  expect(itemsFor('COMPLETED', 'codex-done').length === 0, 'idle Codex completion stays hidden after blur');
   sig.feedPtyChunk(codexDone, osc('turn-start', codexDone) + osc('turn-end', codexDone));
   expect(itemsFor('COMPLETED', 'codex-done').length === 1, 'subsequent turn creates a new unseen completion');
   sig.dismissItem('COMPLETED', 'codex-done');
-  expect(sig.turnState(codexDone).state === 'completed', 'DISMISS keeps completed state');
-  expect(sig.turnState(codexDone).acknowledged === true, 'DISMISS acknowledges completed row');
+  expect(sig.turnState(codexDone).state === 'idle', 'DISMISS consumes completed state to idle');
+  expect(sig.turnState(codexDone).acknowledged === false, 'idle is distinct from acknowledgement');
   expect(itemsFor('COMPLETED', 'codex-done').length === 0, 'dismissed completed row stays hidden');
 
   const codexIdleUnknown = sig.addFakeSession({ name: 'codex-idle-unknown', agent: 'codex' });
@@ -107,11 +105,13 @@ fs.writeFileSync(e2ePath, `
   expect(itemsFor('COMPLETED', 'codex-idle-unknown').length === 0,
     'Codex idle/rate-limit output from unknown must not create attention');
 
-  const codexSubmit = sig.addFakeSession({ name: 'codex-submit', agent: 'codex' });
+  const codexSubmit = sig.addTerminalSession({ name: 'codex-submit', agent: 'codex' });
+  sig.focus(holder);
   sig.typeInput(codexSubmit, 'implement this\\r');
   expect(sig.turnState(codexSubmit).state === 'working', 'Codex submitted line from unknown should infer working');
   expect(itemsFor('COMPLETED', 'codex-submit').length === 0, 'Codex submitted line should not create completed attention');
   sig.feedPtyChunk(codexSubmit, 'Choose an option:\\r\\n1. Wait until the rate limit resets\\r\\n› ');
+  await wait(30); sig.flushRender();
   expect(sig.turnState(codexSubmit).state === 'completed',
     'Codex rate-limit chooser from working should complete the turn');
   expect(itemsFor('COMPLETED', 'codex-submit').length === 1,
@@ -122,12 +122,14 @@ fs.writeFileSync(e2ePath, `
   sig.focus(holder);
   expect(itemsFor('COMPLETED', 'codex-submit').length === 0,
     'seen fallback-completed Codex row stays hidden after blur');
+  expect(sig.turnState(codexSubmit).state === 'idle', 'viewed fallback completion should become idle');
   sig.typeInput(codexSubmit, 'next task\\r');
   expect(sig.turnState(codexSubmit).state === 'working', 'new Codex input after fallback completion returns to working');
   expect(itemsFor('COMPLETED', 'codex-submit').length === 0,
     'new Codex input clears fallback completed attention');
 
-  const codexV2Recovery = sig.addFakeSession({ name: 'codex-v2-recovery', agent: 'codex' });
+  const codexV2Recovery = sig.addTerminalSession({ name: 'codex-v2-recovery', agent: 'codex' });
+  sig.focus(holder);
   sig.setSignalToken(codexV2Recovery, 'codex-secret');
   sig.typeInput(codexV2Recovery, 'first turn\\r');
   const codexBase = { v: 2, sessionId: codexV2Recovery, token: 'codex-secret', agent: 'codex',
@@ -145,14 +147,43 @@ fs.writeFileSync(e2ePath, `
     'new turn must retain the accepted session event sequence');
   expect(sig.turnState(codexV2Recovery).eventIds.includes('codex-event-1'),
     'new turn must retain session event deduplication history');
-  sig.feedPtyChunk(codexV2Recovery, '\\x1b[?25l\\x1b[2K\\r\\x1b[38;5;245m');
+  sig.feedPtyChunk(codexV2Recovery, '\\x1b[?25l\\x1b[2K\\r\\x1b[38;5;245m? for shortcuts\\r\\n');
   expect(sig.turnState(codexV2Recovery).state === 'working',
     'partial ANSI-rich idle redraw must not complete early');
   sig.feedPtyChunk(codexV2Recovery, '\\x1b[0m\\x1b[?25h\\u203a ');
+  await wait(30); sig.flushRender();
   expect(sig.turnState(codexV2Recovery).state === 'completed',
     'chunk-split ANSI-rich Codex composer redraw should recover missed completion');
   expect(itemsFor('COMPLETED', 'codex-v2-recovery').length === 1,
     'recovered second turn should project the existing completed attention state');
+  expect(sig.turnState(codexV2Recovery).source === 'codex:terminal-idle'
+    && sig.turnState(codexV2Recovery).confidence === 'low',
+    'rendered-composer recovery should retain low-confidence diagnostics');
+
+  const alternateFooter = sig.addTerminalSession({ name: 'codex-alt-footer', agent: 'codex' });
+  sig.focus(holder);
+  sig.typeInput(alternateFooter, 'alternate footer\\r');
+  sig.feedPtyChunk(alternateFooter, '\\u203a \\x1b[s\\r\\n? for shortcuts\\x1b[u');
+  await wait(30); sig.flushRender();
+  expect(sig.turnState(alternateFooter).state === 'completed',
+    'Codex footer rendered below a saved composer cursor should recover completion');
+
+  const falseGlyph = sig.addTerminalSession({ name: 'codex-false-glyph', agent: 'codex' });
+  sig.focus(holder);
+  sig.typeInput(falseGlyph, 'keep running\\r');
+  sig.feedPtyChunk(falseGlyph, '\\r\\n\\u203a ');
+  await wait(30); sig.flushRender();
+  expect(sig.turnState(falseGlyph).state === 'working',
+    'ordinary output ending in a prompt glyph without Codex chrome must not complete');
+
+  const staleComposer = sig.addTerminalSession({ name: 'codex-stale-composer', agent: 'codex' });
+  sig.focus(holder);
+  sig.typeInput(staleComposer, 'first request\\r');
+  sig.feedPtyChunk(staleComposer, '? for shortcuts\\r\\n\\u203a ');
+  sig.typeInput(staleComposer, 'second request\\r');
+  await wait(30); sig.flushRender();
+  expect(sig.turnState(staleComposer).state === 'working',
+    'a prior turn composer callback must not complete newly submitted input');
 
   const activeCodex = sig.addFakeSession({ name: 'codex-active', agent: 'codex' });
   sig.typeInput(activeCodex, 'keep working\\r');
@@ -183,7 +214,7 @@ fs.writeFileSync(e2ePath, `
   const idleCodex = sig.addFakeSession({ name: 'codex-idle-inputs', agent: 'codex' });
   for (const [label, input] of idleInputs) {
     sig.typeInput(a, input);
-    expect(sig.turnState(a).state === 'completed', label + ' must leave a completed turn idle');
+    expect(sig.turnState(a).state === 'completed', label + ' must preserve an unseen completed turn');
     expect(itemsFor('COMPLETED', 'claude-a').length === 1,
       label + ' must preserve completed attention');
     sig.typeInput(idleCodex, input);
@@ -197,6 +228,8 @@ fs.writeFileSync(e2ePath, `
   sig.typeInput(a, 'y\\r');
   expect(sig.turnState(a).state === 'working', 'submitted user input after completed → working');
   expect(itemsFor('COMPLETED', 'claude-a').length === 0, 'COMPLETED item gone after typing');
+  sig.typeInput(codexDone, 'resume from idle\\r');
+  expect(sig.turnState(codexDone).state === 'working', 'submitted user input after idle → working');
   sig.feedPtyChunk(a, 'done! all set.\\r\\n');
   expect(sig.turnState(a).state === 'working', 'stale phrases must not resurrect completion');
   expect(itemsFor('COMPLETED', 'claude-a').length === 0, 'no resurrection in the queue either');

@@ -117,9 +117,11 @@ fs.writeFileSync(e2ePath, `
   rail.previewKey('Enter');
   await wait(40);
   expect(rail.activeId() === web && !rail.preview(), 'Enter on preview should activate the session and close the preview');
-  expect(rail.turnState(web).attentionSeenAt >= rail.turnState(web).since, 'opening completed session should record seen timestamp');
+  expect(rail.turnState(web).state === 'idle', 'opening completed session should consume it to idle');
 
   rail.select('threads');
+  const consumedWeb = rail.groups().flatMap((group) => group.rows).find((row) => row.id === web);
+  expect(consumedWeb && consumedWeb.status === 'Idle', 'consumed completion should render Idle in Threads');
   rail.clickRow(web);
   await wait(40);
   expect(!rail.preview(), 'clicking the already-active row should skip preview');
@@ -145,6 +147,7 @@ fs.writeFileSync(e2ePath, `
   rail.focus(api);
   rail.emit(api, 'turn-start');
   rail.emit(api, 'turn-end');
+  expect(rail.turnState(api).state === 'idle', 'active completion should transition directly to idle');
   rail.focus(holder);
   expect(rail.attentionKinds().filter((kind) => kind === 'COMPLETED').length === 1,
     'completion in active session should never appear later');

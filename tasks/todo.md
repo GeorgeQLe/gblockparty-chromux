@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Add an explicit idle turn state, preserve unseen completion attention until consumption, recover missed Codex completion notifications from the rendered composer, make diagnostics rail-aware, and ship as v0.41.0. _(source: user-approved implementation plan; evidence: `prototype/renderer/attention.js`, `prototype/renderer/renderer.js`, `prototype/scripts/test-turn-signals-renderer.js`, `prototype/scripts/test-attention-diagnostics-renderer.js`, `RELEASES.md`)_
+
 - [x] Replace the toolbar collapse control with a permanent 40px paired-browser side rail labeled BROWSER / COLLAPSE, preserving state, shortcuts, reopening paths, narrow-toolbar access, and ship as v0.40.0. _(source: user-approved implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`, `prototype/scripts/test-browser-collapse-renderer.js`, `prototype/README.md`, `RELEASES.md`)_
 
 - [x] Preserve each tab's exact runtime terminal viewport through activation and every fit path without breaking inactive output, bottom following, alternate-screen applications, or skip-to-bottom behavior; ship as v0.39.1. _(source: user-approved implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-terminal-scroll-bottom-renderer.js`, `RELEASES.md`)_

@@ -40,7 +40,8 @@ fs.writeFileSync(e2ePath, `
 
   tabs.emitSignal(active, 'turn-end');
   tabs.emitSignal(background, 'turn-end');
-  expect(tabs.state(active).indicator === 'completed', 'active completed turn should show checkmark');
+  expect(tabs.state(active).indicator === 'idle', 'active completed turn should transition directly to idle');
+  expect(tabs.state(active).ariaLabel.includes('Agent idle'), 'idle status should be accessible on the tab');
   expect(tabs.state(background).indicator === 'completed', 'background completed turn should show checkmark');
   expect(tabs.state(background).title.includes('Turn completed'), 'completed status should appear in tooltip');
 
@@ -75,12 +76,14 @@ fs.writeFileSync(e2ePath, `
 
   tabs.setActivityPreference(true);
   expect(tabs.activityPreferenceStored() === 'true', 'enabled preference should persist');
-  expect(tabs.state(active).indicator === 'completed', 're-enabled setting should restore completed state');
+  expect(tabs.state(active).indicator === 'idle', 're-enabled setting should restore idle state');
   expect(tabs.state(background).indicator === 'working', 're-enabled setting should restore working state');
 
   tabs.exit(background, 7);
   expect(tabs.state(background).indicator === 'dead', 'exited session should override working state');
   expect(tabs.state(background).ariaLabel.includes('Session exited'), 'exit status should be accessible');
+  tabs.exit(active, 0);
+  expect(tabs.state(active).indicator === 'dead', 'exited session should override idle state');
 
   return JSON.stringify({ ok: true, active: tabs.state(active), background: tabs.state(background) });
 })()

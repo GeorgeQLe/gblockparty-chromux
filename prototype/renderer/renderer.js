@@ -877,6 +877,7 @@ function apply(event) {
         );
         if (tabStateChanged && session.id === state.activeId && session.turn.state === 'completed') {
           session.turn.attentionSeenAt = Math.max(session.turn.attentionSeenAt || 0, session.turn.since || 0);
+          window.chromuxAttention.consumeCompletedTurn(session.turn, Date.now());
         }
       }
       break;
@@ -898,11 +899,10 @@ function apply(event) {
       }
       break;
     case 'session-focused':
-      // Display-only: never touches turn state, so looking at a completed
-      // session cannot regress the update queue.
       state.activeId = event.sessionId;
       if (session && session.turn.state === 'completed') {
         session.turn.attentionSeenAt = Math.max(session.turn.attentionSeenAt || 0, session.turn.since || 0);
+        tabStateChanged = window.chromuxAttention.consumeCompletedTurn(session.turn, Date.now());
       }
       break;
     case 'session-adopted':
@@ -913,7 +913,11 @@ function apply(event) {
       }
       break;
     case 'attention-dismissed':
-      if (session) session.turn.acknowledged = true;
+      if (session && session.turn.state === 'completed') {
+        tabStateChanged = window.chromuxAttention.consumeCompletedTurn(session.turn, Date.now());
+      } else if (session) {
+        session.turn.acknowledged = true;
+      }
       break;
     case 'preview-queued':
       if (session) {
@@ -1065,15 +1069,15 @@ function newSessionShape({ id, name, cwd, agent }) {
     capabilities,
     lifecycle: { alive: true, exitCode: null, exitedAt: null, resumeLaunch: null },
     turn: {
-      state: 'unknown', // 'unknown' | 'working' | 'needsInput' | 'completed'
+      state: 'unknown', // 'unknown' | 'working' | 'idle' | 'needsInput' | 'completed'
       instrumented: false, // true once a deterministic signal has arrived
       detail: null,
       since: 0,
-      acknowledged: false, // explicit DISMISS — hides the item, keeps the state
-      attentionSeenAt: 0, // opening a completed session hides only that completion
+      acknowledged: false, // explicit DISMISS for actionable non-completion states
+      attentionSeenAt: 0, // retained for diagnostic history across completion consumption
       token: null, protocol: null, authoritative: false, hasV2: false, inputAt: 0, reason: null,
       source: null, confidence: null, turnId: null, eventId: null,
-      eventIds: [], sequence: -1, stopped: false, authoritativeAt: 0, outputBuf: '',
+      eventIds: [], sequence: -1, stopped: false, authoritativeAt: 0,
     },
     browser: {
       webview: null, webContentsId: null, currentUrl: null, lastReload: 0,
@@ -2647,6 +2651,9 @@ function sessionTabIndicator(session) {
   if (state.ui.tabActivityIndicators && session.turn.state === 'completed') {
     return { kind: 'completed', status: 'Turn completed' };
   }
+  if (state.ui.tabActivityIndicators && session.turn.state === 'idle') {
+    return { kind: 'idle', status: 'Agent idle' };
+  }
   return { kind: 'live', status: 'Session live' };
 }
 
@@ -2881,7 +2888,7 @@ function diagnosticGroup(label, cells) {
 
 function actualTabIndicator(session) {
   if (!session.els || !session.els.dot) return 'missing';
-  return ['dead', 'working', 'completed', 'live'].find((kind) => session.els.dot.classList.contains(kind)) || 'unknown';
+  return ['dead', 'working', 'completed', 'idle', 'live'].find((kind) => session.els.dot.classList.contains(kind)) || 'unknown';
 }
 
 function renderDeveloperDiagnostics() {
@@ -2918,8 +2925,12 @@ function renderDeveloperDiagnostics() {
     updateQueue: state.updateQueue, updateStatus: state.updateStatus,
     activityIndicators: state.ui.tabActivityIndicators,
   });
-  const actualKinds = [...document.querySelectorAll(`#attention-list .attention-item[data-session-id="${CSS.escape(inspected.id)}"] .attention-kind`)]
-    .map((element) => element.textContent);
+  const railMode = RAIL_MODES.has(state.ui.railMode) ? state.ui.railMode : 'attention';
+  const attentionMounted = railMode === 'attention';
+  const actualKinds = attentionMounted
+    ? [...document.querySelectorAll(`#attention-list .attention-item[data-session-id="${CSS.escape(inspected.id)}"] .attention-kind`)]
+      .map((element) => element.textContent)
+    : [];
   const expectedKinds = projection.projectedKinds;
   const indicator = actualTabIndicator(inspected);
   const expectedIndicator = projection.expectedTabIndicator;
@@ -2943,8 +2954,12 @@ function renderDeveloperDiagnostics() {
       diagnosticCell('AGE', relativeAge(inspected.turn.since)),
     ]),
     diagnosticGroup('ATTENTION', [
+      diagnosticCell('RAIL MODE', railMode.toUpperCase()),
       diagnosticCell('EXPECTED', expectedKinds.join(' → ') || 'none'),
-      diagnosticCell('ACTUAL', actualKinds.join(' → ') || 'none', expectedKinds.join('|') !== actualKinds.join('|')),
+      diagnosticCell('ACTUAL', attentionMounted
+        ? (actualKinds.join(' → ') || 'none')
+        : `NOT MOUNTED · ${railMode.toUpperCase()}`,
+      attentionMounted && expectedKinds.join('|') !== actualKinds.join('|')),
       diagnosticCell('BROWSER QUEUE', projection.queueCount),
       diagnosticCell('HEAD', projection.queueHead),
       diagnosticCell('UPDATE PHASE', projection.updatePhase),
@@ -3109,7 +3124,7 @@ function selectRailMode(mode, { persist = true } = {}) {
   if (persist) {
     try { window.localStorage.setItem(RAIL_MODE_STORAGE_KEY, mode); } catch { /* unavailable */ }
   }
-  invalidate('attention');
+  invalidate('attention', ...(state.env && state.env.devMode ? ['diagnostics'] : []));
   return mode;
 }
 
@@ -3125,6 +3140,7 @@ function sessionRailStatus(session) {
   }
   if (stateName === 'working') return { kind: 'working', icon: '', label: 'Working' };
   if (stateName === 'completed') return { kind: 'completed', icon: '✓', label: 'Completed' };
+  if (stateName === 'idle') return { kind: 'idle', icon: '', label: 'Idle' };
   return { kind: 'live', icon: '', label: 'Live' };
 }
 
@@ -3836,10 +3852,9 @@ function hasManagedInstallSource() {
   );
 }
 
-// Safety derives from turn state alone: exited/needsInput/completed are safe;
-// working/unknown block. `acknowledged` (a display flag) never affects safety,
-// and focusing a session cannot change its turn state — so looking at a
-// completed session no longer regresses the update queue.
+// Safety derives from turn state alone: exited/idle/needsInput/completed are
+// safe; working/unknown block. Completion consumption changes completed to
+// idle, and both states remain update-safe.
 function updateSessionSafety(session) {
   return window.chromuxAttention.sessionUpdateSafety(session);
 }
@@ -4255,6 +4270,34 @@ function applyTerminalTitleUpdates(session, data) {
   invalidate('tabs', 'attention');
 }
 
+function renderedTerminalCursorContext(term) {
+  const buffer = term && term.buffer && term.buffer.active;
+  if (!buffer || typeof buffer.getLine !== 'function') return null;
+  const cursorRow = buffer.baseY + buffer.cursorY;
+  const cursorLine = buffer.getLine(cursorRow)?.translateToString(true) || '';
+  const nearbyLines = [];
+  for (let row = Math.max(0, cursorRow - 3); row <= Math.min(buffer.length - 1, cursorRow + 3); row += 1) {
+    nearbyLines.push(buffer.getLine(row)?.translateToString(true) || '');
+  }
+  return { cursorLine, nearbyLines };
+}
+
+function recoverCodexCompletionFromRenderedTerminal(session, expectedInputAt) {
+  if (!session || session.turn.inputAt !== expectedInputAt) return false;
+  const rendered = renderedTerminalCursorContext(session && session.term && session.term.term);
+  if (!rendered || !window.chromuxAttention.applyCodexRenderedCompletionFallback(session, rendered, Date.now())) return false;
+  if (session.id === state.activeId) {
+    session.turn.attentionSeenAt = Math.max(session.turn.attentionSeenAt || 0, session.turn.since || 0);
+    window.chromuxAttention.consumeCompletedTurn(session.turn, Date.now());
+  }
+  recordEvent({
+    type: 'turn-recovered', sessionId: session.id, turnState: session.turn.state,
+    source: 'codex:terminal-idle', confidence: 'low',
+  });
+  invalidate('update', 'attention', 'badges', 'tabs');
+  return true;
+}
+
 // pty event routing — Chromux OSC signals are extracted (chunk-boundary safe)
 // before anything reaches the terminal or the preview detector. A signal whose
 // session id does not match the PTY it arrived on is dropped and recorded as
@@ -4300,13 +4343,8 @@ function handlePtyData(id, data) {
     }
   }
   if (res.clean) {
-    s.term.term.write(res.clean);
-    if (window.chromuxAttention.applyCodexOutputCompletionFallback(s, res.clean, Date.now())) {
-      if (s.id === state.activeId) {
-        s.turn.attentionSeenAt = Math.max(s.turn.attentionSeenAt || 0, s.turn.since || 0);
-      }
-      invalidate('update', 'attention', 'badges', 'tabs');
-    }
+    const recoveryInputAt = s.turn.inputAt;
+    s.term.term.write(res.clean, () => recoverCodexCompletionFromRenderedTerminal(s, recoveryInputAt));
     feedDetector(s, res.clean);
   }
   if (s.agent === '' && s.lifecycle.alive) scanPtyAgentDescendants(false).catch(() => {});
@@ -5506,7 +5544,7 @@ if (window.chromuxTest) {
         marquee: tab.classList.contains('marquee'),
         paused: tab.classList.contains('paused'),
         hoverScroll: tab.classList.contains('hover-scroll'),
-        indicator: ['dead', 'working', 'completed', 'live'].find((kind) => session.els.dot.classList.contains(kind)) || 'unknown',
+        indicator: ['dead', 'working', 'completed', 'idle', 'live'].find((kind) => session.els.dot.classList.contains(kind)) || 'unknown',
         label: label.textContent,
         title: tab.title,
         ariaLabel: tab.getAttribute('aria-label') || '',
@@ -5787,6 +5825,7 @@ if (window.chromuxTest) {
 
   window.chromuxTestSignals = {
     addFakeSession,
+    addTerminalSession: (options = {}) => addRenderableTestSession({ ...options, realTerminal: true }),
     setSignalToken(id, token) { testSession(id).turn.token = token; },
     feedPtyChunk(id, chunk) {
       handlePtyData(id, chunk);
@@ -6690,7 +6729,15 @@ if (window.chromuxTest) {
     exit(id, exitCode = 0) { apply({ type: 'session-exited', sessionId: id, exitCode }); flushRender(); },
     emit(id, event, detail = null) { apply({ type: 'turn-signal', sessionId: id, signal: event, detail }); flushRender(); },
     queue(id, url) { apply({ type: 'preview-queued', sessionId: id, url, source: 'TERM' }); renderQueue(testSession(id)); flushRender(); },
+    selectRail(mode) { selectRailMode(mode); flushRender(); },
     setUpdatePhase(phase) { setUpdateQueuePhase(phase); flushRender(); },
+    injectAttentionKind(id, kind) {
+      const node = document.querySelector(`#attention-list .attention-item[data-session-id="${CSS.escape(id)}"] .attention-kind`);
+      if (!node) throw new Error(`Missing attention row: ${id}`);
+      node.textContent = kind;
+      invalidate('diagnostics');
+      flushRender();
+    },
     injectTabIndicator(id, kind) { testSession(id).els.dot.className = `tab-dot ${kind}`; invalidate('diagnostics'); flushRender(); },
     visible: () => !$('#developer-diagnostics').classList.contains('hidden'),
     groupText: () => $('#diagnostic-groups').textContent,

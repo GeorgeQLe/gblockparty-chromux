@@ -30,6 +30,19 @@ fs.writeFileSync(e2ePath, `
   d.emit(first, 'turn-end');
   expect(d.groupText().includes('COMPLETED'), 'background completion should agree with attention projection');
   expect(d.mismatches() === 0, 'projected completion should agree with rendered queue and tab');
+  d.selectRail('threads');
+  expect(d.groupText().includes('RAIL MODETHREADS') && d.groupText().includes('NOT MOUNTED · THREADS'),
+    'Threads diagnostics should report the active rail and unmounted Attention DOM');
+  expect(d.mismatches() === 0, 'unmounted Attention rows must not create false mismatches in Threads');
+  d.selectRail('git');
+  expect(d.groupText().includes('RAIL MODEGIT') && d.groupText().includes('NOT MOUNTED · GIT'),
+    'Git diagnostics should report the active rail and unmounted Attention DOM');
+  expect(d.mismatches() === 0, 'unmounted Attention rows must not create false mismatches in Git');
+  d.selectRail('attention');
+  d.injectAttentionKind(first, 'WRONG');
+  expect(d.mismatches() > 0, 'a real mounted Attention DOM mismatch should be highlighted');
+  d.emit(first, 'turn-end');
+  expect(d.mismatches() === 0, 'normal Attention render should clear the deliberate row mismatch');
 
   d.focus(first);
   expect(d.selected() === first, 'focus should not change explicit inspection');

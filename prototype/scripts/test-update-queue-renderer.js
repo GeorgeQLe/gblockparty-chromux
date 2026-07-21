@@ -223,6 +223,8 @@ fs.writeFileSync(e2ePath, `
 
   q.setSession(liveId, { turnState: 'completed' });
   expect(q.phase() === 'ready', 'completed turn should make queued update ready');
+  q.setSession(liveId, { turnState: 'idle' });
+  expect(q.phase() === 'ready', 'idle turn should keep queued update ready');
   q.dismissItem('UPDATE READY');
   expect(q.phase() === 'ready', 'ready dismissal should wait for confirmation');
   await answerWarning(true);
@@ -233,16 +235,16 @@ fs.writeFileSync(e2ePath, `
   expect(q.attentionKinds()[0] === 'UPDATE READY', 're-queued ready update should return to attention');
 
   q.markUserInput(liveId);
-  expect(q.turnState(liveId).state === 'working', 'typing after completed should start a working turn');
-  expect(q.phase() === 'waiting', 'typing after completed should block updates again');
-  expect(q.blockers().join(',') === 'live-unknown', 'typed completed session should return to live-unknown blocker');
+  expect(q.turnState(liveId).state === 'working', 'typing after idle should start a working turn');
+  expect(q.phase() === 'waiting', 'typing after idle should block updates again');
+  expect(q.blockers().join(',') === 'live-unknown', 'typed idle session should return to live-unknown blocker');
   q.setSession(liveId, { turnState: 'completed' });
   expect(q.phase() === 'ready', 'completed turn should make queued update ready again');
 
-  // Focusing a safe session must not regress READY (the old flag-wipe bug).
+  // Focusing a safe completion consumes it to idle without regressing READY.
   sig.focus(liveId);
-  expect(q.turnState(liveId).state === 'completed', 'focus must not touch turn state');
-  expect(q.phase() === 'ready', 'focusing a completed session must not regress the queue');
+  expect(q.turnState(liveId).state === 'idle', 'focus should consume completion to idle');
+  expect(q.phase() === 'ready', 'focusing a completed session must keep the queue ready');
 
   // Focusing a blocker leaves the phase waiting.
   q.setSession(liveId, { turnState: 'working' });

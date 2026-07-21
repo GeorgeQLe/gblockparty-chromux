@@ -34,8 +34,6 @@
 
   const V2_EVENTS = new Set(['turn-started', 'turn-completed', 'input-required',
     'permission-required', 'authentication-required', 'rate-limited', 'tool-failed']);
-  const CODEX_OUTPUT_BUFFER_MAX = 4096;
-
   function resetTurnProtocol(turn, now) {
     turn.protocol = null;
     turn.authoritative = false;
@@ -48,7 +46,6 @@
     turn.eventId = null;
     turn.stopped = false;
     turn.authoritativeAt = 0;
-    turn.outputBuf = '';
   }
 
   function normalizeTerminalOutput(output) {
@@ -110,7 +107,7 @@
     if (!turn) return false;
     const submitted = /[\r\n]/.test(input || '');
     if (!submitted) return false;
-    if (['needsInput', 'permission', 'authentication', 'rateLimited', 'toolFailed', 'completed'].includes(turn.state)) {
+    if (['idle', 'needsInput', 'permission', 'authentication', 'rateLimited', 'toolFailed', 'completed'].includes(turn.state)) {
       turn.state = 'working';
       turn.detail = null;
       turn.since = now;
@@ -126,16 +123,34 @@
       resetTurnProtocol(turn, now);
       return true;
     }
+    if (session.agent === 'codex' && turn.state === 'working') {
+      turn.detail = null;
+      turn.since = now;
+      turn.acknowledged = false;
+      resetTurnProtocol(turn, now);
+      return true;
+    }
     return false;
   }
 
-  function applyCodexOutputCompletionFallback(session, output, now) {
+  function consumeCompletedTurn(turn, now) {
+    if (!turn || turn.state !== 'completed') return false;
+    turn.state = 'idle';
+    turn.detail = null;
+    turn.since = now;
+    turn.acknowledged = false;
+    return true;
+  }
+
+  function applyCodexRenderedCompletionFallback(session, rendered, now) {
     const turn = session && session.turn;
     if (!turn || session.agent !== 'codex' || turn.state !== 'working') return false;
-    turn.outputBuf = `${turn.outputBuf || ''}${String(output || '')}`.slice(-CODEX_OUTPUT_BUFFER_MAX);
-    const text = normalizeTerminalOutput(turn.outputBuf);
-    const reachedIdle = /(?:^|\n)\s*(?:›|❯|>)\s*$/.test(text);
-    if (!reachedIdle) return false;
+    const cursorLine = normalizeTerminalOutput(rendered && rendered.cursorLine).trimEnd();
+    const nearbyLines = Array.isArray(rendered && rendered.nearbyLines)
+      ? rendered.nearbyLines.map((line) => normalizeTerminalOutput(line)) : [];
+    const composerAtCursor = /^\s*[›❯]\s*$/.test(cursorLine);
+    const codexChrome = nearbyLines.some((line) => /(?:\?\s+for shortcuts|\bcontext left\b|^\s*Choose an option:)/i.test(line));
+    if (!composerAtCursor || !codexChrome) return false;
     turn.state = 'completed';
     turn.detail = 'Codex turn finished';
     turn.since = Math.max(now, (Number(turn.attentionSeenAt) || 0) + 1);
@@ -160,6 +175,7 @@
         : { safe: false, reason: 'nonterminal agent failure' };
     }
     if (turnState === 'completed') return { safe: true, reason: 'completed' };
+    if (turnState === 'idle') return { safe: true, reason: 'idle' };
     return {
       safe: false,
       reason: turnState === 'working' ? 'agent turn in progress' : 'live work state unknown',
@@ -347,6 +363,7 @@
     if (!session || !session.lifecycle || !session.lifecycle.alive) return 'dead';
     if (activityIndicators && session.turn && session.turn.state === 'working') return 'working';
     if (activityIndicators && session.turn && session.turn.state === 'completed') return 'completed';
+    if (activityIndicators && session.turn && session.turn.state === 'idle') return 'idle';
     return 'live';
   }
 
@@ -382,7 +399,8 @@
   const api = {
     applyTurnSignal,
     applyUserInputTurnTransition,
-    applyCodexOutputCompletionFallback,
+    consumeCompletedTurn,
+    applyCodexRenderedCompletionFallback,
     projectAttentionItems,
     projectAttentionDiagnostic,
     sessionUpdateSafety,

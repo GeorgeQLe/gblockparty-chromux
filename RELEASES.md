@@ -1,5 +1,14 @@
 # Release Notes
 
+## GBlockParty Chromux v0.41.0
+
+Tag: `chromux-v0.41.0`
+
+- Add an explicit quiet `idle` turn state: unseen background completions retain their checkmark and Attention row until viewed or dismissed, while visible completions transition directly to Idle and submitted input returns Idle to Working.
+- Recover missed Codex completion notifications only after xterm finishes rendering a recognized Codex composer at the cursor, retaining the native `agent-turn-complete` hook as authoritative and recording terminal recovery as low confidence.
+- Make Developer Mode attention diagnostics rail-aware so Threads and Git report `NOT MOUNTED` without false mismatches, while genuine Attention DOM drift remains highlighted.
+- Treat Idle sessions as update-safe and preserve exited-session indicator precedence.
+
 ## GBlockParty Chromux v0.40.0
 
 Tag: `chromux-v0.40.0`
