@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.39.1
+
+Tag: `chromux-v0.39.1`
+
+- Preserve each tab's exact normal-buffer terminal viewport across tab activation and terminal fitting.
+- Keep scrolled-back inactive tabs fixed on their saved content while new output arrives, while tabs already at the bottom continue following output.
+- Retain viewport position through browser layout changes, divider and observer-driven resizing, and alternate-screen applications without changing skip-to-bottom behavior.
+
 ## GBlockParty Chromux v0.39.0
 
 Tag: `chromux-v0.39.0`

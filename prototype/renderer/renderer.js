@@ -1092,6 +1092,8 @@ function newSessionShape({ id, name, cwd, agent }) {
       fitAddon: null,
       serializer: null,
       fit: () => {},
+      viewportY: null,
+      fitting: false,
       scrollToBottom: null,
       lineBuf: '',
       signalBuf: '',
@@ -3507,6 +3509,41 @@ function handleTerminalInput(session, data) {
 
 const TERMINAL_SCROLL_ANIMATION_MS = 220;
 
+function rememberTerminalViewport(session) {
+  const termState = session && session.term;
+  const buffer = termState && termState.term && termState.term.buffer && termState.term.buffer.active;
+  if (!termState || termState.fitting || !buffer || buffer.type !== 'normal') return;
+  termState.viewportY = buffer.viewportY;
+}
+
+function fitTerminalPreservingViewport(session, fit) {
+  const termState = session && session.term;
+  const term = termState && termState.term;
+  if (!term || typeof fit !== 'function') return;
+  const before = term.buffer && term.buffer.active;
+  const preservingNormal = Boolean(before && before.type === 'normal');
+  const targetY = preservingNormal && Number.isFinite(termState.viewportY)
+    ? termState.viewportY
+    : (preservingNormal ? before.viewportY : null);
+  const followingBottom = Boolean(preservingNormal && before.viewportY === before.baseY);
+
+  termState.fitting = true;
+  try {
+    fit();
+    const after = term.buffer && term.buffer.active;
+    if (!preservingNormal || !after || after.type !== 'normal') return;
+    const desiredY = followingBottom
+      ? after.baseY
+      : Math.min(after.baseY, Math.max(0, targetY));
+    const delta = desiredY - after.viewportY;
+    if (delta) term.scrollLines(delta);
+    termState.viewportY = after.viewportY;
+  } finally {
+    termState.fitting = false;
+    rememberTerminalViewport(session);
+  }
+}
+
 function terminalCanScrollBack(term) {
   const buffer = term && term.buffer && term.buffer.active;
   return Boolean(buffer && buffer.type === 'normal' && buffer.baseY > 0);
@@ -3621,7 +3658,10 @@ function installTerminalScrollToBottom(session, { reducedMotion = null } = {}) {
       control.classList.add('hidden');
     },
   };
-  const update = () => renderTerminalScrollToBottom(session);
+  const update = () => {
+    rememberTerminalViewport(session);
+    renderTerminalScrollToBottom(session);
+  };
   const cancelFromUser = () => cancelTerminalScrollAnimation(session);
   const activate = () => animateTerminalScrollToBottom(session);
 
@@ -3671,8 +3711,10 @@ async function createSession({ name, cwd, agent, initialUrl = null, initialQueue
   session.term.fitAddon = fitAddon;
   session.term.fit = () => {
     try {
-      fitAddon.fit();
-      window.chromux.ptyResize(id, term.cols, term.rows);
+      fitTerminalPreservingViewport(session, () => {
+        fitAddon.fit();
+        window.chromux.ptyResize(id, term.cols, term.rows);
+      });
     } catch { /* hidden */ }
   };
   session.term.fit();
@@ -6364,7 +6406,14 @@ if (window.chromuxTest) {
       term.open(viewEls.termHost);
       term.resize(cols, rows);
       session.term.term = term;
-      session.term.fit = () => {};
+      session._fitCalls = 0;
+      session._fitViewportMoves = 0;
+      session.term.fit = () => fitTerminalPreservingViewport(session, () => {
+        session._fitCalls += 1;
+        const before = term.buffer.active.viewportY;
+        term.scrollToBottom();
+        if (term.buffer.active.viewportY !== before) session._fitViewportMoves += 1;
+      });
       session._reducedMotion = Boolean(reducedMotion);
       session._scrollEvents = 0;
       session._scrollEventDisposable = term.onScroll(() => { session._scrollEvents += 1; });
@@ -6395,6 +6444,7 @@ if (window.chromuxTest) {
         view.style.width = `${Math.max(320, Number(width) || 320)}px`;
       }
     },
+    setBrowserCollapsed(id, collapsed) { setBrowserCollapsed(testSession(id), Boolean(collapsed)); },
     setReducedMotion(id, reduced) { testSession(id)._reducedMotion = Boolean(reduced); },
     setAlternate(id, active) {
       const sequence = active ? '\x1b[?1049h' : '\x1b[?1049l';
@@ -6418,6 +6468,8 @@ if (window.chromuxTest) {
         ...terminalScrollState(session),
         hidden: control.classList.contains('hidden'),
         animating: Boolean(session.term.scrollToBottom.animationFrame),
+        fitCalls: session._fitCalls,
+        fitViewportMoves: session._fitViewportMoves,
         scrollEvents: session._scrollEvents,
         focused: document.activeElement === session.els.termHost.querySelector('.xterm-helper-textarea'),
         label: control.textContent,

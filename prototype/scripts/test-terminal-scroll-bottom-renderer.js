@@ -93,24 +93,61 @@ fs.writeFileSync(e2ePath, `
 
   const second = terminal.addSession({ name: 'scroll-second', rows: 10, scrollback: 200 });
   await terminal.writeLines(second, 40, 'second');
+  const inactiveBottomBefore = terminal.state(first);
+  await terminal.writeLines(first, 3, 'inactive-following-bottom');
+  await tick();
+  firstState = terminal.state(first);
+  expect(firstState.baseY > inactiveBottomBefore.baseY && firstState.viewportY === firstState.baseY,
+    'an inactive tab following the bottom should continue following new output');
+
+  terminal.scrollLines(first, -15);
+  await tick();
+  const firstSavedViewport = terminal.state(first).viewportY;
   terminal.scrollLines(second, -10);
   await tick();
   const secondBeforeOutput = terminal.state(second);
   expect(!secondBeforeOutput.hidden, 'second session should independently show its control');
+  const secondSavedViewport = secondBeforeOutput.viewportY;
+  terminal.focus(first);
+  await tick();
   await terminal.writeLines(second, 4, 'continued-output');
   await tick();
   let secondState = terminal.state(second);
-  expect(secondState.viewportY < secondState.baseY, 'new output must not force a scrolled-back session to bottom');
+  expect(secondState.viewportY === secondSavedViewport,
+    'output arriving while inactive must preserve a scrolled-back viewport');
+  expect(secondState.viewportY < secondState.baseY, 'inactive output must not force a scrolled-back session to bottom');
   expect(!secondState.hidden, 'new output should remain reachable through the control');
-  terminal.focus(first);
-  expect(terminal.state(second).viewportY === secondState.viewportY, 'switching sessions should preserve the inactive viewport');
+  expect(terminal.state(first).viewportY === firstSavedViewport,
+    'the first tab should retain its distinct viewport after activation fit');
+  expect(terminal.state(second).viewportY === secondSavedViewport, 'switching away should preserve the inactive viewport');
   terminal.focus(second);
-  expect(!terminal.state(second).hidden, 'switching back should preserve session-local control state');
+  await tick();
+  secondState = terminal.state(second);
+  expect(secondState.viewportY === secondSavedViewport,
+    'switching back should restore the exact session-local viewport after fit');
+  expect(secondState.fitCalls > 1 && secondState.fitViewportMoves > 0,
+    'activation fixture must exercise a viewport-moving fit');
+  terminal.focus(first);
+  await tick();
+  terminal.focus(second);
+  await tick();
+  expect(terminal.state(second).viewportY === secondSavedViewport,
+    'repeated switching should keep the second tab at its saved content');
+  terminal.setBrowserCollapsed(second, false);
+  await tick();
+  expect(terminal.state(second).viewportY === secondSavedViewport,
+    'restoring the browser should preserve the terminal viewport through layout fit');
+  terminal.setBrowserCollapsed(second, true);
+  await tick();
+  expect(terminal.state(second).viewportY === secondSavedViewport,
+    'collapsing the browser should preserve the terminal viewport through layout fit');
 
   terminal.focus(first);
+  await tick();
   terminal.scrollLines(first, -18);
   terminal.click(first);
   terminal.focus(second);
+  await tick();
   await wait(260);
   await tick();
   expect(terminal.state(first).viewportY === terminal.state(first).baseY,
@@ -139,11 +176,19 @@ fs.writeFileSync(e2ePath, `
   firstState = terminal.state(first);
   expect(!firstState.animating && firstState.viewportY < firstState.baseY, 'pointer input should cancel an active animation');
 
+  const normalViewportBeforeAlternate = terminal.state(first).viewportY;
   await terminal.setAlternate(first, true);
   await tick();
   firstState = terminal.state(first);
   expect(firstState.alternate && firstState.hidden, 'alternate screen should suppress the control');
+  terminal.focus(second);
+  await tick();
+  terminal.focus(first);
+  await tick();
   await terminal.setAlternate(first, false);
+  await tick();
+  expect(terminal.state(first).viewportY === normalViewportBeforeAlternate,
+    'alternate-screen fits must not overwrite the saved normal-buffer viewport');
   terminal.scrollLines(first, -10);
   await tick();
   expect(!terminal.state(first).hidden, 'returning to normal scrollback should restore threshold behavior');

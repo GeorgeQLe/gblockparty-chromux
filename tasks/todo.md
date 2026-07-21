@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Preserve each tab's exact runtime terminal viewport through activation and every fit path without breaking inactive output, bottom following, alternate-screen applications, or skip-to-bottom behavior; ship as v0.39.1. _(source: user-approved implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-terminal-scroll-bottom-renderer.js`, `RELEASES.md`)_
+
 - [x] Add a read-only live terminal preview popover for inactive Threads rows, linked active-row confirmation cues, fully opaque theme-specific surfaces, accessibility/lifecycle coverage, and v0.39.0 release. _(source: user-approved implementation plan and in-session opacity/padding/readability corrections; evidence: `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`, `prototype/scripts/test-session-rail-renderer.js`, `prototype/README.md`, `RELEASES.md`)_
 
 - [x] Add a session-local floating terminal skip-to-bottom control with a one-page threshold, smooth/reduced-motion behavior, alternate-screen suppression, cancellation safety, real-xterm coverage, and v0.38.0 release. _(source: user-approved implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`, `prototype/scripts/test-terminal-scroll-bottom-renderer.js`, `RELEASES.md`)_
