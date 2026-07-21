@@ -1,5 +1,17 @@
 # Lessons
 
+## 2026-07-21 — Floating previews need opaque material layers
+
+- Theme-level alpha tokens can make a floating preview's header, footer, or terminal backing visually bleed into the workspace even when the outer shell looks substantial.
+- Give floating terminal previews explicit opaque colors for every material layer in all theme/mode combinations; preserve theme identity through borders, gradients, shadows, bevels, and sheen instead of transparency.
+- Correction enforcement: `prototype/scripts/test-session-rail-renderer.js` checks computed popover, header/footer, and terminal-backing colors for full opacity across all eight appearances.
+
+## 2026-07-21 — Scaled terminal previews need one shared inset
+
+- A scaled xterm can look uneven even with nominal CSS padding when its scale factor is calculated from the outer viewport instead of the inset host box.
+- Align header, terminal, and footer content to one horizontal inset, and compute terminal scaling from the host's inner dimensions so right and bottom clearance remain real rather than clipped.
+- Correction enforcement: `prototype/scripts/test-session-rail-renderer.js` compares rendered header/terminal/footer left edges and requires at least 9px of terminal clearance on every remaining edge across all eight appearances.
+
 ## 2026-07-16 — Terminal presentation tests need real focused xterm DOM
 
 - A synthetic `.xterm-helper-textarea` cannot prove that xterm's generated input layer remains invisible or that its scrollbar stays usable under real focus and scrollback.

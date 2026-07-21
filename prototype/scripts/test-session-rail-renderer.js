@@ -31,11 +31,14 @@ fs.writeFileSync(e2ePath, `
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   await wait(100);
 
-  const holder = rail.addSession({ name: 'holder', agent: '', cwd: ${JSON.stringify(looseDir)} });
-  const web = rail.addSession({ name: 'web-agent', agent: 'codex', cwd: ${JSON.stringify(repoAppDir)} });
+  const holder = rail.addTerminalSession({ name: 'holder', agent: '', cwd: ${JSON.stringify(looseDir)} });
+  const web = rail.addTerminalSession({ name: 'web-agent', agent: 'codex', cwd: ${JSON.stringify(repoAppDir)}, cols: 72, rows: 18 });
   const api = rail.addSession({ name: 'api-agent', agent: 'claude', cwd: ${JSON.stringify(repoApiDir)} });
-  const webTwo = rail.addSession({ name: 'web-review', agent: 'grok', cwd: ${JSON.stringify(repoAppDir)} });
+  const webTwo = rail.addTerminalSession({ name: 'web-review', agent: 'grok', cwd: ${JSON.stringify(repoAppDir)}, cols: 54, rows: 14 });
   rail.focus(holder);
+  await rail.write(web, Array.from({ length: 340 }, (_, index) => 'older line ' + index + '\\r\\n').join('')
+    + '\\x1b[31mRECENT RED\\x1b[0m\\r\\ninitial output');
+  rail.sourceScroll(web, -9);
 
   rail.emit(web, 'turn-start');
   rail.emit(web, 'turn-end', 'First background completion');
@@ -61,8 +64,76 @@ fs.writeFileSync(e2ePath, `
     'different exact cwd should form another Threads group');
   expect(webGroup.rows.find((row) => row.id === web).status === 'Completed', 'completed row needs accessible status');
 
-  expect(rail.clickRow(web) === web, 'Threads row should activate its session');
+  const sourceBefore = rail.sourceState(web);
+  expect(sourceBefore.baseY > sourceBefore.viewportY, 'source fixture should begin scrolled away from its latest output');
+  expect(rail.clickRow(web) === holder, 'inactive Threads row should preview without changing the active session');
+  await wait(80);
+  let preview = rail.preview();
+  expect(preview && preview.sessionId === web, 'inactive Threads row should open one anchored preview');
+  expect(preview.focused && preview.role === 'dialog', 'preview should receive keyboard focus as a dialog');
+  expect(preview.ariaLabel.includes('web-agent') && preview.footer.includes('CLICK TO OPEN SESSION') && preview.footer.includes('ESC TO CLOSE'),
+    'preview should expose its session and activation/dismissal instructions');
+  expect(preview.cwdTitle === ${JSON.stringify(repoAppDir)}, 'preview should preserve the full cwd in its tooltip');
+  expect(preview.text.includes('RECENT RED') && preview.coloredCells > 0, 'serialized mirror should preserve recent terminal text and ANSI colors');
+  expect(preview.bufferLength <= 300 + preview.rows, 'serialized mirror should bound recent scrollback to 300 rows');
+  expect(preview.cols === preview.sourceCols && preview.rows === preview.sourceRows,
+    'preview should retain source terminal columns and rows while visually scaling');
+  const sourceAfterPreview = rail.sourceState(web);
+  expect(sourceAfterPreview.viewportY === sourceBefore.viewportY && sourceAfterPreview.baseY === sourceBefore.baseY,
+    'opening and serializing a preview must not move the source terminal viewport');
+  expect(rail.rowState(web).ariaExpanded === 'true' && rail.rowState(web).ariaControls === 'thread-terminal-preview',
+    'inactive preview row should expose expanded and controls ARIA state');
+  expect(rail.rowState(holder).ariaCurrent === 'true', 'active Threads row should expose aria-current');
+  await rail.write(web, '\\r\\nLIVE UPDATE');
+  await wait(80);
+  preview = rail.preview();
+  expect(preview.text.includes('LIVE UPDATE') && preview.refreshCount >= 2, 'subsequent terminal writes should refresh the live mirror');
+  rail.title(web, 'Live preview title');
+  await wait(60);
+  expect(rail.preview()?.title === 'Live preview title' && rail.rowState(web).ariaExpanded === 'true',
+    'rail rerenders should rebind the anchor and update the live preview header');
+  await rail.write(web, '\\x1b[?1049h\\x1b[HALTERNATE PREVIEW');
+  await wait(80);
+  expect(rail.preview()?.text.includes('ALTERNATE PREVIEW'), 'live mirror should reproduce alternate-screen content');
+  await rail.write(web, '\\x1b[?1049l');
+  await wait(80);
+  expect(rail.preview()?.text.includes('LIVE UPDATE'), 'leaving alternate screen should restore the mirrored normal buffer');
+  expect(rail.cue(web).ptyInput === '', 'preview rendering must never send PTY input');
+
+  rail.previewKey('Escape');
+  expect(!rail.preview() && rail.rowState(web).focused, 'Escape should dismiss preview and restore focus to its row');
+  expect(rail.rowState(web).ariaExpanded === 'false', 'dismissal should reset expanded ARIA state');
+  rail.setPreviewSize('compact');
+  rail.clickRow(web);
+  await wait(40);
+  const compactWidth = rail.preview().width;
+  rail.setPreviewSize('large');
+  await wait(60);
+  expect(rail.preview().width > compactWidth + 100, 'Large accessibility size should materially increase effective terminal text space');
+  expect(rail.previewSize().value === 'large' && rail.previewSize().stored === 'large' && rail.previewSize().control === 'large',
+    'preview size should update state, Settings, and local persistence together');
+  rail.setPreviewSize('comfortable');
+  await wait(40);
+  rail.previewKey('Enter');
+  await wait(40);
+  expect(rail.activeId() === web && !rail.preview(), 'Enter on preview should activate the session and close the preview');
   expect(rail.turnState(web).attentionSeenAt >= rail.turnState(web).since, 'opening completed session should record seen timestamp');
+
+  rail.select('threads');
+  rail.clickRow(web);
+  await wait(40);
+  expect(!rail.preview(), 'clicking the already-active row should skip preview');
+  await wait(40);
+  expect(rail.rowState(web).confirm && rail.cue(web).pane, 'active-row click should link row and terminal confirmation animations');
+  rail.clickRow(web);
+  await wait(40);
+  expect(rail.rowState(web).confirm && rail.cue(web).pane, 'repeated active-row clicks should restart both confirmation cues');
+  rail.setReducedMotion(true);
+  rail.clickRow(web);
+  await wait(40);
+  expect(rail.rowState(web).staticConfirm && rail.cue(web).staticPane, 'reduced motion should use an immediate static row and pane highlight');
+  rail.setReducedMotion(null);
+
   rail.select('attention');
   expect(!rail.attentionKinds().includes('COMPLETED'), 'seen completion should leave Attention');
   rail.focus(holder);
@@ -94,6 +165,40 @@ fs.writeFileSync(e2ePath, `
   expect(rows.find((row) => row.id === webTwo).status === 'Working', 'working status should appear in Threads');
   expect(rows.find((row) => row.id === api).status === 'Action required', 'action-required status should appear in Threads');
 
+  rail.focus(holder);
+  rail.clickRow(web);
+  await wait(40);
+  rail.clickRow(webTwo);
+  await wait(60);
+  expect(rail.preview()?.sessionId === webTwo, 'opening another row should replace the existing preview');
+  rail.outsideClick();
+  expect(!rail.preview(), 'outside click should dismiss the preview');
+  rail.clickRow(webTwo);
+  await wait(40);
+  rail.previewClick();
+  await wait(40);
+  expect(rail.activeId() === webTwo && !rail.preview(), 'clicking anywhere in the preview should activate its session');
+  rail.focus(holder);
+  rail.clickRow(webTwo);
+  await wait(40);
+  rail.select('attention');
+  expect(!rail.preview(), 'rail mode changes should dismiss the preview');
+  rail.select('threads');
+  rail.clickRow(webTwo);
+  await wait(40);
+  rail.collapseAnchor(webTwo);
+  await wait(60);
+  expect(!rail.preview(), 'collapsing a group should dismiss a preview whose anchor becomes hidden');
+  const webGroupDetails = [...document.querySelectorAll('#attention-list .rail-group')]
+    .find((group) => group.dataset.groupKey === 'cwd:' + ${JSON.stringify(repoAppDir)});
+  webGroupDetails.open = true;
+  await wait(40);
+  rail.clickRow(webTwo);
+  await wait(40);
+  rail.close(webTwo);
+  await wait(40);
+  expect(!rail.preview(), 'closing the previewed session should dispose and dismiss its preview');
+
   rail.select('git');
   await rail.waitForGit();
   expect(rail.heading() === 'GIT CHANGES', 'Git should identify itself as a change tracker');
@@ -111,6 +216,8 @@ fs.writeFileSync(e2ePath, `
   expect(repoDiff.totals === '1 staged · 2 unstaged', 'Git should summarize staged and unstaged diff counts');
 
   const themes = window.chromuxTestThemes;
+  rail.select('threads');
+  rail.focus(holder);
   for (const theme of themes.ids()) {
     themes.select(theme);
     for (const mode of themes.modes()) {
@@ -122,10 +229,25 @@ fs.writeFileSync(e2ePath, `
       expect(navRect.bottom <= headRect.top + 1, theme + ' ' + mode + ' should keep two-row header order');
       expect(modeButtons.every((button) => button.getBoundingClientRect().right <= railRect.right + 1),
         theme + ' ' + mode + ' should keep icon controls inside rail');
+      rail.clickRow(web);
+      await wait(40);
+      const geometry = rail.preview();
+      expect(geometry && geometry.left >= 0 && geometry.top >= 0 && geometry.right <= window.innerWidth + 1 && geometry.bottom <= window.innerHeight + 1,
+        theme + ' ' + mode + ' should clamp the preview inside the viewport');
+      expect(geometry.cols === geometry.sourceCols && geometry.rows === geometry.sourceRows,
+        theme + ' ' + mode + ' should preserve terminal geometry');
+      expect(geometry.surfaceBackgrounds.every((color) => color.startsWith('rgb(')),
+        theme + ' ' + mode + ' should keep popover, header/footer, and terminal backing fully opaque: ' + geometry.surfaceBackgrounds.join(', '));
+      expect(Math.abs(geometry.padding.headerLeft - geometry.padding.terminalLeft) <= 2
+        && Math.abs(geometry.padding.footerLeft - geometry.padding.terminalLeft) <= 2,
+      theme + ' ' + mode + ' should align header, terminal, and footer insets: ' + JSON.stringify(geometry.padding));
+      expect(geometry.padding.terminalTop >= 9 && geometry.padding.terminalRight >= 9 && geometry.padding.terminalBottom >= 9,
+        theme + ' ' + mode + ' should preserve terminal padding on every edge: ' + JSON.stringify(geometry.padding));
+      rail.previewKey('Escape');
     }
   }
 
-  rail.exit(webTwo, 0);
+  rail.select('git');
   expect(rail.gitDiffs().find((group) => group.title === ${JSON.stringify(canonicalRepoDir)}).count === 2,
     'Git diff counts should not mirror the number of live sessions');
   expect(rail.mode() === 'git', 'incoming attention and status changes must not auto-switch rail mode');

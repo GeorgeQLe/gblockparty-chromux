@@ -60,7 +60,12 @@ The `--dev-mode` and `--no-dev-mode` flags take precedence over the saved prefer
 The left rail has three persisted icon views while the horizontal tabs remain the primary navigator.
 **Attention** shows actionable items and unseen background completions; opening a completed session marks
 that completion seen without changing its completed tab status. **Threads** groups live sessions by exact
-working directory. **Git Changes** tracks the working-copy diffs in repositories used by live sessions,
+working directory. Click an inactive Threads row to inspect a live, read-only terminal preview without
+changing sessions; click anywhere in the preview (or press Enter/Space) to open that session, and press
+Escape or click outside to close it. Clicking the already-active Threads row confirms the connection with
+a linked row-to-terminal highlight. Choose **Settings → Thread Preview Size → Compact, Comfortable, or
+Large** to adjust effective preview text size without changing terminal wrapping; Comfortable is the default.
+**Git Changes** tracks the working-copy diffs in repositories used by live sessions,
 showing each changed file, its status, whether it has staged changes, and repository-level staged/unstaged
 totals. It refreshes automatically while selected. New attention updates the badge without switching the
 selected rail view.

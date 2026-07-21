@@ -2,7 +2,7 @@
 // preview detection, review queue, element picker, capture → claude -p.
 'use strict';
 
-/* global Terminal, FitAddon */
+/* global Terminal, FitAddon, SerializeAddon */
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -10,6 +10,7 @@ const THEME_STORAGE_KEY = 'chromux.theme';
 const THEME_MODE_STORAGE_KEY = 'chromux.themeMode';
 const TAB_ACTIVITY_STORAGE_KEY = 'chromux.tabActivityIndicators';
 const RAIL_MODE_STORAGE_KEY = 'chromux.railMode';
+const THREAD_PREVIEW_SIZE_STORAGE_KEY = 'chromux.threadPreviewSize';
 const THEME_IDS = new Set(['blueprint', 'retro-os', 'streak', 'liquid-glass']);
 const THEME_MODE_IDS = new Set(['light', 'dark']);
 const THEME_LABELS = {
@@ -19,6 +20,7 @@ const THEME_LABELS = {
   'liquid-glass': 'Liquid Glass',
 };
 const RAIL_MODES = new Set(['attention', 'threads', 'git']);
+const THREAD_PREVIEW_SIZES = new Set(['compact', 'comfortable', 'large']);
 
 function storedTheme() {
   try {
@@ -50,6 +52,13 @@ function storedRailMode() {
   } catch { return 'attention'; }
 }
 
+function storedThreadPreviewSize() {
+  try {
+    const value = window.localStorage.getItem(THREAD_PREVIEW_SIZE_STORAGE_KEY);
+    return THREAD_PREVIEW_SIZES.has(value) ? value : 'comfortable';
+  } catch { return 'comfortable'; }
+}
+
 const state = {
   sessions: new Map(), // id -> session
   activeId: null,
@@ -68,9 +77,12 @@ const state = {
     windowButtonPosition: null,
     tabActivityIndicators: storedTabActivityIndicators(),
     railMode: storedRailMode(),
+    threadPreviewSize: storedThreadPreviewSize(),
     gitRoots: new Map(), // exact cwd -> { value: string|null|undefined, promise }
     gitDiffs: new Map(), // repository root -> { value: summary|null|undefined, promise }
     railExpanded: new Map(),
+    threadPreview: null,
+    reducedMotionOverride: null,
     captureModal: null, // { captureId, pngBase64, payloadBase } while composing/delivering
     dirty: new Set(),
     rafScheduled: false,
@@ -394,6 +406,7 @@ function applyTheme(theme, { persist = true } = {}) {
   for (const session of state.sessions.values()) {
     syncSessionTerminalTheme(session, next, state.ui.themeMode);
   }
+  if (state.ui.threadPreview) refreshThreadPreview();
   renderThemeControls();
   syncWindowButtonPosition();
   return next;
@@ -410,12 +423,30 @@ function applyThemeMode(mode, { persist = true } = {}) {
   for (const session of state.sessions.values()) {
     syncSessionTerminalTheme(session, state.ui.theme, next);
   }
+  if (state.ui.threadPreview) refreshThreadPreview();
   renderThemeControls();
+  return next;
+}
+
+function applyThreadPreviewSize(size, { persist = true } = {}) {
+  const next = THREAD_PREVIEW_SIZES.has(size) ? size : 'comfortable';
+  state.ui.threadPreviewSize = next;
+  document.body.dataset.threadPreviewSize = next;
+  const select = $('#settings-thread-preview-size');
+  if (select) select.value = next;
+  if (persist) {
+    try { window.localStorage.setItem(THREAD_PREVIEW_SIZE_STORAGE_KEY, next); } catch { /* unavailable */ }
+  }
+  if (state.ui.threadPreview) requestAnimationFrame(() => {
+    positionThreadPreview();
+    scaleThreadPreviewTerminal();
+  });
   return next;
 }
 
 applyTheme(state.ui.theme, { persist: false });
 applyTabActivityIndicators(state.ui.tabActivityIndicators, { persist: false });
+applyThreadPreviewSize(state.ui.threadPreviewSize, { persist: false });
 
 // ───────────────────────────────────────────────────────────────────────────
 // Preview detection — scan complete terminal lines for localhost URLs and
@@ -1059,6 +1090,7 @@ function newSessionShape({ id, name, cwd, agent }) {
     term: {
       term: null,
       fitAddon: null,
+      serializer: null,
       fit: () => {},
       scrollToBottom: null,
       lineBuf: '',
@@ -3042,6 +3074,7 @@ function renderRailNavigation(attentionCount) {
 
 function selectRailMode(mode, { persist = true } = {}) {
   if (!RAIL_MODES.has(mode)) return state.ui.railMode;
+  if (mode !== 'threads') dismissThreadPreview();
   state.ui.railMode = mode;
   if (persist) {
     try { window.localStorage.setItem(RAIL_MODE_STORAGE_KEY, mode); } catch { /* unavailable */ }
@@ -3195,7 +3228,14 @@ function renderGroupedSessionRail(host, mode) {
     details.className = 'rail-group';
     details.dataset.groupKey = group.key;
     details.open = state.ui.railExpanded.get(`${mode}:${group.key}`) !== false;
-    details.addEventListener('toggle', () => state.ui.railExpanded.set(`${mode}:${group.key}`, details.open));
+    details.addEventListener('toggle', () => {
+      state.ui.railExpanded.set(`${mode}:${group.key}`, details.open);
+      if (!details.open && state.ui.threadPreview
+        && details.querySelector(`[data-session-id="${CSS.escape(state.ui.threadPreview.sessionId)}"]`)) {
+        dismissThreadPreview();
+      }
+      requestAnimationFrame(syncThreadPreviewAnchor);
+    });
     const summary = document.createElement('summary');
     summary.title = group.title;
     const label = document.createElement('span'); label.className = 'rail-group-label'; label.textContent = group.label;
@@ -3208,6 +3248,11 @@ function renderGroupedSessionRail(host, mode) {
       row.className = 'rail-session-row';
       row.type = 'button';
       row.dataset.sessionId = session.id;
+      if (session.id === state.activeId) row.setAttribute('aria-current', 'true');
+      else {
+        row.setAttribute('aria-expanded', String(state.ui.threadPreview?.sessionId === session.id));
+        row.setAttribute('aria-controls', 'thread-terminal-preview');
+      }
       row.title = `${sessionDisplayLabel(session)} — ${status.label}\n${session.cwd || '~'}`;
       row.setAttribute('aria-label', `${sessionDisplayLabel(session)}. ${status.label}. ${session.cwd || '~'}`);
       const icon = document.createElement('span');
@@ -3217,12 +3262,217 @@ function renderGroupedSessionRail(host, mode) {
       icon.setAttribute('aria-label', status.label);
       const name = document.createElement('span'); name.className = 'rail-session-name'; name.textContent = sessionDisplayLabel(session);
       row.append(icon, name);
-      row.onclick = () => activateSession(session.id);
+      row.onclick = () => {
+        if (mode !== 'threads') activateSession(session.id);
+        else if (session.id === state.activeId) {
+          dismissThreadPreview();
+          animateThreadSessionConfirmation(row, session);
+        } else openThreadPreview(session, row);
+      };
       rows.appendChild(row);
     }
     details.append(summary, rows);
     host.appendChild(details);
   }
+  syncThreadPreviewAnchor();
+}
+
+const THREAD_PREVIEW_SCROLLBACK = 300;
+
+function prefersReducedMotion() {
+  if (typeof state.ui.reducedMotionOverride === 'boolean') return state.ui.reducedMotionOverride;
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function animateThreadSessionConfirmation(row, session) {
+  const pane = session?.els?.termPane || session?.els?.view?.querySelector('.term-pane');
+  if (!row || !pane) return;
+  const rowClass = prefersReducedMotion() ? 'thread-row-confirm-static' : 'thread-row-confirm';
+  const paneClass = prefersReducedMotion() ? 'thread-pane-confirm-static' : 'thread-pane-confirm';
+  row.classList.remove('thread-row-confirm', 'thread-row-confirm-static');
+  pane.classList.remove('thread-pane-confirm', 'thread-pane-confirm-static');
+  void row.offsetWidth;
+  void pane.offsetWidth;
+  row.classList.add(rowClass);
+  requestAnimationFrame(() => pane.classList.add(paneClass));
+  if (session._threadCueTimer) clearTimeout(session._threadCueTimer);
+  session._threadCueTimer = setTimeout(() => {
+    row.classList.remove(rowClass);
+    pane.classList.remove(paneClass);
+    session._threadCueTimer = null;
+  }, prefersReducedMotion() ? 240 : 650);
+}
+
+function positionThreadPreview() {
+  const preview = state.ui.threadPreview;
+  if (!preview || !preview.popover.isConnected || !preview.anchor.isConnected) return;
+  const anchorRect = preview.anchor.getBoundingClientRect();
+  const popoverRect = preview.popover.getBoundingClientRect();
+  const gap = 10;
+  const margin = 10;
+  const maxLeft = Math.max(margin, window.innerWidth - popoverRect.width - margin);
+  const maxTop = Math.max(margin, window.innerHeight - popoverRect.height - margin);
+  preview.popover.style.left = `${Math.max(margin, Math.min(anchorRect.right + gap, maxLeft))}px`;
+  preview.popover.style.top = `${Math.max(margin, Math.min(anchorRect.top + (anchorRect.height - popoverRect.height) / 2, maxTop))}px`;
+}
+
+function scaleThreadPreviewTerminal() {
+  const preview = state.ui.threadPreview;
+  if (!preview) return;
+  const screen = preview.terminalHost.querySelector('.xterm-screen');
+  if (!screen) return;
+  const screenRect = screen.getBoundingClientRect();
+  const unscaledWidth = screenRect.width / (preview.scale || 1);
+  const unscaledHeight = screenRect.height / (preview.scale || 1);
+  const scale = Math.min(1,
+    preview.terminalHost.clientWidth / Math.max(1, unscaledWidth),
+    preview.terminalHost.clientHeight / Math.max(1, unscaledHeight));
+  preview.scale = scale;
+  preview.terminalHost.style.transform = `scale(${scale})`;
+}
+
+function refreshThreadPreview() {
+  const preview = state.ui.threadPreview;
+  if (!preview || preview.refreshFrame) return;
+  preview.refreshFrame = requestAnimationFrame(() => {
+    preview.refreshFrame = null;
+    const session = state.sessions.get(preview.sessionId);
+    if (!session || !session.lifecycle.alive || !session.term.term || !session.term.serializer) {
+      dismissThreadPreview();
+      return;
+    }
+    let serialized = '';
+    try { serialized = session.term.serializer.serialize({ scrollback: THREAD_PREVIEW_SCROLLBACK }); } catch { return; }
+    const source = session.term.term;
+    const mirror = preview.terminal;
+    mirror.reset();
+    mirror.resize(Math.max(2, source.cols || 80), Math.max(1, source.rows || 24));
+    mirror.options.theme = terminalThemeFor();
+    mirror.write(serialized, () => {
+      if (state.ui.threadPreview !== preview) return;
+      mirror.scrollToBottom();
+      scaleThreadPreviewTerminal();
+      preview.refreshCount += 1;
+    });
+  });
+}
+
+function syncThreadPreviewAnchor() {
+  const preview = state.ui.threadPreview;
+  if (!preview) return;
+  if (state.ui.railMode !== 'threads') {
+    dismissThreadPreview();
+    return;
+  }
+  const anchor = document.querySelector(`#attention-list .rail-session-row[data-session-id="${CSS.escape(preview.sessionId)}"]`);
+  if (!anchor || !anchor.offsetParent || anchor.getClientRects().length === 0) {
+    dismissThreadPreview();
+    return;
+  }
+  if (preview.anchor !== anchor) {
+    preview.resizeObserver?.disconnect();
+    preview.resizeObserver?.observe(anchor);
+    preview.resizeObserver?.observe(preview.popover);
+  }
+  preview.anchor = anchor;
+  const session = state.sessions.get(preview.sessionId);
+  const title = preview.popover.querySelector('.thread-preview-title');
+  const status = preview.popover.querySelector('.thread-preview-status');
+  const cwd = preview.popover.querySelector('.thread-preview-cwd');
+  if (session && title) title.textContent = sessionDisplayLabel(session);
+  if (session) preview.popover.setAttribute('aria-label', `Preview ${sessionDisplayLabel(session)}. Click to open session.`);
+  if (session && status) status.textContent = `${agentLabel(session.agent)} · ${sessionRailStatus(session).label}`;
+  if (session && cwd) { cwd.title = session.cwd || '~'; cwd.textContent = session.cwd || '~'; }
+  anchor.setAttribute('aria-expanded', 'true');
+  anchor.setAttribute('aria-controls', 'thread-terminal-preview');
+  positionThreadPreview();
+}
+
+function dismissThreadPreview({ restoreFocus = false } = {}) {
+  const preview = state.ui.threadPreview;
+  if (!preview) return false;
+  state.ui.threadPreview = null;
+  if (preview.refreshFrame) cancelAnimationFrame(preview.refreshFrame);
+  preview.writeDisposable?.dispose();
+  preview.resizeObserver?.disconnect();
+  window.removeEventListener('resize', preview.reposition);
+  $('#attention-list')?.removeEventListener('scroll', preview.reposition);
+  document.removeEventListener('pointerdown', preview.outsidePointer, true);
+  preview.terminal.dispose();
+  preview.popover.remove();
+  if (preview.anchor?.isConnected) {
+    preview.anchor.setAttribute('aria-expanded', 'false');
+    if (restoreFocus) preview.anchor.focus();
+  }
+  return true;
+}
+
+function activateThreadPreview() {
+  const preview = state.ui.threadPreview;
+  if (!preview) return;
+  const sessionId = preview.sessionId;
+  dismissThreadPreview();
+  activateSession(sessionId);
+}
+
+function openThreadPreview(session, anchor) {
+  dismissThreadPreview();
+  if (!session?.term?.term || typeof session.term.term.loadAddon !== 'function') {
+    activateSession(session.id);
+    return;
+  }
+  if (!session.term.serializer) {
+    session.term.serializer = new SerializeAddon.SerializeAddon();
+    session.term.term.loadAddon(session.term.serializer);
+  }
+  const popover = document.createElement('section');
+  popover.id = 'thread-terminal-preview';
+  popover.className = 'thread-terminal-preview';
+  popover.tabIndex = 0;
+  popover.setAttribute('role', 'dialog');
+  popover.setAttribute('aria-label', `Preview ${sessionDisplayLabel(session)}. Click to open session.`);
+  const header = document.createElement('header'); header.className = 'thread-preview-header';
+  const title = document.createElement('strong'); title.className = 'thread-preview-title'; title.textContent = sessionDisplayLabel(session);
+  const status = document.createElement('span'); status.className = 'thread-preview-status'; status.textContent = `${agentLabel(session.agent)} · ${sessionRailStatus(session).label}`;
+  const cwd = document.createElement('span'); cwd.className = 'thread-preview-cwd'; cwd.title = session.cwd || '~'; cwd.textContent = session.cwd || '~';
+  header.append(title, status, cwd);
+  const terminalViewport = document.createElement('div'); terminalViewport.className = 'thread-preview-viewport';
+  const terminalHost = document.createElement('div'); terminalHost.className = 'thread-preview-terminal'; terminalHost.setAttribute('aria-hidden', 'true'); terminalViewport.appendChild(terminalHost);
+  const footer = document.createElement('footer'); footer.className = 'thread-preview-footer';
+  footer.innerHTML = '<span>CLICK TO OPEN SESSION</span><span>ESC TO CLOSE</span>';
+  popover.append(header, terminalViewport, footer);
+  document.body.appendChild(popover);
+  const terminal = new Terminal({
+    cols: Math.max(2, session.term.term.cols || 80), rows: Math.max(1, session.term.term.rows || 24),
+    fontFamily: '"SF Mono", Menlo, monospace', fontSize: 11, lineHeight: 1.15,
+    cursorBlink: false, disableStdin: true, scrollback: THREAD_PREVIEW_SCROLLBACK, theme: terminalThemeFor(),
+  });
+  terminal.open(terminalHost);
+  const preview = {
+    sessionId: session.id, anchor, popover, terminal, terminalViewport, terminalHost,
+    refreshFrame: null, refreshCount: 0, scale: 1, writeDisposable: null, resizeObserver: null,
+    reposition: () => positionThreadPreview(), outsidePointer: null,
+  };
+  state.ui.threadPreview = preview;
+  preview.writeDisposable = session.term.term.onWriteParsed(refreshThreadPreview);
+  preview.resizeObserver = new ResizeObserver(() => { positionThreadPreview(); scaleThreadPreviewTerminal(); });
+  preview.resizeObserver.observe(anchor);
+  preview.resizeObserver.observe(popover);
+  preview.outsidePointer = (event) => {
+    if (!popover.contains(event.target) && !preview.anchor.contains(event.target)) dismissThreadPreview();
+  };
+  window.addEventListener('resize', preview.reposition);
+  $('#attention-list')?.addEventListener('scroll', preview.reposition, { passive: true });
+  document.addEventListener('pointerdown', preview.outsidePointer, true);
+  popover.addEventListener('click', activateThreadPreview);
+  popover.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); activateThreadPreview(); }
+    else if (event.key === 'Escape') { event.preventDefault(); dismissThreadPreview({ restoreFocus: true }); }
+  });
+  anchor.setAttribute('aria-expanded', 'true');
+  positionThreadPreview();
+  refreshThreadPreview();
+  popover.focus({ preventScroll: true });
 }
 
 function writePtyInput(session, data) {
@@ -3453,6 +3703,7 @@ async function createSession({ name, cwd, agent, initialUrl = null, initialQueue
 }
 
 function activateSession(id) {
+  dismissThreadPreview();
   if (!state.ui.diagnosticSessionId || !state.sessions.has(state.ui.diagnosticSessionId)) state.ui.diagnosticSessionId = id;
   apply({ type: 'session-focused', sessionId: id });
   for (const s of state.sessions.values()) {
@@ -3474,6 +3725,8 @@ function activateSession(id) {
 function closeSession(id) {
   const s = state.sessions.get(id);
   if (!s) return;
+  if (state.ui.threadPreview?.sessionId === id) dismissThreadPreview();
+  if (s._threadCueTimer) clearTimeout(s._threadCueTimer);
   window.chromux.ptyKill(id);
   if (s.term.scrollToBottom) s.term.scrollToBottom.dispose();
   s.term.term.dispose();
@@ -4675,6 +4928,9 @@ $('#settings-theme-mode').addEventListener('click', (event) => {
 $('#settings-tab-activity-indicators').addEventListener('change', (event) => {
   applyTabActivityIndicators(event.target.checked);
 });
+$('#settings-thread-preview-size').addEventListener('change', (event) => {
+  applyThreadPreviewSize(event.target.value);
+});
 $('#settings-prevent-sleep').addEventListener('change', (event) => {
   changePreventSleep(event.target.checked);
 });
@@ -5083,7 +5339,7 @@ if (window.chromuxTest) {
     return session.id;
   };
 
-  const addRenderableTestSession = ({ name = 'tab-test', agent = 'codex', cwd = '/tmp', turnState = 'unknown', alive = true } = {}) => {
+  const addRenderableTestSession = ({ name = 'tab-test', agent = 'codex', cwd = '/tmp', turnState = 'unknown', alive = true, realTerminal = false, cols = 64, rows = 16 } = {}) => {
     state.counter += 1;
     const session = newSessionShape({ id: 's' + state.counter, name, cwd, agent });
     session.turn.state = turnState;
@@ -5092,11 +5348,20 @@ if (window.chromuxTest) {
     const viewEls = buildSessionView(session);
     const tabEls = buildSessionTab(session);
     const written = [];
-    session._written = written;
-    session.term.term = { write: (d) => written.push(d), focus() {}, dispose() {} };
-    session.term.fit = () => {};
     session.els = { ...viewEls, ...tabEls };
     applyBrowserLayout(session);
+    session._written = written;
+    session._ptyInputs = [];
+    if (realTerminal) {
+      const term = new Terminal({ cols, rows, scrollback: 600, fontFamily: 'monospace', fontSize: 12, lineHeight: 1, theme: terminalThemeFor() });
+      term.open(viewEls.termHost);
+      term.resize(cols, rows);
+      term.onData((data) => handleTerminalInput(session, data));
+      session.term.term = term;
+    } else {
+      session.term.term = { write: (d) => written.push(d), focus() {}, dispose() {} };
+    }
+    session.term.fit = () => {};
     state.sessions.set(session.id, session);
     apply({ type: 'session-created', sessionId: session.id, name, cwd, agent });
     renderQueue(session);
@@ -5184,6 +5449,7 @@ if (window.chromuxTest) {
 
   window.chromuxTestRail = {
     addSession: addRenderableTestSession,
+    addTerminalSession: (options = {}) => addRenderableTestSession({ ...options, realTerminal: true }),
     focus(id) { activateSession(id); flushRender(); },
     emit(id, event, detail = null) { apply({ type: 'turn-signal', sessionId: id, signal: event, detail }); flushRender(); },
     exit(id, exitCode = 0) { apply({ type: 'session-exited', sessionId: id, exitCode }); flushRender(); },
@@ -5223,6 +5489,113 @@ if (window.chromuxTest) {
       const row = document.querySelector(`#attention-list .rail-session-row[data-session-id="${CSS.escape(id)}"]`);
       if (!row) throw new Error(`Missing rail row: ${id}`);
       row.click(); flushRender(); return state.activeId;
+    },
+    write(id, data) {
+      const term = testSession(id).term.term;
+      return new Promise((resolve) => term.write(String(data), resolve));
+    },
+    preview() {
+      const preview = state.ui.threadPreview;
+      if (!preview) return null;
+      const buffer = preview.terminal.buffer.active;
+      const lines = [];
+      let coloredCells = 0;
+      for (let index = 0; index < buffer.length; index += 1) {
+        const line = buffer.getLine(index);
+        lines.push(line?.translateToString(true) || '');
+        if (line) {
+          for (let column = 0; column < line.length; column += 1) {
+            const cell = line.getCell(column);
+            if (cell && (!cell.isFgDefault() || !cell.isBgDefault())) coloredCells += 1;
+          }
+        }
+      }
+      const rect = preview.popover.getBoundingClientRect();
+      const source = testSession(preview.sessionId).term.term;
+      const surfaceBackgrounds = [
+        preview.popover,
+        preview.popover.querySelector('.thread-preview-header'),
+        preview.terminalViewport,
+        preview.popover.querySelector('.thread-preview-footer'),
+      ].map((element) => getComputedStyle(element).backgroundColor);
+      const headerTitleRect = preview.popover.querySelector('.thread-preview-title').getBoundingClientRect();
+      const screenRect = preview.terminalHost.querySelector('.xterm-screen').getBoundingClientRect();
+      const footerLabelRect = preview.popover.querySelector('.thread-preview-footer span').getBoundingClientRect();
+      const viewportRect = preview.terminalViewport.getBoundingClientRect();
+      return {
+        sessionId: preview.sessionId,
+        text: lines.join('\n'),
+        html: preview.terminalHost.innerHTML,
+        focused: document.activeElement === preview.popover,
+        role: preview.popover.getAttribute('role'),
+        ariaLabel: preview.popover.getAttribute('aria-label'),
+        title: preview.popover.querySelector('.thread-preview-title')?.textContent || '',
+        footer: preview.popover.querySelector('.thread-preview-footer')?.textContent || '',
+        cwdTitle: preview.popover.querySelector('.thread-preview-cwd')?.title || '',
+        left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom,
+        width: rect.width, height: rect.height,
+        cols: preview.terminal.cols, rows: preview.terminal.rows,
+        sourceCols: source.cols, sourceRows: source.rows,
+        bufferLength: buffer.length,
+        refreshCount: preview.refreshCount,
+        coloredCells,
+        surfaceBackgrounds,
+        padding: {
+          headerLeft: headerTitleRect.left - rect.left,
+          terminalLeft: screenRect.left - rect.left,
+          footerLeft: footerLabelRect.left - rect.left,
+          terminalTop: screenRect.top - viewportRect.top,
+          terminalRight: rect.right - screenRect.right,
+          terminalBottom: viewportRect.bottom - screenRect.bottom,
+        },
+      };
+    },
+    sourceState(id) {
+      const session = testSession(id);
+      const term = session.term.term;
+      return {
+        viewportY: term.buffer?.active?.viewportY ?? null,
+        baseY: term.buffer?.active?.baseY ?? null,
+        focused: document.activeElement === session.els.termHost.querySelector('.xterm-helper-textarea'),
+      };
+    },
+    sourceScroll(id, amount) { testSession(id).term.term.scrollLines(amount); },
+    rowState(id) {
+      const row = document.querySelector(`#attention-list .rail-session-row[data-session-id="${CSS.escape(id)}"]`);
+      if (!row) return null;
+      return {
+        ariaCurrent: row.getAttribute('aria-current'), ariaExpanded: row.getAttribute('aria-expanded'),
+        ariaControls: row.getAttribute('aria-controls'), focused: document.activeElement === row,
+        confirm: row.classList.contains('thread-row-confirm'), staticConfirm: row.classList.contains('thread-row-confirm-static'),
+      };
+    },
+    previewClick() { state.ui.threadPreview?.popover.click(); flushRender(); },
+    previewKey(key) {
+      state.ui.threadPreview?.popover.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+      flushRender();
+    },
+    outsideClick() { document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); flushRender(); },
+    collapseAnchor(id) {
+      const row = document.querySelector(`#attention-list .rail-session-row[data-session-id="${CSS.escape(id)}"]`);
+      const details = row?.closest('details');
+      if (details) details.open = false;
+    },
+    close(id) { closeSession(id); flushRender(); },
+    setReducedMotion(value) { state.ui.reducedMotionOverride = value; },
+    setPreviewSize(value) { applyThreadPreviewSize(value); },
+    previewSize: () => ({
+      value: state.ui.threadPreviewSize,
+      stored: window.localStorage.getItem(THREAD_PREVIEW_SIZE_STORAGE_KEY),
+      control: $('#settings-thread-preview-size')?.value || '',
+    }),
+    cue(id) {
+      const session = testSession(id);
+      const pane = session.els.view.querySelector('.term-pane');
+      return {
+        pane: pane.classList.contains('thread-pane-confirm'),
+        staticPane: pane.classList.contains('thread-pane-confirm-static'),
+        ptyInput: session._ptyInputs.join(''),
+      };
     },
     activeId: () => state.activeId,
     turnState: (id) => ({ ...testSession(id).turn }),

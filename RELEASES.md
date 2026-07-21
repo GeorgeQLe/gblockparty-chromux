@@ -1,5 +1,15 @@
 # Release Notes
 
+## GBlockParty Chromux v0.39.0
+
+Tag: `chromux-v0.39.0`
+
+- Add one live, read-only xterm preview when an inactive Threads row is selected, preserving ANSI colors, wrapping, recent scrollback, and alternate-screen state without changing the active session or source viewport.
+- Open the previewed session by clicking anywhere in the popover or using Enter/Space; dismiss on Escape, outside click, mode changes, hidden anchors, session closure, or activation through another route.
+- Confirm clicks on the already-active Threads row with a linked row and terminal-pane cue, including repeatable and reduced-motion treatments.
+- Add accessible current/expanded state, viewport clamping, fully opaque theme-specific preview surfaces, and lifecycle/geometry coverage across all eight theme appearances.
+- Default to a more readable Comfortable popover and add persisted Compact, Comfortable, and Large preview sizes for vision accessibility without changing source terminal wrapping.
+
 ## GBlockParty Chromux v0.38.0
 
 Tag: `chromux-v0.38.0`

@@ -137,7 +137,7 @@
     </div>
     <div class="sb-right">
       <button id="btn-log" class="sb-btn">DELIVERY LOG</button>
-      <span class="sb-ver">chromux 0.33.0</span>
+      <span class="sb-ver">chromux 0.39.0</span>
     </div>
   </footer>
 
@@ -211,6 +211,20 @@
               <span class="theme-check" aria-hidden="true">✓</span>
             </button>
           </div>
+        </section>
+        <div class="settings-divider" aria-hidden="true"></div>
+        <section class="settings-preferences" aria-labelledby="thread-preview-size-heading">
+          <div>
+            <div id="thread-preview-size-heading" class="microlabel">THREAD PREVIEW SIZE</div>
+            <div class="settings-section-copy">Increase the popover to make its scaled terminal text easier to read while preserving exact terminal geometry.</div>
+          </div>
+          <label class="settings-select-label">
+            <select id="settings-thread-preview-size" aria-label="Thread preview size">
+              <option value="compact">Compact</option>
+              <option value="comfortable">Comfortable</option>
+              <option value="large">Large</option>
+            </select>
+          </label>
         </section>
         <div class="settings-divider" aria-hidden="true"></div>
         <section class="settings-preferences" aria-labelledby="tab-activity-heading">
@@ -486,6 +500,7 @@
 
   <script src="../node_modules/@xterm/xterm/lib/xterm.js"></script>
   <script src="../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
+  <script src="../node_modules/@xterm/addon-serialize/lib/addon-serialize.js"></script>
   <script src="signals.js"></script>
   <script src="attention.js"></script>
   <script src="renderer.js"></script>

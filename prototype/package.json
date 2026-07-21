@@ -1,6 +1,6 @@
 {
   "name": "chromux",
-  "version": "0.38.0",
+  "version": "0.39.0",
   "description": "OSS desktop front-end for local and GBlockParty-managed agent/browser workspaces.",
   "main": "main.js",
   "private": false,
@@ -65,6 +65,7 @@
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.10.0",
+    "@xterm/addon-serialize": "^0.13.0",
     "@xterm/xterm": "^5.5.0",
     "js-yaml": "^4.1.0",
     "node-pty": "^1.0.0"
