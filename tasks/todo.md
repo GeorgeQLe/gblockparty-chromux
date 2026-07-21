@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Add searchable session tabs with a sticky search/add action pair and unobstructed right-most close control; ship as v0.35.0. _(source: user request; evidence: `prototype/renderer/index.html`, `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`, `prototype/scripts/test-tab-titles-renderer.js`, `RELEASES.md`)_
+
 - [x] Preserve each tab's exact Claude, Codex, or Grok conversation across restart with authenticated provider IDs, schema v3 snapshots, distinct legacy inference, and a visible best-effort warning; ship as v0.33.3. _(source: user-approved implementation plan; evidence: `prototype/main.js`, `prototype/renderer/renderer.js`, `prototype/scripts/test-restore-session-identity.js`, `prototype/scripts/test-codex-notifier.js`, `prototype/scripts/test-turn-signals-renderer.js`, `RELEASES.md`)_
 
 - [x] Stabilize Streak attention-card and `VIEW`/`DISMISS` click targets so hover and active feedback cannot cancel a first boundary click, and ship the fix as v0.33.2. _(source: user-approved implementation plan; evidence: `prototype/renderer/styles.css`, `prototype/scripts/test-streak-attention-click-targets-renderer.js`, `prototype/scripts/test-themes-renderer.js`, `RELEASES.md`)_

@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.35.0
+
+Tag: `chromux-v0.35.0`
+
+- Add session search by dynamic title, launch name, agent, or working directory, with keyboard navigation and one-click activation.
+- Keep search and add-session controls together at the editor's right inset while session tabs scroll beneath them.
+- Preserve scroll-end clearance so the right-most session tab and its close button remain fully reachable.
+
 ## GBlockParty Chromux v0.34.0
 
 Tag: `chromux-v0.34.0`

@@ -56,7 +56,12 @@
     <div id="workspace">
       <nav id="session-tabs" aria-label="Session tabs">
         <div id="tab-list">
-          <button id="btn-new-session" class="session-tab add-tab" title="New session (⌘T)" aria-label="New session">+</button>
+          <div id="tab-actions">
+            <button id="btn-search-sessions" class="session-tab tab-action" title="Search sessions" aria-label="Search sessions" aria-expanded="false" aria-controls="session-search-panel">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.25"/><path d="m10.25 10.25 3.1 3.1"/></svg>
+            </button>
+            <button id="btn-new-session" class="session-tab add-tab" title="New session (⌘T)" aria-label="New session">+</button>
+          </div>
         </div>
       </nav>
       <div id="restore-warning" class="restore-warning hidden"></div>
@@ -82,6 +87,14 @@
         <div id="views"></div>
       </main>
     </div>
+  </div>
+
+  <div id="session-search-panel" class="session-search-panel hidden" role="dialog" aria-label="Search sessions">
+    <label class="session-search-field">
+      <span>SEARCH</span>
+      <input id="session-search-input" type="text" placeholder="Title, agent, or directory" autocomplete="off" spellcheck="false">
+    </label>
+    <div id="session-search-results" class="session-search-results" role="listbox" aria-label="Matching sessions"></div>
   </div>
 
   <!-- ══ developer diagnostics (runtime-gated) ══ -->

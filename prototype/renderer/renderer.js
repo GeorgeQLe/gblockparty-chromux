@@ -2667,8 +2667,87 @@ function buildSessionTab(session) {
     state.ui.hoverTabSessionId = null;
     renderTabs();
   });
-  $('#tab-list').insertBefore(tab, $('#btn-new-session'));
+  $('#tab-list').insertBefore(tab, $('#tab-actions'));
   return { tab, dot, tabLabelWrap: labelWrap, tabLabel: label, tabBadge: badge };
+}
+
+function sessionSearchText(session) {
+  return [sessionDisplayLabel(session), session.name, session.agent, session.cwd]
+    .filter(Boolean)
+    .join('\n')
+    .toLocaleLowerCase();
+}
+
+function positionSessionSearch() {
+  const panel = $('#session-search-panel');
+  const workspace = $('#workspace');
+  const button = $('#btn-search-sessions');
+  if (!panel || panel.classList.contains('hidden') || !workspace || !button) return;
+  const workspaceRect = workspace.getBoundingClientRect();
+  const buttonRect = button.getBoundingClientRect();
+  const margin = 8;
+  const width = panel.getBoundingClientRect().width;
+  panel.style.left = `${Math.max(margin, workspaceRect.right - width - margin)}px`;
+  panel.style.top = `${buttonRect.bottom + 6}px`;
+}
+
+function closeSessionSearch({ restoreFocus = false } = {}) {
+  const panel = $('#session-search-panel');
+  if (!panel || panel.classList.contains('hidden')) return;
+  panel.classList.add('hidden');
+  $('#btn-search-sessions').setAttribute('aria-expanded', 'false');
+  if (restoreFocus) $('#btn-search-sessions').focus();
+}
+
+function renderSessionSearch() {
+  const results = $('#session-search-results');
+  if (!results) return;
+  const query = $('#session-search-input').value.trim().toLocaleLowerCase();
+  const matches = [...state.sessions.values()].filter((session) => sessionSearchText(session).includes(query));
+  results.innerHTML = '';
+  if (!matches.length) {
+    const empty = document.createElement('div');
+    empty.className = 'session-search-empty';
+    empty.textContent = state.sessions.size ? 'No matching sessions.' : 'No sessions open.';
+    results.appendChild(empty);
+    return;
+  }
+  for (const session of matches) {
+    const row = document.createElement('button');
+    row.className = 'session-search-result';
+    row.type = 'button';
+    row.setAttribute('role', 'option');
+    row.setAttribute('aria-selected', String(session.id === state.activeId));
+    row.dataset.sessionId = session.id;
+    const title = document.createElement('span');
+    title.className = 'session-search-result-title';
+    title.textContent = sessionDisplayLabel(session);
+    const meta = document.createElement('span');
+    meta.className = 'session-search-result-meta';
+    meta.textContent = [session.agent, session.cwd].filter(Boolean).join(' · ');
+    row.append(title, meta);
+    row.onclick = () => {
+      activateSession(session.id);
+      closeSessionSearch();
+    };
+    results.appendChild(row);
+  }
+}
+
+function openSessionSearch() {
+  const panel = $('#session-search-panel');
+  const input = $('#session-search-input');
+  panel.classList.remove('hidden');
+  $('#btn-search-sessions').setAttribute('aria-expanded', 'true');
+  input.value = '';
+  renderSessionSearch();
+  positionSessionSearch();
+  input.focus();
+}
+
+function toggleSessionSearch() {
+  if ($('#session-search-panel').classList.contains('hidden')) openSessionSearch();
+  else closeSessionSearch({ restoreFocus: true });
 }
 
 function renderTabs() {
@@ -2678,6 +2757,7 @@ function renderTabs() {
     updateSessionTabText(s);
   }
   updateTabOverflowState();
+  if (!$('#session-search-panel').classList.contains('hidden')) renderSessionSearch();
 }
 
 function diagnosticText(value, fallback = '—') {
@@ -4159,7 +4239,38 @@ function openNewSessionModal() {
   $('#ns-name').select();
 }
 
-$('#btn-new-session').onclick = openNewSessionModal;
+$('#btn-new-session').onclick = () => {
+  closeSessionSearch();
+  openNewSessionModal();
+};
+$('#btn-search-sessions').onclick = toggleSessionSearch;
+$('#session-search-input').addEventListener('input', renderSessionSearch);
+$('#session-search-input').addEventListener('keydown', (event) => {
+  if (event.key === 'ArrowDown') {
+    const first = $('#session-search-results .session-search-result');
+    if (first) {
+      event.preventDefault();
+      first.focus();
+    }
+  } else if (event.key === 'Enter') {
+    const first = $('#session-search-results .session-search-result');
+    if (first) {
+      event.preventDefault();
+      first.click();
+    }
+  }
+});
+$('#session-search-results').addEventListener('keydown', (event) => {
+  if (!['ArrowDown', 'ArrowUp'].includes(event.key)) return;
+  const rows = [...document.querySelectorAll('#session-search-results .session-search-result')];
+  const index = rows.indexOf(event.target);
+  if (index < 0) return;
+  event.preventDefault();
+  const next = event.key === 'ArrowDown'
+    ? rows[Math.min(rows.length - 1, index + 1)]
+    : (index === 0 ? $('#session-search-input') : rows[index - 1]);
+  if (next) next.focus();
+});
 $('#btn-first-session').onclick = openNewSessionModal;
 $('#btn-detect').onclick = openDetectModal;
 $('#btn-first-detect').onclick = openDetectModal;
@@ -5631,20 +5742,24 @@ document.addEventListener('keydown', (e) => {
     $('#modal-new').classList.add('hidden');
     $('#modal-detect').classList.add('hidden');
     $('#drawer-log').classList.add('hidden');
+    closeSessionSearch({ restoreFocus: true });
     invalidate('shortcutDebug');
   }
 });
 
-document.addEventListener('click', () => {
+document.addEventListener('click', (event) => {
   closeSessionContextMenu();
+  if (!event.target.closest('#session-search-panel') && !event.target.closest('#tab-actions')) closeSessionSearch();
   invalidate('shortcutDebug');
 });
 document.addEventListener('focusin', () => invalidate('shortcutDebug'));
 document.addEventListener('focusout', () => setTimeout(() => invalidate('shortcutDebug'), 0));
 window.addEventListener('blur', () => {
   closeSessionContextMenu();
+  closeSessionSearch();
   invalidate('shortcutDebug');
 });
+window.addEventListener('resize', positionSessionSearch);
 
 setInterval(() => {
   scanPtyAgentDescendants(false).catch(() => {});

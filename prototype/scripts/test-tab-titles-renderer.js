@@ -25,20 +25,24 @@ fs.writeFileSync(e2ePath, `
   await wait(100);
 
   const tabList = document.querySelector('#tab-list');
+  const tabActions = document.querySelector('#tab-actions');
+  const searchButton = document.querySelector('#btn-search-sessions');
   const addButton = document.querySelector('#btn-new-session');
   const workspace = document.querySelector('#workspace');
   const sessionTabs = document.querySelector('#session-tabs');
   const stage = document.querySelector('#stage');
-  expect(tabList.firstElementChild === addButton, 'add-session button should be left-aligned when there are no tabs');
-  expect(Math.abs(addButton.getBoundingClientRect().left - tabList.getBoundingClientRect().left) < 1,
-    'empty add-session button should render at the left edge of the tab strip');
+  expect(tabList.firstElementChild === tabActions, 'sticky tab actions should be the only tab-list item when there are no tabs');
+  expect(tabActions.firstElementChild === searchButton && tabActions.lastElementChild === addButton,
+    'search should sit immediately before the add-session button');
+  expect(Math.abs(searchButton.getBoundingClientRect().left - tabList.getBoundingClientRect().left) < 1,
+    'empty search button should render at the left edge of the tab strip');
 
   const first = tabs.addSession({ name: 'launch-a', cwd: '/tmp/chromux-a', agent: 'claude' });
-  const firstTab = addButton.previousElementSibling;
+  const firstTab = tabActions.previousElementSibling;
   expect(firstTab === tabList.firstElementChild, 'first session tab should be inserted before the add-session button');
-  expect(firstTab.nextElementSibling === addButton, 'add-session button should sit directly after the right-most tab');
-  expect(Math.abs(addButton.getBoundingClientRect().left - firstTab.getBoundingClientRect().right - 6) < 1,
-    'add-session button should render with a 6px gap after the right-most tab');
+  expect(firstTab.nextElementSibling === tabActions, 'sticky actions should sit directly after the right-most tab');
+  expect(Math.abs(tabActions.getBoundingClientRect().left - firstTab.getBoundingClientRect().right - 6) < 1,
+    'search should render with a 6px gap after the right-most tab');
   expect(tabs.label(first) === 'launch-a', 'new tab should fall back to launch name');
   expect(tabs.tooltip(first).includes('/tmp/chromux-a'), 'fallback tooltip should retain cwd');
 
@@ -69,12 +73,14 @@ fs.writeFileSync(e2ePath, `
     'neighboring session tabs should render with a 6px gap');
   expect(Math.abs(inactiveTab.getBoundingClientRect().left - activeTab.getBoundingClientRect().right - 6) < 1,
     'every neighboring session tab should retain the 6px gap');
-  expect(Math.abs(addButton.getBoundingClientRect().left - inactiveTab.getBoundingClientRect().right - 6) < 1,
-    'add-session button should retain the same 6px gap as session tabs');
+  expect(Math.abs(tabActions.getBoundingClientRect().left - inactiveTab.getBoundingClientRect().right - 6) < 1,
+    'sticky actions should retain the same 6px gap as session tabs');
   tabs.forceTabWidth(active, 120);
   tabs.forceTabWidth(inactive, 120);
   tabs.feed(active, titleOsc('0', 'Active session title with enough detail to overflow the tab label area'));
   tabs.feed(inactive, titleOsc('0', 'Inactive session title with enough detail to overflow the tab label area'));
+  tabs.unhover(active);
+  tabs.unhover(inactive);
   tabs.focus(active);
   await tick();
 
@@ -113,6 +119,47 @@ fs.writeFileSync(e2ePath, `
   expect(!shortState.truncated, 'short inactive tab should not be marked truncated');
   expect(!shortState.hoverScroll, 'hovering non-truncated inactive tab should do nothing');
   expect(!activeState.paused, 'hovering non-truncated inactive tab should not pause active marquee');
+
+  searchButton.click();
+  const searchPanel = document.querySelector('#session-search-panel');
+  const searchInput = document.querySelector('#session-search-input');
+  expect(!searchPanel.classList.contains('hidden'), 'search button should open the session search panel');
+  expect(searchButton.getAttribute('aria-expanded') === 'true', 'open search should expose its expanded state');
+  searchInput.value = '/tmp/inactive';
+  searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+  const searchResults = [...document.querySelectorAll('.session-search-result')];
+  expect(searchResults.length === 1, 'session search should filter by working directory');
+  expect(searchResults[0].textContent.includes('Inactive session title'), 'search result should show the dynamic session title');
+  searchResults[0].click();
+  expect(tabs.state(inactive).active, 'choosing a search result should activate that session');
+  expect(searchPanel.classList.contains('hidden'), 'choosing a search result should close search');
+
+  workspace.style.flex = '0 0 400px';
+  workspace.style.width = '400px';
+  await tick();
+  const listRectAtStart = tabList.getBoundingClientRect();
+  const actionsRectAtStart = tabActions.getBoundingClientRect();
+  const workspaceRectAtStart = workspace.getBoundingClientRect();
+  expect(Math.abs(actionsRectAtStart.right - listRectAtStart.right) < 1,
+    'search and add actions should stick to the editor right edge while tabs overflow');
+  expect(Math.abs(
+    (workspaceRectAtStart.right - actionsRectAtStart.right)
+      - (listRectAtStart.left - workspaceRectAtStart.left),
+  ) < 1, 'sticky actions should preserve the tab strip margin at the editor right edge');
+  tabList.scrollLeft = tabList.scrollWidth;
+  await tick();
+  const finalTab = tabActions.previousElementSibling;
+  const finalTabRect = finalTab.getBoundingClientRect();
+  const finalCloseRect = finalTab.querySelector('.tab-x').getBoundingClientRect();
+  const actionsRectAtEnd = tabActions.getBoundingClientRect();
+  expect(finalTabRect.right <= actionsRectAtEnd.left - 5,
+    'right-most session tab should finish before sticky actions at maximum scroll');
+  expect(finalCloseRect.right <= actionsRectAtEnd.left,
+    'sticky actions should not cover the right-most tab close button at maximum scroll');
+  workspace.style.flex = '';
+  workspace.style.width = '';
+  tabList.scrollLeft = 0;
+  await tick();
 
   const themes = window.chromuxTestThemes;
   expect(themes, 'missing theme test API');
