@@ -1060,6 +1060,7 @@ function newSessionShape({ id, name, cwd, agent }) {
       term: null,
       fitAddon: null,
       fit: () => {},
+      scrollToBottom: null,
       lineBuf: '',
       signalBuf: '',
       titleBuf: '',
@@ -2378,6 +2379,13 @@ function buildSessionView(session) {
   termHead.append(termLabel, termCwd);
   const termHost = document.createElement('div');
   termHost.className = 'term-host';
+  const scrollToBottom = document.createElement('button');
+  scrollToBottom.type = 'button';
+  scrollToBottom.className = 'term-scroll-bottom hidden';
+  scrollToBottom.textContent = '↓ SKIP TO BOTTOM';
+  scrollToBottom.title = 'Skip to latest terminal output';
+  scrollToBottom.setAttribute('aria-label', 'Skip to latest terminal output');
+  termHost.appendChild(scrollToBottom);
   termPane.append(termHead, termHost);
 
   // divider
@@ -2521,7 +2529,7 @@ function buildSessionView(session) {
   });
 
   return {
-    view, termLabel, termHost, urlBar, favoriteBtn, favoritesBtn, favoritesBadge, favoritesPanel, favoritesList, queueBtn, queueBadge, queuePanel, queueList,
+    view, termLabel, termHost, scrollToBottom, urlBar, favoriteBtn, favoritesBtn, favoritesBadge, favoritesPanel, favoritesList, queueBtn, queueBadge, queuePanel, queueList,
     consoleChip, captureChip, pickBtn, captureBtn, webHost, placeholder, refreshFlash,
     divider, webPane, browserToolbar, collapseBtn,
   };
@@ -3247,6 +3255,137 @@ function handleTerminalInput(session, data) {
   return rewrite;
 }
 
+const TERMINAL_SCROLL_ANIMATION_MS = 220;
+
+function terminalCanScrollBack(term) {
+  const buffer = term && term.buffer && term.buffer.active;
+  return Boolean(buffer && buffer.type === 'normal' && buffer.baseY > 0);
+}
+
+function terminalScrollState(session) {
+  const term = session && session.term && session.term.term;
+  const buffer = term && term.buffer && term.buffer.active;
+  const rows = Math.max(0, Number(term && term.rows) || 0);
+  const behind = buffer ? Math.max(0, buffer.baseY - buffer.viewportY) : 0;
+  return {
+    baseY: buffer ? buffer.baseY : 0,
+    viewportY: buffer ? buffer.viewportY : 0,
+    rows,
+    behind,
+    alternate: Boolean(buffer && buffer.type !== 'normal'),
+    visible: Boolean(
+      session
+      && session.term.scrollToBottom
+      && !session.term.scrollToBottom.animationFrame
+      && terminalCanScrollBack(term)
+      && rows > 0
+      && behind >= rows
+    ),
+  };
+}
+
+function renderTerminalScrollToBottom(session) {
+  const control = session && session.els && session.els.scrollToBottom;
+  if (!control) return;
+  control.classList.toggle('hidden', !terminalScrollState(session).visible);
+}
+
+function cancelTerminalScrollAnimation(session, { render = true } = {}) {
+  const tracker = session && session.term && session.term.scrollToBottom;
+  if (!tracker || !tracker.animationFrame) return false;
+  cancelAnimationFrame(tracker.animationFrame);
+  tracker.animationFrame = null;
+  tracker.animationStartedAt = 0;
+  if (render) renderTerminalScrollToBottom(session);
+  return true;
+}
+
+function finishTerminalScrollToBottom(session) {
+  const term = session && session.term && session.term.term;
+  const tracker = session && session.term && session.term.scrollToBottom;
+  if (!term || !tracker || tracker.disposed) return;
+  tracker.animationFrame = null;
+  tracker.animationStartedAt = 0;
+  term.scrollToBottom();
+  renderTerminalScrollToBottom(session);
+  if (state.activeId === session.id) term.focus();
+}
+
+function animateTerminalScrollToBottom(session) {
+  const term = session && session.term && session.term.term;
+  const tracker = session && session.term && session.term.scrollToBottom;
+  if (!term || !tracker || tracker.disposed) return;
+  cancelTerminalScrollAnimation(session, { render: false });
+  const control = session.els && session.els.scrollToBottom;
+  if (control) control.classList.add('hidden');
+
+  if (tracker.reducedMotion()) {
+    finishTerminalScrollToBottom(session);
+    return;
+  }
+
+  const startY = term.buffer.active.viewportY;
+  tracker.animationStartedAt = performance.now();
+  const step = (now) => {
+    if (tracker.disposed || !tracker.animationFrame) return;
+    if (!terminalCanScrollBack(term)) {
+      finishTerminalScrollToBottom(session);
+      return;
+    }
+    const progress = Math.min(1, Math.max(0, (now - tracker.animationStartedAt) / TERMINAL_SCROLL_ANIMATION_MS));
+    const eased = 1 - Math.pow(1 - progress, 3);
+    const currentY = term.buffer.active.viewportY;
+    const targetY = term.buffer.active.baseY;
+    const desiredY = Math.round(startY + (targetY - startY) * eased);
+    const delta = desiredY - currentY;
+    if (delta) term.scrollLines(delta);
+    if (progress >= 1) {
+      finishTerminalScrollToBottom(session);
+      return;
+    }
+    tracker.animationFrame = requestAnimationFrame(step);
+  };
+  tracker.animationFrame = requestAnimationFrame(step);
+}
+
+function installTerminalScrollToBottom(session, { reducedMotion = null } = {}) {
+  const term = session.term.term;
+  const host = session.els.termHost;
+  const control = session.els.scrollToBottom;
+  const disposables = [];
+  const tracker = {
+    animationFrame: null,
+    animationStartedAt: 0,
+    disposed: false,
+    reducedMotion: typeof reducedMotion === 'function'
+      ? reducedMotion
+      : () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    dispose() {
+      if (tracker.disposed) return;
+      tracker.disposed = true;
+      cancelTerminalScrollAnimation(session, { render: false });
+      for (const disposable of disposables) disposable.dispose();
+      host.removeEventListener('wheel', cancelFromUser, true);
+      host.removeEventListener('pointerdown', cancelFromUser, true);
+      control.removeEventListener('click', activate);
+      control.classList.add('hidden');
+    },
+  };
+  const update = () => renderTerminalScrollToBottom(session);
+  const cancelFromUser = () => cancelTerminalScrollAnimation(session);
+  const activate = () => animateTerminalScrollToBottom(session);
+
+  session.term.scrollToBottom = tracker;
+  disposables.push(term.onScroll(update));
+  disposables.push(term.onWriteParsed(update));
+  disposables.push(term.onResize(update));
+  host.addEventListener('wheel', cancelFromUser, true);
+  host.addEventListener('pointerdown', cancelFromUser, true);
+  control.addEventListener('click', activate);
+  update();
+  return tracker;
+}
+
 async function createSession({ name, cwd, agent, initialUrl = null, initialQueue = [], command = undefined, resumeLaunch = null }) {
   state.counter += 1;
   const id = 's' + state.counter;
@@ -3288,6 +3427,7 @@ async function createSession({ name, cwd, agent, initialUrl = null, initialQueue
   };
   session.term.fit();
   registerTerminalLinks(session);
+  installTerminalScrollToBottom(session);
 
   term.onData((data) => handleTerminalInput(session, data));
   new ResizeObserver(() => session.term.fit()).observe(viewEls.termHost);
@@ -3335,6 +3475,7 @@ function closeSession(id) {
   const s = state.sessions.get(id);
   if (!s) return;
   window.chromux.ptyKill(id);
+  if (s.term.scrollToBottom) s.term.scrollToBottom.dispose();
   s.term.term.dispose();
   s.els.view.remove();
   s.els.tab.remove();
@@ -5828,6 +5969,106 @@ if (window.chromuxTest) {
     },
     confirmContext() { $('#grok-context-confirm').click(); },
     sessionAgents: () => [...state.sessions.values()].map((session) => session.agent),
+  };
+
+  window.chromuxTestTerminalScroll = {
+    addSession({ name = 'terminal-scroll-test', cols = 60, rows = 12, scrollback = 240, reducedMotion = false } = {}) {
+      state.counter += 1;
+      const session = newSessionShape({ id: 's' + state.counter, name, cwd: '/tmp', agent: 'codex' });
+      const viewEls = buildSessionView(session);
+      const tabEls = buildSessionTab(session);
+      session.els = { ...viewEls, ...tabEls };
+      applyBrowserLayout(session);
+      const term = new Terminal({
+        cols,
+        rows,
+        scrollback,
+        fontFamily: 'monospace',
+        fontSize: 12,
+        lineHeight: 1,
+        theme: terminalThemeFor(),
+      });
+      term.open(viewEls.termHost);
+      term.resize(cols, rows);
+      session.term.term = term;
+      session.term.fit = () => {};
+      session._reducedMotion = Boolean(reducedMotion);
+      session._scrollEvents = 0;
+      session._scrollEventDisposable = term.onScroll(() => { session._scrollEvents += 1; });
+      installTerminalScrollToBottom(session, { reducedMotion: () => session._reducedMotion });
+      state.sessions.set(session.id, session);
+      apply({ type: 'session-created', sessionId: session.id, name, cwd: session.cwd, agent: session.agent });
+      activateSession(session.id);
+      flushRender();
+      return session.id;
+    },
+    write(id, data) {
+      return new Promise((resolve) => testSession(id).term.term.write(String(data), resolve));
+    },
+    writeLines(id, count, prefix = 'scrollback line') {
+      const data = Array.from({ length: count }, (_, index) => `${prefix} ${index}\r\n`).join('');
+      return new Promise((resolve) => testSession(id).term.term.write(data, resolve));
+    },
+    scrollLines(id, amount) { testSession(id).term.term.scrollLines(amount); },
+    scrollToBottom(id) { testSession(id).term.term.scrollToBottom(); },
+    resize(id, cols, rows) { testSession(id).term.term.resize(cols, rows); },
+    setViewWidth(id, width = null) {
+      const view = testSession(id).els.view;
+      if (width === null) {
+        view.style.inset = '';
+        view.style.width = '';
+      } else {
+        view.style.inset = '0 auto 0 0';
+        view.style.width = `${Math.max(320, Number(width) || 320)}px`;
+      }
+    },
+    setReducedMotion(id, reduced) { testSession(id)._reducedMotion = Boolean(reduced); },
+    setAlternate(id, active) {
+      const sequence = active ? '\x1b[?1049h' : '\x1b[?1049l';
+      return new Promise((resolve) => testSession(id).term.term.write(sequence, resolve));
+    },
+    click(id) { testSession(id).els.scrollToBottom.click(); },
+    wheel(id) {
+      testSession(id).els.termHost.dispatchEvent(new WheelEvent('wheel', { bubbles: true, deltaY: -1 }));
+    },
+    pointer(id) {
+      testSession(id).els.termHost.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    },
+    focus(id) { activateSession(id); flushRender(); },
+    state(id) {
+      const session = testSession(id);
+      const control = session.els.scrollToBottom;
+      const hostRect = session.els.termHost.getBoundingClientRect();
+      const controlRect = control.getBoundingClientRect();
+      const controlStyle = getComputedStyle(control);
+      return {
+        ...terminalScrollState(session),
+        hidden: control.classList.contains('hidden'),
+        animating: Boolean(session.term.scrollToBottom.animationFrame),
+        scrollEvents: session._scrollEvents,
+        focused: document.activeElement === session.els.termHost.querySelector('.xterm-helper-textarea'),
+        label: control.textContent,
+        title: control.title,
+        ariaLabel: control.getAttribute('aria-label'),
+        bottomInset: hostRect.bottom - controlRect.bottom,
+        centerOffset: ((controlRect.left + controlRect.right) / 2) - ((hostRect.left + hostRect.right) / 2),
+        color: controlStyle.color,
+        background: controlStyle.backgroundColor,
+        theme: document.body.dataset.theme,
+        mode: document.body.dataset.themeMode,
+      };
+    },
+    dispose(id) {
+      const session = testSession(id);
+      session._scrollEventDisposable.dispose();
+      session.term.scrollToBottom.dispose();
+      session.term.term.dispose();
+      session.els.view.remove();
+      session.els.tab.remove();
+      state.sessions.delete(id);
+      if (state.activeId === id) state.activeId = state.sessions.keys().next().value || null;
+      flushRender();
+    },
   };
 
   window.chromuxTestThemes = {

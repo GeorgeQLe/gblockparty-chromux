@@ -797,8 +797,31 @@ body {
 
 .term-pane { background: var(--bg0); }
 .term-head-cwd { flex: 1; color: var(--faint); font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.term-host { flex: 1; min-height: 0; padding: 6px 2px 6px 8px; }
+.term-host { position: relative; flex: 1; min-height: 0; padding: 6px 2px 6px 8px; }
 .term-host .xterm { height: 100%; }
+.term-scroll-bottom {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  min-height: 26px;
+  padding: 0 12px;
+  border: 1px solid var(--line-hi);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg2) 92%, transparent);
+  color: var(--text);
+  box-shadow: 0 5px 18px color-mix(in srgb, var(--bg0) 72%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  font: 700 9px/1 var(--font-display);
+  letter-spacing: .14em;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.term-scroll-bottom:hover { color: var(--amber-hot); border-color: var(--amber); }
+.term-scroll-bottom:active { background: var(--bg3); }
+.term-scroll-bottom:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 
 .divider { background: var(--line); cursor: col-resize; position: relative; }
 .divider::after {

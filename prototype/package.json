@@ -1,6 +1,6 @@
 {
   "name": "chromux",
-  "version": "0.37.0",
+  "version": "0.38.0",
   "description": "OSS desktop front-end for local and GBlockParty-managed agent/browser workspaces.",
   "main": "main.js",
   "private": false,
@@ -57,6 +57,7 @@
     "test:grok-warning-renderer": "node scripts/test-grok-warning-renderer.js",
     "test:streak-attention-click-targets-renderer": "node scripts/test-streak-attention-click-targets-renderer.js",
     "test:themes-renderer": "node scripts/test-themes-renderer.js",
+    "test:terminal-scroll-bottom-renderer": "node scripts/test-terminal-scroll-bottom-renderer.js",
     "package": "electron-packager . Chromux --platform=darwin --arch=arm64 --icon=build/icon --app-bundle-id=dev.georgele.chromux --overwrite --out=dist --ignore='^/dist' --ignore='^/build/icon.iconset' --asar.unpack='**/node_modules/node-pty/**'",
     "install-app": "npm run package && node scripts/record-install-source.js && rm -rf /Applications/Chromux.app && cp -R dist/Chromux-darwin-arm64/Chromux.app /Applications/Chromux.app",
     "rebuild": "electron-rebuild -f -w node-pty",

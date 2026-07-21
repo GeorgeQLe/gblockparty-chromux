@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Add a session-local floating terminal skip-to-bottom control with a one-page threshold, smooth/reduced-motion behavior, alternate-screen suppression, cancellation safety, real-xterm coverage, and v0.38.0 release. _(source: user-approved implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`, `prototype/scripts/test-terminal-scroll-bottom-renderer.js`, `RELEASES.md`)_
+
 - [x] Vertically center the horizontal session-tab scrollbar with balanced 3px gaps across every theme while preserving stable overflow geometry; ship as v0.36.1. _(source: user-approved implementation plan; evidence: `prototype/renderer/styles.css`, `prototype/scripts/test-tab-titles-renderer.js`, `RELEASES.md`)_
 
 - [x] Add completion seen-state and a persisted Attention/Threads/Git session rail with exact-cwd and Git-root grouping; ship as v0.36.0. _(source: user-approved implementation plan; evidence: `prototype/renderer/attention.js`, `prototype/renderer/renderer.js`, `prototype/main.js`, `prototype/scripts/test-session-rail-renderer.js`, `RELEASES.md`)_

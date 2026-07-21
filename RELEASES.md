@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.38.0
+
+Tag: `chromux-v0.38.0`
+
+- Add a floating, bottom-centered `↓ SKIP TO BOTTOM` control after a terminal is at least one visible page behind its newest output.
+- Smoothly follow the current end of scrollback without interrupting a user's scrolled-back viewport when new PTY output arrives; reduced-motion mode jumps immediately.
+- Keep scroll state independent per session, suppress the control in alternate-screen and no-scrollback buffers, cancel animations on user interaction or disposal, and return focus safely to the active terminal.
+
 ## GBlockParty Chromux v0.37.0
 
 Tag: `chromux-v0.37.0`
