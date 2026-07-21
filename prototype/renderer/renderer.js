@@ -9,6 +9,7 @@ const $ = (sel) => document.querySelector(sel);
 const THEME_STORAGE_KEY = 'chromux.theme';
 const THEME_MODE_STORAGE_KEY = 'chromux.themeMode';
 const TAB_ACTIVITY_STORAGE_KEY = 'chromux.tabActivityIndicators';
+const RAIL_MODE_STORAGE_KEY = 'chromux.railMode';
 const THEME_IDS = new Set(['blueprint', 'retro-os', 'streak', 'liquid-glass']);
 const THEME_MODE_IDS = new Set(['light', 'dark']);
 const THEME_LABELS = {
@@ -17,6 +18,7 @@ const THEME_LABELS = {
   streak: 'Streak',
   'liquid-glass': 'Liquid Glass',
 };
+const RAIL_MODES = new Set(['attention', 'threads', 'git']);
 
 function storedTheme() {
   try {
@@ -41,6 +43,13 @@ function storedTabActivityIndicators() {
   } catch { return true; }
 }
 
+function storedRailMode() {
+  try {
+    const value = window.localStorage.getItem(RAIL_MODE_STORAGE_KEY);
+    return RAIL_MODES.has(value) ? value : 'attention';
+  } catch { return 'attention'; }
+}
+
 const state = {
   sessions: new Map(), // id -> session
   activeId: null,
@@ -58,6 +67,9 @@ const state = {
     themeMode: storedThemeMode(),
     windowButtonPosition: null,
     tabActivityIndicators: storedTabActivityIndicators(),
+    railMode: storedRailMode(),
+    gitRoots: new Map(), // exact cwd -> { value: string|null|undefined, promise }
+    railExpanded: new Map(),
     captureModal: null, // { captureId, pngBase64, payloadBase } while composing/delivering
     dirty: new Set(),
     rafScheduled: false,
@@ -831,6 +843,9 @@ function apply(event) {
         tabStateChanged = window.chromuxAttention.applyTurnSignal(
           session.turn, event.signal, event.detail, Date.now(), event.envelope || null,
         );
+        if (tabStateChanged && session.id === state.activeId && session.turn.state === 'completed') {
+          session.turn.attentionSeenAt = Math.max(session.turn.attentionSeenAt || 0, session.turn.since || 0);
+        }
       }
       break;
     case 'user-input':
@@ -854,6 +869,9 @@ function apply(event) {
       // Display-only: never touches turn state, so looking at a completed
       // session cannot regress the update queue.
       state.activeId = event.sessionId;
+      if (session && session.turn.state === 'completed') {
+        session.turn.attentionSeenAt = Math.max(session.turn.attentionSeenAt || 0, session.turn.since || 0);
+      }
       break;
     case 'session-adopted':
       if (session && ADOPTABLE_AGENTS.has(event.agent) && session.agent !== event.agent) {
@@ -1020,6 +1038,7 @@ function newSessionShape({ id, name, cwd, agent }) {
       detail: null,
       since: 0,
       acknowledged: false, // explicit DISMISS — hides the item, keeps the state
+      attentionSeenAt: 0, // opening a completed session hides only that completion
       token: null, protocol: null, authoritative: false, hasV2: false, inputAt: 0, reason: null,
       source: null, confidence: null, turnId: null, eventId: null,
       eventIds: [], sequence: -1, stopped: false, authoritativeAt: 0, outputBuf: '',
@@ -2938,6 +2957,11 @@ function renderAttentionQueue() {
   if (!host) return;
   host.innerHTML = '';
   const items = attentionItems();
+  renderRailNavigation(items.length);
+  if (state.ui.railMode !== 'attention') {
+    renderGroupedSessionRail(host, state.ui.railMode);
+    return;
+  }
   if (items.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'attention-empty';
@@ -2986,6 +3010,125 @@ function renderAttentionQueue() {
     }
     row.append(top, detail, actions);
     host.appendChild(row);
+  }
+}
+
+function renderRailNavigation(attentionCount) {
+  const mode = RAIL_MODES.has(state.ui.railMode) ? state.ui.railMode : 'attention';
+  const heading = $('#rail-heading');
+  if (heading) heading.textContent = mode === 'git' ? 'GIT' : mode.toUpperCase();
+  const count = $('#rail-attention-count');
+  if (count) {
+    count.textContent = String(attentionCount);
+    count.classList.toggle('zero', attentionCount === 0);
+    count.setAttribute('aria-label', `${attentionCount} attention item${attentionCount === 1 ? '' : 's'}`);
+  }
+  document.querySelectorAll('[data-rail-mode]').forEach((button) => {
+    const selected = button.dataset.railMode === mode;
+    button.classList.toggle('selected', selected);
+    button.setAttribute('aria-pressed', String(selected));
+  });
+}
+
+function selectRailMode(mode, { persist = true } = {}) {
+  if (!RAIL_MODES.has(mode)) return state.ui.railMode;
+  state.ui.railMode = mode;
+  if (persist) {
+    try { window.localStorage.setItem(RAIL_MODE_STORAGE_KEY, mode); } catch { /* unavailable */ }
+  }
+  invalidate('attention');
+  return mode;
+}
+
+function directoryBasename(directory) {
+  const clean = String(directory || '~').replace(/\/+$/, '');
+  return clean.split('/').filter(Boolean).pop() || clean || '/';
+}
+
+function sessionRailStatus(session) {
+  const stateName = session.turn && session.turn.state;
+  if (['needsInput', 'permission', 'authentication', 'rateLimited', 'toolFailed'].includes(stateName)) {
+    return { kind: 'action', icon: '!', label: 'Action required' };
+  }
+  if (stateName === 'working') return { kind: 'working', icon: '', label: 'Working' };
+  if (stateName === 'completed') return { kind: 'completed', icon: '✓', label: 'Completed' };
+  return { kind: 'live', icon: '', label: 'Live' };
+}
+
+function ensureGitRoot(cwd) {
+  if (state.ui.gitRoots.has(cwd)) return state.ui.gitRoots.get(cwd);
+  const entry = { value: undefined, promise: null };
+  entry.promise = Promise.resolve(window.chromux.gitRoot(cwd))
+    .then((root) => { entry.value = typeof root === 'string' && root ? root : null; })
+    .catch(() => { entry.value = null; })
+    .finally(() => invalidate('attention'));
+  state.ui.gitRoots.set(cwd, entry);
+  return entry;
+}
+
+function groupedRailSessions(mode) {
+  const live = orderedSessions().filter((session) => session.lifecycle && session.lifecycle.alive);
+  const groups = new Map();
+  const add = (key, label, title, session, order = 0) => {
+    if (!groups.has(key)) groups.set(key, { key, label, title, sessions: [], order });
+    groups.get(key).sessions.push(session);
+  };
+  for (const session of live) {
+    const cwd = session.cwd || '~';
+    if (mode === 'threads') {
+      add(`cwd:${cwd}`, directoryBasename(cwd), cwd, session);
+      continue;
+    }
+    const entry = ensureGitRoot(cwd);
+    if (entry.value === undefined) add('git:pending', 'Resolving repositories…', 'Resolving Git repository roots', session, 1);
+    else if (entry.value === null) add('git:none', 'Not a Git repository', 'Sessions outside a Git repository', session, 2);
+    else add(`git:${entry.value}`, directoryBasename(entry.value), entry.value, session, 0);
+  }
+  return [...groups.values()].sort((a, b) => (a.order - b.order)
+    || (a.key === 'git:none' ? 1 : b.key === 'git:none' ? -1 : a.label.localeCompare(b.label)));
+}
+
+function renderGroupedSessionRail(host, mode) {
+  const groups = groupedRailSessions(mode);
+  if (groups.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'attention-empty';
+    empty.textContent = 'No live sessions.';
+    host.appendChild(empty);
+    return;
+  }
+  for (const group of groups) {
+    const details = document.createElement('details');
+    details.className = 'rail-group';
+    details.dataset.groupKey = group.key;
+    details.open = state.ui.railExpanded.get(`${mode}:${group.key}`) !== false;
+    details.addEventListener('toggle', () => state.ui.railExpanded.set(`${mode}:${group.key}`, details.open));
+    const summary = document.createElement('summary');
+    summary.title = group.title;
+    const label = document.createElement('span'); label.className = 'rail-group-label'; label.textContent = group.label;
+    const count = document.createElement('span'); count.className = 'rail-group-count'; count.textContent = String(group.sessions.length);
+    summary.append(label, count);
+    const rows = document.createElement('div'); rows.className = 'rail-group-rows';
+    for (const session of group.sessions) {
+      const status = sessionRailStatus(session);
+      const row = document.createElement('button');
+      row.className = 'rail-session-row';
+      row.type = 'button';
+      row.dataset.sessionId = session.id;
+      row.title = `${sessionDisplayLabel(session)} — ${status.label}\n${session.cwd || '~'}`;
+      row.setAttribute('aria-label', `${sessionDisplayLabel(session)}. ${status.label}. ${session.cwd || '~'}`);
+      const icon = document.createElement('span');
+      icon.className = `rail-status ${status.kind}`;
+      icon.textContent = status.icon;
+      icon.title = status.label;
+      icon.setAttribute('aria-label', status.label);
+      const name = document.createElement('span'); name.className = 'rail-session-name'; name.textContent = sessionDisplayLabel(session);
+      row.append(icon, name);
+      row.onclick = () => activateSession(session.id);
+      rows.appendChild(row);
+    }
+    details.append(summary, rows);
+    host.appendChild(details);
   }
 }
 
@@ -3610,6 +3753,9 @@ function handlePtyData(id, data) {
   if (res.clean) {
     s.term.term.write(res.clean);
     if (window.chromuxAttention.applyCodexOutputCompletionFallback(s, res.clean, Date.now())) {
+      if (s.id === state.activeId) {
+        s.turn.attentionSeenAt = Math.max(s.turn.attentionSeenAt || 0, s.turn.since || 0);
+      }
       invalidate('update', 'attention', 'badges', 'tabs');
     }
     feedDetector(s, res.clean);
@@ -4272,6 +4418,9 @@ $('#session-search-results').addEventListener('keydown', (event) => {
   if (next) next.focus();
 });
 $('#btn-first-session').onclick = openNewSessionModal;
+document.querySelectorAll('[data-rail-mode]').forEach((button) => {
+  button.addEventListener('click', () => selectRailMode(button.dataset.railMode));
+});
 $('#btn-detect').onclick = openDetectModal;
 $('#btn-first-detect').onclick = openDetectModal;
 $('#detect-search').oninput = (e) => {
@@ -4691,6 +4840,7 @@ if (window.chromuxTest) {
       };
     }
     session.turn.state = turnState;
+    if (turnState !== 'unknown') session.turn.since = Date.now();
     session.browser.queue = Array.isArray(queue)
       ? queue.map((item) => normalizeQueueItem(item, 'RESTORE')).filter(Boolean)
       : [];
@@ -4711,6 +4861,7 @@ if (window.chromuxTest) {
     state.counter += 1;
     const session = newSessionShape({ id: 's' + state.counter, name, cwd, agent });
     session.turn.state = turnState;
+    if (turnState !== 'unknown') session.turn.since = Date.now();
     session.lifecycle.alive = alive;
     const viewEls = buildSessionView(session);
     const tabEls = buildSessionTab(session);
@@ -4805,6 +4956,60 @@ if (window.chromuxTest) {
     flushRender,
   };
 
+  window.chromuxTestRail = {
+    addSession: addRenderableTestSession,
+    focus(id) { activateSession(id); flushRender(); },
+    emit(id, event, detail = null) { apply({ type: 'turn-signal', sessionId: id, signal: event, detail }); flushRender(); },
+    exit(id, exitCode = 0) { apply({ type: 'session-exited', sessionId: id, exitCode }); flushRender(); },
+    title(id, value) { handlePtyData(id, `\x1b]0;${value}\x07`); flushRender(); },
+    mode: () => state.ui.railMode,
+    storedMode: () => {
+      try { return window.localStorage.getItem(RAIL_MODE_STORAGE_KEY); } catch { return null; }
+    },
+    select(mode) {
+      const button = document.querySelector(`[data-rail-mode="${mode}"]`);
+      if (!button) throw new Error(`Unknown rail mode: ${mode}`);
+      button.click(); flushRender(); return state.ui.railMode;
+    },
+    heading: () => $('#rail-heading')?.textContent || '',
+    attentionCount: () => Number($('#rail-attention-count')?.textContent || 0),
+    nav: () => [...document.querySelectorAll('[data-rail-mode]')].map((button) => ({
+      mode: button.dataset.railMode,
+      label: button.getAttribute('aria-label'),
+      title: button.title,
+      pressed: button.getAttribute('aria-pressed'),
+    })),
+    groups: () => [...document.querySelectorAll('#attention-list .rail-group')].map((group) => ({
+      key: group.dataset.groupKey,
+      label: group.querySelector('.rail-group-label')?.textContent || '',
+      title: group.querySelector('summary')?.title || '',
+      count: Number(group.querySelector('.rail-group-count')?.textContent || 0),
+      open: group.open,
+      rows: [...group.querySelectorAll('.rail-session-row')].map((row) => ({
+        id: row.dataset.sessionId,
+        name: row.querySelector('.rail-session-name')?.textContent || '',
+        status: row.querySelector('.rail-status')?.getAttribute('aria-label') || '',
+        title: row.title,
+        ariaLabel: row.getAttribute('aria-label') || '',
+      })),
+    })),
+    clickRow(id) {
+      const row = document.querySelector(`#attention-list .rail-session-row[data-session-id="${CSS.escape(id)}"]`);
+      if (!row) throw new Error(`Missing rail row: ${id}`);
+      row.click(); flushRender(); return state.activeId;
+    },
+    activeId: () => state.activeId,
+    turnState: (id) => ({ ...testSession(id).turn }),
+    attentionKinds: () => [...document.querySelectorAll('#attention-list .attention-kind')].map((el) => el.textContent),
+    resolveGitRoot: (cwd) => window.chromux.gitRoot(cwd),
+    gitCacheSize: () => state.ui.gitRoots.size,
+    async waitForGit() {
+      await Promise.all([...state.ui.gitRoots.values()].map((entry) => entry.promise));
+      flushRender();
+    },
+    flushRender,
+  };
+
   window.chromuxTestUpdateQueue = {
     setStatus(status) {
       renderUpdateStatus({
@@ -4877,7 +5082,12 @@ if (window.chromuxTest) {
     setSession(id, patch = {}) {
       const session = testSession(id);
       if (patch.alive !== undefined) session.lifecycle.alive = patch.alive;
-      if (patch.turnState !== undefined) session.turn.state = patch.turnState;
+      if (patch.turnState !== undefined) {
+        session.turn.state = patch.turnState;
+        session.turn.since = Math.max(Date.now(), (session.turn.since || 0) + 1,
+          patch.turnState === 'completed' ? (session.turn.attentionSeenAt || 0) + 1 : 0);
+        session.turn.acknowledged = false;
+      }
       invalidate('update', 'attention', 'badges');
       flushRender();
     },

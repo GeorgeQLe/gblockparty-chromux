@@ -55,6 +55,15 @@ Packaged launches hide the strip by default. Use **SETTINGS → DEVELOPER MODE**
 setting; Chromux confirms when sessions are open, saves a restore snapshot, and restarts to apply it.
 The `--dev-mode` and `--no-dev-mode` flags take precedence over the saved preference.
 
+### Session rail
+
+The left rail has three persisted icon views while the horizontal tabs remain the primary navigator.
+**Attention** shows actionable items and unseen background completions; opening a completed session marks
+that completion seen without changing its completed tab status. **Threads** groups live sessions by exact
+working directory. **Git** groups them by repository root and puts remaining sessions in **Not a Git
+repository**. Rail rows show Action required, Working, Completed, or Live status and activate the matching
+session. New attention updates the badge without switching the selected rail view.
+
 ### Host resources and parallel agents
 
 Open **RESOURCES** to inspect host-wide owners, FIFO queues, lease expiry, wait time, and iOS Simulator capacity. Chromux uses a background Unix-socket broker shared by the app and Codex MCP clients. See [`docs/resource-broker.md`](docs/resource-broker.md) for MCP registration, the optional LaunchAgent, global Computer Use guidance, and simulator wrapper contract. Prefer Codex's built-in Browser for web-app testing; native macOS and foreground Simulator work must lease `macos:foreground-input`.
@@ -160,7 +169,10 @@ Claude Code and Grok Build provide native start, actionable-notification, and
 completion callbacks. Codex provides native completion while start is inferred
 from submitted Enter; its actionable notification capabilities are unavailable.
 Unknown native notifications are retained in local diagnostics and never create
-an attention row. Chromux does not post macOS Notification Center alerts.
+an attention row. A background completion remains in Attention until its session is opened or the row is
+explicitly dismissed; a completion received by the active session is already seen. Opening a session never
+dismisses permission, authentication, input, rate-limit, or tool-failure attention. Chromux does not post
+macOS Notification Center alerts.
 | Browser pane profiles | Session-specific Electron partitions `persist:chromux-<session ID>` |
 
 Chromux has no account, cloud sync, Chromux-hosted capture upload, or product

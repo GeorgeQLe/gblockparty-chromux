@@ -98,7 +98,9 @@
     turn.state = next;
     turn.instrumented = true;
     turn.detail = (envelope && envelope.message) || detail || null;
-    turn.since = now;
+    turn.since = next === 'completed'
+      ? Math.max(now, (Number(turn.attentionSeenAt) || 0) + 1)
+      : now;
     turn.acknowledged = false;
     return true;
   }
@@ -136,7 +138,7 @@
     if (!reachedIdle) return false;
     turn.state = 'completed';
     turn.detail = 'Codex turn finished';
-    turn.since = now;
+    turn.since = Math.max(now, (Number(turn.attentionSeenAt) || 0) + 1);
     turn.acknowledged = false;
     turn.protocol = 'output';
     turn.source = 'codex:terminal-idle';
@@ -234,7 +236,8 @@
       items.push(scopedItem({ type, kind, session, detail: turn.detail || fallback,
         cls: type, primaryAction: 'FOCUS', createdAt: turn.since, acknowledged: false }));
     }
-    if (!turn.acknowledged && turn.state === 'completed') {
+    if (!turn.acknowledged && turn.state === 'completed'
+      && (Number(turn.since) || 0) > (Number(turn.attentionSeenAt) || 0)) {
       items.push(scopedItem({
         type: 'completed',
         kind: 'COMPLETED',
@@ -358,6 +361,9 @@
     else if (session.turn && session.turn.acknowledged
       && ['completed', 'needsInput', 'permission', 'authentication', 'rateLimited', 'toolFailed'].includes(session.turn.state)) {
       suppression = 'acknowledged';
+    } else if (session.turn && session.turn.state === 'completed'
+      && (Number(session.turn.since) || 0) <= (Number(session.turn.attentionSeenAt) || 0)) {
+      suppression = 'seen-completion';
     } else if (sessionItems.length === 0) suppression = 'no-actionable-state';
     return {
       expectedItem: sessionItems[0] || null,

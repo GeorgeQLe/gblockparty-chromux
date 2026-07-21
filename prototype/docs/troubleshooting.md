@@ -150,6 +150,12 @@ See [privacy-and-local-data.md](privacy-and-local-data.md) for the complete loca
 
 ## Agent attention is missing or marked legacy
 
+Use the rail's **Attention** icon for actionable items and unseen background completions. Opening a completed
+session removes only that completion from Attention; its tab and Threads/Git row remain Completed. Permission,
+authentication, input, rate-limit, and tool-failure items are not cleared by opening their session. The
+**Threads** view groups exact working directories, while **Git** resolves repository roots and uses a final
+**Not a Git repository** group. New attention changes the Attention badge but does not switch your rail view.
+
 Chromux regenerates its classifier and installed hook files at startup. New v2
 events are authenticated to one PTY; copied terminal output, callbacks from a
 different session, and stale or duplicate callbacks are intentionally rejected.

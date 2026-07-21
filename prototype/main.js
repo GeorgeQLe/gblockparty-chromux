@@ -65,6 +65,8 @@ const PROJECTS_FILE_BYTES_MAX = 1024 * 1024;
 const PROJECT_NAME_MAX = 100;
 const PACKAGE_JSON_BYTES_MAX = 1024 * 1024;
 const WINDOW_BUTTON_COORD_MAX = 200;
+const GIT_CWD_MAX = 4096;
+const GIT_ROOT_TIMEOUT_MS = 2500;
 
 let win = null;
 const ptys = new Map(); // sessionId -> IPty
@@ -1235,6 +1237,22 @@ function runCmd(cmd, args, timeout = 10000) {
   });
 }
 
+async function gitRoot(cwd) {
+  if (typeof cwd !== 'string' || cwd.length === 0 || cwd.length > GIT_CWD_MAX || !path.isAbsolute(cwd)) return null;
+  let directory;
+  try {
+    directory = fs.realpathSync(cwd);
+    if (!fs.statSync(directory).isDirectory()) return null;
+  } catch { return null; }
+  const output = await runCmd('/usr/bin/git', ['-C', directory, 'rev-parse', '--show-toplevel'], GIT_ROOT_TIMEOUT_MS);
+  const root = output.trim();
+  if (!root || root.includes('\0') || !path.isAbsolute(root)) return null;
+  try {
+    const resolved = fs.realpathSync(root);
+    return fs.statSync(resolved).isDirectory() ? resolved : null;
+  } catch { return null; }
+}
+
 async function listTtyProcesses() {
   const out = await runCmd('/bin/ps', ['-axo', 'pid=,ppid=,tty=,etime=,command=']);
   const procs = [];
@@ -1713,6 +1731,7 @@ ipcMain.handle('favorites-replace', (_e, records) => replaceFavorites(records));
 ipcMain.handle('projects-read', () => readProjects());
 ipcMain.handle('projects-replace', (_e, records) => replaceProjects(records));
 ipcMain.handle('project-config', (_e, cwd) => packageProjectConfig(cwd));
+ipcMain.handle('git-root', (_e, cwd) => gitRoot(cwd));
 
 ipcMain.handle('check-updates', (_e, opts = {}) => getUpdateStatus(opts));
 

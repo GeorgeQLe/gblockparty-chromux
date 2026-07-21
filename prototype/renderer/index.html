@@ -42,9 +42,23 @@
   <!-- ══ main frame ══ -->
   <div id="app">
     <aside id="rail">
-      <div class="rail-head">
-        <span class="microlabel">ATTENTION QUEUE</span>
-        <button id="btn-detect" class="btn" title="Detect open terminal tabs & agent sessions (⌘D)">⛶ DETECT</button>
+      <div class="rail-header">
+        <nav class="rail-nav" aria-label="Session rail views">
+          <button class="rail-mode-btn" data-rail-mode="attention" aria-label="Attention" title="Attention" aria-pressed="true">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3.2a4.8 4.8 0 0 0-4.8 4.8v2.4L3.8 13h12.4l-1.4-2.6V8A4.8 4.8 0 0 0 10 3.2Z"/><path d="M8.2 15.2a2 2 0 0 0 3.6 0"/></svg>
+            <span id="rail-attention-count" class="rail-count">0</span>
+          </button>
+          <button class="rail-mode-btn" data-rail-mode="threads" aria-label="Threads" title="Threads" aria-pressed="false">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="6" cy="6" r="2.2"/><circle cx="14" cy="6" r="2.2"/><circle cx="10" cy="14" r="2.2"/><path d="m7.8 7.4 1.4 4.2m3-4.2-1.4 4.2"/></svg>
+          </button>
+          <button class="rail-mode-btn" data-rail-mode="git" aria-label="Git" title="Git repositories" aria-pressed="false">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="15" r="2"/><circle cx="14" cy="10" r="2"/><path d="M6 7v6m2-6.4 4.2 2.5"/></svg>
+          </button>
+        </nav>
+        <div class="rail-head">
+          <span id="rail-heading" class="microlabel">ATTENTION</span>
+          <button id="btn-detect" class="btn" title="Detect open terminal tabs & agent sessions (⌘D)">⛶ DETECT</button>
+        </div>
       </div>
       <div id="attention-list"></div>
       <div class="rail-foot">

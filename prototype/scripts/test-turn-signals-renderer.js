@@ -89,8 +89,12 @@ fs.writeFileSync(e2ePath, `
   expect(itemsFor('COMPLETED', 'codex-done').length === 0, 'focused completed Codex session is display-hidden');
   expect(sig.turnState(codexDone).state === 'completed', 'VIEW/focus must not clear completed state');
   expect(sig.turnState(codexDone).acknowledged === false, 'VIEW/focus must not acknowledge completion');
+  expect(sig.turnState(codexDone).attentionSeenAt >= sig.turnState(codexDone).since,
+    'VIEW/focus should record completion as seen separately from dismissal');
   sig.focus(holder);
-  expect(itemsFor('COMPLETED', 'codex-done').length === 1, 'completed Codex row reappears after blur');
+  expect(itemsFor('COMPLETED', 'codex-done').length === 0, 'seen Codex completion stays hidden after blur');
+  sig.feedPtyChunk(codexDone, osc('turn-start', codexDone) + osc('turn-end', codexDone));
+  expect(itemsFor('COMPLETED', 'codex-done').length === 1, 'subsequent turn creates a new unseen completion');
   sig.dismissItem('COMPLETED', 'codex-done');
   expect(sig.turnState(codexDone).state === 'completed', 'DISMISS keeps completed state');
   expect(sig.turnState(codexDone).acknowledged === true, 'DISMISS acknowledges completed row');
@@ -116,8 +120,8 @@ fs.writeFileSync(e2ePath, `
   expect(itemsFor('COMPLETED', 'codex-submit').length === 0,
     'focused fallback-completed Codex session is display-hidden');
   sig.focus(holder);
-  expect(itemsFor('COMPLETED', 'codex-submit').length === 1,
-    'fallback-completed Codex row reappears after blur');
+  expect(itemsFor('COMPLETED', 'codex-submit').length === 0,
+    'seen fallback-completed Codex row stays hidden after blur');
   sig.typeInput(codexSubmit, 'next task\\r');
   expect(sig.turnState(codexSubmit).state === 'working', 'new Codex input after fallback completion returns to working');
   expect(itemsFor('COMPLETED', 'codex-submit').length === 0,

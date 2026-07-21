@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.36.0
+
+Tag: `chromux-v0.36.0`
+
+- Add persisted icon-only Attention, Threads, and Git rail modes while retaining horizontal session tabs as the primary navigator.
+- Keep unseen background completions in Attention until their session is opened, without clearing actionable agent states or completed tab status.
+- Group live Threads by exact working directory and Git sessions by validated repository root, with accessible status icons and a final non-repository group.
+
 ## GBlockParty Chromux v0.35.0
 
 Tag: `chromux-v0.35.0`
