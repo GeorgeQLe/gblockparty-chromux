@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.41.1
+
+Tag: `chromux-v0.41.1`
+
+- Keep every rendered terminal row above the pane's lower boundary by moving the existing visual inset onto xterm's FitAddon-aware element.
+- Preserve the terminal's 6px vertical inset while allowing FitAddon to choose one fewer row at boundary heights.
+- Cover real xterm geometry across row-boundary heights, bottom scrolling, repeated tab activation, browser layout changes, and explicit refits.
+
 ## GBlockParty Chromux v0.41.0
 
 Tag: `chromux-v0.41.0`

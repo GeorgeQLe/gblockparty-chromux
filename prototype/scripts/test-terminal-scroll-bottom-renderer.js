@@ -63,6 +63,44 @@ fs.writeFileSync(e2ePath, `
   }
   terminal.setViewWidth(first, null);
 
+  const geometryFirst = terminal.addGeometrySession({ name: 'geometry-first' });
+  const geometrySecond = terminal.addGeometrySession({ name: 'geometry-second' });
+  const assertBottomGeometry = (id, context) => {
+    const geometry = terminal.state(id);
+    expect(geometry.screenHeight > 0, context + ' should render a real xterm screen');
+    expect(geometry.screenBottomInset >= 5.5,
+      context + ' crossed the intended 6px bottom inset: ' + JSON.stringify(geometry));
+    expect(geometry.screenBottomInset <= 20,
+      context + ' should not lose an extra terminal row: ' + JSON.stringify(geometry));
+  };
+  for (let height = 112; height <= 172; height += 1) {
+    terminal.setHostHeight(geometryFirst, height);
+    await tick();
+    assertBottomGeometry(geometryFirst, 'height ' + height);
+  }
+  terminal.setHostHeight(geometryFirst, 112);
+  await tick();
+  await terminal.writeLines(geometryFirst, 80, 'geometry-scrollback');
+  terminal.scrollToBottom(geometryFirst);
+  await tick();
+  assertBottomGeometry(geometryFirst, 'after scrolling to bottom');
+  for (let switchCount = 0; switchCount < 3; switchCount += 1) {
+    terminal.focus(geometrySecond);
+    await tick();
+    terminal.focus(geometryFirst);
+    await tick();
+  }
+  assertBottomGeometry(geometryFirst, 'after repeated tab activation fits');
+  terminal.setBrowserCollapsed(geometryFirst, false);
+  await tick();
+  terminal.setBrowserCollapsed(geometryFirst, true);
+  await tick();
+  terminal.refit(geometryFirst);
+  await tick();
+  assertBottomGeometry(geometryFirst, 'after browser layout and explicit refits');
+  terminal.focus(first);
+  await tick();
+
   terminal.resize(first, 60, 12);
   await tick();
   firstState = terminal.state(first);
@@ -207,6 +245,8 @@ fs.writeFileSync(e2ePath, `
   terminal.dispose(first);
   terminal.dispose(second);
   terminal.dispose(noScrollback);
+  terminal.dispose(geometryFirst);
+  terminal.dispose(geometrySecond);
 
   return JSON.stringify({ ok: true, smoothScrollEvents: firstState.scrollEvents - animationStartEvents });
 })()

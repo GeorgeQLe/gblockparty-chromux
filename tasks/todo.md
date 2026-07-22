@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Keep rendered terminal rows inside the pane at every fitted height without changing scrolling, tab activation, layout refits, or skip-to-bottom behavior; ship as v0.41.1. _(source: user-approved implementation plan; evidence: `prototype/renderer/styles.css`, `prototype/scripts/test-terminal-scroll-bottom-renderer.js`, `RELEASES.md`)_
+
 - [x] Add an explicit idle turn state, preserve unseen completion attention until consumption, recover missed Codex completion notifications from the rendered composer, make diagnostics rail-aware, and ship as v0.41.0. _(source: user-approved implementation plan; evidence: `prototype/renderer/attention.js`, `prototype/renderer/renderer.js`, `prototype/scripts/test-turn-signals-renderer.js`, `prototype/scripts/test-attention-diagnostics-renderer.js`, `RELEASES.md`)_
 
 - [x] Replace the toolbar collapse control with a permanent 40px paired-browser side rail labeled BROWSER / COLLAPSE, preserving state, shortcuts, reopening paths, narrow-toolbar access, and ship as v0.40.0. _(source: user-approved implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`, `prototype/scripts/test-browser-collapse-renderer.js`, `prototype/README.md`, `RELEASES.md`)_

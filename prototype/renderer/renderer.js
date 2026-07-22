@@ -6504,6 +6504,46 @@ if (window.chromuxTest) {
       flushRender();
       return session.id;
     },
+    addGeometrySession({ name = 'terminal-geometry-test', scrollback = 240 } = {}) {
+      state.counter += 1;
+      const session = newSessionShape({ id: 's' + state.counter, name, cwd: '/tmp', agent: 'codex' });
+      const viewEls = buildSessionView(session);
+      const tabEls = buildSessionTab(session);
+      session.els = { ...viewEls, ...tabEls };
+      applyBrowserLayout(session);
+      const term = new Terminal({
+        cols: 60,
+        rows: 12,
+        scrollback,
+        fontFamily: 'monospace',
+        fontSize: 12,
+        lineHeight: 1,
+        theme: terminalThemeFor(),
+      });
+      const fitAddon = new FitAddon.FitAddon();
+      term.loadAddon(fitAddon);
+      term.open(viewEls.termHost);
+      session.term.term = term;
+      session.term.fitAddon = fitAddon;
+      session._fitCalls = 0;
+      session._fitViewportMoves = 0;
+      session.term.fit = () => fitTerminalPreservingViewport(session, () => {
+        session._fitCalls += 1;
+        const before = term.buffer.active.viewportY;
+        fitAddon.fit();
+        if (term.buffer.active.viewportY !== before) session._fitViewportMoves += 1;
+      });
+      session._reducedMotion = true;
+      session._scrollEvents = 0;
+      session._scrollEventDisposable = term.onScroll(() => { session._scrollEvents += 1; });
+      installTerminalScrollToBottom(session, { reducedMotion: () => true });
+      state.sessions.set(session.id, session);
+      apply({ type: 'session-created', sessionId: session.id, name, cwd: session.cwd, agent: session.agent });
+      activateSession(session.id);
+      flushRender();
+      session.term.fit();
+      return session.id;
+    },
     write(id, data) {
       return new Promise((resolve) => testSession(id).term.term.write(String(data), resolve));
     },
@@ -6514,6 +6554,13 @@ if (window.chromuxTest) {
     scrollLines(id, amount) { testSession(id).term.term.scrollLines(amount); },
     scrollToBottom(id) { testSession(id).term.term.scrollToBottom(); },
     resize(id, cols, rows) { testSession(id).term.term.resize(cols, rows); },
+    setHostHeight(id, height) {
+      const session = testSession(id);
+      session.els.termHost.style.flex = 'none';
+      session.els.termHost.style.height = `${Math.max(1, Number(height) || 1)}px`;
+      session.term.fit();
+    },
+    refit(id) { testSession(id).term.fit(); },
     setViewWidth(id, width = null) {
       const view = testSession(id).els.view;
       if (width === null) {
@@ -6544,6 +6591,10 @@ if (window.chromuxTest) {
       const hostRect = session.els.termHost.getBoundingClientRect();
       const controlRect = control.getBoundingClientRect();
       const controlStyle = getComputedStyle(control);
+      const xterm = session.els.termHost.querySelector('.xterm');
+      const screen = session.els.termHost.querySelector('.xterm-screen');
+      const xtermRect = xterm ? xterm.getBoundingClientRect() : null;
+      const screenRect = screen ? screen.getBoundingClientRect() : null;
       return {
         ...terminalScrollState(session),
         hidden: control.classList.contains('hidden'),
@@ -6559,6 +6610,12 @@ if (window.chromuxTest) {
         centerOffset: ((controlRect.left + controlRect.right) / 2) - ((hostRect.left + hostRect.right) / 2),
         color: controlStyle.color,
         background: controlStyle.backgroundColor,
+        hostHeight: hostRect.height,
+        xtermTopInset: xtermRect ? xtermRect.top - hostRect.top : null,
+        xtermBottomInset: xtermRect ? hostRect.bottom - xtermRect.bottom : null,
+        screenTopInset: screenRect ? screenRect.top - hostRect.top : null,
+        screenBottomInset: screenRect ? hostRect.bottom - screenRect.bottom : null,
+        screenHeight: screenRect ? screenRect.height : null,
         theme: document.body.dataset.theme,
         mode: document.body.dataset.themeMode,
       };

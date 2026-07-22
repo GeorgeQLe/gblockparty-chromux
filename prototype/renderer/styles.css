@@ -842,8 +842,8 @@ body[data-thread-preview-size="large"] .thread-terminal-preview { width: min(720
 
 .term-pane { background: var(--bg0); }
 .term-head-cwd { flex: 1; color: var(--faint); font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.term-host { position: relative; flex: 1; min-height: 0; padding: 6px 2px 6px 8px; }
-.term-host .xterm { height: 100%; }
+.term-host { position: relative; flex: 1; min-height: 0; }
+.term-host .xterm { height: 100%; padding: 6px 2px 6px 8px; }
 .term-scroll-bottom {
   position: absolute;
   z-index: 4;
