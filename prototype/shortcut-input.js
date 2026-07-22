@@ -15,6 +15,7 @@ const CHROMUX_SHORTCUT_ACTIONS = {
   GUARDED_QUIT: 'guarded-quit',
   NEW_SESSION: 'new-session',
   DETECT: 'detect',
+  COMPOSER_OPEN: 'composer-open',
 };
 
 const ALLOWED_CHROMUX_SHORTCUT_FOCUS_KINDS = new Set(['terminal', 'appSurface']);
@@ -54,6 +55,14 @@ function shortcutLetter(input = {}) {
   return match ? match[1] : null;
 }
 
+function shortcutNamedKey(input = {}) {
+  for (const candidate of [input.key, input.keyCode, input.code]) {
+    const key = String(candidate || '').toLowerCase();
+    if (key === 'enter' || key === 'numpadenter') return 'ENTER';
+  }
+  return null;
+}
+
 function shortcutInputType(input = {}) {
   if (!input.type) return 'keyDown';
   return String(input.type);
@@ -63,7 +72,7 @@ function normalizeShortcutChord(input = {}) {
   const digit = sessionShortcutDigit(input);
   return {
     type: shortcutInputType(input),
-    key: digit || shortcutLetter(input),
+    key: digit || shortcutLetter(input) || shortcutNamedKey(input),
     meta: modifierActive(input, 'meta'),
     shift: modifierActive(input, 'shift'),
     alt: modifierActive(input, 'alt'),
@@ -98,6 +107,9 @@ function chromuxShortcutAction(input = {}) {
   }
   if (chord.key === 'D' && !chord.shift) {
     return { id: CHROMUX_SHORTCUT_ACTIONS.DETECT, key: 'D', label: 'Cmd+D' };
+  }
+  if (chord.key === 'ENTER' && chord.shift) {
+    return { id: CHROMUX_SHORTCUT_ACTIONS.COMPOSER_OPEN, key: 'ENTER', label: 'Cmd+Shift+Enter' };
   }
   return null;
 }

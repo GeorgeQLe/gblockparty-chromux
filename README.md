@@ -20,6 +20,10 @@ See [`docs/gblockparty-iaas-integration.md`](docs/gblockparty-iaas-integration.m
 for the proposed boundary between the local-first Chromux cockpit and optional
 GBlockParty-managed workspace execution, persistence, and cross-device access.
 
+See [`docs/terminal-interaction-roadmap.md`](docs/terminal-interaction-roadmap.md)
+for the shipped multiline composer contract and the ordered path toward structured
+agent interactions and a future Monaco editor adapter.
+
 ## Releases
 
 Chromux checks GitHub Releases at:

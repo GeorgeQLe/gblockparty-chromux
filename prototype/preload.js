@@ -27,6 +27,10 @@ contextBridge.exposeInMainWorld('chromux', {
   favoritesReplace: (records) => ipcRenderer.invoke('favorites-replace', records),
   projectsRead: () => ipcRenderer.invoke('projects-read'),
   projectsReplace: (records) => ipcRenderer.invoke('projects-replace', records),
+  promptHistoryRead: (cwd) => ipcRenderer.invoke('prompt-history-read', cwd),
+  promptHistoryAppend: (cwd, entry) => ipcRenderer.invoke('prompt-history-append', cwd, entry),
+  promptHistoryDelete: (cwd, id) => ipcRenderer.invoke('prompt-history-delete', cwd, id),
+  promptHistoryClear: (cwd) => ipcRenderer.invoke('prompt-history-clear', cwd),
   projectConfig: (cwd) => ipcRenderer.invoke('project-config', cwd),
   gitRoot: (cwd) => ipcRenderer.invoke('git-root', cwd),
   gitDiffSummary: (cwd) => ipcRenderer.invoke('git-diff-summary', cwd),
@@ -73,6 +77,7 @@ contextBridge.exposeInMainWorld('chromux', {
   onShortcutToggleBrowser: (cb) => ipcRenderer.on('shortcut-toggle-browser', () => cb()),
   onShortcutOpenNewSession: (cb) => ipcRenderer.on('shortcut-open-new-session', () => cb()),
   onShortcutOpenDetectModal: (cb) => ipcRenderer.on('shortcut-open-detect-modal', () => cb()),
+  onShortcutOpenComposer: (cb) => ipcRenderer.on('shortcut-open-composer', () => cb()),
   webviewPreloadPath: 'file://' + path.join(__dirname, 'webview-preload.js'),
 });
 

@@ -1,5 +1,14 @@
 # Release Notes
 
+## GBlockParty Chromux v0.42.0
+
+Tag: `chromux-v0.42.0`
+
+- Add an on-demand multiline composer to Codex, Claude, Grok, and shell panes with `Command+Shift+Enter` open/submit, newline editing, per-session drafts, xterm-native paste/input submission, shell multiline confirmation, and safe exited-session behavior.
+- Add local per-project prompt history with scratch-preserving `Option+Up` / `Option+Down` recall, search, full-prompt reuse, deletion, clearing, deduplication, atomic `0600` persistence, per-project retention, and a global 5 MiB cap.
+- Upgrade managed restore snapshots to schema v4 with bounded composer drafts while retaining legacy readability, leaving restored composers closed, and keeping the xterm helper textarea untouched.
+- Document local plaintext storage and the ordered roadmap for normalized agent interactions, Codex App Server, structured controls, and a future lazy-loaded Monaco adapter.
+
 ## GBlockParty Chromux v0.41.1
 
 Tag: `chromux-v0.41.1`

@@ -26,10 +26,12 @@ expectShortcut(sessionShortcutDigit({ key: 'Unidentified', code: 'Digit3' }) ===
 expectShortcut(sessionShortcutDigit({ key: '', code: 'Numpad1' }) === null, 'shortcut digit should ignore numpad codes');
 expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 't', meta: true }).id === 'new-session', 'Command+T should be Chromux-owned');
 expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'd', meta: true }).id === 'detect', 'Command+D should be Chromux-owned');
+expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'Enter', meta: true, shift: true }).id === 'composer-open', 'Command+Shift+Enter should open composer');
 expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'c', meta: true }) === null, 'Command+C should stay unowned');
 expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'v', meta: true }) === null, 'Command+V should stay unowned');
 expectShortcut(shouldRouteChromuxShortcut({ type: 'keyDown', key: '1', meta: true }, { focusKind: 'terminal' }), 'terminal focus should allow Chromux shortcuts');
 expectShortcut(!shouldRouteChromuxShortcut({ type: 'keyDown', key: '1', meta: true }, { focusKind: 'hostEditable' }), 'host editable focus should suppress Chromux shortcuts');
+expectShortcut(!shouldRouteChromuxShortcut({ type: 'keyDown', key: 'Enter', meta: true, shift: true }, { focusKind: 'hostEditable' }), 'composer submit should remain local to host editable focus');
 
 fs.writeFileSync(e2ePath, `
 (async () => {

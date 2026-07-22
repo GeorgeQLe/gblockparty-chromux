@@ -15,6 +15,7 @@ const { checkForUpdates } = require('./update-checker');
 const { createDevModeRestart, resolveDevMode, restartArgs } = require('./dev-mode');
 const { BrokerClient } = require('./resource-broker/client');
 const { createPreventSleepController } = require('./prevent-sleep');
+const { MAX_DRAFT_BYTES, createPromptHistoryStore } = require('./prompt-history');
 const {
   CHROMUX_SHORTCUT_ACTIONS,
   chromuxShortcutAction,
@@ -41,6 +42,7 @@ const RESTORE_SESSIONS = path.join(CHROMUX_HOME, 'restore-sessions.json');
 const PREFERENCES_FILE = path.join(CHROMUX_HOME, 'preferences.json');
 const FAVORITES_FILE = path.join(CHROMUX_HOME, 'favorites.json');
 const PROJECTS_FILE = path.join(CHROMUX_HOME, 'projects.json');
+const PROMPT_HISTORY_FILE = path.join(CHROMUX_HOME, 'prompt-history.json');
 const HOOKS_CLAUDE = path.join(CHROMUX_HOME, 'hooks-claude.json');
 const CODEX_NOTIFY = path.join(CHROMUX_HOME, 'codex-notify.sh');
 const GROK_HOOK_SCRIPT = path.join(CHROMUX_HOME, 'grok-hook.sh');
@@ -81,6 +83,7 @@ const resourceClient = new BrokerClient({ client: {
   pid: process.pid,
   cooperative: true,
 } });
+const promptHistory = createPromptHistoryStore({ filePath: PROMPT_HISTORY_FILE });
 
 if (SMOKE && !process.env.CHROMUX_KEEP_USER_DATA) {
   app.setPath('userData', fs.mkdtempSync(path.join(os.tmpdir(), 'chromux-smoke-user-data-')));
@@ -310,7 +313,7 @@ function shortcutDebugKey(input) {
   if (lower === 'control' || code === 'ControlLeft' || code === 'ControlRight') return '⌃';
   if (!detailsActive) return null;
   if (digit) return digit;
-  if (['j', 'b', 't', 'd', 'q'].includes(lower)) return lower.toUpperCase();
+  if (['j', 'b', 't', 'd', 'q', 'enter'].includes(lower)) return lower === 'enter' ? 'Enter' : lower.toUpperCase();
   if (['c', 'v'].includes(lower)) return lower.toUpperCase();
   if (lower === 'escape' || code === 'Escape') return 'Esc';
   if (lower === 'arrowup' || code === 'ArrowUp') return '↑';
@@ -439,6 +442,10 @@ function handleShellShortcutInput(event, input, source = 'host', webContentsId =
     send('shortcut-open-detect-modal');
     return true;
   }
+  if (action.id === CHROMUX_SHORTCUT_ACTIONS.COMPOSER_OPEN) {
+    send('shortcut-open-composer');
+    return true;
+  }
   return false;
 }
 
@@ -474,6 +481,11 @@ function installAppMenu() {
         {
           label: 'Toggle Paired Browser',
           click: () => send('shortcut-toggle-browser'),
+        },
+        {
+          label: 'Open Terminal Composer',
+          accelerator: 'CommandOrControl+Shift+Enter',
+          click: () => send('shortcut-open-composer'),
         },
         { type: 'separator' },
         { role: 'resetZoom' },
@@ -765,6 +777,10 @@ function sanitizeRestoreSession(session) {
       ts: Number.isFinite(item.ts) ? item.ts : Date.now(),
     })).filter((item) => item.url)
     : [];
+  const composerDraft = typeof session.composerDraft === 'string'
+    && Buffer.byteLength(session.composerDraft, 'utf8') <= MAX_DRAFT_BYTES
+    ? session.composerDraft
+    : null;
   return {
     name: String(session.name || path.basename(cwd) || 'session').slice(0, 80),
     cwd,
@@ -776,6 +792,7 @@ function sanitizeRestoreSession(session) {
     savedAt: typeof session.savedAt === 'string' ? session.savedAt : new Date().toISOString(),
     opened: Boolean(session.opened),
     restoredAt: typeof session.restoredAt === 'string' ? session.restoredAt : null,
+    ...(composerDraft ? { composerDraft } : {}),
   };
 }
 
@@ -783,7 +800,7 @@ function writeRestoreSnapshot({ sessions, reason = 'manual', restoreId = null, s
   ensureDirs();
   const clean = Array.isArray(sessions) ? sessions.map(sanitizeRestoreSession).filter(Boolean) : [];
   const payload = {
-    schemaVersion: 3,
+    schemaVersion: 4,
     restoreId: restoreId || `restore-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     reason,
     savedAt: savedAt || new Date().toISOString(),
@@ -1764,6 +1781,10 @@ ipcMain.handle('favorites-read', () => readFavorites());
 ipcMain.handle('favorites-replace', (_e, records) => replaceFavorites(records));
 ipcMain.handle('projects-read', () => readProjects());
 ipcMain.handle('projects-replace', (_e, records) => replaceProjects(records));
+ipcMain.handle('prompt-history-read', (_e, cwd) => promptHistory.readProject(cwd));
+ipcMain.handle('prompt-history-append', (_e, cwd, entry) => promptHistory.append(cwd, entry));
+ipcMain.handle('prompt-history-delete', (_e, cwd, id) => promptHistory.remove(cwd, id));
+ipcMain.handle('prompt-history-clear', (_e, cwd) => promptHistory.clear(cwd));
 ipcMain.handle('project-config', (_e, cwd) => packageProjectConfig(cwd));
 ipcMain.handle('git-root', (_e, cwd) => gitRoot(cwd));
 ipcMain.handle('git-diff-summary', (_e, cwd) => gitDiffSummary(cwd));

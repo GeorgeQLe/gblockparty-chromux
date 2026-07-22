@@ -106,12 +106,14 @@ fs.writeFileSync(e2ePath, `
     'malformed saved ID must be discarded and inferred safely');
 
   const saved = await window.chromux.saveRestoreSnapshot({ reason: 'manual', sessions: [
-    { name: 'valid', cwd: ${JSON.stringify(shared)}, agent: 'claude', resumeId: ${JSON.stringify(ids.exactB)} },
-    { name: 'invalid', cwd: ${JSON.stringify(shared)}, agent: 'claude', resumeId: 'not/a/session' },
+    { name: 'valid', cwd: ${JSON.stringify(shared)}, agent: 'claude', resumeId: ${JSON.stringify(ids.exactB)}, composerDraft: 'saved draft' },
+    { name: 'invalid', cwd: ${JSON.stringify(shared)}, agent: 'claude', resumeId: 'not/a/session', composerDraft: 'x'.repeat(65537) },
   ] });
-  expect(saved.schemaVersion === 3, 'new snapshot must use schema v3');
+  expect(saved.schemaVersion === 4, 'new snapshot must use schema v4');
   expect(saved.sessions[0].resumeId === ${JSON.stringify(ids.exactB)}, 'valid resumeId not persisted');
   expect(saved.sessions[1].resumeId === null, 'malformed resumeId persisted');
+  expect(saved.sessions[0].composerDraft === 'saved draft', 'bounded composer draft not persisted');
+  expect(!Object.prototype.hasOwnProperty.call(saved.sessions[1], 'composerDraft'), 'oversized composer draft persisted');
   return JSON.stringify({ ok: true });
 })()
 `);

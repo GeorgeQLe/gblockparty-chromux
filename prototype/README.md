@@ -71,6 +71,20 @@ showing each changed file, its status, whether it has staged changes, and reposi
 totals. It refreshes automatically while selected. New attention updates the badge without switching the
 selected rail view.
 
+### Multiline terminal composer
+
+Native xterm input remains the default. Open the per-session composer with the terminal-header
+**COMPOSE** button or `Command+Shift+Enter`. Inside it, `Enter` inserts a newline,
+`Command+Shift+Enter` submits, and `Escape` closes without clearing. A successful submission clears
+the editor but leaves it open and focused. Shell-only sessions show a confirmation before multiline
+text is sent; canceling keeps the draft untouched. Closing the composer returns focus to raw xterm,
+which remains the escape hatch for interactive terminal input.
+
+Drafts are capped at 64 KiB and persist independently in managed restore snapshots. **HISTORY** and
+`Option+Up` / `Option+Down` reuse prompts from sessions with the same canonical working directory.
+History is local plaintext, searchable, individually deletable, clearable per project with confirmation,
+deduplicated by exact prompt text, limited to 100 entries per project, and capped at 5 MiB globally.
+
 ### Host resources and parallel agents
 
 Open **RESOURCES** to inspect host-wide owners, FIFO queues, lease expiry, wait time, and iOS Simulator capacity. Chromux uses a background Unix-socket broker shared by the app and Codex MCP clients. See [`docs/resource-broker.md`](docs/resource-broker.md) for MCP registration, the optional LaunchAgent, global Computer Use guidance, and simulator wrapper contract. Prefer Codex's built-in Browser for web-app testing; native macOS and foreground Simulator work must lease `macos:foreground-input`.
@@ -155,7 +169,8 @@ See [`docs/troubleshooting.md`](docs/troubleshooting.md) for the full support gu
 | --- | --- |
 | Capture payloads + screenshots | `~/.chromux/captures/<timestamp>/` |
 | Delivery log | `~/.chromux/delivery-log.jsonl` |
-| Restore snapshot | `~/.chromux/restore-sessions.json` (schema v3; includes each agent tab's validated provider conversation ID when available) |
+| Restore snapshot | `~/.chromux/restore-sessions.json` (schema v4; includes validated provider conversation IDs and optional 64 KiB composer drafts) |
+| Prompt history | `~/.chromux/prompt-history.json` (local plaintext, mode `0600`, 100 entries/project, 5 MiB total) |
 | Saved projects | `~/.chromux/projects.json` |
 | Update cache/source/install log | `~/.chromux/update-cache.json`, `~/.chromux/update-source.json`, `~/.chromux/update-install.log` |
 | Hook settings and notify scripts | `~/.chromux/hooks-claude.json`, `~/.chromux/codex-notify.sh`, `~/.chromux/hooks-grok.json`, `~/.chromux/grok-hook.sh`, and `~/.grok/hooks/chromux-turn-signals.json` |

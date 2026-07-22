@@ -844,6 +844,51 @@ body[data-thread-preview-size="large"] .thread-terminal-preview { width: min(720
 .term-head-cwd { flex: 1; color: var(--faint); font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .term-host { position: relative; flex: 1; min-height: 0; }
 .term-host .xterm { height: 100%; padding: 6px 2px 6px 8px; }
+.compose-toggle { flex: none; }
+.compose-toggle.has-draft::after {
+  content: ""; display: inline-block; width: 5px; height: 5px; margin-left: 5px;
+  border-radius: 50%; background: var(--amber); box-shadow: var(--glow-amber);
+}
+.terminal-composer {
+  flex: none; min-height: 0; padding: 8px; border-top: 1px solid var(--line-hi);
+  background: color-mix(in srgb, var(--bg1) 94%, var(--amber) 6%);
+  box-shadow: 0 -8px 24px color-mix(in srgb, var(--bg0) 82%, transparent);
+}
+.composer-toolbar, .composer-actions, .composer-history-controls {
+  display: flex; align-items: center; gap: 8px;
+}
+.composer-toolbar { margin-bottom: 6px; }
+.composer-toolbar .microlabel { color: var(--amber); }
+.composer-status { flex: 1; color: var(--faint); font: 700 9px/1 var(--font-display); letter-spacing: .08em; text-align: right; }
+.composer-textarea {
+  display: block; width: 100%; min-height: 0; box-sizing: border-box; resize: none;
+  border: 1px solid var(--line-hi); border-radius: 4px; outline: none;
+  padding: 8px 10px; background: var(--bg0); color: var(--text);
+  font: 12px/1.45 var(--font-mono); caret-color: var(--amber);
+}
+.composer-textarea:focus { border-color: var(--amber); box-shadow: var(--glow-amber); }
+.composer-actions { justify-content: space-between; margin-top: 6px; }
+.composer-count { color: var(--faint); font: 700 9px/1 var(--font-display); letter-spacing: .08em; }
+.composer-submit { min-height: 26px; padding: 0 12px; }
+.composer-history { margin-top: 8px; border-top: 1px solid var(--line); padding-top: 8px; }
+.composer-history-controls input[type="search"] {
+  flex: 1; min-width: 0; border: 1px solid var(--line); background: var(--bg0); color: var(--text);
+  font: 11px/1.2 var(--font-mono); padding: 6px 8px; outline: none;
+}
+.composer-history-controls input[type="search"]:focus { border-color: var(--amber); }
+.composer-history-list { max-height: min(210px, 26vh); overflow: auto; margin-top: 6px; border: 1px solid var(--line); }
+.composer-history-row { display: flex; align-items: stretch; gap: 6px; padding: 6px; border-bottom: 1px solid var(--line); }
+.composer-history-row:last-child { border-bottom: 0; }
+.composer-history-reuse {
+  display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 3px; border: 0;
+  background: transparent; color: var(--text); text-align: left; cursor: pointer;
+}
+.composer-history-reuse:hover .composer-history-preview { color: var(--amber-hot); }
+.composer-history-preview { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 11px/1.25 var(--font-mono); }
+.composer-history-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--faint); font: 9px/1.2 var(--font-display); letter-spacing: .05em; }
+.composer-history-empty { padding: 14px; color: var(--faint); font-size: 11px; text-align: center; }
+.head-btn.danger { color: var(--red); }
+.head-btn.danger:hover { border-color: var(--red); }
 .term-scroll-bottom {
   position: absolute;
   z-index: 4;

@@ -127,6 +127,7 @@ const BOUNDS = {
   reloadThrottleMs: 3000,
   shortcutDebugStaleMs: 1500,
   resumeStartupExitMs: 15000,
+  composerDraftBytes: 64 * 1024,
 };
 
 function normalizeFavoriteUrl(rawUrl) {
@@ -1106,6 +1107,16 @@ function newSessionShape({ id, name, cwd, agent }) {
       typedInputBuf: '',
       previewSuppress: [],
     },
+    composer: {
+      open: false,
+      draft: '',
+      history: [],
+      historyLoaded: false,
+      drawerOpen: false,
+      query: '',
+      recallIndex: -1,
+      scratchDraft: null,
+    },
     els: null,
   };
 }
@@ -1261,6 +1272,7 @@ function normalizeShortcutDebugKey(raw, modifiers = {}) {
   if (!shortcutDebugDetailsActive(modifiers)) return null;
   if (/^[1-9]$/.test(key)) return key;
   if (['j', 'b', 't', 'd', 'q', 'c', 'v'].includes(lower)) return lower.toUpperCase();
+  if (lower === 'enter') return 'Enter';
   if (lower === 'escape' || lower === 'esc') return 'Esc';
   if (lower === 'arrowup') return '↑';
   if (lower === 'arrowdown') return '↓';
@@ -1462,6 +1474,7 @@ function computeShortcutCatalog() {
   definitions.push(
     { id: 'queue-next', label: '⌘J', key: 'J', modifiers: { meta: true }, kind: 'guarded', order: 20 },
     { id: 'browser-toggle', label: '⌘⇧B', key: 'B', modifiers: { meta: true, shift: true }, kind: 'guarded', order: 21 },
+    { id: 'composer-open', label: '⌘⇧Enter', key: 'Enter', modifiers: { meta: true, shift: true }, kind: 'guarded', order: 22 },
     { id: 'quit', label: '⌘Q', key: 'Q', modifiers: { meta: true }, kind: 'global', order: 30 },
     { id: 'new-session', label: '⌘T', key: 'T', modifiers: { meta: true }, kind: 'document', order: 31 },
     { id: 'detect', label: '⌘D', key: 'D', modifiers: { meta: true }, kind: 'document', order: 32 },
@@ -1484,6 +1497,9 @@ function computeShortcutCatalog() {
       description = activeSession
         ? (activeSession.browser.collapsed ? 'open browser' : 'shut browser')
         : 'no active session';
+    } else if (shortcut.id === 'composer-open') {
+      disabledReason = guardReason || (activeSession ? null : 'no active session');
+      description = activeSession ? 'open composer' : 'no active session';
     } else if (shortcut.id === 'quit') {
       disabledReason = guardReason;
       description = 'guarded quit';
@@ -2436,7 +2452,10 @@ function buildSessionView(session) {
   const termCwd = document.createElement('span');
   termCwd.className = 'term-head-cwd';
   termCwd.textContent = session.cwd;
-  termHead.append(termLabel, termCwd);
+  const composeBtn = document.createElement('button');
+  composeBtn.type = 'button'; composeBtn.className = 'head-btn compose-toggle'; composeBtn.textContent = 'COMPOSE';
+  composeBtn.title = 'Open multiline composer (⌘⇧Enter)'; composeBtn.setAttribute('aria-label', 'Open multiline composer');
+  termHead.append(termLabel, termCwd, composeBtn);
   const termHost = document.createElement('div');
   termHost.className = 'term-host';
   const scrollToBottom = document.createElement('button');
@@ -2446,7 +2465,34 @@ function buildSessionView(session) {
   scrollToBottom.title = 'Skip to latest terminal output';
   scrollToBottom.setAttribute('aria-label', 'Skip to latest terminal output');
   termHost.appendChild(scrollToBottom);
-  termPane.append(termHead, termHost);
+  const composer = document.createElement('section');
+  composer.className = 'terminal-composer hidden'; composer.setAttribute('aria-label', 'Multiline terminal composer');
+  const composerToolbar = document.createElement('div'); composerToolbar.className = 'composer-toolbar';
+  const composerLabel = document.createElement('span'); composerLabel.className = 'microlabel'; composerLabel.textContent = 'PROMPT COMPOSER';
+  const composerStatus = document.createElement('span'); composerStatus.className = 'composer-status'; composerStatus.textContent = '⌘⇧ENTER SENDS · ENTER NEWLINE';
+  const historyBtn = document.createElement('button'); historyBtn.type = 'button'; historyBtn.className = 'head-btn'; historyBtn.textContent = 'HISTORY';
+  const closeComposerBtn = document.createElement('button'); closeComposerBtn.type = 'button'; closeComposerBtn.className = 'head-btn'; closeComposerBtn.textContent = 'CLOSE';
+  composerToolbar.append(composerLabel, composerStatus, historyBtn, closeComposerBtn);
+  const composerTextarea = document.createElement('textarea');
+  composerTextarea.className = 'composer-textarea'; composerTextarea.rows = 3; composerTextarea.spellcheck = true;
+  composerTextarea.placeholder = 'Write a multiline prompt…'; composerTextarea.setAttribute('aria-label', 'Prompt text');
+  const composerActions = document.createElement('div'); composerActions.className = 'composer-actions';
+  const composerCount = document.createElement('span'); composerCount.className = 'composer-count';
+  const submitComposerBtn = document.createElement('button');
+  submitComposerBtn.type = 'button'; submitComposerBtn.className = 'btn btn-amber composer-submit'; submitComposerBtn.textContent = 'SUBMIT ⌘⇧↵';
+  composerActions.append(composerCount, submitComposerBtn);
+  const historyDrawer = document.createElement('div'); historyDrawer.className = 'composer-history hidden';
+  const historyControls = document.createElement('div'); historyControls.className = 'composer-history-controls';
+  const historySearch = document.createElement('input');
+  historySearch.type = 'search'; historySearch.placeholder = 'Search project history'; historySearch.spellcheck = false;
+  historySearch.setAttribute('aria-label', 'Search project prompt history');
+  const clearHistoryBtn = document.createElement('button');
+  clearHistoryBtn.type = 'button'; clearHistoryBtn.className = 'head-btn danger'; clearHistoryBtn.textContent = 'CLEAR PROJECT HISTORY';
+  historyControls.append(historySearch, clearHistoryBtn);
+  const historyList = document.createElement('div'); historyList.className = 'composer-history-list';
+  historyDrawer.append(historyControls, historyList);
+  composer.append(composerToolbar, composerTextarea, composerActions, historyDrawer);
+  termPane.append(termHead, termHost, composer);
 
   // divider
   const divider = document.createElement('div');
@@ -2568,6 +2614,14 @@ function buildSessionView(session) {
     favoritesPanel.classList.toggle('hidden');
   };
   favoriteBtn.onclick = () => toggleFavorite(session, session.browser.currentUrl || urlBar.value);
+  composeBtn.onclick = () => openComposer(session);
+  closeComposerBtn.onclick = () => closeComposer(session);
+  historyBtn.onclick = () => toggleComposerHistory(session);
+  submitComposerBtn.onclick = () => submitComposer(session);
+  composerTextarea.addEventListener('input', () => updateComposerDraftFromInput(session));
+  composer.addEventListener('keydown', (event) => handleComposerKeydown(session, event));
+  historySearch.addEventListener('input', () => { session.composer.query = historySearch.value; renderComposerHistory(session); });
+  clearHistoryBtn.onclick = () => clearComposerHistory(session);
   collapseBtn.onclick = () => setBrowserCollapsed(session, !session.browser.collapsed);
   pickBtn.onclick = () => (session.browser.picking ? null : startPick(session));
   captureBtn.onclick = () => openCaptureModal(session, { selector: null, outerHTML: null, pageTitle: null, pageUrl: session.browser.currentUrl });
@@ -2595,10 +2649,242 @@ function buildSessionView(session) {
   });
 
   return {
-    view, termLabel, termHost, scrollToBottom, urlBar, favoriteBtn, favoritesBtn, favoritesBadge, favoritesPanel, favoritesList, queueBtn, queueBadge, queuePanel, queueList,
+    view, termLabel, termHost, scrollToBottom, composeBtn, composer, composerTextarea, composerStatus, composerCount,
+    submitComposerBtn, historyBtn, historyDrawer, historySearch, historyList, clearHistoryBtn,
+    urlBar, favoriteBtn, favoritesBtn, favoritesBadge, favoritesPanel, favoritesList, queueBtn, queueBadge, queuePanel, queueList,
     consoleChip, captureChip, pickBtn, captureBtn, webHost, placeholder, refreshFlash,
     divider, webPane, browserContent, browserRail, browserToolbar, collapseBtn,
   };
+}
+
+function utf8ByteLength(value) {
+  return new TextEncoder().encode(String(value || '')).byteLength;
+}
+
+function utf8WithinLimit(value) {
+  return typeof value === 'string' && utf8ByteLength(value) <= BOUNDS.composerDraftBytes;
+}
+
+function truncateComposerDraft(value) {
+  const text = String(value || '');
+  if (utf8WithinLimit(text)) return text;
+  let bytes = 0;
+  let result = '';
+  const encoder = new TextEncoder();
+  for (const character of text) {
+    const size = encoder.encode(character).byteLength;
+    if (bytes + size > BOUNDS.composerDraftBytes) break;
+    result += character;
+    bytes += size;
+  }
+  return result;
+}
+
+function autosizeComposer(session) {
+  const textarea = session.els && session.els.composerTextarea;
+  const pane = session.els && session.els.termHost && session.els.termHost.parentElement;
+  if (!textarea || !pane) return;
+  textarea.style.height = 'auto';
+  const computed = getComputedStyle(textarea);
+  const lineHeight = Number.parseFloat(computed.lineHeight) || 18;
+  const chrome = (Number.parseFloat(computed.paddingTop) || 0) + (Number.parseFloat(computed.paddingBottom) || 0)
+    + (Number.parseFloat(computed.borderTopWidth) || 0) + (Number.parseFloat(computed.borderBottomWidth) || 0);
+  const minimum = (lineHeight * 3) + chrome;
+  const maximum = Math.max(minimum, Math.floor(pane.clientHeight * 0.4));
+  const height = Math.min(maximum, Math.max(minimum, textarea.scrollHeight));
+  textarea.style.height = `${height}px`;
+  textarea.style.overflowY = textarea.scrollHeight > maximum ? 'auto' : 'hidden';
+}
+
+function resetComposerRecall(session) {
+  session.composer.recallIndex = -1;
+  session.composer.scratchDraft = null;
+}
+
+function setComposerDraft(session, value, { resetRecall = true } = {}) {
+  const draft = truncateComposerDraft(value);
+  session.composer.draft = draft;
+  if (session.els && session.els.composerTextarea && session.els.composerTextarea.value !== draft) {
+    session.els.composerTextarea.value = draft;
+  }
+  if (resetRecall) resetComposerRecall(session);
+  renderComposer(session);
+}
+
+function updateComposerDraftFromInput(session) {
+  const textarea = session.els.composerTextarea;
+  const next = truncateComposerDraft(textarea.value);
+  if (textarea.value !== next) textarea.value = next;
+  session.composer.draft = next;
+  resetComposerRecall(session);
+  renderComposer(session);
+}
+
+function renderComposer(session) {
+  if (!session.els || !session.els.composer) return;
+  const { composer } = session;
+  const alive = Boolean(session.lifecycle.alive);
+  session.els.composer.classList.toggle('hidden', !composer.open);
+  session.els.composeBtn.classList.toggle('active', composer.open);
+  session.els.composeBtn.classList.toggle('has-draft', Boolean(composer.draft));
+  session.els.composeBtn.textContent = 'COMPOSE';
+  session.els.composerTextarea.value = composer.draft;
+  session.els.composerCount.textContent = `${utf8ByteLength(composer.draft).toLocaleString()} / ${BOUNDS.composerDraftBytes.toLocaleString()} BYTES`;
+  session.els.submitComposerBtn.disabled = !alive || !composer.draft.trim();
+  session.els.composerStatus.textContent = alive ? '⌘⇧ENTER SENDS · ENTER NEWLINE' : 'SESSION EXITED · DRAFT PRESERVED';
+  session.els.historyBtn.classList.toggle('active', composer.drawerOpen);
+  session.els.historyDrawer.classList.toggle('hidden', !composer.drawerOpen);
+  autosizeComposer(session);
+}
+
+async function loadComposerHistory(session, { force = false } = {}) {
+  if (session.composer.historyLoaded && !force) return session.composer.history;
+  try {
+    const entries = await window.chromux.promptHistoryRead(session.cwd);
+    session.composer.history = Array.isArray(entries) ? entries : [];
+  } catch {
+    session.composer.history = [];
+  }
+  session.composer.historyLoaded = true;
+  renderComposerHistory(session);
+  return session.composer.history;
+}
+
+function openComposer(session) {
+  if (!session || !session.els) return null;
+  session.composer.open = true;
+  renderComposer(session);
+  loadComposerHistory(session).catch(() => {});
+  requestAnimationFrame(() => {
+    session.term.fit();
+    autosizeComposer(session);
+    session.els.composerTextarea.focus();
+    session.els.composerTextarea.setSelectionRange(session.composer.draft.length, session.composer.draft.length);
+    reportShortcutFocusContext();
+  });
+  invalidate('shortcutDebug');
+  return { sessionId: session.id, open: true };
+}
+
+function closeComposer(session) {
+  if (!session || !session.els || !session.composer.open) return null;
+  session.composer.open = false;
+  session.composer.drawerOpen = false;
+  renderComposer(session);
+  requestAnimationFrame(() => { session.term.fit(); session.term.term.focus(); reportShortcutFocusContext(); });
+  invalidate('shortcutDebug');
+  return { sessionId: session.id, open: false };
+}
+
+function composerEntryMeta(entry) {
+  const timestamp = new Date(entry.submittedAt);
+  const time = Number.isFinite(timestamp.getTime()) ? timestamp.toLocaleString() : '';
+  return [time, agentLabel(entry.agent === 'shell' ? '' : entry.agent), entry.sessionName].filter(Boolean).join(' · ');
+}
+
+function renderComposerHistory(session) {
+  const list = session.els && session.els.historyList;
+  if (!list) return;
+  list.innerHTML = '';
+  const query = session.composer.query.trim().toLocaleLowerCase();
+  const entries = session.composer.history.filter((entry) => !query || entry.text.toLocaleLowerCase().includes(query));
+  if (!entries.length) {
+    const empty = document.createElement('div'); empty.className = 'composer-history-empty';
+    empty.textContent = query ? 'No matching prompts.' : 'No prompts saved for this project.';
+    list.appendChild(empty);
+    return;
+  }
+  for (const entry of entries) {
+    const row = document.createElement('div'); row.className = 'composer-history-row';
+    const reuse = document.createElement('button'); reuse.type = 'button'; reuse.className = 'composer-history-reuse';
+    const preview = document.createElement('span'); preview.className = 'composer-history-preview';
+    preview.textContent = entry.text.replace(/\s+/g, ' ').trim().slice(0, 240);
+    const meta = document.createElement('span'); meta.className = 'composer-history-meta'; meta.textContent = composerEntryMeta(entry);
+    reuse.append(preview, meta);
+    reuse.onclick = () => {
+      setComposerDraft(session, entry.text);
+      session.composer.drawerOpen = false;
+      renderComposer(session);
+      session.els.composerTextarea.focus();
+    };
+    const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'head-btn danger'; remove.textContent = 'DELETE';
+    remove.onclick = async () => {
+      try { session.composer.history = await window.chromux.promptHistoryDelete(session.cwd, entry.id); } catch { return; }
+      renderComposerHistory(session);
+    };
+    row.append(reuse, remove); list.appendChild(row);
+  }
+}
+
+async function toggleComposerHistory(session) {
+  session.composer.drawerOpen = !session.composer.drawerOpen;
+  renderComposer(session);
+  if (session.composer.drawerOpen) {
+    await loadComposerHistory(session, { force: true });
+    session.els.historySearch.focus();
+  } else {
+    session.els.composerTextarea.focus();
+  }
+}
+
+async function clearComposerHistory(session) {
+  if (!window.confirm('Clear prompt history for this project? This cannot be undone.')) return;
+  try { session.composer.history = await window.chromux.promptHistoryClear(session.cwd); } catch { return; }
+  renderComposerHistory(session);
+  session.els.historySearch.focus();
+}
+
+function recallComposerHistory(session, direction) {
+  const entries = session.composer.history;
+  if (!entries.length) return;
+  if (direction < 0) {
+    if (session.composer.recallIndex < 0) session.composer.scratchDraft = session.composer.draft;
+    session.composer.recallIndex = Math.min(entries.length - 1, session.composer.recallIndex + 1);
+    setComposerDraft(session, entries[session.composer.recallIndex].text, { resetRecall: false });
+  } else if (session.composer.recallIndex >= 0) {
+    session.composer.recallIndex -= 1;
+    const value = session.composer.recallIndex < 0
+      ? (session.composer.scratchDraft || '')
+      : entries[session.composer.recallIndex].text;
+    setComposerDraft(session, value, { resetRecall: false });
+    if (session.composer.recallIndex < 0) session.composer.scratchDraft = null;
+  }
+  session.els.composerTextarea.setSelectionRange(session.composer.draft.length, session.composer.draft.length);
+}
+
+async function submitComposer(session) {
+  const text = session.composer.draft.replace(/\r\n?/g, '\n');
+  if (!session.lifecycle.alive || !text.trim() || !utf8WithinLimit(text)) return false;
+  if (!session.agent && text.includes('\n') && !window.confirm('Submit this multiline prompt to the shell? Each line may be interpreted as shell input.')) return false;
+  session.term.term.paste(text);
+  session.term.term.input('\r', true);
+  setComposerDraft(session, '');
+  session.els.composerTextarea.focus();
+  try {
+    session.composer.history = await window.chromux.promptHistoryAppend(session.cwd, {
+      text,
+      agent: session.agent || 'shell',
+      sessionName: session.name,
+      submittedAt: new Date().toISOString(),
+    });
+    session.composer.historyLoaded = true;
+    renderComposerHistory(session);
+  } catch { /* PTY submission succeeded; persistence failure is non-fatal */ }
+  return true;
+}
+
+function handleComposerKeydown(session, event) {
+  if (event.key === 'Escape') {
+    event.preventDefault(); event.stopPropagation(); closeComposer(session); return;
+  }
+  if (event.key === 'Enter' && event.metaKey && event.shiftKey && !event.altKey && !event.ctrlKey) {
+    event.preventDefault(); event.stopPropagation(); submitComposer(session); return;
+  }
+  if (event.target === session.els.composerTextarea && event.altKey && !event.metaKey && !event.ctrlKey && !event.shiftKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+    event.preventDefault(); event.stopPropagation();
+    loadComposerHistory(session, { force: session.composer.recallIndex < 0 })
+      .then(() => recallComposerHistory(session, event.key === 'ArrowUp' ? -1 : 1));
+  }
 }
 
 // "Capture submitted for this URL" chip — derived purely from capture records
@@ -3720,10 +4006,11 @@ function installTerminalScrollToBottom(session, { reducedMotion = null } = {}) {
   return tracker;
 }
 
-async function createSession({ name, cwd, agent, initialUrl = null, initialQueue = [], command = undefined, resumeLaunch = null }) {
+async function createSession({ name, cwd, agent, initialUrl = null, initialQueue = [], command = undefined, resumeLaunch = null, composerDraft = '' }) {
   state.counter += 1;
   const id = 's' + state.counter;
   const session = newSessionShape({ id, name, cwd, agent });
+  session.composer.draft = utf8WithinLimit(composerDraft) ? String(composerDraft || '') : '';
   if (resumeLaunch) {
     session.lifecycle.resumeLaunch = {
       ...resumeLaunch,
@@ -3737,6 +4024,7 @@ async function createSession({ name, cwd, agent, initialUrl = null, initialQueue
   const viewEls = buildSessionView(session);
   const tabEls = buildSessionTab(session);
   session.els = { ...viewEls, ...tabEls };
+  renderComposer(session);
   applyBrowserLayout(session);
 
   const term = new Terminal({
@@ -3799,7 +4087,8 @@ function activateSession(id) {
     if (active) {
       requestAnimationFrame(() => {
         s.term.fit();
-        s.term.term.focus();
+        if (s.composer.open) s.els.composerTextarea.focus();
+        else s.term.term.focus();
       });
     }
   }
@@ -4008,6 +4297,7 @@ function snapshotOpenSessions() {
       detectedText: item.detectedText || null,
       ts: item.ts || Date.now(),
     })),
+    ...(session.composer.draft ? { composerDraft: session.composer.draft } : {}),
     savedAt: new Date().toISOString(),
   }));
 }
@@ -4421,6 +4711,7 @@ function handlePtyExit({ id, exitCode }) {
   if (!s) return;
   apply({ type: 'session-exited', sessionId: id, exitCode });
   s.term.term.write(`\r\n\x1b[38;5;210m── session exited (${exitCode}) ──\x1b[0m\r\n`);
+  renderComposer(s);
   if (isQuickCodexResumeExit(s)) showResumeRetryWarning(s, exitCode);
 }
 
@@ -4566,6 +4857,7 @@ async function openRestoredSession(row) {
     agent: resolved.agent || '',
     initialUrl: resolved.currentUrl || null,
     initialQueue: resolved.queue || [],
+    composerDraft: resolved.composerDraft || '',
     command,
     resumeLaunch: resumeLaunchForRow(resolved, {
       name,
@@ -4933,6 +5225,7 @@ async function autoRestoreWorkspace() {
         agent: row.agent || '',
         initialUrl: row.currentUrl || null,
         initialQueue: row.queue || [],
+        composerDraft: row.composerDraft || '',
         command,
         resumeLaunch: resumeLaunchForRow(row, {
           name,
@@ -5208,6 +5501,7 @@ window.chromux.onShortcutFocusNextQueueItem(handleShortcutFocusNextQueueItem);
 window.chromux.onShortcutToggleBrowser(handleShortcutToggleBrowser);
 window.chromux.onShortcutOpenNewSession(handleShortcutOpenNewSession);
 window.chromux.onShortcutOpenDetectModal(handleShortcutOpenDetectModal);
+window.chromux.onShortcutOpenComposer(handleShortcutOpenComposer);
 
 $('#btn-log').onclick = async () => {
   const drawer = $('#drawer-log');
@@ -5336,6 +5630,12 @@ function handleShortcutOpenDetectModal() {
   return { opened: true };
 }
 
+function handleShortcutOpenComposer() {
+  if (guardedShortcutDisabledReason(shortcutFocusContext())) return null;
+  const session = state.sessions.get(state.activeId);
+  return session ? openComposer(session) : null;
+}
+
 function shortcutInputFromDomEvent(e) {
   return {
     type: e.type === 'keyup' ? 'keyUp' : 'keyDown',
@@ -5359,6 +5659,7 @@ function chromuxShortcutActionFromInput(input) {
   if (key === 'D' && !input.shift) return { id: 'detect' };
   if (key === 'J' && !input.shift) return { id: 'queue-focus' };
   if (key === 'B' && input.shift) return { id: 'browser-toggle' };
+  if (String(input.key || '').toLowerCase() === 'enter' && input.shift) return { id: 'composer-open' };
   return null;
 }
 
@@ -5374,6 +5675,7 @@ function handleRendererShortcutKeydown(e) {
   else if (action.id === 'browser-toggle') result = handleShortcutToggleBrowser();
   else if (action.id === 'new-session') result = handleShortcutOpenNewSession();
   else if (action.id === 'detect') result = handleShortcutOpenDetectModal();
+  else if (action.id === 'composer-open') result = handleShortcutOpenComposer();
   else return;
 
   if (result !== null) {
@@ -5447,16 +5749,18 @@ if (window.chromuxTest) {
     return session.id;
   };
 
-  const addRenderableTestSession = ({ name = 'tab-test', agent = 'codex', cwd = '/tmp', turnState = 'unknown', alive = true, realTerminal = false, cols = 64, rows = 16 } = {}) => {
+  const addRenderableTestSession = ({ name = 'tab-test', agent = 'codex', cwd = '/tmp', turnState = 'unknown', alive = true, realTerminal = false, cols = 64, rows = 16, composerDraft = '' } = {}) => {
     state.counter += 1;
     const session = newSessionShape({ id: 's' + state.counter, name, cwd, agent });
     session.turn.state = turnState;
     if (turnState !== 'unknown') session.turn.since = Date.now();
     session.lifecycle.alive = alive;
+    session.composer.draft = utf8WithinLimit(composerDraft) ? composerDraft : '';
     const viewEls = buildSessionView(session);
     const tabEls = buildSessionTab(session);
     const written = [];
     session.els = { ...viewEls, ...tabEls };
+    renderComposer(session);
     applyBrowserLayout(session);
     session._written = written;
     session._ptyInputs = [];
@@ -5476,6 +5780,102 @@ if (window.chromuxTest) {
     activateSession(session.id);
     flushRender();
     return session.id;
+  };
+
+  window.chromuxTestComposer = {
+    addSession(options = {}) {
+      const id = addRenderableTestSession({ ...options, realTerminal: true });
+      const session = testSession(id);
+      const fitAddon = new FitAddon.FitAddon();
+      session.term.term.loadAddon(fitAddon);
+      session.term.fitAddon = fitAddon;
+      session.term.fit = () => fitTerminalPreservingViewport(session, () => fitAddon.fit());
+      session.term.fit();
+      new ResizeObserver(() => session.term.fit()).observe(session.els.termHost);
+      return id;
+    },
+    focus(id) { activateSession(id); flushRender(); },
+    open(id) { openComposer(testSession(id)); },
+    clickOpen(id) { testSession(id).els.composeBtn.click(); },
+    keyboardOpen(id) {
+      activateSession(id);
+      testSession(id).term.term.focus();
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', metaKey: true, shiftKey: true, bubbles: true, cancelable: true }));
+    },
+    close(id) { closeComposer(testSession(id)); },
+    escape(id) {
+      const textarea = testSession(id).els.composerTextarea;
+      textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    },
+    setDraft(id, value) {
+      const session = testSession(id);
+      session.els.composerTextarea.value = String(value);
+      session.els.composerTextarea.dispatchEvent(new Event('input', { bubbles: true }));
+    },
+    draft: (id) => testSession(id).composer.draft,
+    async submit(id) { return submitComposer(testSession(id)); },
+    submitShortcut(id) {
+      const textarea = testSession(id).els.composerTextarea;
+      textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', metaKey: true, shiftKey: true, bubbles: true, cancelable: true }));
+    },
+    enter(id) {
+      const textarea = testSession(id).els.composerTextarea;
+      textarea.setRangeText('\n', textarea.selectionStart, textarea.selectionEnd, 'end');
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    },
+    nativeInput(id, data) { testSession(id).term.term.input(String(data), true); },
+    async write(id, data) {
+      const term = testSession(id).term.term;
+      return new Promise((resolve) => term.write(String(data), resolve));
+    },
+    ptyInputs: (id) => (testSession(id)._ptyInputs || []).slice(),
+    clearPtyInputs(id) { testSession(id)._ptyInputs = []; },
+    scrollLines(id, count) { testSession(id).term.term.scrollLines(count); rememberTerminalViewport(testSession(id)); },
+    setBrowserCollapsed(id, collapsed) { setBrowserCollapsed(testSession(id), collapsed); },
+    async history(id) { return loadComposerHistory(testSession(id), { force: true }); },
+    async toggleHistory(id) { return toggleComposerHistory(testSession(id)); },
+    search(id, query) {
+      const input = testSession(id).els.historySearch; input.value = query;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    },
+    historyPreviews: (id) => [...testSession(id).els.historyList.querySelectorAll('.composer-history-preview')].map((el) => el.textContent),
+    reuse(id, index = 0) { testSession(id).els.historyList.querySelectorAll('.composer-history-reuse')[index]?.click(); },
+    async deleteHistory(id, index = 0) {
+      const session = testSession(id);
+      const query = session.composer.query.trim().toLocaleLowerCase();
+      const entry = session.composer.history.filter((item) => !query || item.text.toLocaleLowerCase().includes(query))[index];
+      if (!entry) return;
+      session.composer.history = await window.chromux.promptHistoryDelete(session.cwd, entry.id);
+      renderComposerHistory(session);
+    },
+    async clearHistory(id) { await clearComposerHistory(testSession(id)); },
+    recall(id, key) {
+      const textarea = testSession(id).els.composerTextarea;
+      textarea.dispatchEvent(new KeyboardEvent('keydown', { key, altKey: true, bubbles: true, cancelable: true }));
+    },
+    exit(id, exitCode = 0) { handlePtyExit({ id, exitCode }); flushRender(); },
+    snapshot: () => snapshotOpenSessions().map((row) => ({ ...row })),
+    state(id) {
+      const session = testSession(id); const textarea = session.els.composerTextarea;
+      const paneRect = session.els.termHost.parentElement.getBoundingClientRect();
+      const helper = session.els.termHost.querySelector('.xterm-helper-textarea');
+      return {
+        open: session.composer.open,
+        drawerOpen: session.composer.drawerOpen,
+        focused: document.activeElement === textarea,
+        terminalFocused: terminalFocused(),
+        submitDisabled: session.els.submitComposerBtn.disabled,
+        hasDraftIndicator: session.els.composeBtn.classList.contains('has-draft'),
+        textareaHeight: textarea.getBoundingClientRect().height,
+        paneHeight: paneRect.height,
+        helperCount: session.els.termHost.querySelectorAll('.xterm-helper-textarea').length,
+        helperInlineStyle: helper?.getAttribute('style') || '',
+        helperBackground: helper ? getComputedStyle(helper).backgroundColor : '',
+        helperInsideComposer: Boolean(helper && helper.closest('.terminal-composer')),
+        viewportY: session.term.term.buffer.active.viewportY,
+        baseY: session.term.term.buffer.active.baseY,
+      };
+    },
   };
 
   window.chromuxTestTabs = {

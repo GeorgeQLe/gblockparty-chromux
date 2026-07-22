@@ -67,7 +67,8 @@ retention and sharing, and dispose of data that is no longer needed.
 | Selected element data | User selects an element with `PICK ELEMENT`. | Included inside `payload.yaml`. | Persisted only as part of a saved payload. | Sent with `SEND - claude -p` because it is part of the YAML payload. |
 | User capture notes | User types a note in the capture modal. | Included inside `payload.yaml` and the delivery prompt. | Persisted only as part of a saved payload. | Sent with `SEND - claude -p`. |
 | Delivery log | User sends a payload or chooses file-drop. | `~/.chromux/delivery-log.jsonl` | Appended indefinitely until the user deletes it. | Not sent by Chromux. |
-| Restore snapshot | App close, managed update, or Developer Mode restart stores reopen state, including each agent tab's validated provider conversation ID when available. | `~/.chromux/restore-sessions.json` | One snapshot file is overwritten by later snapshots and marked consumed after restore; it is not auto-deleted. | Not sent by Chromux. |
+| Restore snapshot | App close, managed update, or Developer Mode restart stores reopen state, including each agent tab's validated provider conversation ID and an optional bounded composer draft. | `~/.chromux/restore-sessions.json` | One schema-v4 snapshot file is overwritten by later snapshots and marked consumed after restore; it is not auto-deleted. | Not sent by Chromux. Draft text is sent only if the user later submits it to the terminal. |
+| Prompt history | A successful composer submission. | `~/.chromux/prompt-history.json` | Atomically replaced with mode `0600`; exact prompts are deduplicated, up to 100 remain per canonical project directory, and the complete file is capped at 5 MiB by evicting globally oldest entries. Individual and per-project deletion are available in **HISTORY**. | Chromux does not sync or separately send the file. Submitted prompts still pass to the selected agent CLI or shell and follow that tool's network and retention behavior. |
 | Global favorites | User pins the current paired-browser page or a queued document/URL. | `~/.chromux/favorites.json` | Atomically replaced after each change; up to 200 entries remain until unpinned or the file is deleted. | Not synced or sent by Chromux. Opening a favorite can cause ordinary browser network traffic. |
 | Appearance preference | User chooses a theme and Light or Dark mode in Settings. | Chromium-managed local storage for the Chromux renderer. | The selected theme and mode remain until changed or the app profile is cleared. | Not synced or sent by Chromux. |
 | Agent hook files | Chromux starts and writes local hook helpers. | `~/.chromux/signal-classifier.js`, `~/.chromux/signal-*.json`, `~/.chromux/hooks-claude.json`, `~/.chromux/codex-notify.sh`, `~/.chromux/hooks-grok.json`, `~/.chromux/grok-hook.sh`, and `~/.grok/hooks/chromux-turn-signals.json` | Rewritten at startup; small per-session correlation records remain local. | Not sent by Chromux. Hook JSON is bounded, classified locally, and emitted into the owning PTY with a per-session random authentication token. Claude/Codex paths are passed at launch; Grok discovers its global hook, which no-ops outside Chromux. |
@@ -179,6 +180,7 @@ Review paths before running destructive commands.
 rm -rf ~/.chromux/captures
 rm -f ~/.chromux/delivery-log.jsonl
 rm -f ~/.chromux/restore-sessions.json
+rm -f ~/.chromux/prompt-history.json
 rm -f ~/.chromux/favorites.json
 rm -f ~/.chromux/update-cache.json
 rm -f ~/.chromux/update-source.json
@@ -204,6 +206,7 @@ the Chromux app profile directory, not shared browser or unrelated app data.
   local URLs, file paths, or user notes.
 - Chromux does not automatically delete old captures or delivery logs.
 - Favorites are not encrypted or synced and may reveal local paths, hosts, or browsing targets to anyone who can read the user's local files or backups.
+- Composer drafts and prompt history are local plaintext and may contain source code, secrets, instructions, or other sensitive text. They are not included in diagnostics or console logs, but remain visible to the local account, backups, and anyone with filesystem access.
 - Chromux does not provide a current UI for clearing the browser profile.
 - Chromux does not provide enterprise policy controls, audit export controls,
   DPA terms, data residency controls, or managed retention settings.
