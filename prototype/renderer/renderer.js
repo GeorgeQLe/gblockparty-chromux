@@ -19,7 +19,7 @@ const THEME_LABELS = {
   streak: 'Streak',
   'liquid-glass': 'Liquid Glass',
 };
-const RAIL_MODES = new Set(['attention', 'threads', 'git']);
+const RAIL_MODES = new Set(['threads', 'git']);
 const THREAD_PREVIEW_SIZES = new Set(['compact', 'comfortable', 'large']);
 
 function storedTheme() {
@@ -48,8 +48,10 @@ function storedTabActivityIndicators() {
 function storedRailMode() {
   try {
     const value = window.localStorage.getItem(RAIL_MODE_STORAGE_KEY);
-    return RAIL_MODES.has(value) ? value : 'attention';
-  } catch { return 'attention'; }
+    const migrated = RAIL_MODES.has(value) ? value : 'threads';
+    if (value !== migrated) window.localStorage.setItem(RAIL_MODE_STORAGE_KEY, migrated);
+    return migrated;
+  } catch { return 'threads'; }
 }
 
 function storedThreadPreviewSize() {
@@ -3211,10 +3213,10 @@ function renderDeveloperDiagnostics() {
     updateQueue: state.updateQueue, updateStatus: state.updateStatus,
     activityIndicators: state.ui.tabActivityIndicators,
   });
-  const railMode = RAIL_MODES.has(state.ui.railMode) ? state.ui.railMode : 'attention';
-  const attentionMounted = railMode === 'attention';
+  const railMode = RAIL_MODES.has(state.ui.railMode) ? state.ui.railMode : 'threads';
+  const attentionMounted = railMode === 'threads';
   const actualKinds = attentionMounted
-    ? [...document.querySelectorAll(`#attention-list .attention-item[data-session-id="${CSS.escape(inspected.id)}"] .attention-kind`)]
+    ? [...document.querySelectorAll(`#thread-list .attention-item[data-session-id="${CSS.escape(inspected.id)}"] .attention-kind`)]
       .map((element) => element.textContent)
     : [];
   const expectedKinds = projection.projectedKinds;
@@ -3239,7 +3241,7 @@ function renderDeveloperDiagnostics() {
       diagnosticCell('SEQUENCE', inspected.turn.sequence),
       diagnosticCell('AGE', relativeAge(inspected.turn.since)),
     ]),
-    diagnosticGroup('ATTENTION', [
+    diagnosticGroup('THREAD ATTENTION', [
       diagnosticCell('RAIL MODE', railMode.toUpperCase()),
       diagnosticCell('EXPECTED', expectedKinds.join(' → ') || 'none'),
       diagnosticCell('ACTUAL', attentionMounted
@@ -3285,7 +3287,7 @@ function attentionItems() {
   }).map((item) => ({
     session: item.sessionId
       ? state.sessions.get(item.sessionId)
-      : { name: 'Chromux update', cwd: '' },
+      : { name: 'Chromux Update', cwd: '' },
     item,
   })).filter((row) => row.session);
 }
@@ -3324,73 +3326,162 @@ function dismissAttentionItem(item) {
   }
 }
 
+function attentionItemDismissible(item) {
+  if (item.scope === 'global') return item.type !== 'updateRunning';
+  return ['delivery', 'input', 'completed'].includes(item.type);
+}
+
+function appendAttentionActions(host, item) {
+  const action = attentionAction(item);
+  const primary = document.createElement('button');
+  primary.className = 'qi-btn open';
+  primary.textContent = item.primaryAction || 'VIEW';
+  primary.setAttribute('aria-label', `${primary.textContent}: ${item.kind}`);
+  primary.onclick = (event) => {
+    event.stopPropagation();
+    action();
+  };
+  host.appendChild(primary);
+  if (!attentionItemDismissible(item)) return;
+  const dismiss = document.createElement('button');
+  dismiss.className = 'qi-btn';
+  dismiss.textContent = 'DISMISS';
+  dismiss.setAttribute('aria-label', `Dismiss: ${item.kind}`);
+  dismiss.onclick = (event) => {
+    event.stopPropagation();
+    dismissAttentionItem(item);
+  };
+  host.appendChild(dismiss);
+}
+
+function appendUpdateAttentionRow(host, rowData) {
+  if (!rowData) return;
+  const { session, item } = rowData;
+  const row = document.createElement('section');
+  row.className = `attention-item attention-system-row ${item.cls || ''}`;
+  row.dataset.attentionScope = 'system';
+  row.setAttribute('aria-label', `Chromux Update. ${item.kind}. ${item.detail}`);
+  const top = document.createElement('div'); top.className = 'attention-top';
+  const kind = document.createElement('span'); kind.className = 'attention-kind'; kind.textContent = item.kind;
+  const name = document.createElement('span'); name.className = 'attention-name'; name.textContent = sessionDisplayLabel(session);
+  top.append(kind, name);
+  const detail = document.createElement('div'); detail.className = 'attention-detail'; detail.textContent = item.detail; detail.title = item.detail;
+  const actions = document.createElement('div'); actions.className = 'attention-actions';
+  appendAttentionActions(actions, item);
+  row.append(top, detail, actions);
+  host.appendChild(row);
+}
+
+function attentionSessionRows(items) {
+  const grouped = new Map();
+  for (const row of items) {
+    if (!row.item.sessionId) continue;
+    if (!grouped.has(row.item.sessionId)) grouped.set(row.item.sessionId, { session: row.session, items: [] });
+    grouped.get(row.item.sessionId).items.push(row.item);
+  }
+  return [...grouped.values()];
+}
+
+function appendThreadSessionRow(host, session, { attention = null } = {}) {
+  const status = sessionRailStatus(session);
+  const row = document.createElement('button');
+  row.className = 'rail-session-row';
+  row.type = 'button';
+  row.dataset.sessionId = session.id;
+  if (session.id === state.activeId) row.setAttribute('aria-current', 'true');
+  else {
+    row.setAttribute('aria-expanded', String(state.ui.threadPreview?.sessionId === session.id));
+    row.setAttribute('aria-controls', 'thread-terminal-preview');
+  }
+  const attentionSummary = attention
+    ? `${attention.items[0].kind}${attention.items.length > 1 ? ` and ${attention.items.length - 1} more` : ''}`
+    : null;
+  row.title = `${sessionDisplayLabel(session)} — ${status.label}${attentionSummary ? ` — ${attentionSummary}` : ''}\n${session.cwd || '~'}`;
+  row.setAttribute('aria-label', `${sessionDisplayLabel(session)}. ${status.label}.${attentionSummary ? ` Needs attention: ${attentionSummary}.` : ''} ${session.cwd || '~'}`);
+  const icon = document.createElement('span');
+  icon.className = `rail-status ${status.kind}`;
+  icon.textContent = status.icon;
+  icon.title = status.label;
+  icon.setAttribute('aria-label', status.label);
+  const name = document.createElement('span');
+  name.className = attention ? 'rail-session-name attention-name' : 'rail-session-name';
+  name.textContent = sessionDisplayLabel(session);
+  row.append(icon, name);
+  if (attention) {
+    const reason = document.createElement('span'); reason.className = 'attention-row-reason'; reason.textContent = attention.items[0].kind;
+    row.appendChild(reason);
+    if (attention.items.length > 1) {
+      const more = document.createElement('span'); more.className = 'attention-row-more'; more.textContent = `+${attention.items.length - 1}`;
+      more.setAttribute('aria-label', `${attention.items.length - 1} additional attention item${attention.items.length === 2 ? '' : 's'}`);
+      row.appendChild(more);
+    }
+  }
+  row.onclick = () => {
+    if (session.id === state.activeId) {
+      dismissThreadPreview();
+      animateThreadSessionConfirmation(row, session);
+    } else openThreadPreview(session, row);
+  };
+  host.appendChild(row);
+  return row;
+}
+
+function appendNeedsAttentionGroup(host, sessionRows) {
+  if (sessionRows.length === 0) return;
+  const details = document.createElement('details');
+  details.className = 'rail-group attention-thread-group';
+  details.dataset.groupKey = 'attention:needs';
+  details.open = true;
+  details.addEventListener('toggle', () => {
+    if (!details.open) details.open = true;
+  });
+  const summary = document.createElement('summary'); summary.title = 'Sessions with outstanding work';
+  const label = document.createElement('span'); label.className = 'rail-group-label'; label.textContent = 'NEEDS ATTENTION';
+  const count = document.createElement('span'); count.className = 'rail-group-count'; count.textContent = String(sessionRows.length);
+  summary.append(label, count);
+  const rows = document.createElement('div'); rows.className = 'rail-group-rows';
+  for (const attention of sessionRows) {
+    const card = document.createElement('div');
+    card.className = `attention-item attention-thread ${attention.items[0].cls || ''}`;
+    card.dataset.sessionId = attention.session.id;
+    appendThreadSessionRow(card, attention.session, { attention });
+    const reasons = document.createElement('div'); reasons.className = 'attention-reasons';
+    for (const item of attention.items) {
+      const reason = document.createElement('div'); reason.className = 'attention-reason'; reason.dataset.attentionKind = item.kind;
+      const copy = document.createElement('div'); copy.className = 'attention-reason-copy';
+      const kind = document.createElement('span'); kind.className = 'attention-kind'; kind.textContent = item.kind;
+      const detail = document.createElement('span'); detail.className = 'attention-detail'; detail.textContent = item.detail || attention.session.cwd; detail.title = detail.textContent;
+      copy.append(kind, detail);
+      const actions = document.createElement('div'); actions.className = 'attention-actions'; appendAttentionActions(actions, item);
+      reason.append(copy, actions); reasons.appendChild(reason);
+    }
+    card.appendChild(reasons); rows.appendChild(card);
+  }
+  details.append(summary, rows); host.appendChild(details);
+}
+
 function renderAttentionQueue() {
-  const host = $('#attention-list');
+  const host = $('#thread-list');
   if (!host) return;
   host.innerHTML = '';
   const items = attentionItems();
   renderRailNavigation(items.length);
-  if (state.ui.railMode !== 'attention') {
-    if (state.ui.railMode === 'git') renderGitDiffRail(host);
-    else renderGroupedSessionRail(host, state.ui.railMode);
+  if (state.ui.railMode === 'git') {
+    renderGitDiffRail(host);
     return;
   }
-  if (items.length === 0) {
-    const empty = document.createElement('div');
-    empty.className = 'attention-empty';
-    empty.textContent = 'No sessions need attention. Queued previews, delivery failures, and agent input/completion signals will appear here.';
-    host.appendChild(empty);
-    return;
-  }
-  for (const { session, item } of items) {
-    const row = document.createElement('div');
-    row.className = `attention-item ${item.cls || ''}`;
-    if (item.sessionId) row.dataset.sessionId = item.sessionId;
-    const action = attentionAction(item);
-    row.onclick = action;
-    const top = document.createElement('div');
-    top.className = 'attention-top';
-    const kind = document.createElement('span');
-    kind.className = 'attention-kind';
-    kind.textContent = item.kind;
-    const name = document.createElement('span');
-    name.className = 'attention-name';
-    name.textContent = sessionDisplayLabel(session);
-    top.append(kind, name);
-    const detail = document.createElement('div');
-    detail.className = 'attention-detail';
-    detail.textContent = item.detail || session.cwd;
-    detail.title = item.detail || session.cwd;
-    const actions = document.createElement('div');
-    actions.className = 'attention-actions';
-    const primary = document.createElement('button');
-    primary.className = 'qi-btn open';
-    primary.textContent = item.primaryAction || 'VIEW';
-    primary.onclick = (e) => {
-      e.stopPropagation();
-      action();
-    };
-    actions.appendChild(primary);
-    if (item.type !== 'queue' && item.type !== 'updateRunning') {
-      const dismiss = document.createElement('button');
-      dismiss.className = 'qi-btn';
-      dismiss.textContent = 'DISMISS';
-      dismiss.onclick = (e) => {
-        e.stopPropagation();
-        dismissAttentionItem(item);
-      };
-      actions.appendChild(dismiss);
-    }
-    row.append(top, detail, actions);
-    host.appendChild(row);
-  }
+  const update = items.find((row) => row.item.scope === 'global') || null;
+  const attentive = attentionSessionRows(items);
+  appendUpdateAttentionRow(host, update);
+  appendNeedsAttentionGroup(host, attentive);
+  renderGroupedSessionRail(host, 'threads', new Set(attentive.map((row) => row.session.id)));
 }
 
 function renderRailNavigation(attentionCount) {
-  const mode = RAIL_MODES.has(state.ui.railMode) ? state.ui.railMode : 'attention';
+  const mode = RAIL_MODES.has(state.ui.railMode) ? state.ui.railMode : 'threads';
   const heading = $('#rail-heading');
   if (heading) heading.textContent = mode === 'git' ? 'GIT CHANGES' : mode.toUpperCase();
-  const count = $('#rail-attention-count');
+  const count = $('#rail-thread-count');
   if (count) {
     count.textContent = String(attentionCount);
     count.classList.toggle('zero', attentionCount === 0);
@@ -3524,8 +3615,9 @@ function renderGitDiffRail(host) {
   }
 }
 
-function groupedRailSessions(mode) {
-  const live = orderedSessions().filter((session) => session.lifecycle && session.lifecycle.alive);
+function groupedRailSessions(mode, excludedSessionIds = new Set()) {
+  const live = orderedSessions().filter((session) => session.lifecycle && session.lifecycle.alive
+    && !excludedSessionIds.has(session.id));
   const groups = new Map();
   const add = (key, label, title, session, order = 0) => {
     if (!groups.has(key)) groups.set(key, { key, label, title, sessions: [], order });
@@ -3546,12 +3638,16 @@ function groupedRailSessions(mode) {
     || (a.key === 'git:none' ? 1 : b.key === 'git:none' ? -1 : a.label.localeCompare(b.label)));
 }
 
-function renderGroupedSessionRail(host, mode) {
-  const groups = groupedRailSessions(mode);
+function renderGroupedSessionRail(host, mode, excludedSessionIds = new Set()) {
+  const groups = groupedRailSessions(mode, excludedSessionIds);
   if (groups.length === 0) {
+    if (host.childElementCount > 0) {
+      syncThreadPreviewAnchor();
+      return;
+    }
     const empty = document.createElement('div');
     empty.className = 'attention-empty';
-    empty.textContent = 'No live sessions.';
+    empty.textContent = 'No threads yet. Start or detect a session to see it here.';
     host.appendChild(empty);
     return;
   }
@@ -3575,33 +3671,7 @@ function renderGroupedSessionRail(host, mode) {
     summary.append(label, count);
     const rows = document.createElement('div'); rows.className = 'rail-group-rows';
     for (const session of group.sessions) {
-      const status = sessionRailStatus(session);
-      const row = document.createElement('button');
-      row.className = 'rail-session-row';
-      row.type = 'button';
-      row.dataset.sessionId = session.id;
-      if (session.id === state.activeId) row.setAttribute('aria-current', 'true');
-      else {
-        row.setAttribute('aria-expanded', String(state.ui.threadPreview?.sessionId === session.id));
-        row.setAttribute('aria-controls', 'thread-terminal-preview');
-      }
-      row.title = `${sessionDisplayLabel(session)} — ${status.label}\n${session.cwd || '~'}`;
-      row.setAttribute('aria-label', `${sessionDisplayLabel(session)}. ${status.label}. ${session.cwd || '~'}`);
-      const icon = document.createElement('span');
-      icon.className = `rail-status ${status.kind}`;
-      icon.textContent = status.icon;
-      icon.title = status.label;
-      icon.setAttribute('aria-label', status.label);
-      const name = document.createElement('span'); name.className = 'rail-session-name'; name.textContent = sessionDisplayLabel(session);
-      row.append(icon, name);
-      row.onclick = () => {
-        if (mode !== 'threads') activateSession(session.id);
-        else if (session.id === state.activeId) {
-          dismissThreadPreview();
-          animateThreadSessionConfirmation(row, session);
-        } else openThreadPreview(session, row);
-      };
-      rows.appendChild(row);
+      appendThreadSessionRow(rows, session);
     }
     details.append(summary, rows);
     host.appendChild(details);
@@ -3696,7 +3766,7 @@ function syncThreadPreviewAnchor() {
     dismissThreadPreview();
     return;
   }
-  const anchor = document.querySelector(`#attention-list .rail-session-row[data-session-id="${CSS.escape(preview.sessionId)}"]`);
+  const anchor = document.querySelector(`#thread-list .rail-session-row[data-session-id="${CSS.escape(preview.sessionId)}"]`);
   if (!anchor || !anchor.offsetParent || anchor.getClientRects().length === 0) {
     dismissThreadPreview();
     return;
@@ -3728,7 +3798,7 @@ function dismissThreadPreview({ restoreFocus = false } = {}) {
   preview.writeDisposable?.dispose();
   preview.resizeObserver?.disconnect();
   window.removeEventListener('resize', preview.reposition);
-  $('#attention-list')?.removeEventListener('scroll', preview.reposition);
+  $('#thread-list')?.removeEventListener('scroll', preview.reposition);
   document.removeEventListener('pointerdown', preview.outsidePointer, true);
   preview.terminal.dispose();
   preview.popover.remove();
@@ -3794,7 +3864,7 @@ function openThreadPreview(session, anchor) {
     if (!popover.contains(event.target) && !preview.anchor.contains(event.target)) dismissThreadPreview();
   };
   window.addEventListener('resize', preview.reposition);
-  $('#attention-list')?.addEventListener('scroll', preview.reposition, { passive: true });
+  $('#thread-list')?.addEventListener('scroll', preview.reposition, { passive: true });
   document.addEventListener('pointerdown', preview.outsidePointer, true);
   popover.addEventListener('click', activateThreadPreview);
   popover.addEventListener('keydown', (event) => {
@@ -4327,7 +4397,7 @@ function showLifecyclePrompt(reason) {
     : (isUpdateInstall
     ? 'Continuing will stop live PTYs, save a workspace snapshot, install the update, and reopen the sessions after restart using Claude/Codex resume where possible.'
     : (isUpdateDismiss
-      ? 'This removes the queued update from the attention list without installing it. The available update remains visible in Settings and can be queued again later.'
+      ? 'This removes the pinned Chromux Update row from Threads without installing it. The available update remains visible in Settings and can be queued again later.'
     : (live.length === 0
       ? 'Chromux will close after you confirm.'
       : 'Continuing will stop live PTYs and save a workspace snapshot. When Chromux opens again, it will reopen the sessions using Claude/Codex resume where possible.')));
@@ -5920,7 +5990,7 @@ if (window.chromuxTest) {
     label: (id) => testSession(id).els.tabLabel.textContent,
     terminalTitle: (id) => testSession(id).term.title,
     tooltip: (id) => testSession(id).els.tab.title,
-    attentionKinds: () => [...document.querySelectorAll('#attention-list .attention-kind')].map((el) => el.textContent),
+    attentionKinds: () => [...document.querySelectorAll('#thread-list .attention-kind')].map((el) => el.textContent),
     activityPreference: () => state.ui.tabActivityIndicators,
     activityPreferenceStored: () => {
       try { return window.localStorage.getItem(TAB_ACTIVITY_STORAGE_KEY); } catch { return null; }
@@ -5966,20 +6036,47 @@ if (window.chromuxTest) {
     storedMode: () => {
       try { return window.localStorage.getItem(RAIL_MODE_STORAGE_KEY); } catch { return null; }
     },
+    migrateMode(value) {
+      if (value === null) window.localStorage.removeItem(RAIL_MODE_STORAGE_KEY);
+      else window.localStorage.setItem(RAIL_MODE_STORAGE_KEY, value);
+      const mode = storedRailMode();
+      return { mode, stored: window.localStorage.getItem(RAIL_MODE_STORAGE_KEY) };
+    },
     select(mode) {
       const button = document.querySelector(`[data-rail-mode="${mode}"]`);
       if (!button) throw new Error(`Unknown rail mode: ${mode}`);
       button.click(); flushRender(); return state.ui.railMode;
     },
     heading: () => $('#rail-heading')?.textContent || '',
-    attentionCount: () => Number($('#rail-attention-count')?.textContent || 0),
+    attentionCount: () => Number($('#rail-thread-count')?.textContent || 0),
+    attentionCards: () => [...document.querySelectorAll('.attention-thread')].map((card) => ({
+      id: card.dataset.sessionId,
+      reasons: [...card.querySelectorAll('.attention-reason')].map((reason) => ({
+        kind: reason.querySelector('.attention-kind')?.textContent || '',
+        detail: reason.querySelector('.attention-detail')?.textContent || '',
+        actions: [...reason.querySelectorAll('.attention-actions .qi-btn')].map((button) => button.textContent),
+      })),
+    })),
+    clickAttentionAction(id, kind, label) {
+      const card = document.querySelector(`.attention-thread[data-session-id="${CSS.escape(id)}"]`);
+      const reason = [...(card?.querySelectorAll('.attention-reason') || [])]
+        .find((candidate) => candidate.querySelector('.attention-kind')?.textContent === kind);
+      const button = [...(reason?.querySelectorAll('.attention-actions .qi-btn') || [])]
+        .find((candidate) => candidate.textContent === label);
+      if (!button) throw new Error(`Missing ${label} action for ${kind} on ${id}`);
+      button.click(); flushRender(); return state.activeId;
+    },
+    queue(id, url, reason = 'detected in agent output') {
+      apply({ type: 'preview-queued', sessionId: id, url, source: 'TERM', reason });
+      renderQueue(testSession(id)); flushRender();
+    },
     nav: () => [...document.querySelectorAll('[data-rail-mode]')].map((button) => ({
       mode: button.dataset.railMode,
       label: button.getAttribute('aria-label'),
       title: button.title,
       pressed: button.getAttribute('aria-pressed'),
     })),
-    groups: () => [...document.querySelectorAll('#attention-list .rail-group')].map((group) => ({
+    groups: () => [...document.querySelectorAll('#thread-list .rail-group')].map((group) => ({
       key: group.dataset.groupKey,
       label: group.querySelector('.rail-group-label')?.textContent || '',
       title: group.querySelector('summary')?.title || '',
@@ -5994,7 +6091,7 @@ if (window.chromuxTest) {
       })),
     })),
     clickRow(id) {
-      const row = document.querySelector(`#attention-list .rail-session-row[data-session-id="${CSS.escape(id)}"]`);
+      const row = document.querySelector(`#thread-list .rail-session-row[data-session-id="${CSS.escape(id)}"]`);
       if (!row) throw new Error(`Missing rail row: ${id}`);
       row.click(); flushRender(); return state.activeId;
     },
@@ -6069,7 +6166,7 @@ if (window.chromuxTest) {
     },
     sourceScroll(id, amount) { testSession(id).term.term.scrollLines(amount); },
     rowState(id) {
-      const row = document.querySelector(`#attention-list .rail-session-row[data-session-id="${CSS.escape(id)}"]`);
+      const row = document.querySelector(`#thread-list .rail-session-row[data-session-id="${CSS.escape(id)}"]`);
       if (!row) return null;
       return {
         ariaCurrent: row.getAttribute('aria-current'), ariaExpanded: row.getAttribute('aria-expanded'),
@@ -6084,7 +6181,7 @@ if (window.chromuxTest) {
     },
     outsideClick() { document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); flushRender(); },
     collapseAnchor(id) {
-      const row = document.querySelector(`#attention-list .rail-session-row[data-session-id="${CSS.escape(id)}"]`);
+      const row = document.querySelector(`#thread-list .rail-session-row[data-session-id="${CSS.escape(id)}"]`);
       const details = row?.closest('details');
       if (details) details.open = false;
     },
@@ -6107,7 +6204,7 @@ if (window.chromuxTest) {
     },
     activeId: () => state.activeId,
     turnState: (id) => ({ ...testSession(id).turn }),
-    attentionKinds: () => [...document.querySelectorAll('#attention-list .attention-kind')].map((el) => el.textContent),
+    attentionKinds: () => [...document.querySelectorAll('#thread-list .attention-kind')].map((el) => el.textContent),
     resolveGitRoot: (cwd) => window.chromux.gitRoot(cwd),
     gitCacheSize: () => state.ui.gitRoots.size,
     async waitForGit() {
@@ -6116,7 +6213,7 @@ if (window.chromuxTest) {
       await Promise.all([...state.ui.gitDiffs.values()].map((entry) => entry.promise));
       flushRender();
     },
-    gitDiffs: () => [...document.querySelectorAll('#attention-list .git-diff-group')].map((group) => ({
+    gitDiffs: () => [...document.querySelectorAll('#thread-list .git-diff-group')].map((group) => ({
       title: group.querySelector('summary')?.title || '',
       count: Number(group.querySelector('.rail-group-count')?.textContent || 0),
       totals: group.querySelector('.git-diff-totals')?.textContent || '',
@@ -6149,16 +6246,16 @@ if (window.chromuxTest) {
     },
     phase: () => state.updateQueue.phase,
     blockers: () => updateBlockers().map((row) => row.session.name),
-    attentionKinds: () => [...document.querySelectorAll('#attention-list .attention-kind')].map((el) => el.textContent),
+    attentionKinds: () => [...document.querySelectorAll('#thread-list .attention-kind')].map((el) => el.textContent),
     attentionButtons(kind) {
-      for (const el of document.querySelectorAll('#attention-list .attention-item')) {
+      for (const el of document.querySelectorAll('#thread-list .attention-item')) {
         if (el.querySelector('.attention-kind')?.textContent !== kind) continue;
         return [...el.querySelectorAll('.attention-actions .qi-btn')].map((button) => button.textContent);
       }
       return [];
     },
     clickAttentionPrimary(kind) {
-      for (const el of document.querySelectorAll('#attention-list .attention-item')) {
+      for (const el of document.querySelectorAll('#thread-list .attention-item')) {
         if (el.querySelector('.attention-kind')?.textContent !== kind) continue;
         const primary = el.querySelector('.attention-actions .qi-btn.open');
         if (!primary) throw new Error(`No primary action on ${kind}`);
@@ -6169,7 +6266,7 @@ if (window.chromuxTest) {
       throw new Error(`No attention item ${kind}`);
     },
     dismissItem(kind) {
-      for (const el of document.querySelectorAll('#attention-list .attention-item')) {
+      for (const el of document.querySelectorAll('#thread-list .attention-item')) {
         if (el.querySelector('.attention-kind')?.textContent !== kind) continue;
         const dismiss = [...el.querySelectorAll('.attention-actions .qi-btn')]
           .find((button) => button.textContent === 'DISMISS');
@@ -6256,12 +6353,12 @@ if (window.chromuxTest) {
     snapshot: () => snapshotOpenSessions().map((row) => ({ ...row })),
     activeId: () => state.activeId,
     written: (id) => (testSession(id)._written || []).join(''),
-    attentionItems: () => [...document.querySelectorAll('#attention-list .attention-item')].map((el) => ({
+    attentionItems: () => [...document.querySelectorAll('#thread-list .attention-item')].map((el) => ({
       kind: el.querySelector('.attention-kind')?.textContent || '',
       name: el.querySelector('.attention-name')?.textContent || '',
     })),
     dismissItem(kind, name) {
-      for (const el of document.querySelectorAll('#attention-list .attention-item')) {
+      for (const el of document.querySelectorAll('#thread-list .attention-item')) {
         if (el.querySelector('.attention-kind')?.textContent !== kind) continue;
         if (name && el.querySelector('.attention-name')?.textContent !== name) continue;
         const buttons = [...el.querySelectorAll('.attention-actions .qi-btn')];
@@ -6386,7 +6483,7 @@ if (window.chromuxTest) {
       activateSession(id);
       flushRender();
     },
-    attentionItems: () => [...document.querySelectorAll('#attention-list .attention-item')].map((el) => ({
+    attentionItems: () => [...document.querySelectorAll('#thread-list .attention-item')].map((el) => ({
       kind: el.querySelector('.attention-kind')?.textContent || '',
       name: el.querySelector('.attention-name')?.textContent || '',
       detail: el.querySelector('.attention-detail')?.textContent || '',
@@ -7189,7 +7286,7 @@ if (window.chromuxTest) {
     selectRail(mode) { selectRailMode(mode); flushRender(); },
     setUpdatePhase(phase) { setUpdateQueuePhase(phase); flushRender(); },
     injectAttentionKind(id, kind) {
-      const node = document.querySelector(`#attention-list .attention-item[data-session-id="${CSS.escape(id)}"] .attention-kind`);
+      const node = document.querySelector(`#thread-list .attention-item[data-session-id="${CSS.escape(id)}"] .attention-kind`);
       if (!node) throw new Error(`Missing attention row: ${id}`);
       node.textContent = kind;
       invalidate('diagnostics');

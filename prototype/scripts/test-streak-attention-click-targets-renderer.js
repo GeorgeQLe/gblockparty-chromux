@@ -31,7 +31,7 @@ fs.writeFileSync(e2ePath, `
         label + ' should preserve ' + key + '; before=' + JSON.stringify(expected) + ' after=' + JSON.stringify(actual));
     }
   };
-  const attentionRow = (kind, name) => [...document.querySelectorAll('#attention-list .attention-item')]
+  const attentionRow = (kind, name) => [...document.querySelectorAll('#thread-list .attention-item')]
     .find((row) => row.querySelector('.attention-kind')?.textContent === kind
       && row.querySelector('.attention-name')?.textContent === name);
   const attentionButton = (row, label) => [...row.querySelectorAll('.attention-actions .qi-btn')]

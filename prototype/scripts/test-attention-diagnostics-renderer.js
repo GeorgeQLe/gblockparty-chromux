@@ -31,18 +31,18 @@ fs.writeFileSync(e2ePath, `
   expect(d.groupText().includes('COMPLETED'), 'background completion should agree with attention projection');
   expect(d.mismatches() === 0, 'projected completion should agree with rendered queue and tab');
   d.selectRail('threads');
-  expect(d.groupText().includes('RAIL MODETHREADS') && d.groupText().includes('NOT MOUNTED · THREADS'),
-    'Threads diagnostics should report the active rail and unmounted Attention DOM');
-  expect(d.mismatches() === 0, 'unmounted Attention rows must not create false mismatches in Threads');
+  expect(d.groupText().includes('RAIL MODETHREADS') && !d.groupText().includes('NOT MOUNTED · THREADS'),
+    'Threads diagnostics should compare the unified mounted attention state');
+  expect(d.mismatches() === 0, 'unified Threads rows should agree with the attention projection');
   d.selectRail('git');
   expect(d.groupText().includes('RAIL MODEGIT') && d.groupText().includes('NOT MOUNTED · GIT'),
-    'Git diagnostics should report the active rail and unmounted Attention DOM');
-  expect(d.mismatches() === 0, 'unmounted Attention rows must not create false mismatches in Git');
-  d.selectRail('attention');
+    'Git diagnostics should report the active rail and unmounted attentive Threads DOM');
+  expect(d.mismatches() === 0, 'unmounted attentive rows must not create false mismatches in Git');
+  d.selectRail('threads');
   d.injectAttentionKind(first, 'WRONG');
-  expect(d.mismatches() > 0, 'a real mounted Attention DOM mismatch should be highlighted');
+  expect(d.mismatches() > 0, 'a real mounted Threads attention mismatch should be highlighted');
   d.emit(first, 'turn-end');
-  expect(d.mismatches() === 0, 'normal Attention render should clear the deliberate row mismatch');
+  expect(d.mismatches() === 0, 'normal Threads render should clear the deliberate row mismatch');
 
   d.focus(first);
   expect(d.selected() === first, 'focus should not change explicit inspection');

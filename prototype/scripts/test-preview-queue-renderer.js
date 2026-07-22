@@ -162,7 +162,7 @@ fs.writeFileSync(e2ePath, `
   q.focus(holder);
   const attention = q.attentionItems().find((item) => item.kind === 'QUEUE 3' && item.name === 'preview-session');
   expect(attention && attention.detail === 'detected in agent output: http://localhost:49151/uat-a',
-    'attention queue detail should include reason and URL: ' + JSON.stringify(attention));
+    'Threads attention detail should include reason and URL: ' + JSON.stringify(attention));
   q.focus(queueId);
 
   q.openQueued(queueId, 'http://localhost:49151/uat-a');

@@ -1,5 +1,14 @@
 # Release Notes
 
+## GBlockParty Chromux v0.43.0
+
+Tag: `chromux-v0.43.0`
+
+- Make Threads the default unified session rail and migrate saved Attention or invalid rail preferences, leaving Git Changes as the only alternate mode.
+- Pin managed Chromux Update status above an expanded Needs Attention section, aggregate every outstanding reason and action into one attentive thread, and keep attentive sessions out of their working-directory groups until the final reason clears.
+- Move the individual outstanding-item badge to Threads while preserving attention priority, update safety, acknowledgements, previews, active-session confirmation, keyboard access, and direct inline actions.
+- Update diagnostics, accessibility copy, documentation, and focused renderer coverage for the unified two-mode rail.
+
 ## GBlockParty Chromux v0.42.0
 
 Tag: `chromux-v0.42.0`

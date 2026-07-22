@@ -43,13 +43,17 @@ fs.writeFileSync(e2ePath, `
   rail.emit(web, 'turn-start');
   rail.emit(web, 'turn-end', 'First background completion');
   expect(rail.attentionCount() === 1, 'background completion should increment attention count');
-  rail.select('threads');
-  expect(rail.mode() === 'threads' && rail.storedMode() === 'threads', 'Threads selection should persist');
+  expect(rail.mode() === 'threads' && rail.storedMode() === 'threads', 'Threads should be the persisted default');
+  expect(JSON.stringify(rail.migrateMode('attention')) === JSON.stringify({ mode: 'threads', stored: 'threads' }),
+    'saved Attention preference should migrate to Threads');
+  expect(JSON.stringify(rail.migrateMode('invalid')) === JSON.stringify({ mode: 'threads', stored: 'threads' }),
+    'invalid rail preference should migrate to Threads');
   expect(rail.heading() === 'THREADS', 'Threads should set contextual heading');
-  expect(rail.attentionCount() === 1, 'Attention count should remain visible outside Attention mode');
+  expect(rail.attentionCount() === 1, 'Threads badge should count individual outstanding items');
 
   const nav = rail.nav();
-  expect(nav.length === 3 && nav.every((item) => item.label && item.title), 'rail controls need accessible labels and tooltips');
+  expect(nav.length === 2 && nav.map((item) => item.mode).join(',') === 'threads,git'
+    && nav.every((item) => item.label && item.title), 'rail should expose only accessible Threads and Git Changes controls');
   expect(nav.find((item) => item.mode === 'threads').pressed === 'true', 'selected rail control needs pressed state');
   const modeButtons = [...document.querySelectorAll('[data-rail-mode]')];
   for (const button of modeButtons) {
@@ -58,11 +62,14 @@ fs.writeFileSync(e2ePath, `
   }
   const threadGroups = rail.groups();
   const webGroup = threadGroups.find((group) => group.title === ${JSON.stringify(repoAppDir)});
-  expect(webGroup && webGroup.label === 'web' && webGroup.count === 2 && webGroup.open,
-    'Threads should group live sessions by exact cwd and start expanded');
+  const needsAttention = threadGroups.find((group) => group.key === 'attention:needs');
+  expect(needsAttention && needsAttention.label === 'NEEDS ATTENTION' && needsAttention.count === 1 && needsAttention.open,
+    'Threads should pin outstanding sessions in an expanded Needs Attention section');
+  expect(webGroup && webGroup.label === 'web' && webGroup.count === 1 && webGroup.open,
+    'attentive sessions should be deduplicated from their exact-cwd group');
   expect(threadGroups.some((group) => group.title === ${JSON.stringify(repoApiDir)} && group.count === 1),
     'different exact cwd should form another Threads group');
-  expect(webGroup.rows.find((row) => row.id === web).status === 'Completed', 'completed row needs accessible status');
+  expect(needsAttention.rows.find((row) => row.id === web).status === 'Completed', 'attentive row needs accessible status');
 
   const sourceBefore = rail.sourceState(web);
   expect(sourceBefore.baseY > sourceBefore.viewportY, 'source fixture should begin scrolled away from its latest output');
@@ -122,6 +129,8 @@ fs.writeFileSync(e2ePath, `
   rail.select('threads');
   const consumedWeb = rail.groups().flatMap((group) => group.rows).find((row) => row.id === web);
   expect(consumedWeb && consumedWeb.status === 'Idle', 'consumed completion should render Idle in Threads');
+  expect(rail.groups().find((group) => group.title === ${JSON.stringify(repoAppDir)})?.count === 2,
+    'session should return to its exact-cwd group immediately after its final attention item clears');
   rail.clickRow(web);
   await wait(40);
   expect(!rail.preview(), 'clicking the already-active row should skip preview');
@@ -136,8 +145,7 @@ fs.writeFileSync(e2ePath, `
   expect(rail.rowState(web).staticConfirm && rail.cue(web).staticPane, 'reduced motion should use an immediate static row and pane highlight');
   rail.setReducedMotion(null);
 
-  rail.select('attention');
-  expect(!rail.attentionKinds().includes('COMPLETED'), 'seen completion should leave Attention');
+  expect(!rail.attentionKinds().includes('COMPLETED'), 'seen completion should leave unified Threads attention');
   rail.focus(holder);
   expect(!rail.attentionKinds().includes('COMPLETED'), 'seen completion should stay removed after focus changes');
   rail.emit(web, 'turn-start');
@@ -153,6 +161,17 @@ fs.writeFileSync(e2ePath, `
     'completion in active session should never appear later');
   rail.emit(api, 'permission-required', 'Approve command');
   expect(rail.attentionKinds().includes('PERMISSION'), 'background actionable state should appear');
+  rail.queue(api, 'http://localhost:49151/api-preview');
+  const apiCard = rail.attentionCards().find((card) => card.id === api);
+  expect(apiCard && apiCard.reasons.map((reason) => reason.kind).join(',') === 'PERMISSION,QUEUE 1',
+    'one attentive thread should aggregate simultaneous reasons in priority order');
+  expect(rail.attentionCount() === 3, 'badge should continue to count individual reasons, not attentive sessions');
+  rail.clickRow(web);
+  await wait(40);
+  expect(rail.preview()?.sessionId === web, 'ordinary row should still open a preview before inline action test');
+  rail.clickAttentionAction(api, 'QUEUE 1', 'OPEN');
+  expect(!rail.preview() && rail.activeId() === api, 'inline attention actions should act directly without opening a thread preview');
+  rail.focus(holder);
   rail.focus(api);
   rail.focus(holder);
   expect(rail.turnState(api).state === 'permission' && rail.attentionKinds().includes('PERMISSION'),
@@ -184,7 +203,7 @@ fs.writeFileSync(e2ePath, `
   rail.focus(holder);
   rail.clickRow(webTwo);
   await wait(40);
-  rail.select('attention');
+  rail.select('git');
   expect(!rail.preview(), 'rail mode changes should dismiss the preview');
   rail.select('threads');
   rail.clickRow(webTwo);
@@ -192,7 +211,7 @@ fs.writeFileSync(e2ePath, `
   rail.collapseAnchor(webTwo);
   await wait(60);
   expect(!rail.preview(), 'collapsing a group should dismiss a preview whose anchor becomes hidden');
-  const webGroupDetails = [...document.querySelectorAll('#attention-list .rail-group')]
+  const webGroupDetails = [...document.querySelectorAll('#thread-list .rail-group')]
     .find((group) => group.dataset.groupKey === 'cwd:' + ${JSON.stringify(repoAppDir)});
   webGroupDetails.open = true;
   await wait(40);

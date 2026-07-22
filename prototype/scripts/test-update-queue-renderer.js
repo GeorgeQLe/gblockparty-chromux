@@ -187,7 +187,7 @@ fs.writeFileSync(e2ePath, `
   q.dismissItem('UPDATE WAITING');
   await answerWarning(true);
   expect(q.phase() === 'idle', 'dismissing waiting update should return queue to idle');
-  expect(!q.attentionKinds().includes('UPDATE WAITING'), 'dismissed waiting update should leave attention queue');
+  expect(!q.attentionKinds().includes('UPDATE WAITING'), 'dismissed waiting update should leave unified Threads');
   q.queue();
   expect(q.phase() === 'waiting', 'queueing again with blockers should return to waiting');
   expect(q.attentionKinds()[0] === 'UPDATE WAITING', 're-queued waiting update should return to attention');
@@ -229,7 +229,7 @@ fs.writeFileSync(e2ePath, `
   expect(q.phase() === 'ready', 'ready dismissal should wait for confirmation');
   await answerWarning(true);
   expect(q.phase() === 'idle', 'dismissing ready update should return queue to idle');
-  expect(!q.attentionKinds().includes('UPDATE READY'), 'dismissed ready update should leave attention queue');
+  expect(!q.attentionKinds().includes('UPDATE READY'), 'dismissed ready update should leave unified Threads');
   q.queue();
   expect(q.phase() === 'ready', 'queueing again with no blockers should return to ready');
   expect(q.attentionKinds()[0] === 'UPDATE READY', 're-queued ready update should return to attention');
@@ -275,20 +275,20 @@ fs.writeFileSync(e2ePath, `
   await new Promise((resolve) => setTimeout(resolve, 50));
   q.flushRender();
   expect(q.phase() === 'failed', 'failed install should leave failed queue state, got ' + q.phase());
-  expect(q.attentionKinds().includes('UPDATE FAILED'), 'failed update should stay visible in attention queue');
+  expect(q.attentionKinds().includes('UPDATE FAILED'), 'failed update should stay visible in the pinned Threads system row');
   expect(q.attentionButtons('UPDATE FAILED').includes('DISMISS'), 'failed update should expose DISMISS');
   expect(q.installButtonText() === 'RETRY INSTALL', 'failed settings action should retry');
   q.dismissItem('UPDATE FAILED');
   expect(q.phase() === 'failed', 'failed dismissal should wait for confirmation');
   await answerWarning(true);
   expect(q.phase() === 'idle', 'dismissing failed update should return queue to idle');
-  expect(!q.attentionKinds().includes('UPDATE FAILED'), 'dismissed failed update should leave attention queue');
+  expect(!q.attentionKinds().includes('UPDATE FAILED'), 'dismissed failed update should leave unified Threads');
   q.queue();
   expect(q.phase() === 'ready', 'queueing again after failed dismissal should return to ready');
-  expect(q.attentionKinds().includes('UPDATE READY'), 'ready update should stay visible behind direct agent items');
+  expect(q.attentionKinds()[0] === 'UPDATE READY', 'ready update should stay pinned above attentive sessions');
 
-  // Agent-first triage order: direct agent/user-action items outrank queued
-  // previews and completed turns; passive update waiting ranks below them.
+  // The Chromux Update system row stays first. Attentive sessions retain the
+  // domain priority order below it, aggregating all reasons for each session.
   const orderHolder = await q.addSession({ name: 'order-holder', agent: '', turnState: 'completed' });
   sig.focus(orderHolder);
   q.setSession(liveId, { turnState: 'completed' });
@@ -309,16 +309,18 @@ fs.writeFileSync(e2ePath, `
 
   q.queue();
   let kinds = q.attentionKinds();
+  const entryKinds = [...document.querySelectorAll('.attention-thread .attention-reason:first-child .attention-kind')]
+    .map((element) => element.textContent);
   expect(q.phase() === 'ready', 'all safe order sessions should make update ready');
-  expect(indexOf(kinds, 'INPUT NEEDED') < indexOf(kinds, 'DELIVERY FAIL'), 'INPUT NEEDED should outrank DELIVERY FAIL');
-  expect(indexOf(kinds, 'DELIVERY FAIL') < indexOf(kinds, 'UPDATE READY'), 'DELIVERY FAIL should outrank UPDATE READY');
-  expect(indexOf(kinds, 'UPDATE READY') < indexOf(kinds, 'QUEUE 1'), 'UPDATE READY should outrank queued previews');
-  expect(indexOf(kinds, 'QUEUE 1') < indexOf(kinds, 'COMPLETED'), 'queued previews should outrank completed turns');
+  expect(kinds[0] === 'UPDATE READY', 'UPDATE READY should be pinned above Needs Attention');
+  expect(indexOf(entryKinds, 'INPUT NEEDED') < indexOf(entryKinds, 'DELIVERY FAIL'), 'input thread should outrank delivery thread');
+  expect(indexOf(entryKinds, 'DELIVERY FAIL') < indexOf(entryKinds, 'QUEUE 1'), 'delivery thread should outrank queued-preview thread');
+  expect(indexOf(entryKinds, 'QUEUE 1') < indexOf(entryKinds, 'COMPLETED'), 'queued-preview thread should outrank completion-only threads');
 
   q.setSession(orderQueue, { turnState: 'unknown' });
   kinds = q.attentionKinds();
   expect(q.phase() === 'waiting', 'unknown order queue session should make update waiting');
-  expect(indexOf(kinds, 'COMPLETED') < indexOf(kinds, 'UPDATE WAITING'), 'passive UPDATE WAITING should rank below completed turns');
+  expect(kinds[0] === 'UPDATE WAITING', 'UPDATE WAITING should remain the pinned system row');
 
   sig.focus(orderInput);
   expect(!sig.attentionItems().some((i) => i.kind === 'INPUT NEEDED' && i.name === 'order-input'),

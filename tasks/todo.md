@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Unify outstanding work into Threads, remove the standalone Attention rail mode, aggregate attentive sessions without duplication, pin managed-update status, preserve direct actions and previews, and ship as v0.43.0. _(source: user-approved implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-session-rail-renderer.js`, `prototype/scripts/test-update-queue-renderer.js`, `prototype/README.md`, `RELEASES.md`)_
+
 - [x] Ship Chromux v0.42.0 with an on-demand multiline terminal composer, per-project prompt history, schema-v4 draft restoration, focused renderer/persistence coverage, documentation, tag, and latest GitHub Release. _(source: user-approved implementation plan; evidence: `prototype/prompt-history.js`, `prototype/renderer/renderer.js`, `prototype/scripts/test-prompt-history.js`, `prototype/scripts/test-composer-renderer.js`, `docs/terminal-interaction-roadmap.md`, `RELEASES.md`)_
 
 - [x] Keep rendered terminal rows inside the pane at every fitted height without changing scrolling, tab activation, layout refits, or skip-to-bottom behavior; ship as v0.41.1. _(source: user-approved implementation plan; evidence: `prototype/renderer/styles.css`, `prototype/scripts/test-terminal-scroll-bottom-renderer.js`, `RELEASES.md`)_

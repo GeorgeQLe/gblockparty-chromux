@@ -32,7 +32,7 @@ fs.writeFileSync(e2ePath, `
   await wait(100);
 
   // Focus holder: keeps the sessions under test in the background, since the
-  // focused session is display-excluded from the attention queue.
+  // Focused session is display-excluded from unified Threads attention.
   const holder = sig.addFakeSession({ name: 'holder', agent: '' });
 
   const secure = sig.addFakeSession({ name: 'secure', agent: 'claude' });

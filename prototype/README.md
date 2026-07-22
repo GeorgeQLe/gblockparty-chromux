@@ -49,7 +49,7 @@ screenshots of the open theme picker in all eight theme/mode combinations.
 ### Developer diagnostics
 
 Interactive source launches show a read-only diagnostics strip above the shortcut status bar. It can
-inspect any open or exited session independently of tab focus and compares the attention projection,
+inspect any open or exited session independently of tab focus and compares the unified Threads attention projection,
 tracked turn state, rendered tab indicator, update safety, browser queue, and recent sanitized events.
 Packaged launches hide the strip by default. Use **SETTINGS → DEVELOPER MODE** to change the persisted
 setting; Chromux confirms when sessions are open, saves a restore snapshot, and restarts to apply it.
@@ -57,19 +57,22 @@ The `--dev-mode` and `--no-dev-mode` flags take precedence over the saved prefer
 
 ### Session rail
 
-The left rail has three persisted icon views while the horizontal tabs remain the primary navigator.
-**Attention** shows actionable items and unseen background completions; opening or dismissing a completion
-consumes it to a quiet Idle state, while completions already visible in the active session become Idle
-immediately. **Threads** groups live sessions by exact
-working directory. Click an inactive Threads row to inspect a live, read-only terminal preview without
+The left rail has two persisted icon views while the horizontal tabs remain the primary navigator.
+**Threads** is the default unified session view. A pinned, expanded **Needs Attention** section appears
+above exact-working-directory groups whenever sessions have actionable items, failed deliveries, queued
+browser previews, or unseen background completions. Each session appears once, with all of its reasons and
+actions together, and returns to its directory group as soon as the last reason clears. Managed
+**Chromux Update** status appears in a pinned system row above Needs Attention. Opening or dismissing a
+completion consumes it to a quiet Idle state, while completions already visible in the active session become
+Idle immediately. Click an inactive Threads row to inspect a live, read-only terminal preview without
 changing sessions; click anywhere in the preview (or press Enter/Space) to open that session, and press
 Escape or click outside to close it. Clicking the already-active Threads row confirms the connection with
 a linked row-to-terminal highlight. Choose **Settings → Thread Preview Size → Compact, Comfortable, or
 Large** to adjust effective preview text size without changing terminal wrapping; Comfortable is the default.
 **Git Changes** tracks the working-copy diffs in repositories used by live sessions,
 showing each changed file, its status, whether it has staged changes, and repository-level staged/unstaged
-totals. It refreshes automatically while selected. New attention updates the badge without switching the
-selected rail view.
+totals. It refreshes automatically while selected. The badge on Threads counts individual outstanding items,
+including managed-update notices, without switching away from Git Changes.
 
 ### Multiline terminal composer
 
@@ -191,8 +194,8 @@ Claude Code and Grok Build provide native start, actionable-notification, and
 completion callbacks. Codex provides native completion while start is inferred
 from submitted Enter; its actionable notification capabilities are unavailable.
 Unknown native notifications are retained in local diagnostics and never create
-an attention row. A background completion remains in Attention until its session is opened or the row is
-explicitly dismissed; a completion received by the active session is already seen. Opening a session never
+an attentive Threads reason. A background completion remains in Needs Attention until its session is opened
+or that reason is explicitly dismissed; a completion received by the active session is already seen. Opening a session never
 dismisses permission, authentication, input, rate-limit, or tool-failure attention. Chromux does not post
 macOS Notification Center alerts.
 | Browser pane profiles | Session-specific Electron partitions `persist:chromux-<session ID>` |

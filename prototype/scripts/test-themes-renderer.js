@@ -70,7 +70,7 @@ fs.writeFileSync(e2ePath, `
   document.body.appendChild(fixtures);
   const attentionEmptyFixture = document.createElement('div');
   attentionEmptyFixture.className = 'attention-empty';
-  document.querySelector('#attention-list').appendChild(attentionEmptyFixture);
+  document.querySelector('#thread-list').appendChild(attentionEmptyFixture);
 
   const realTerminalHost = document.createElement('div');
   realTerminalHost.className = 'term-host';
@@ -282,7 +282,7 @@ fs.writeFileSync(e2ePath, `
   expectContrast(fixtures.querySelector('.q-badge'), 'streak queue badge');
   themes.selectMode('dark');
   expectContrast(fixtures.querySelector('.session-tab.active'), 'streak dark active session tab');
-  document.querySelector('#attention-list').appendChild(attentionEmptyFixture);
+  document.querySelector('#thread-list').appendChild(attentionEmptyFixture);
   const attentionHeadingLeft = document.querySelector('.rail-head .microlabel').getBoundingClientRect().left;
   const attentionEmptyLeft = attentionEmptyFixture.getBoundingClientRect().left;
   expect(Math.abs(attentionHeadingLeft - attentionEmptyLeft) <= 1, 'streak attention heading should align with the empty queue card; got ' + attentionHeadingLeft + ' vs ' + attentionEmptyLeft);

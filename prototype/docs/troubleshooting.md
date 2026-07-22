@@ -148,15 +148,16 @@ claude -p "$(cat /Users/me/.chromux/captures/<timestamp>/payload.yaml)"
 See [capture-payload.md](capture-payload.md) for the YAML schema and field limits.
 See [privacy-and-local-data.md](privacy-and-local-data.md) for the complete local-data map, outbound boundaries, and cleanup guidance.
 
-## Agent attention is missing or marked legacy
+## A thread's attention reason is missing or marked legacy
 
-Use the rail's **Attention** icon for actionable items and unseen background completions. Opening a completed
-session removes only that completion from Attention; its tab and Threads/Git row remain Completed. Permission,
-authentication, input, rate-limit, and tool-failure items are not cleared by opening their session. The
-**Threads** groups live sessions by exact working directory. **Git Changes** resolves the repositories used
+Use the rail's **Threads** icon for actionable items and unseen background completions. Sessions with
+outstanding work are pinned in the expanded **Needs Attention** section above working-directory groups.
+Opening a completed session removes only that completion reason and returns the session to its directory
+group when no other reasons remain. Permission, authentication, input, rate-limit, and tool-failure items are
+not cleared by opening their session. **Git Changes** resolves the repositories used
 by live sessions and tracks their staged, unstaged, untracked, renamed, and conflicted files. Clean working
-trees remain visible as clean; non-repository sessions are omitted. New attention changes the Attention badge
-but does not switch your rail view.
+trees remain visible as clean; non-repository sessions are omitted. New outstanding work changes the Threads
+badge but does not switch away from Git Changes.
 
 Chromux regenerates its classifier and installed hook files at startup. New v2
 events are authenticated to one PTY; copied terminal output, callbacks from a
