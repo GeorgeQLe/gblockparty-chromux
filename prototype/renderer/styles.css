@@ -973,6 +973,8 @@ body.dragging webview { pointer-events: none; }
   width: 40px;
   min-width: 40px;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
   border-left: 1px solid var(--line-hi);
   background: linear-gradient(180deg, var(--bg2), var(--bg1));
 }
@@ -985,6 +987,10 @@ body.dragging webview { pointer-events: none; }
   flex-direction: column;
   justify-content: center;
   gap: 9px;
+}
+.browser-rail > .browser-rail-toggle {
+  flex: 1 1 auto;
+  height: auto;
 }
 .browser-rail-label {
   writing-mode: vertical-rl;

@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.43.1
+
+Tag: `chromux-v0.43.1`
+
+- Center the paired-browser `BROWSER` and `COLLAPSE` rail controls vertically across the full-height 40px rail.
+- Keep the entire rail clickable while preserving its icon, vertical label, colors, hover behavior, browser state, shortcuts, and narrow-toolbar access.
+- Add real-renderer geometry coverage for full-height hit area and centered visible content in both open and shut states.
+
 ## GBlockParty Chromux v0.43.0
 
 Tag: `chromux-v0.43.0`

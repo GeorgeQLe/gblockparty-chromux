@@ -6829,6 +6829,16 @@ if (window.chromuxTest) {
       const captureRect = session.els.captureBtn.getBoundingClientRect();
       const webPaneRect = session.els.webPane.getBoundingClientRect();
       const railRect = session.els.browserRail.getBoundingClientRect();
+      const toggleRect = session.els.collapseBtn.getBoundingClientRect();
+      const toggleContentRects = [...session.els.collapseBtn.children]
+        .map((child) => child.getBoundingClientRect())
+        .filter((rect) => rect.width > 0 && rect.height > 0);
+      const toggleContentTop = toggleContentRects.length
+        ? Math.min(...toggleContentRects.map((rect) => rect.top))
+        : toggleRect.top;
+      const toggleContentBottom = toggleContentRects.length
+        ? Math.max(...toggleContentRects.map((rect) => rect.bottom))
+        : toggleRect.bottom;
       const openIcon = session.els.collapseBtn.querySelector('.panel-open-icon');
       return {
         active: state.activeId === id,
@@ -6841,6 +6851,13 @@ if (window.chromuxTest) {
         collapseTitle: session.els.collapseBtn.title,
         collapseAriaLabel: session.els.collapseBtn.getAttribute('aria-label'),
         railWidth: Math.round(railRect.width),
+        railBounds: { top: railRect.top, bottom: railRect.bottom, height: railRect.height },
+        toggleBounds: { top: toggleRect.top, bottom: toggleRect.bottom, height: toggleRect.height },
+        toggleSpansRail: Math.abs(toggleRect.top - railRect.top) <= 1
+          && Math.abs(toggleRect.bottom - railRect.bottom) <= 1,
+        toggleContentCenterDelta: Math.abs(
+          ((toggleContentTop + toggleContentBottom) / 2) - ((railRect.top + railRect.bottom) / 2)
+        ),
         railAtFarRight: Math.abs(railRect.right - webPaneRect.right) <= 1,
         railAfterContent: session.els.webPane.firstElementChild === session.els.browserContent
           && session.els.browserContent.nextElementSibling === session.els.browserRail,

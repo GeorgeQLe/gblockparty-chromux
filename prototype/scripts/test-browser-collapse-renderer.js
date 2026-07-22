@@ -41,6 +41,9 @@ fs.writeFileSync(e2ePath, `
   expect(first.collapseAriaLabel === first.collapseTitle, 'shut browser rail should expose its open action accessibly');
   expect(first.grid.includes('40px'), 'new session should start on the 40px browser rail, got ' + first.grid);
   expect(first.railWidth === 40, 'browser rail should remain exactly 40px wide, got ' + first.railWidth);
+  expect(first.toggleSpansRail, 'BROWSER toggle should span the full rail: ' + JSON.stringify(first));
+  expect(first.toggleContentCenterDelta <= 1,
+    'BROWSER toggle content should be vertically centered in the rail: ' + JSON.stringify(first));
   expect(first.railAtFarRight, "browser rail should be the pane's far-right child");
   expect(first.railAfterContent, 'browser content and rail should be siblings with the rail last');
   expect(!first.toggleInToolbar, 'browser toggle should not live in the scrolling toolbar');
@@ -96,6 +99,9 @@ fs.writeFileSync(e2ePath, `
   expect(first.collapseTitle === 'Shut paired browser (⌘⇧B)', 'open browser title should say shut');
   expect(first.collapseAriaLabel === first.collapseTitle, 'open browser rail should expose its shut action accessibly');
   expect(first.railWidth === 40 && first.railAtFarRight, 'open browser rail should stay 40px at the far-right edge');
+  expect(first.toggleSpansRail, 'COLLAPSE toggle should span the full rail: ' + JSON.stringify(first));
+  expect(first.toggleContentCenterDelta <= 1,
+    'COLLAPSE toggle content should be vertically centered in the rail: ' + JSON.stringify(first));
   expect(!first.openIconPresent, 'open-state COLLAPSE rail should not show the panel-open icon');
   expect(first.currentUrl === 'http://localhost:5173/current', 'restore must preserve current URL');
   expect(first.queueCount === 1, 'restore must preserve queue state');
