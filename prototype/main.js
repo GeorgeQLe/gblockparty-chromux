@@ -12,6 +12,7 @@ const { spawn, execFile } = require('child_process');
 const pty = require('node-pty');
 const yaml = require('js-yaml');
 const { checkForUpdates } = require('./update-checker');
+const { createCodexUpdateService } = require('./codex-update-service');
 const { createDevModeRestart, resolveDevMode, restartArgs } = require('./dev-mode');
 const { BrokerClient } = require('./resource-broker/client');
 const { createPreventSleepController } = require('./prevent-sleep');
@@ -90,6 +91,7 @@ const resourceClient = new BrokerClient({ client: {
   cooperative: true,
 } });
 const promptHistory = createPromptHistoryStore({ filePath: PROMPT_HISTORY_FILE });
+const codexUpdateService = createCodexUpdateService();
 
 if (SMOKE && !process.env.CHROMUX_KEEP_USER_DATA) {
   app.setPath('userData', fs.mkdtempSync(path.join(os.tmpdir(), 'chromux-smoke-user-data-')));
@@ -695,7 +697,10 @@ function codexCommand(resumeId = null) {
   // The path sits inside a TOML string inside a shell arg — escape both
   // layers: backslash-escape for TOML, then single-quote for the shell.
   const notifyToml = `notify=["${CODEX_NOTIFY.replace(/[\\"]/g, '\\$&')}"]`;
-  const base = hookInstall.codex ? `codex -c ${shellQuote(notifyToml)}` : 'codex';
+  const updateOverride = 'check_for_update_on_startup=false';
+  const base = hookInstall.codex
+    ? `codex -c ${shellQuote(notifyToml)} -c ${shellQuote(updateOverride)}`
+    : `codex -c ${shellQuote(updateOverride)}`;
   return resumeId ? `${base} resume ${shellQuote(resumeId)}` : base;
 }
 
@@ -1820,6 +1825,12 @@ ipcMain.handle('git-root', (_e, cwd) => gitRoot(cwd));
 ipcMain.handle('git-diff-summary', (_e, cwd) => gitDiffSummary(cwd));
 
 ipcMain.handle('check-updates', (_e, opts = {}) => getUpdateStatus(opts));
+ipcMain.handle('codex-update-check', (_e, opts = {}) => codexUpdateService.check({ force: Boolean(opts.force) }));
+ipcMain.handle('codex-update-install', (event) => codexUpdateService.install({
+  onProgress: (progress) => {
+    if (!event.sender.isDestroyed()) event.sender.send('codex-update-progress', progress);
+  },
+}));
 
 ipcMain.handle('save-restore-snapshot', (_e, { reason = 'manual', sessions = [] } = {}) => (
   writeRestoreSnapshot({ reason, sessions })

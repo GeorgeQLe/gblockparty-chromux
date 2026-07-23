@@ -1,5 +1,14 @@
 # Release Notes
 
+## GBlockParty Chromux v0.48.0
+
+Tag: `chromux-v0.48.0`
+
+- Check Codex once per Chromux launch, hold every fresh or restored Codex session behind one workspace decision, and continue restoring Claude, Grok, and shell sessions immediately.
+- Follow Codex's stable release-source policy for Homebrew, npm-compatible, and standalone installs; cache successful checks for one hour, bound failures and progress, require explicit update confirmation, and verify the installed version before releasing queued sessions.
+- Suppress Codex's native startup update prompt only inside Chromux with the official process-scoped configuration override, including fresh, resumed, restored, Detect, and recognized shell launches.
+- Offer one aggregated prompt with release notes, retry, verified update, and launch-local Resume Anyway paths while preserving the existing per-session warning for genuine Codex resume failures.
+
 ## GBlockParty Chromux v0.47.0
 
 Tag: `chromux-v0.47.0`

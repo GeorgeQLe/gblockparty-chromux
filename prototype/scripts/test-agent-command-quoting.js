@@ -180,6 +180,7 @@ child.on('close', (code, signal) => {
   const grokInstallPath = path.join(homeDir, '.grok', 'hooks', 'chromux-turn-signals.json');
   const grokScriptPath = path.join(homeDir, '.chromux', 'grok-hook.sh');
   const tomlArg = notifyTomlArg(notifyPath);
+  const updateArg = 'check_for_update_on_startup=false';
   const tomlInner = (tomlArg.match(/^notify=\["(.*)"\]$/s) || [])[1];
   expect(
     typeof tomlInner === 'string' && tomlInner.replace(/\\(["\\])/g, '$1') === notifyPath,
@@ -196,12 +197,12 @@ child.on('close', (code, signal) => {
 
   checkCommand('renderer claude', report.renderer.claude, ['--settings', hooksPath]);
   checkCommand('renderer claude --resume', report.renderer.claudeResume, ['--settings', hooksPath, '--resume', 'resume-id-1234']);
-  checkCommand('renderer codex', report.renderer.codex, ['-c', tomlArg]);
-  checkCommand('renderer codex resume', report.renderer.codexResume, ['-c', tomlArg, 'resume', 'resume-id-1234']);
+  checkCommand('renderer codex', report.renderer.codex, ['-c', tomlArg, '-c', updateArg]);
+  checkCommand('renderer codex resume', report.renderer.codexResume, ['-c', tomlArg, '-c', updateArg, 'resume', 'resume-id-1234']);
   checkCommand('renderer grok', report.renderer.grok, []);
   checkCommand('renderer grok --resume', report.renderer.grokResume, ['--resume', 'resume-id-1234']);
   checkCommand('main claude resume', report.main.claude, ['--settings', hooksPath, '--resume', claudeResumeId]);
-  checkCommand('main codex resume', report.main.codex, ['-c', tomlArg, 'resume', codexResumeId]);
+  checkCommand('main codex resume', report.main.codex, ['-c', tomlArg, '-c', updateArg, 'resume', codexResumeId]);
   checkCommand('main grok resume', report.main.grok, ['--resume', grokResumeId]);
 
   if (failures > 0) {

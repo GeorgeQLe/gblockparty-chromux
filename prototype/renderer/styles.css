@@ -450,6 +450,8 @@ body[data-thread-preview-size="large"] .thread-terminal-preview { width: min(720
   flex: none;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 6px;
 }
 .restore-warning .rw-action {

@@ -1,6 +1,6 @@
 {
   "name": "chromux",
-  "version": "0.47.0",
+  "version": "0.48.0",
   "description": "OSS desktop front-end for local and GBlockParty-managed agent/browser workspaces.",
   "main": "main.js",
   "private": false,
@@ -51,6 +51,8 @@
     "test:agent-command-quoting": "node scripts/test-agent-command-quoting.js",
     "test:restore-session-identity": "node scripts/test-restore-session-identity.js",
     "test:codex-notifier": "node scripts/test-codex-notifier.js",
+    "test:codex-update-service": "node scripts/test-codex-update-service.js",
+    "test:codex-update-gate-renderer": "node scripts/test-codex-update-gate-renderer.js",
     "test:github-update-check": "node scripts/test-github-update-check.js",
     "test:window-config": "node scripts/test-window-config.js",
     "test:prevent-sleep": "node scripts/test-prevent-sleep.js && node scripts/test-prevent-sleep-renderer.js",

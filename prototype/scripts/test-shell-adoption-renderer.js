@@ -17,7 +17,8 @@ fs.writeFileSync(e2ePath, `
 (async () => {
   const adopt = window.chromuxTestShellAdoption;
   const commands = window.chromuxTestAgentCommand;
-  if (!adopt || !commands) throw new Error('Missing shell adoption test API');
+  const gate = window.chromuxTestCodexGate;
+  if (!adopt || !commands || !gate) throw new Error('Missing shell adoption test API');
   const expect = (cond, msg) => { if (!cond) throw new Error(msg); };
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const ctrlU = '\\x15';
@@ -25,6 +26,7 @@ fs.writeFileSync(e2ePath, `
   for (let i = 0; i < 100 && !(commands.env() && commands.env().home); i += 1) {
     await wait(50);
   }
+  await gate.resumeAnyway();
 
   const codexBase = commands.build('codex');
   const claudeBase = commands.build('claude');
@@ -78,9 +80,20 @@ fs.writeFileSync(e2ePath, `
   expect(adopt.agent(grok) === 'grok', 'grok rewrite should adopt identity');
   expect(adopt.header(grok).includes('GROK'), 'terminal header should update to GROK');
 
-  const guardLines = [
+  const existingNotifyLines = [
     "codex -c 'notify=[\\"/tmp/codex-notify.sh\\"]'\\r",
     'codex --config=notify=[\\"/tmp/codex-notify.sh\\"]\\r',
+  ];
+  for (const line of existingNotifyLines) {
+    const id = adopt.addShellSession({ name: 'managed-' + line.slice(0, 10) });
+    const rewrite = adopt.type(id, line);
+    expect(rewrite && rewrite.agent === 'codex', 'existing notify should gain the update override: ' + line);
+    expect(rewrite.command.includes('check_for_update_on_startup=false'), 'update override missing: ' + rewrite.command);
+    expect(rewrite.command.includes('notify='), 'existing notify config should be preserved: ' + rewrite.command);
+  }
+
+  const guardLines = [
+    "codex -c 'notify=[\\"/tmp/codex-notify.sh\\"]' -c 'check_for_update_on_startup=false'\\r",
     'claude --settings /tmp/hooks-claude.json\\r',
     'codex | cat\\r',
     'codex > out.txt\\r',

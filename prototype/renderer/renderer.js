@@ -107,9 +107,19 @@ const state = {
   restoreInferredRows: [],
   restoreWarningDismissed: false,
   resumeRetryWarning: null,
+  codexUpdate: {
+    phase: 'checking',
+    status: null,
+    queue: [],
+    nextSequence: 0,
+    progress: '',
+    checkPromise: null,
+    releasePromise: null,
+  },
   lifecyclePrompt: null,
   testInstallUpdateResult: null,
   testUpdateInstallTrace: null,
+  testCodexLaunchExecutor: null,
   updateQueue: {
     phase: 'idle',
     error: null,
@@ -2254,9 +2264,10 @@ function agentCommand(agent, resumeId = null) {
     const notifyPath = state.env && state.env.codexNotifyPath;
     // The path sits inside a TOML string inside a shell arg — escape both
     // layers: backslash-escape for TOML, then single-quote for the shell.
-    const base = notifyPath
-      ? `codex -c ${shellQuote(`notify=["${notifyPath.replace(/[\\"]/g, '\\$&')}"]`)}`
-      : 'codex';
+    const configs = [];
+    if (notifyPath) configs.push(`notify=["${notifyPath.replace(/[\\"]/g, '\\$&')}"]`);
+    configs.push('check_for_update_on_startup=false');
+    const base = `codex ${configs.map((value) => `-c ${shellQuote(value)}`).join(' ')}`;
     return resumeId ? `${base} resume ${shellQuote(resumeId)}` : base;
   }
   if (agent === 'grok') {
@@ -2332,6 +2343,17 @@ function codexHasNotifyConfigArg(tokens) {
   return false;
 }
 
+function codexHasUpdateCheckOverride(tokens) {
+  for (let i = 1; i < tokens.length; i += 1) {
+    const text = tokens[i].text;
+    const next = tokens[i + 1] ? tokens[i + 1].text : '';
+    if ((text === '-c' || text === '--config') && /\bcheck_for_update_on_startup\s*=\s*false\b/.test(next)) return true;
+    if (((text.startsWith('-c') && text.length > 2) || text.startsWith('--config='))
+      && /\bcheck_for_update_on_startup\s*=\s*false\b/.test(text)) return true;
+  }
+  return false;
+}
+
 function rewriteShellLaunchLine(line) {
   const parsed = simpleShellTokens(line);
   if (!parsed) return null;
@@ -2340,8 +2362,11 @@ function rewriteShellLaunchLine(line) {
   if (!ADOPTABLE_AGENTS.has(agent)) return null;
   if (commandToken.raw !== agent) return null;
   if (agent === 'claude' && claudeHasSettingsArg(parsed.tokens)) return null;
-  if (agent === 'codex' && codexHasNotifyConfigArg(parsed.tokens)) return null;
-  const base = agentCommand(agent);
+  const hasCodexNotify = agent === 'codex' && codexHasNotifyConfigArg(parsed.tokens);
+  if (agent === 'codex' && hasCodexNotify && codexHasUpdateCheckOverride(parsed.tokens)) return null;
+  const base = agent === 'codex' && hasCodexNotify
+    ? `codex -c ${shellQuote('check_for_update_on_startup=false')}`
+    : agentCommand(agent);
   if (!base) return null;
   const args = parsed.line.slice(commandToken.end).trim();
   return {
@@ -4218,6 +4243,23 @@ function adoptSessionAgent(session, agent, source = 'unknown', detail = {}) {
 function handleTerminalInput(session, data) {
   if (!session) return null;
   const rewrite = rewriteShellLaunchInput(session, data);
+  if (rewrite && rewrite.agent === 'codex' && !codexLaunchIsReleased()) {
+    writePtyInput(session, '\x15');
+    queueCodexLaunch({
+      name: session.name,
+      cwd: session.cwd,
+      agent: 'codex',
+      command: rewrite.command,
+      source: 'shell-rewrite',
+    }, async () => {
+      adoptSessionAgent(session, rewrite.agent, 'rewrite', { command: rewrite.command });
+      const outgoing = `${rewrite.command}\r`;
+      apply({ type: 'user-input', sessionId: session.id, data: outgoing });
+      writePtyInput(session, outgoing);
+      return session;
+    }).catch(() => {});
+    return { ...rewrite, held: true };
+  }
   const outgoing = rewrite ? rewrite.data : data;
   if (rewrite) adoptSessionAgent(session, rewrite.agent, 'rewrite', { command: rewrite.command });
   apply({ type: 'user-input', sessionId: session.id, data: outgoing });
@@ -4394,7 +4436,94 @@ function installTerminalScrollToBottom(session, { reducedMotion = null } = {}) {
   return tracker;
 }
 
-async function createSession({ name, cwd, agent, initialUrl = null, initialQueue = [], initialAttentionRecords = [], command = undefined, resumeLaunch = null, composerDraft = '' }) {
+function codexLaunchIsReleased() {
+  return state.codexUpdate.phase === 'released' || state.codexUpdate.phase === 'bypassed';
+}
+
+function queueCodexLaunch(options, action = null) {
+  return new Promise((resolve, reject) => {
+    state.codexUpdate.queue.push({
+      sequence: state.codexUpdate.nextSequence++,
+      options: { ...options },
+      action,
+      resolve,
+      reject,
+    });
+    renderWorkspaceWarning();
+  });
+}
+
+async function releaseCodexLaunches({ bypass = false } = {}) {
+  if (state.codexUpdate.releasePromise) return state.codexUpdate.releasePromise;
+  state.codexUpdate.phase = 'releasing';
+  state.codexUpdate.releasePromise = (async () => {
+    while (state.codexUpdate.queue.length > 0) {
+      const queued = state.codexUpdate.queue.shift();
+      try {
+        const session = queued.action
+          ? await queued.action()
+          : (state.testCodexLaunchExecutor
+            ? await state.testCodexLaunchExecutor(queued.options)
+            : await createSessionNow(queued.options));
+        queued.resolve(session);
+      } catch (error) {
+        queued.reject(error);
+      }
+    }
+    state.codexUpdate.phase = bypass ? 'bypassed' : 'released';
+    state.codexUpdate.releasePromise = null;
+    renderWorkspaceWarning();
+  })();
+  return state.codexUpdate.releasePromise;
+}
+
+async function checkCodexPreflight({ force = false } = {}) {
+  if (state.codexUpdate.checkPromise) return state.codexUpdate.checkPromise;
+  state.codexUpdate.phase = 'checking';
+  state.codexUpdate.progress = '';
+  renderWorkspaceWarning();
+  state.codexUpdate.checkPromise = window.chromux.checkCodexUpdate({ force }).then(async (status) => {
+    state.codexUpdate.status = status;
+    state.codexUpdate.checkPromise = null;
+    if (status && !status.error && status.updateAvailable === false) {
+      await releaseCodexLaunches();
+    } else {
+      state.codexUpdate.phase = status && status.error ? 'check-failed' : 'update-available';
+      renderWorkspaceWarning();
+    }
+    return status;
+  }).catch((error) => {
+    state.codexUpdate.status = { error: error && error.message ? error.message : 'Codex update check failed' };
+    state.codexUpdate.checkPromise = null;
+    state.codexUpdate.phase = 'check-failed';
+    renderWorkspaceWarning();
+    return state.codexUpdate.status;
+  });
+  return state.codexUpdate.checkPromise;
+}
+
+async function installCodexUpdate() {
+  if (state.codexUpdate.phase === 'updating') return;
+  state.codexUpdate.phase = 'updating';
+  state.codexUpdate.progress = '';
+  renderWorkspaceWarning();
+  const result = await window.chromux.installCodexUpdate();
+  state.codexUpdate.status = result;
+  if (result && result.ok) await releaseCodexLaunches();
+  else {
+    state.codexUpdate.phase = 'update-failed';
+    renderWorkspaceWarning();
+  }
+}
+
+async function createSession(options) {
+  if (options && options.agent === 'codex' && !codexLaunchIsReleased()) {
+    return queueCodexLaunch(options);
+  }
+  return createSessionNow(options);
+}
+
+async function createSessionNow({ name, cwd, agent, initialUrl = null, initialQueue = [], initialAttentionRecords = [], command = undefined, resumeLaunch = null, composerDraft = '' }) {
   state.counter += 1;
   const id = 's' + state.counter;
   const session = newSessionShape({ id, name, cwd, agent });
@@ -4725,7 +4854,7 @@ function snapshotAttentionRecordsBySession(sessions) {
 function snapshotOpenSessions() {
   const sessions = orderedSessions();
   const attentionBySession = snapshotAttentionRecordsBySession(sessions);
-  return sessions.map((session) => ({
+  const open = sessions.map((session) => ({
     name: session.name,
     cwd: session.cwd,
     agent: session.agent || '',
@@ -4745,6 +4874,23 @@ function snapshotOpenSessions() {
     ...(session.composer.draft ? { composerDraft: session.composer.draft } : {}),
     savedAt: new Date().toISOString(),
   }));
+  const heldCodex = state.codexUpdate.queue
+    .filter((queued) => !queued.action && queued.options && queued.options.agent === 'codex')
+    .map(({ options }) => ({
+      name: options.name,
+      cwd: options.cwd,
+      agent: 'codex',
+      resumeId: options.resumeLaunch?.resumeId || null,
+      alive: true,
+      currentUrl: options.initialUrl || null,
+      queue: Array.isArray(options.initialQueue) ? options.initialQueue : [],
+      ...(Array.isArray(options.initialAttentionRecords) && options.initialAttentionRecords.length
+        ? { attentionRecords: options.initialAttentionRecords }
+        : {}),
+      ...(options.composerDraft ? { composerDraft: options.composerDraft } : {}),
+      savedAt: new Date().toISOString(),
+    }));
+  return [...open, ...heldCodex];
 }
 
 function liveSessions() {
@@ -5529,13 +5675,18 @@ async function openAllDetectedAgents() {
   if (!det) return;
   const btn = $('#detect-open-all');
   btn.disabled = true;
-  for (const row of visibleDetectedRows()) {
+  const pending = visibleDetectedRows().filter((row) => row.agent && !row.opened);
+  for (const row of pending.filter((candidate) => candidate.agent !== 'codex')) {
     if (!row.agent || row.opened) continue;
     try {
       await openDetectedRow(row, resumeCommandFor(row) ? 'resume' : 'fresh');
     } catch { /* keep going — remaining rows still open */ }
     renderDetectList();
   }
+  await Promise.all(pending.filter((row) => row.agent === 'codex').map(async (row) => {
+    try { await openDetectedRow(row, resumeCommandFor(row) ? 'resume' : 'fresh'); } catch { /* keep going */ }
+    renderDetectList();
+  }));
 }
 
 async function openAllRestoredSessions() {
@@ -5543,13 +5694,18 @@ async function openAllRestoredSessions() {
   const rows = visibleRestoreRows();
   const btn = $('#restore-open-all');
   btn.disabled = true;
-  for (const row of rows) {
+  const pending = rows.filter((row) => !row.opened && !row.restoredAt);
+  for (const row of pending.filter((candidate) => candidate.agent !== 'codex')) {
     if (row.opened || row.restoredAt) continue;
     try {
       await openRestoredSession(row);
     } catch { /* keep going */ }
     renderRestoreSessions();
   }
+  await Promise.all(pending.filter((row) => row.agent === 'codex').map(async (row) => {
+    try { await openRestoredSession(row); } catch { /* keep going */ }
+    renderRestoreSessions();
+  }));
 }
 
 function sendResumeRetryCommand(warning = state.resumeRetryWarning) {
@@ -5573,6 +5729,74 @@ function renderWorkspaceWarning() {
   const host = $('#restore-warning');
   if (!host) return;
   host.innerHTML = '';
+
+  const codex = state.codexUpdate;
+  const waiting = codex && codex.queue.length;
+  if (waiting > 0 && !codexLaunchIsReleased()) {
+    const status = codex.status || {};
+    const main = document.createElement('div');
+    main.className = 'rw-main';
+    const title = document.createElement('div');
+    title.className = 'rw-title';
+    title.textContent = codex.phase === 'update-available'
+      ? `Codex update available — ${waiting} session${waiting === 1 ? '' : 's'} waiting`
+      : codex.phase === 'updating'
+        ? `Updating Codex — ${waiting} session${waiting === 1 ? '' : 's'} waiting`
+        : codex.phase === 'update-failed'
+          ? `Codex update failed — ${waiting} session${waiting === 1 ? '' : 's'} waiting`
+          : codex.phase === 'check-failed'
+            ? `Codex update check failed — ${waiting} session${waiting === 1 ? '' : 's'} waiting`
+            : `Checking Codex — ${waiting} session${waiting === 1 ? '' : 's'} waiting`;
+    const detail = document.createElement('div');
+    detail.className = 'rw-detail';
+    if (codex.phase === 'update-available') {
+      detail.textContent = `Installed ${status.currentVersion}; latest ${status.latestVersion}. Update once, then Chromux will resume every waiting Codex session.`;
+    } else if (codex.phase === 'updating') {
+      detail.textContent = codex.progress || 'Running codex update and verifying the installed version…';
+    } else if (codex.phase === 'check-failed' || codex.phase === 'update-failed') {
+      detail.textContent = status.error || 'Codex update handling failed. Retry or resume this workspace without updating.';
+    } else {
+      detail.textContent = 'Chromux is checking the stable release source before starting Codex.';
+    }
+    detail.title = detail.textContent;
+    main.append(title, detail);
+
+    const actions = document.createElement('div');
+    actions.className = 'rw-actions';
+    if (codex.phase === 'update-available') {
+      const notes = document.createElement('button');
+      notes.className = 'rw-action';
+      notes.textContent = 'RELEASE NOTES';
+      notes.onclick = () => window.chromux.openUpdateRelease({ status }).catch(() => {});
+      const update = document.createElement('button');
+      update.className = 'rw-action rw-primary';
+      update.textContent = 'UPDATE CODEX';
+      update.onclick = () => installCodexUpdate().catch(() => {});
+      actions.append(notes, update);
+    } else if (codex.phase === 'check-failed') {
+      const retryCheck = document.createElement('button');
+      retryCheck.className = 'rw-action rw-primary';
+      retryCheck.textContent = 'RETRY CHECK';
+      retryCheck.onclick = () => checkCodexPreflight({ force: true }).catch(() => {});
+      actions.appendChild(retryCheck);
+    } else if (codex.phase === 'update-failed') {
+      const retryUpdate = document.createElement('button');
+      retryUpdate.className = 'rw-action rw-primary';
+      retryUpdate.textContent = 'RETRY UPDATE';
+      retryUpdate.onclick = () => installCodexUpdate().catch(() => {});
+      actions.appendChild(retryUpdate);
+    }
+    if (codex.phase !== 'updating' && codex.phase !== 'releasing') {
+      const resume = document.createElement('button');
+      resume.className = 'rw-action rw-dismiss';
+      resume.textContent = 'RESUME ANYWAY';
+      resume.onclick = () => releaseCodexLaunches({ bypass: true }).catch(() => {});
+      actions.appendChild(resume);
+    }
+    host.append(main, actions);
+    host.classList.remove('hidden');
+    return;
+  }
 
   const retry = state.resumeRetryWarning;
   if (retry) {
@@ -5661,7 +5885,7 @@ async function autoRestoreWorkspace() {
 
   const res = await window.chromux.resolveRestoreSessions({ sessions: snapshot.sessions });
   const restored = [];
-  for (const row of res.sessions || []) {
+  const restoreRow = async (row) => {
     try {
       const name = uniqueSessionName(row.name || (row.cwd ? row.cwd.split('/').filter(Boolean).pop() : 'restored'));
       const command = row.command || undefined;
@@ -5685,7 +5909,13 @@ async function autoRestoreWorkspace() {
       row.opened = true;
       row.restoredAt = new Date().toISOString();
     } catch { /* keep restoring remaining sessions */ }
+  };
+  const rows = res.sessions || [];
+  for (const row of rows.filter((candidate) => candidate.agent !== 'codex')) {
+    await restoreRow(row);
   }
+  const codexRestores = rows.filter((row) => row.agent === 'codex').map((row) => restoreRow(row));
+  await Promise.all(codexRestores);
   const consumed = await window.chromux.markRestoreSnapshotConsumed({
     restoreId: snapshot.restoreId,
     restoredSessions: restored,
@@ -6132,6 +6362,65 @@ function handleRendererShortcutKeydown(e) {
 }
 
 if (window.chromuxTest) {
+  window.chromuxTestCodexGate = {
+    reset() {
+      state.codexUpdate.phase = 'checking';
+      state.codexUpdate.status = null;
+      state.codexUpdate.queue = [];
+      state.codexUpdate.nextSequence = 0;
+      state.codexUpdate.progress = '';
+      state.codexUpdate.checkPromise = null;
+      state.codexUpdate.releasePromise = null;
+      state.testCodexLaunchExecutor = null;
+      state.testCodexLaunchTrace = [];
+      renderWorkspaceWarning();
+    },
+    useFakeLauncher() {
+      const trace = [];
+      state.testCodexLaunchExecutor = async (options) => {
+        trace.push(options.name);
+        return { id: options.name, name: options.name };
+      };
+      state.testCodexLaunchTrace = trace;
+    },
+    launch(agent, name, trace) {
+      if (agent !== 'codex') {
+        trace.push(name);
+        return Promise.resolve({ id: name, name });
+      }
+      return createSession({ name, cwd: '/tmp', agent: 'codex' });
+    },
+    setStatus(status) {
+      state.codexUpdate.status = { ...status };
+      state.codexUpdate.phase = status.error
+        ? 'check-failed'
+        : (status.updateAvailable ? 'update-available' : 'checking');
+      if (status.updateAvailable === false && !status.error) return releaseCodexLaunches();
+      renderWorkspaceWarning();
+      return Promise.resolve();
+    },
+    failUpdate(error = 'fixture update failure') {
+      state.codexUpdate.status = { ...(state.codexUpdate.status || {}), error };
+      state.codexUpdate.phase = 'update-failed';
+      renderWorkspaceWarning();
+    },
+    succeedUpdate(status = {}) {
+      state.codexUpdate.status = { ...(state.codexUpdate.status || {}), ...status, ok: true, error: null };
+      return releaseCodexLaunches();
+    },
+    resumeAnyway: () => releaseCodexLaunches({ bypass: true }),
+    phase: () => state.codexUpdate.phase,
+    waiting: () => state.codexUpdate.queue.map((item) => item.options.name),
+    launched: () => [...(state.testCodexLaunchTrace || [])],
+    snapshot: () => snapshotOpenSessions(),
+    warning: () => ({
+      hidden: $('#restore-warning').classList.contains('hidden'),
+      title: $('#restore-warning .rw-title')?.textContent || '',
+      detail: $('#restore-warning .rw-detail')?.textContent || '',
+      buttons: [...document.querySelectorAll('#restore-warning button')].map((button) => button.textContent),
+    }),
+  };
+
   window.chromuxTestDetect = {
     setDetectRows(rows) {
       state.detect = { rows: rows.map((row) => ({ ...row })) };
@@ -7830,12 +8119,19 @@ setInterval(() => {
   state.env = await window.chromux.getEnv();
   state.restoreSessions = state.env.restoreSessions || null;
   window.chromux.onUpdateStatus((status) => renderUpdateStatus(status));
+  window.chromux.onCodexUpdateProgress((progress) => {
+    if (progress && progress.output) {
+      state.codexUpdate.progress = `${state.codexUpdate.progress}${progress.output}`.slice(-4000).trim();
+    }
+    renderWorkspaceWarning();
+  });
   window.chromux.onPreventSleepStatus((status) => renderPreventSleepStatus(status));
   $('#storage-path').textContent = state.env.capturesDir.replace(state.env.home, '~');
   $('.sb-ver').textContent = `chromux ${state.env.version || '0.6.0'} — prototype`;
   $('#settings-developer-mode').checked = Boolean(state.env.devMode);
   renderPreventSleepStatus();
   renderDeveloperDiagnostics();
+  checkCodexPreflight().catch(() => {});
   await autoRestoreWorkspace().catch((err) => {
     renderRestoreWarning([{ name: 'restore failed', cwd: err.message, agent: 'chromux' }]);
   });
