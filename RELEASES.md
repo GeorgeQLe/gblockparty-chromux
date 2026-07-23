@@ -1,5 +1,14 @@
 # Release Notes
 
+## GBlockParty Chromux v0.44.2
+
+Tag: `chromux-v0.44.2`
+
+- Keep Threads rows clickable while working agents animate their terminal titles by synchronizing presentation metadata in place instead of rebuilding the rail.
+- Keep row text, tooltip, ARIA status, and an open terminal-preview heading synchronized without changing inactive preview-first or no-preview direct-activation behavior.
+- Give every Needs Attention card its own boundary with 6px separation and inset padding across all four themes in Light and Dark modes.
+- Add real-Electron coverage for DOM-node preservation, pointer continuity, title/status synchronization, inline action isolation, and attention-card geometry.
+
 ## GBlockParty Chromux v0.44.1
 
 Tag: `chromux-v0.44.1`

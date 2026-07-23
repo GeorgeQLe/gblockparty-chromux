@@ -95,10 +95,21 @@ fs.writeFileSync(e2ePath, `
   await wait(80);
   preview = rail.preview();
   expect(preview.text.includes('LIVE UPDATE') && preview.refreshCount >= 2, 'subsequent terminal writes should refresh the live mirror');
+  const previewRowBeforeTitle = document.querySelector('#thread-list .rail-session-row[data-session-id="' + CSS.escape(web) + '"]');
   rail.title(web, 'Live preview title');
   await wait(60);
-  expect(rail.preview()?.title === 'Live preview title' && rail.rowState(web).ariaExpanded === 'true',
-    'rail rerenders should rebind the anchor and update the live preview header');
+  const previewRowAfterTitle = document.querySelector('#thread-list .rail-session-row[data-session-id="' + CSS.escape(web) + '"]');
+  const synchronizedPreviewRow = rail.groups().flatMap((group) => group.rows).find((row) => row.id === web);
+  expect(previewRowAfterTitle === previewRowBeforeTitle,
+    'presentation-only title updates should preserve the exact Threads row DOM node');
+  expect(rail.preview()?.title === 'Live preview title' && rail.preview()?.ariaLabel.includes('Live preview title')
+    && rail.rowState(web).ariaExpanded === 'true',
+  'title updates should synchronize the open preview heading without replacing its anchor');
+  expect(synchronizedPreviewRow.name === 'Live preview title'
+    && synchronizedPreviewRow.title.includes('Live preview title')
+    && synchronizedPreviewRow.ariaLabel.includes('Live preview title')
+    && synchronizedPreviewRow.status === 'Completed',
+  'title updates should synchronize Threads text, tooltip, ARIA label, and status metadata');
   await rail.write(web, '\\x1b[?1049h\\x1b[HALTERNATE PREVIEW');
   await wait(80);
   expect(rail.preview()?.text.includes('ALTERNATE PREVIEW'), 'live mirror should reproduce alternate-screen content');
@@ -166,6 +177,11 @@ fs.writeFileSync(e2ePath, `
   expect(apiCard && apiCard.reasons.map((reason) => reason.kind).join(',') === 'PERMISSION,QUEUE 1',
     'one attentive thread should aggregate simultaneous reasons in priority order');
   expect(rail.attentionCount() === 3, 'badge should continue to count individual reasons, not attentive sessions');
+  const initialAttentionGeometry = rail.attentionGeometry();
+  expect(initialAttentionGeometry.cards.length >= 2 && initialAttentionGeometry.gaps.every((gap) => gap >= 5.9),
+    'Needs Attention cards should have at least 6px of visual separation');
+  expect(initialAttentionGeometry.firstInset >= 5.9 && initialAttentionGeometry.lastInset >= 5.9,
+    'Needs Attention cards should remain inside the group padding');
   rail.clickRow(web);
   await wait(40);
   expect(rail.preview()?.sessionId === web, 'ordinary row should still open a preview before inline action test');
@@ -178,10 +194,19 @@ fs.writeFileSync(e2ePath, `
     'opening actionable session must not clear its state or attention');
 
   rail.select('threads');
+  rail.emit(webTwo, 'turn-start');
+  const workingRowBeforeTitle = document.querySelector('#thread-list .rail-session-row[data-session-id="' + CSS.escape(webTwo) + '"]');
+  workingRowBeforeTitle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
   rail.title(webTwo, '\u2839 Dynamic review title');
+  const workingRowAfterTitle = document.querySelector('#thread-list .rail-session-row[data-session-id="' + CSS.escape(webTwo) + '"]');
+  workingRowBeforeTitle.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+  workingRowBeforeTitle.click();
+  await wait(40);
+  expect(workingRowAfterTitle === workingRowBeforeTitle && rail.preview()?.sessionId === webTwo,
+    'a pointer interaction spanning a working title update should retain its row and open the expected preview');
+  rail.previewKey('Escape');
   expect(rail.groups().flatMap((group) => group.rows).some((row) => row.name === 'Dynamic review title'),
     'grouped rows should normalize Codex spinner prefixes in dynamic session titles');
-  rail.emit(webTwo, 'turn-start');
   rail.emit(api, 'permission-required');
   let rows = rail.groups().flatMap((group) => group.rows);
   expect(rows.find((row) => row.id === webTwo).status === 'Working', 'working status should appear in Threads');
@@ -255,9 +280,22 @@ fs.writeFileSync(e2ePath, `
       expect(navRect.bottom <= headRect.top + 1, theme + ' ' + mode + ' should keep two-row header order');
       expect(modeButtons.every((button) => button.getBoundingClientRect().right <= railRect.right + 1),
         theme + ' ' + mode + ' should keep icon controls inside rail');
-      rail.clickRow(web);
+      const attentionGeometry = rail.attentionGeometry();
+      expect(attentionGeometry.cards.length >= 2 && attentionGeometry.gaps.every((gap) => gap >= 5.9)
+        && attentionGeometry.firstInset >= 5.9 && attentionGeometry.lastInset >= 5.9,
+      theme + ' ' + mode + ' should preserve separated, inset Needs Attention cards: ' + JSON.stringify(attentionGeometry));
+      const rowBeforePointer = document.querySelector('#thread-list .rail-session-row[data-session-id="' + CSS.escape(web) + '"]');
+      rowBeforePointer.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      rail.title(web, theme + ' ' + mode + ' active title');
+      const rowAfterTitle = document.querySelector('#thread-list .rail-session-row[data-session-id="' + CSS.escape(web) + '"]');
+      rowBeforePointer.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+      rowBeforePointer.click();
+      expect(rowAfterTitle === rowBeforePointer,
+        theme + ' ' + mode + ' should preserve the pointer target across an animated title update');
       await wait(40);
       const geometry = rail.preview();
+      expect(geometry?.sessionId === web,
+        theme + ' ' + mode + ' should complete the pointer interaction on the expected session');
       expect(geometry && geometry.left >= 0 && geometry.top >= 0 && geometry.right <= window.innerWidth + 1 && geometry.bottom <= window.innerHeight + 1,
         theme + ' ' + mode + ' should clamp the preview inside the viewport');
       expect(geometry.cols === geometry.sourceCols && geometry.rows === geometry.sourceRows,

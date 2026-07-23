@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Preserve Threads row identity and click continuity through presentation-only terminal title changes, add 6px-separated inset Needs Attention cards, and ship as v0.44.2. _(source: user-approved implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`, `prototype/scripts/test-session-rail-renderer.js`, `RELEASES.md`)_
+
 - [x] Keep sessions focused through Threads, search, attention items, or programmatic navigation visible in the horizontally scrolling tab strip without moving an already-visible tab, and ship as v0.44.1. _(source: user-approved implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-tab-titles-renderer.js`, `RELEASES.md`)_
 
 - [x] Normalize Codex spinner-prefixed display titles, unify tab and Threads status projection and animation, preserve action/exit precedence with activity indicators disabled, and ship as v0.44.0. _(source: user-approved implementation plan; evidence: `prototype/renderer/attention.js`, `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`, focused renderer tests, `RELEASES.md`)_

@@ -262,8 +262,8 @@ body {
 .attention-system-row { cursor: default; }
 .attention-thread-group { flex: none; border-color: color-mix(in srgb, var(--amber) 55%, var(--line)); }
 .attention-thread-group > summary { color: var(--amber); }
-.attention-thread { padding: 0; gap: 0; cursor: default; border: 0; border-left: 2px solid var(--amber); background: var(--bg2); }
-.attention-thread + .attention-thread { border-top: 1px solid var(--line); }
+.attention-thread-group > .rail-group-rows { display: flex; flex-direction: column; gap: 6px; padding: 6px; }
+.attention-thread { padding: 0; gap: 0; cursor: default; border: 1px solid var(--line); border-left: 2px solid var(--amber); background: var(--bg2); }
 .attention-thread:hover { border-color: var(--amber); }
 .attention-thread .rail-session-row { height: auto; min-height: 34px; border-bottom: 1px solid var(--line); }
 .attention-row-reason {

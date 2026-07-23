@@ -3375,8 +3375,45 @@ function attentionSessionRows(items) {
   return [...grouped.values()];
 }
 
-function appendThreadSessionRow(host, session, { attention = null } = {}) {
+function syncThreadSessionRowPresentation(row, session) {
+  if (!row || !session) return;
   const status = sessionRailStatus(session);
+  const label = sessionDisplayLabel(session);
+  const attentionSummary = row.dataset.attentionSummary || '';
+  row.title = `${label} — ${status.label}${attentionSummary ? ` — ${attentionSummary}` : ''}\n${session.cwd || '~'}`;
+  row.setAttribute('aria-label', `${label}. ${status.label}.${attentionSummary ? ` Needs attention: ${attentionSummary}.` : ''} ${session.cwd || '~'}`);
+  const icon = row.querySelector('.rail-status');
+  if (icon) {
+    icon.className = `rail-status ${status.kind}`;
+    icon.textContent = status.icon;
+    icon.title = status.label;
+    icon.setAttribute('aria-label', status.label);
+  }
+  const name = row.querySelector('.rail-session-name');
+  if (name && name.textContent !== label) name.textContent = label;
+}
+
+function syncThreadPreviewPresentation(session) {
+  const preview = state.ui.threadPreview;
+  if (!preview || !session || preview.sessionId !== session.id) return;
+  const label = sessionDisplayLabel(session);
+  const title = preview.popover.querySelector('.thread-preview-title');
+  const status = preview.popover.querySelector('.thread-preview-status');
+  const cwd = preview.popover.querySelector('.thread-preview-cwd');
+  if (title) title.textContent = label;
+  preview.popover.setAttribute('aria-label', `Preview ${label}. Click to open session.`);
+  if (status) status.textContent = `${agentLabel(session.agent)} · ${sessionRailStatus(session).label}`;
+  if (cwd) { cwd.title = session.cwd || '~'; cwd.textContent = session.cwd || '~'; }
+}
+
+function syncThreadSessionPresentation(session) {
+  if (!session) return;
+  document.querySelectorAll(`#thread-list .rail-session-row[data-session-id="${CSS.escape(session.id)}"]`)
+    .forEach((row) => syncThreadSessionRowPresentation(row, session));
+  syncThreadPreviewPresentation(session);
+}
+
+function appendThreadSessionRow(host, session, { attention = null } = {}) {
   const row = document.createElement('button');
   row.className = 'rail-session-row';
   row.type = 'button';
@@ -3389,16 +3426,11 @@ function appendThreadSessionRow(host, session, { attention = null } = {}) {
   const attentionSummary = attention
     ? `${attention.items[0].kind}${attention.items.length > 1 ? ` and ${attention.items.length - 1} more` : ''}`
     : null;
-  row.title = `${sessionDisplayLabel(session)} — ${status.label}${attentionSummary ? ` — ${attentionSummary}` : ''}\n${session.cwd || '~'}`;
-  row.setAttribute('aria-label', `${sessionDisplayLabel(session)}. ${status.label}.${attentionSummary ? ` Needs attention: ${attentionSummary}.` : ''} ${session.cwd || '~'}`);
+  row.dataset.attentionSummary = attentionSummary || '';
   const icon = document.createElement('span');
-  icon.className = `rail-status ${status.kind}`;
-  icon.textContent = status.icon;
-  icon.title = status.label;
-  icon.setAttribute('aria-label', status.label);
+  icon.className = 'rail-status';
   const name = document.createElement('span');
   name.className = attention ? 'rail-session-name attention-name' : 'rail-session-name';
-  name.textContent = sessionDisplayLabel(session);
   row.append(icon, name);
   if (attention) {
     const reason = document.createElement('span'); reason.className = 'attention-row-reason'; reason.textContent = attention.items[0].kind;
@@ -3415,6 +3447,7 @@ function appendThreadSessionRow(host, session, { attention = null } = {}) {
       animateThreadSessionConfirmation(row, session);
     } else openThreadPreview(session, row);
   };
+  syncThreadSessionRowPresentation(row, session);
   host.appendChild(row);
   return row;
 }
@@ -3764,13 +3797,7 @@ function syncThreadPreviewAnchor() {
   }
   preview.anchor = anchor;
   const session = state.sessions.get(preview.sessionId);
-  const title = preview.popover.querySelector('.thread-preview-title');
-  const status = preview.popover.querySelector('.thread-preview-status');
-  const cwd = preview.popover.querySelector('.thread-preview-cwd');
-  if (session && title) title.textContent = sessionDisplayLabel(session);
-  if (session) preview.popover.setAttribute('aria-label', `Preview ${sessionDisplayLabel(session)}. Click to open session.`);
-  if (session && status) status.textContent = `${agentLabel(session.agent)} · ${sessionRailStatus(session).label}`;
-  if (session && cwd) { cwd.title = session.cwd || '~'; cwd.textContent = session.cwd || '~'; }
+  syncThreadPreviewPresentation(session);
   anchor.setAttribute('aria-expanded', 'true');
   anchor.setAttribute('aria-controls', 'thread-terminal-preview');
   positionThreadPreview();
@@ -4634,7 +4661,8 @@ function applyTerminalTitleUpdates(session, data) {
   const latest = res.titles[res.titles.length - 1].title;
   if (!latest || latest === session.term.title) return;
   session.term.title = latest;
-  invalidate('tabs', 'attention', ...(state.env && state.env.devMode ? ['diagnostics'] : []));
+  syncThreadSessionPresentation(session);
+  invalidate('tabs', ...(state.env && state.env.devMode ? ['diagnostics'] : []));
 }
 
 function renderedTerminalCursorContext(term) {
@@ -6065,6 +6093,18 @@ if (window.chromuxTest) {
         actions: [...reason.querySelectorAll('.attention-actions .qi-btn')].map((button) => button.textContent),
       })),
     })),
+    attentionGeometry() {
+      const rows = document.querySelector('.attention-thread-group > .rail-group-rows');
+      const cards = [...(rows?.querySelectorAll(':scope > .attention-thread') || [])];
+      const rowsRect = rows?.getBoundingClientRect();
+      const rects = cards.map((card) => card.getBoundingClientRect());
+      return {
+        cards: rects.map((rect) => ({ top: rect.top, bottom: rect.bottom })),
+        gaps: rects.slice(1).map((rect, index) => rect.top - rects[index].bottom),
+        firstInset: rowsRect && rects[0] ? rects[0].top - rowsRect.top : 0,
+        lastInset: rowsRect && rects.length ? rowsRect.bottom - rects[rects.length - 1].bottom : 0,
+      };
+    },
     clickAttentionAction(id, kind, label) {
       const card = document.querySelector(`.attention-thread[data-session-id="${CSS.escape(id)}"]`);
       const reason = [...(card?.querySelectorAll('.attention-reason') || [])]
