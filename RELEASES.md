@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.52.1
+
+Tag: `chromux-v0.52.1`
+
+- Treat exact whitespace-trimmed Codex `/clear` submissions as an authoritative idle boundary, immediately removing the session from Working and projecting Idle through tabs, Threads, attention, diagnostics, and update safety.
+- Advance the cleared turn generation, remove stale turn metadata, and suppress delayed rendered or native completion signals so cleared work cannot reappear.
+- Re-arm the normal working and completion lifecycle on the next ordinary prompt while leaving `/clear` with arguments, other slash commands, and non-Codex sessions unchanged.
+
 ## GBlockParty Chromux v0.52.0
 
 Tag: `chromux-v0.52.0`

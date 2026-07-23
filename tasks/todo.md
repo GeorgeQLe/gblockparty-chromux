@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Treat exact Codex `/clear` as an authoritative idle boundary, invalidate stale completion callbacks and notifications until the next ordinary prompt, project idle across every shared consumer, and ship as v0.52.1. _(source: user-supplied implementation plan; evidence: `prototype/renderer/attention.js`, `prototype/renderer/renderer.js`, focused turn-signal/tab-activity/session-rail/diagnostics/update-safety coverage, complete prototype suite, source and packaged smoke, `RELEASES.md`)_
+
 - [x] Default non-attentive Threads to persisted Recent ordering, add A–Z, persist deliberate session activity in schema-v7 restore snapshots, preserve urgency ordering, and ship as v0.52.0. _(source: user-supplied implementation plan; evidence: `prototype/main.js`, `prototype/renderer/renderer.js`, `prototype/scripts/test-session-rail-renderer.js`, `prototype/scripts/test-restore-session-identity.js`, complete prototype suite, source and packaged smoke, `RELEASES.md`)_
 
 - [x] Add per-session paired-browser tabs, internal terminal HTTP(S) link routing, a project-scoped HTML explorer with live-cwd resolution/autocomplete, schema-compatible restore persistence, and ship as v0.51.0. _(source: user-supplied implementation plan; evidence: `prototype/main.js`, `prototype/preload.js`, `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`, `prototype/scripts/test-browser-tabs-html-explorer.js`, complete prototype suite, packaged smoke, `RELEASES.md`)_

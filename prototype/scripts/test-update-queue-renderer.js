@@ -252,6 +252,12 @@ fs.writeFileSync(e2ePath, `
   sig.focus(liveId);
   expect(q.phase() === 'waiting', 'focusing a blocker leaves phase waiting');
   expect(q.blockers().join(',') === 'live-unknown', 'blocker unchanged by focus');
+  sig.typeInput(liveId, '/clear\\r');
+  expect(q.turnState(liveId).state === 'idle', 'Codex /clear should immediately make the working session idle');
+  expect(q.phase() === 'ready' && q.blockers().length === 0,
+    'Codex /clear should immediately remove the working update blocker');
+  sig.typeInput(liveId, 'new update-safe turn\\r');
+  expect(q.phase() === 'waiting', 'ordinary input after /clear should block updates again');
   q.setSession(liveId, { turnState: 'completed' });
   expect(q.phase() === 'ready', 'ready again after completion');
 

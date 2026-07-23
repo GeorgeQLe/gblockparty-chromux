@@ -27,6 +27,13 @@ fs.writeFileSync(e2ePath, `
   expect(d.selected() === first, 'inspected session must remain independent of focus');
   d.emit(first, 'turn-start');
   expect(d.groupText().includes('working'), 'tracked Codex working state should render');
+  d.typeInput(first, '/clear\\r');
+  expect(d.groupText().includes('TURNidle')
+    && d.groupText().includes('TABidle')
+    && d.groupText().includes('UPDATE SAFEYES · idle'),
+  'Codex /clear should project idle consistently through diagnostics and update safety');
+  expect(d.mismatches() === 0, 'cleared idle projections should agree with mounted Threads and tab state');
+  d.typeInput(first, 'new diagnostic turn\\r');
   d.emit(first, 'turn-end');
   expect(d.groupText().includes('COMPLETED'), 'background completion should agree with attention projection');
   expect(d.mismatches() === 0, 'projected completion should agree with rendered queue and tab');

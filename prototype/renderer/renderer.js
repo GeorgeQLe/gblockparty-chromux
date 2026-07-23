@@ -1327,7 +1327,7 @@ function newSessionShape({ id, name, cwd, agent }) {
       token: null, protocol: null, authoritative: false, hasV2: false, inputAt: 0, reason: null,
       source: null, confidence: null, turnId: null, eventId: null,
       eventIds: [], sequence: -1, stopped: false, authoritativeAt: 0,
-      generation: 0, sawBusyRender: false,
+      generation: 0, sawBusyRender: false, completionBlocked: false,
     },
     browser: createBrowserState(),
     term: {
@@ -8860,6 +8860,7 @@ if (window.chromuxTest) {
   window.chromuxTestDiagnostics = {
     addSession: addRenderableTestSession,
     focus(id) { activateSession(id); flushRender(); },
+    typeInput(id, data = 'x') { apply({ type: 'user-input', sessionId: id, data }); flushRender(); },
     select(id) {
       const selector = $('#diagnostic-session');
       selector.value = id;

@@ -322,6 +322,22 @@ fs.writeFileSync(e2ePath, `
   rail.emit(webTwo, 'turn-end');
   expect(!rail.groups().some((group) => group.key === 'status:working'),
     'Working section should disappear when its final active turn completes');
+  const clearRailCodex = rail.addTerminalSession({
+    name: 'clear-rail-codex', agent: 'codex', cwd: ${JSON.stringify(looseDir)},
+  });
+  rail.focus(holder);
+  rail.submit(clearRailCodex, 'clearable Codex work\\r');
+  expect(rail.groups().find((group) => group.key === 'status:working')
+    ?.rows.some((row) => row.id === clearRailCodex),
+  'submitted Codex work should enter the Working section');
+  rail.submit(clearRailCodex, '  /clear  \\r');
+  const clearedCodexRow = rail.groups().flatMap((group) => group.rows)
+    .find((row) => row.id === clearRailCodex);
+  expect(!rail.groups().find((group) => group.key === 'status:working')
+    ?.rows.some((row) => row.id === clearRailCodex)
+    && clearedCodexRow?.status === 'Idle',
+  'exact Codex /clear should immediately leave Working and return to its cwd group as Idle');
+  rail.close(clearRailCodex);
   rail.focus(holder);
   rail.clickRow(webTwo);
   await wait(40);

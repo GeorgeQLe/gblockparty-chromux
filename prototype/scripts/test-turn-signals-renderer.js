@@ -179,8 +179,10 @@ fs.writeFileSync(e2ePath, `
   sig.typeInput(codexClear, '   /clear   \\r');
   expect(sig.turnState(codexClear).state === 'idle',
     'exact whitespace-trimmed /clear should keep an idle Codex session idle');
-  expect(sig.turnState(codexClear).generation === clearGeneration,
-    '/clear must not advance or reset the existing turn generation');
+  expect(sig.turnState(codexClear).generation === clearGeneration + 1,
+    '/clear must advance the generation to invalidate pending render callbacks');
+  expect(sig.turnState(codexClear).completionBlocked === true,
+    '/clear must block stale completion signals until the next ordinary prompt');
   sig.typeInput(codexClear, 'unsubmitted draft');
   expect(sig.turnState(codexClear).state === 'idle',
     'typing after /clear without submission should remain idle');
@@ -189,10 +191,40 @@ fs.writeFileSync(e2ePath, `
   sig.focus(holder);
   sig.typeInput(clearDuringTurn, 'ordinary request\\r');
   const activeGeneration = sig.turnState(clearDuringTurn).generation;
+  sig.feedPtyChunk(clearDuringTurn, 'busy output\\r\\n');
   sig.typeInput(clearDuringTurn, '/clear\\r');
+  const clearedTurn = sig.turnState(clearDuringTurn);
+  expect(clearedTurn.state === 'idle'
+    && clearedTurn.generation === activeGeneration + 1
+    && clearedTurn.completionBlocked === true,
+  '/clear must end existing work, advance its generation, and arm completion suppression');
+  expect(clearedTurn.detail === null && clearedTurn.protocol === null && clearedTurn.source === null
+    && clearedTurn.confidence === null && clearedTurn.turnId === null && clearedTurn.eventId === null
+    && clearedTurn.stopped === false && clearedTurn.sawBusyRender === false,
+  '/clear must remove stale turn metadata');
+  sig.feedPtyChunk(clearDuringTurn, '? for shortcuts\\r\\n› ');
+  await wait(30); sig.flushRender();
+  expect(sig.turnState(clearDuringTurn).state === 'idle',
+    'a delayed rendered-composer callback must not resurrect a cleared turn');
+  sig.emitSignal(clearDuringTurn, 'turn-end', 'stale native completion');
+  expect(sig.turnState(clearDuringTurn).state === 'idle',
+    'a delayed native completion must not resurrect a cleared turn');
+  sig.typeInput(clearDuringTurn, 'next ordinary request\\r');
   expect(sig.turnState(clearDuringTurn).state === 'working'
-    && sig.turnState(clearDuringTurn).generation === activeGeneration,
-  '/clear must not restart an existing working generation');
+    && sig.turnState(clearDuringTurn).completionBlocked === false,
+  'the next ordinary prompt must clear suppression and start working');
+  sig.emitSignal(clearDuringTurn, 'turn-end', 'new turn complete');
+  expect(sig.turnState(clearDuringTurn).state === 'completed',
+    'the ordinary prompt after /clear must accept its own completion');
+
+  const clearVariants = sig.addFakeSession({ name: 'codex-clear-variants', agent: 'codex', turnState: 'idle' });
+  sig.typeInput(clearVariants, '/clear foo\\r');
+  expect(sig.turnState(clearVariants).state === 'working',
+    '/clear with arguments must retain ordinary Codex submission behavior');
+  const claudeClear = sig.addFakeSession({ name: 'claude-clear', agent: 'claude', turnState: 'idle' });
+  sig.typeInput(claudeClear, '/clear\\r');
+  expect(sig.turnState(claudeClear).state === 'working',
+    'exact /clear must retain ordinary submission behavior for non-Codex agents');
 
   const codexV2Recovery = sig.addTerminalSession({ name: 'codex-v2-recovery', agent: 'codex' });
   sig.focus(holder);

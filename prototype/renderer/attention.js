@@ -65,6 +65,7 @@
   function applyTurnSignal(turn, signal, detail, now, envelope = null) {
     const next = TURN_SIGNAL_STATES[signal];
     if (!turn || !next) return false;
+    if (next === 'completed' && turn.completionBlocked) return false;
     if (envelope) {
       if (!V2_EVENTS.has(signal)) return false;
       if (turn.inputAt && envelope.timestamp <= turn.inputAt) return false;
@@ -107,7 +108,18 @@
     if (!turn) return false;
     const submitted = /[\r\n]/.test(input || '');
     if (!submitted) return false;
-    if (session.agent === 'codex' && String(submittedLine || '').trim() === '/clear') return false;
+    if (session.agent === 'codex' && String(submittedLine || '').trim() === '/clear') {
+      turn.state = 'idle';
+      turn.detail = null;
+      turn.since = now;
+      turn.acknowledged = false;
+      turn.generation = (Number(turn.generation) || 0) + 1;
+      turn.sawBusyRender = false;
+      turn.completionBlocked = true;
+      resetTurnProtocol(turn, now);
+      return true;
+    }
+    if (session.agent === 'codex') turn.completionBlocked = false;
     if (['idle', 'needsInput', 'permission', 'authentication', 'rateLimited', 'toolFailed', 'completed'].includes(turn.state)) {
       turn.state = 'working';
       turn.detail = null;
@@ -151,7 +163,7 @@
 
   function applyCodexRenderedCompletionFallback(session, rendered, now) {
     const turn = session && session.turn;
-    if (!turn || session.agent !== 'codex' || turn.state !== 'working') return false;
+    if (!turn || session.agent !== 'codex' || turn.state !== 'working' || turn.completionBlocked) return false;
     const cursorLine = normalizeTerminalOutput(rendered && rendered.cursorLine).trimEnd();
     const nearbyLines = Array.isArray(rendered && rendered.nearbyLines)
       ? rendered.nearbyLines.map((line) => normalizeTerminalOutput(line)) : [];

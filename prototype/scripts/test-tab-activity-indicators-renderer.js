@@ -47,6 +47,26 @@ fs.writeFileSync(e2ePath, `
   expect(tabs.state(background).indicator === 'working', 'signaled background working state should show spinner');
   expect(tabs.state(active).ariaLabel.includes('Agent working'), 'working status should be accessible on the tab');
 
+  tabs.typeInput(active, '/clear\\r');
+  expect(tabs.state(active).indicator === 'idle'
+    && tabs.state(active).ariaLabel.includes('Agent idle'),
+  'focused Codex /clear should immediately replace the spinner with idle across tab projections');
+  tabs.typeInput(active, 'build this again\\r');
+  expect(tabs.state(active).indicator === 'working',
+    'ordinary input after focused /clear should restore the spinner');
+
+  const backgroundCodex = tabs.addSession({ name: 'background-codex-clear', agent: 'codex' });
+  tabs.focus(active);
+  tabs.typeInput(backgroundCodex, 'background work\\r');
+  expect(tabs.state(backgroundCodex).indicator === 'working',
+    'background Codex fixture should begin working');
+  tabs.typeInput(backgroundCodex, '  /clear  \\r');
+  const clearedRow = document.querySelector('#thread-list .rail-session-row[data-session-id="'
+    + CSS.escape(backgroundCodex) + '"]');
+  expect(tabs.state(backgroundCodex).indicator === 'idle'
+    && clearedRow?.querySelector('.rail-status')?.getAttribute('aria-label') === 'Idle',
+  'background Codex /clear should project idle through both tabs and Threads');
+
   const workingRow = document.querySelector('#thread-list .rail-session-row[data-session-id="' + CSS.escape(background) + '"]');
   const workingStatus = workingRow?.querySelector('.rail-status');
   expect(workingStatus?.getAttribute('aria-label') === 'Working',
