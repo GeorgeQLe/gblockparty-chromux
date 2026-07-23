@@ -101,6 +101,76 @@ fs.writeFileSync(e2ePath, `
     'renderer should enforce the 64 KiB UTF-8 bound without splitting a character');
   c.close(restored);
 
+  const acceptedSkill = c.addSession({ name: 'accepted-skill', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16, cols: 42 });
+  c.nativeInput(acceptedSkill, '$ski'); c.clearPtyInputs(acceptedSkill);
+  await c.renderPromptFixture(acceptedSkill, '? for shortcuts\\r\\n› $skill-creator audit');
+  c.open(acceptedSkill); await tick();
+  expect(c.draft(acceptedSkill) === '$skill-creator audit' && c.ptyInputs(acceptedSkill).join('') === '\\x15\\x0b',
+    'Compose should transfer the rendered value after a Codex skill autocomplete expansion');
+  c.close(acceptedSkill); c.clearPtyInputs(acceptedSkill); c.open(acceptedSkill); await tick();
+  expect(!c.state(acceptedSkill).conflictOpen && c.ptyInputs(acceptedSkill).length === 0,
+    'an immediately reopened composer must not recover the stale pre-clear rendered row');
+
+  const recalledPrompt = c.addSession({ name: 'recalled-prompt', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16, cols: 42 });
+  c.nativeInput(recalledPrompt, '\\x1b[A'); c.clearPtyInputs(recalledPrompt);
+  await c.renderPromptFixture(recalledPrompt, '? for shortcuts\\r\\n› recalled history value 😀');
+  c.open(recalledPrompt); await tick();
+  expect(c.draft(recalledPrompt) === 'recalled history value 😀',
+    'Compose should use Codex-rendered history recall instead of literal navigation input');
+
+  const wrappedPrompt = c.addSession({ name: 'wrapped-prompt', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16, cols: 20 });
+  c.nativeInput(wrappedPrompt, 'shadow'); c.clearPtyInputs(wrappedPrompt);
+  await c.renderPromptFixture(wrappedPrompt, '? for shortcuts\\r\\n› alpha beta gamma delta epsilon');
+  c.open(wrappedPrompt); await tick();
+  expect(c.draft(wrappedPrompt) === 'alpha beta gamma delta epsilon' && !c.draft(wrappedPrompt).includes('\\n'),
+    'visual xterm wrapping must not become a prompt newline');
+
+  const multilinePrompt = c.addSession({ name: 'multiline-prompt', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16, cols: 48 });
+  c.nativeInput(multilinePrompt, 'stale shadow'); c.clearPtyInputs(multilinePrompt);
+  await c.renderPromptFixture(multilinePrompt, '? for shortcuts\\r\\n› first line with › and │ symbols\\r\\n  second intentional line');
+  c.open(multilinePrompt); await tick();
+  expect(c.draft(multilinePrompt) === 'first line with › and │ symbols\\nsecond intentional line',
+    'intentional prompt newlines should survive while decoration-like content remains intact');
+
+  const menuPrompt = c.addSession({ name: 'menu-prompt', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16, cols: 52 });
+  c.nativeInput(menuPrompt, 'menu-shadow'); c.clearPtyInputs(menuPrompt);
+  await c.renderPromptFixture(menuPrompt, '? for shortcuts\\r\\n› expanded-token', [
+    '  $skill-creator   Create a skill',
+    '  $skill-installer Install a skill',
+  ]);
+  c.open(menuPrompt); await tick();
+  expect(c.draft(menuPrompt) === 'expanded-token'
+    && !c.draft(menuPrompt).includes('Create a skill') && !c.draft(menuPrompt).includes('Install a skill'),
+  'autocomplete menu rows must not be scraped into the prompt');
+
+  const framedPrompt = c.addSession({ name: 'framed-prompt', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16, cols: 52 });
+  c.nativeInput(framedPrompt, 'frame-shadow'); c.clearPtyInputs(framedPrompt);
+  await c.renderPromptFixture(framedPrompt, '╭────────────────────╮\\r\\n│ › bordered value │', ['╰────────────────────╯']);
+  c.open(framedPrompt); await tick();
+  expect(c.draft(framedPrompt) === 'bordered value',
+    'Codex prompt borders should be removed without removing prompt content');
+
+  const placeholderPrompt = c.addSession({ name: 'placeholder-prompt', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16 });
+  await c.renderPromptFixture(placeholderPrompt, '? for shortcuts\\r\\n› Ask Codex anything…');
+  c.open(placeholderPrompt); await tick();
+  expect(c.draft(placeholderPrompt) === '' && c.ptyInputs(placeholderPrompt).length === 0,
+    'Codex placeholder text must not transfer as user input');
+
+  const submittedPrompt = c.addSession({ name: 'submitted-prompt', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16 });
+  c.nativeInput(submittedPrompt, 'already submitted');
+  await c.renderPromptFixture(submittedPrompt, '? for shortcuts\\r\\n› already submitted');
+  c.nativeInput(submittedPrompt, '\\r'); c.clearPtyInputs(submittedPrompt);
+  c.open(submittedPrompt); await tick();
+  expect(c.draft(submittedPrompt) === '' && c.ptyInputs(submittedPrompt).length === 0,
+    'a stale rendered row must not recover a prompt after submission');
+
+  const ambiguousPrompt = c.addSession({ name: 'ambiguous-prompt', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16 });
+  c.nativeInput(ambiguousPrompt, 'safe shadow'); c.clearPtyInputs(ambiguousPrompt);
+  await c.renderPromptFixture(ambiguousPrompt, 'ordinary output\\r\\n› unrelated glyph without Codex chrome');
+  c.open(ambiguousPrompt); await tick();
+  expect(c.draft(ambiguousPrompt) === 'safe shadow' && c.ptyInputs(ambiguousPrompt).length === 0,
+    'ambiguous rendered content should fall back to the shadow without clearing the live Codex prompt');
+
   const transfer = c.addSession({ name: 'transfer', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16 });
   c.nativeInput(transfer, 'abc'); c.nativeInput(transfer, '\\x1b[D'); c.nativeInput(transfer, 'Z');
   c.nativeInput(transfer, '\\x1b[3~'); c.nativeInput(transfer, '\\x1b[200~paste😀\\x1b[201~');
@@ -127,24 +197,45 @@ fs.writeFileSync(e2ePath, `
     'clipboard preload bridge should reject text above the composer bound');
 
   const conflict = c.addSession({ name: 'conflict', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, composerDraft: 'draft', rows: 16 });
-  c.nativeInput(conflict, 'terminal'); c.clearPtyInputs(conflict); c.open(conflict); await tick();
+  c.nativeInput(conflict, 'literal'); c.clearPtyInputs(conflict);
+  await c.renderPromptFixture(conflict, '? for shortcuts\\r\\n› terminal-expanded');
+  c.open(conflict); await tick();
   expect(c.state(conflict).conflictOpen && c.draft(conflict) === 'draft', 'conflicting sources should open an accessible choice prompt');
   c.resolveConflict(conflict, 'append'); await tick();
-  expect(c.draft(conflict) === 'draft\\nterminal' && c.ptyInputs(conflict).join('') === '\\x15\\x0b', 'Append should merge then clear the PTY line once');
-  c.close(conflict); c.setDraft(conflict, 'keep'); c.nativeInput(conflict, 'replacement'); c.clearPtyInputs(conflict); c.open(conflict); await tick();
+  expect(c.draft(conflict) === 'draft\\nterminal-expanded' && c.ptyInputs(conflict).join('') === '\\x15\\x0b',
+    'Append should merge the rendered value then clear the PTY line once');
+  c.close(conflict); c.setDraft(conflict, 'keep'); c.nativeInput(conflict, 'replacement-shadow'); c.clearPtyInputs(conflict);
+  await c.renderPromptFixture(conflict, '? for shortcuts\\r\\n› replacement-rendered');
+  c.open(conflict); await tick();
   c.resolveConflict(conflict, 'replace'); await tick();
-  expect(c.draft(conflict) === 'replacement' && c.ptyInputs(conflict).join('') === '\\x15\\x0b', 'Replace should use terminal text then clear the PTY line once');
-  c.close(conflict); c.setDraft(conflict, 'copy-draft'); c.nativeInput(conflict, 'copy-terminal'); c.clearPtyInputs(conflict); c.open(conflict); await tick();
+  expect(c.draft(conflict) === 'replacement-rendered' && c.ptyInputs(conflict).join('') === '\\x15\\x0b',
+    'Replace should use the rendered terminal value then clear the PTY line once');
+  c.close(conflict); c.setDraft(conflict, 'copy-draft'); c.nativeInput(conflict, 'copy-shadow'); c.clearPtyInputs(conflict);
+  await c.renderPromptFixture(conflict, '? for shortcuts\\r\\n› copy-rendered');
+  c.open(conflict); await tick();
   await c.resolveConflict(conflict, 'copy'); await tick();
-  expect(c.draft(conflict) === 'copy-draft' && c.pendingInput(conflict) === 'copy-terminal' && c.ptyInputs(conflict).length === 0
-    && await window.chromuxTest.clipboardReadText() === 'copy-terminal', 'Copy should preserve both sources and use the preload clipboard bridge');
+  expect(c.draft(conflict) === 'copy-draft' && c.pendingInput(conflict) === 'copy-rendered' && c.ptyInputs(conflict).length === 0
+    && await window.chromuxTest.clipboardReadText() === 'copy-rendered',
+  'Copy should preserve both sources and copy exactly the rendered prompt through the preload bridge');
   c.close(conflict); c.open(conflict); await tick(); c.resolveConflict(conflict, 'dismiss'); await tick();
-  expect(c.draft(conflict) === 'copy-draft' && c.pendingInput(conflict) === 'copy-terminal' && c.ptyInputs(conflict).length === 0,
+  expect(c.draft(conflict) === 'copy-draft' && c.pendingInput(conflict) === 'copy-rendered' && c.ptyInputs(conflict).length === 0,
     'dismissing the prompt should preserve both sources');
+
+  const overflowConflict = c.addSession({
+    name: 'overflow-conflict', agent: 'codex', cwd: ${JSON.stringify(projectDir)},
+    composerDraft: 'x'.repeat(65530), rows: 16,
+  });
+  c.nativeInput(overflowConflict, 'shadow-overflow'); c.clearPtyInputs(overflowConflict);
+  await c.renderPromptFixture(overflowConflict, '? for shortcuts\\r\\n› rendered-overflow');
+  c.open(overflowConflict); await tick();
+  expect(c.state(overflowConflict).appendConflictDisabled && !(await c.resolveConflict(overflowConflict, 'append'))
+    && c.draft(overflowConflict) === 'x'.repeat(65530) && c.pendingInput(overflowConflict) === 'rendered-overflow'
+    && c.ptyInputs(overflowConflict).length === 0,
+  'overflowing Append should remain disabled and preserve the draft, rendered prompt, and live input');
 
   const independent = c.addSession({ name: 'independent', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16 });
   c.nativeInput(independent, 'separate');
-  expect(c.pendingInput(independent) === 'separate' && c.pendingInput(conflict) === 'copy-terminal', 'pending input must remain session scoped');
+  expect(c.pendingInput(independent) === 'separate' && c.pendingInput(conflict) === 'copy-rendered', 'pending input must remain session scoped');
   c.nativeInput(independent, '\\r'); c.clearPtyInputs(independent); c.open(independent); await tick();
   expect(c.draft(independent) === '' && c.ptyInputs(independent).length === 0, 'submitted lines should not transfer');
   c.close(independent); c.nativeInput(independent, 'dead'); c.exit(independent, 0); c.clearPtyInputs(independent); c.open(independent); await tick();
@@ -172,6 +263,13 @@ fs.writeFileSync(e2ePath, `
   expect((await c.history(first)).length === 0, 'clear project history should remove all entries after confirmation');
 
   const shell = c.addSession({ name: 'shell', agent: '', cwd: ${JSON.stringify(shellDir)}, rows: 16 });
+  c.nativeInput(shell, 'echo shadow'); c.clearPtyInputs(shell);
+  await c.renderPromptFixture(shell, '? for shortcuts\\r\\n› rendered text belongs only to Codex');
+  c.open(shell); await tick();
+  expect(c.draft(shell) === 'echo shadow' && c.ptyInputs(shell).join('') === '\\x15\\x0b',
+    'non-Codex sessions should retain shadow-model transfer behavior');
+  c.setDraft(shell, '');
+  c.close(shell);
   c.open(shell); await tick(); c.setDraft(shell, 'echo one\\necho two'); c.clearPtyInputs(shell);
   window.confirm = () => false;
   expect(!(await c.submit(shell)), 'cancelled shell multiline warning should reject submission');

@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Transfer the current rendered Codex prompt value into COMPOSE and every draft-conflict outcome, retain conservative shadow fallback behavior, and ship as v0.49.0. _(source: user-approved implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-composer-renderer.js`, focused renderer suites, packaged Electron verification, `RELEASES.md`)_
+
 - [x] Preserve working Threads spinner DOM nodes while typing unsubmitted terminal input, retain genuine submitted-input turn transitions, and ship as v0.48.1. _(source: user-approved implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-tab-activity-indicators-renderer.js`, focused activity/session-rail/turn/composer/update tests, `RELEASES.md`)_
 
 - [x] Gate all Chromux-managed Codex launches behind one source-aware update preflight, suppress per-PTY native prompts, release queued resumes deterministically after update/current/bypass decisions, and ship as v0.48.0. _(source: user-approved implementation plan; evidence: `prototype/codex-update-service.js`, `prototype/main.js`, `prototype/preload.js`, `prototype/renderer/renderer.js`, focused service/renderer/command/restore tests, `RELEASES.md`)_

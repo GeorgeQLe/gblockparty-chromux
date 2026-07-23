@@ -740,10 +740,116 @@ function updatePendingTerminalInput(termState, data) {
   }
 }
 
+const CODEX_PROMPT_GLYPH_RE = /^\s*[›❯](?:\s|$)/u;
+const CODEX_PROMPT_PLACEHOLDER_RE = /^(?:ask codex(?: anything)?|type (?:a )?(?:message|prompt)|write a prompt)[.…]*$/iu;
+const CODEX_PROMPT_CHROME_RE = /(?:\?\s+for shortcuts|\bcontext left\b|^\s*choose an option:)/iu;
+const CODEX_FRAME_EDGE_RE = /^\s*[╭╰┌└┏┗╔╚].*[╮╯┐┘┓┛╗╝]\s*$/u;
+const CODEX_FRAME_VERTICAL_RE = /^\s*[│┃║]\s?(.*?)(?:\s?[│┃║])?\s*$/u;
+
+function terminalBufferRow(buffer, index) {
+  const line = buffer && typeof buffer.getLine === 'function' ? buffer.getLine(index) : null;
+  if (!line || typeof line.translateToString !== 'function') return null;
+  return {
+    text: line.translateToString(true),
+    wrapped: Boolean(line.isWrapped),
+  };
+}
+
+function codexPromptRowContent(text) {
+  const raw = String(text || '');
+  const framed = raw.match(CODEX_FRAME_VERTICAL_RE);
+  return framed ? framed[1].replace(/\s+$/u, '') : raw.replace(/\s+$/u, '');
+}
+
+function readCodexRenderedPrompt(session) {
+  const term = session && session.term && session.term.term;
+  const buffer = term && term.buffer && term.buffer.active;
+  if (!buffer || !Number.isFinite(buffer.baseY) || !Number.isFinite(buffer.cursorY)) {
+    return { status: 'unsupported', text: '' };
+  }
+  const cursorRow = buffer.baseY + buffer.cursorY;
+  const scanStart = Math.max(0, cursorRow - 1024);
+  const scanEnd = Math.min(buffer.length - 1, cursorRow + 16);
+  let promptStart = -1;
+  for (let index = cursorRow; index >= scanStart; index -= 1) {
+    const row = terminalBufferRow(buffer, index);
+    if (!row) break;
+    const content = codexPromptRowContent(row.text);
+    if (CODEX_PROMPT_GLYPH_RE.test(content)) {
+      promptStart = index;
+      break;
+    }
+    if (index < cursorRow && (CODEX_FRAME_EDGE_RE.test(row.text) || CODEX_PROMPT_CHROME_RE.test(content))) break;
+  }
+  if (promptStart < 0) return { status: 'unsupported', text: '' };
+
+  let promptEnd = cursorRow;
+  while (promptEnd + 1 <= scanEnd) {
+    const next = terminalBufferRow(buffer, promptEnd + 1);
+    if (!next || !next.wrapped) break;
+    promptEnd += 1;
+  }
+  let framed = false;
+  let hasChrome = false;
+  const chromeRows = [
+    ...Array.from({ length: Math.min(3, promptStart - scanStart) }, (_, offset) => promptStart - 1 - offset),
+    ...Array.from({ length: Math.max(0, scanEnd - promptEnd) }, (_, offset) => promptEnd + 1 + offset),
+  ];
+  for (const index of chromeRows) {
+    const row = terminalBufferRow(buffer, index);
+    if (!row) continue;
+    if (CODEX_FRAME_EDGE_RE.test(row.text)) framed = true;
+    if (CODEX_PROMPT_CHROME_RE.test(codexPromptRowContent(row.text))) hasChrome = true;
+  }
+  if (!framed && !hasChrome) {
+    return { status: 'ambiguous', text: '' };
+  }
+
+  let value = '';
+  for (let index = promptStart; index <= promptEnd; index += 1) {
+    const row = terminalBufferRow(buffer, index);
+    if (!row) return { status: 'ambiguous', text: '' };
+    let content = codexPromptRowContent(row.text);
+    if (index === promptStart) content = content.replace(CODEX_PROMPT_GLYPH_RE, '');
+    else if (!row.wrapped) content = content.replace(/^ {2}/u, '');
+    value += index > promptStart && !row.wrapped ? `\n${content}` : content;
+  }
+  if (CODEX_PROMPT_PLACEHOLDER_RE.test(value.trim())) value = '';
+  if (session.term.promptSnapshotInvalidated && value) return { status: 'ambiguous', text: '' };
+  if (!utf8WithinLimit(value)) return { status: 'overflow', text: '' };
+  return { status: 'resolved', text: value };
+}
+
+function resolveCurrentTerminalPrompt(session) {
+  const shadow = session && session.term ? session.term.typedInputBuf : '';
+  if (!session || !session.lifecycle.alive) {
+    return { text: '', source: 'none', confidence: 'none', canClear: false };
+  }
+  if (session.agent !== 'codex') {
+    return { text: shadow, source: 'shadow', confidence: 'fallback', canClear: Boolean(shadow) };
+  }
+  const rendered = readCodexRenderedPrompt(session);
+  if (rendered.status === 'resolved') {
+    session.term.typedInputBuf = rendered.text;
+    session.term.typedInputCursor = rendered.text.length;
+    return { text: rendered.text, source: 'codex-rendered', confidence: 'high', canClear: Boolean(rendered.text) };
+  }
+  return {
+    text: shadow,
+    source: rendered.status === 'ambiguous' || rendered.status === 'overflow'
+      ? `shadow-${rendered.status}` : 'shadow',
+    confidence: rendered.status === 'unsupported' ? 'fallback' : 'low',
+    canClear: Boolean(shadow) && rendered.status === 'unsupported',
+  };
+}
+
 function trackTypedPreviewSuppressions(session, data) {
   if (!session || !data) return;
   const t = session.term;
-  const submitted = /[\r\n]/.test(String(data)) ? submittedInputText(lineBufferAfterInput(t.typedInputBuf, String(data).split(/[\r\n]/, 1)[0])) : '';
+  const raw = String(data);
+  if (/[\r\n]/.test(raw)) t.promptSnapshotInvalidated = true;
+  else if (raw !== '\x15\x0b') t.promptSnapshotInvalidated = false;
+  const submitted = /[\r\n]/.test(raw) ? submittedInputText(lineBufferAfterInput(t.typedInputBuf, raw.split(/[\r\n]/, 1)[0])) : '';
   updatePendingTerminalInput(t, data);
   if (submitted) {
     const hits = scanLineForPreviews(submitted);
@@ -1208,6 +1314,7 @@ function newSessionShape({ id, name, cwd, agent }) {
       title: '',
       typedInputBuf: '',
       typedInputCursor: 0,
+      promptSnapshotInvalidated: false,
       previewSuppress: [],
     },
     composer: {
@@ -2881,8 +2988,9 @@ function renderComposer(session) {
   session.els.composerTextarea.value = composer.draft;
   session.els.composerCount.textContent = `${utf8ByteLength(composer.draft).toLocaleString()} / ${BOUNDS.composerDraftBytes.toLocaleString()} BYTES`;
   session.els.submitComposerBtn.disabled = !alive || !composer.draft.trim();
-  const appendOverflows = Boolean(composer.pendingInputChoice)
-    && utf8ByteLength(`${composer.draft}\n${composer.pendingInputChoice}`) > BOUNDS.composerDraftBytes;
+  const pendingText = composer.pendingInputChoice ? composer.pendingInputChoice.text : '';
+  const appendOverflows = Boolean(pendingText)
+    && utf8ByteLength(`${composer.draft}\n${pendingText}`) > BOUNDS.composerDraftBytes;
   session.els.composerStatus.textContent = !alive
     ? 'SESSION EXITED · DRAFT PRESERVED'
     : (appendOverflows ? 'APPEND EXCEEDS 64 KIB · CHOOSE REPLACE, COPY, OR DISMISS' : '⌘⇧ENTER SENDS · ENTER NEWLINE');
@@ -2911,24 +3019,28 @@ async function loadComposerHistory(session, { force = false } = {}) {
   return session.composer.history;
 }
 
-function clearPendingTerminalLine(session) {
-  if (!session.lifecycle.alive || !session.term.typedInputBuf) return false;
+function clearPendingTerminalLine(session, resolution) {
+  if (!session.lifecycle.alive || !resolution || !resolution.canClear || !session.term.typedInputBuf) return false;
   handleTerminalInput(session, '\x15\x0b');
+  // xterm may still display the pre-clear row until Codex redraws. Do not
+  // recover that stale value if COMPOSE closes and reopens immediately.
+  session.term.promptSnapshotInvalidated = true;
   return true;
 }
 
 async function resolveComposerInputChoice(session, action) {
   const pending = session && session.composer.pendingInputChoice;
   if (!pending) return false;
+  const pendingText = pending.text;
   if (action === 'append') {
-    if (utf8ByteLength(`${session.composer.draft}\n${pending}`) > BOUNDS.composerDraftBytes) return false;
-    setComposerDraft(session, `${session.composer.draft}\n${pending}`);
-    clearPendingTerminalLine(session);
+    if (utf8ByteLength(`${session.composer.draft}\n${pendingText}`) > BOUNDS.composerDraftBytes) return false;
+    setComposerDraft(session, `${session.composer.draft}\n${pendingText}`);
+    clearPendingTerminalLine(session, pending);
   } else if (action === 'replace') {
-    setComposerDraft(session, pending);
-    clearPendingTerminalLine(session);
+    setComposerDraft(session, pendingText);
+    clearPendingTerminalLine(session, pending);
   } else if (action === 'copy') {
-    if (!utf8WithinLimit(pending) || !await window.chromux.clipboardWriteText(pending)) return false;
+    if (!utf8WithinLimit(pendingText) || !await window.chromux.clipboardWriteText(pendingText)) return false;
   } else if (action !== 'dismiss') return false;
   session.composer.pendingInputChoice = null;
   renderComposer(session);
@@ -2969,12 +3081,15 @@ function toggleComposerExpanded(session) {
 function openComposer(session) {
   if (!session || !session.els) return null;
   if (session.composer.open) return { sessionId: session.id, open: true };
-  const pending = session.lifecycle.alive ? session.term.typedInputBuf : '';
+  // Resolve while xterm still has its original size and visibility. Codex's
+  // rendered editor is canonical; the session-local keystroke model is a
+  // bounded fallback when the active buffer cannot be identified safely.
+  const pending = resolveCurrentTerminalPrompt(session);
   session.composer.open = true;
-  if (pending && !session.composer.draft) {
-    setComposerDraft(session, pending);
-    clearPendingTerminalLine(session);
-  } else if (pending && session.composer.draft) {
+  if (pending.text && !session.composer.draft) {
+    setComposerDraft(session, pending.text);
+    clearPendingTerminalLine(session, pending);
+  } else if (pending.text && session.composer.draft) {
     session.composer.pendingInputChoice = pending;
   }
   renderComposer(session);
@@ -6570,6 +6685,14 @@ if (window.chromuxTest) {
       const term = testSession(id).term.term;
       return new Promise((resolve) => term.write(String(data), resolve));
     },
+    async renderPromptFixture(id, prompt, menuRows = []) {
+      const term = testSession(id).term.term;
+      term.reset();
+      const menu = Array.isArray(menuRows) && menuRows.length
+        ? `\x1b7\r\n${menuRows.join('\r\n')}\x1b8`
+        : '';
+      return new Promise((resolve) => term.write(String(prompt) + menu, resolve));
+    },
     ptyInputs: (id) => (testSession(id)._ptyInputs || []).slice(),
     clearPtyInputs(id) { testSession(id)._ptyInputs = []; },
     scrollLines(id, count) { testSession(id).term.term.scrollLines(count); rememberTerminalViewport(testSession(id)); },
@@ -6606,6 +6729,8 @@ if (window.chromuxTest) {
         open: session.composer.open,
         expanded: session.composer.expanded,
         conflictOpen: Boolean(session.composer.pendingInputChoice) && !session.els.composerInputChoice.classList.contains('hidden'),
+        appendConflictDisabled: session.els.composerInputChoiceActions
+          .querySelector('[data-composer-input-action="append"]').disabled,
         drawerOpen: session.composer.drawerOpen,
         focused: document.activeElement === textarea,
         terminalFocused: terminalFocused(),

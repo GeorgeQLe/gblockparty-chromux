@@ -1,5 +1,14 @@
 # Release Notes
 
+## GBlockParty Chromux v0.49.0
+
+Tag: `chromux-v0.49.0`
+
+- Transfer the current Codex prompt editor value into COMPOSE from the cursor-anchored xterm buffer, capturing accepted autocomplete expansions, history recall, cursor edits, Unicode, intentional newlines, and visual wrapping.
+- Use the same resolved prompt value for empty-draft insertion and Append, Replace, Copy, and Dismiss conflict outcomes while preserving the 64 KiB UTF-8 and clipboard boundaries.
+- Exclude prompt chrome, placeholders, borders, autocomplete menus, unrelated output, and stale submitted rows; retain the session-local keystroke model as a conservative fallback and leave ambiguous live Codex input uncleared.
+- Keep Claude, Grok, and shell transfer behavior unchanged and add real-Electron coverage for rendered extraction, ambiguity, overflow, exited sessions, conflicts, and non-Codex fallback.
+
 ## GBlockParty Chromux v0.48.1
 
 Tag: `chromux-v0.48.1`
