@@ -630,35 +630,117 @@ function submittedInputText(raw) {
   return stripTerminalControlsForPreview(raw).replace(/\s+/g, ' ').trim();
 }
 
+function previousCodePointIndex(text, index) {
+  if (index <= 0) return 0;
+  const prior = text.charCodeAt(index - 1);
+  return prior >= 0xDC00 && prior <= 0xDFFF && index > 1 ? index - 2 : index - 1;
+}
+
+function nextCodePointIndex(text, index) {
+  if (index >= text.length) return text.length;
+  const current = text.charCodeAt(index);
+  return current >= 0xD800 && current <= 0xDBFF && index + 1 < text.length ? index + 2 : index + 1;
+}
+
+function previousWordIndex(text, index) {
+  let cursor = index;
+  while (cursor > 0 && /\s/u.test(text.slice(previousCodePointIndex(text, cursor), cursor))) cursor = previousCodePointIndex(text, cursor);
+  while (cursor > 0 && !/\s/u.test(text.slice(previousCodePointIndex(text, cursor), cursor))) cursor = previousCodePointIndex(text, cursor);
+  return cursor;
+}
+
+function nextWordIndex(text, index) {
+  let cursor = index;
+  while (cursor < text.length && !/\s/u.test(text.slice(cursor, nextCodePointIndex(text, cursor)))) cursor = nextCodePointIndex(text, cursor);
+  while (cursor < text.length && /\s/u.test(text.slice(cursor, nextCodePointIndex(text, cursor)))) cursor = nextCodePointIndex(text, cursor);
+  return cursor;
+}
+
+function insertPendingTerminalText(termState, value) {
+  const before = termState.typedInputBuf.slice(0, termState.typedInputCursor);
+  const after = termState.typedInputBuf.slice(termState.typedInputCursor);
+  const inserted = truncateUtf8(String(value || ''), Math.max(0, BOUNDS.composerDraftBytes - utf8ByteLength(before + after)));
+  termState.typedInputBuf = before + inserted + after;
+  termState.typedInputCursor = before.length + inserted.length;
+}
+
+function updatePendingTerminalInput(termState, data) {
+  const raw = String(data || '');
+  let index = 0;
+  termState.typedInputCursor = Math.min(termState.typedInputBuf.length, Math.max(0, Number(termState.typedInputCursor) || 0));
+  while (index < raw.length) {
+    const rest = raw.slice(index);
+    const wordMove = rest.match(/^\x1b([bf])/);
+    if (wordMove) {
+      termState.typedInputCursor = wordMove[1] === 'b'
+        ? previousWordIndex(termState.typedInputBuf, termState.typedInputCursor)
+        : nextWordIndex(termState.typedInputBuf, termState.typedInputCursor);
+      index += wordMove[0].length;
+      continue;
+    }
+    const csi = rest.match(/^\x1b\[([0-9;?]*)([A-Za-z~])/);
+    if (csi) {
+      const sequence = csi[0];
+      const params = csi[1];
+      const final = csi[2];
+      const wordModified = /(?:^|;)(?:3|5)(?:;|$)/.test(params);
+      if (final === 'D') termState.typedInputCursor = wordModified
+        ? previousWordIndex(termState.typedInputBuf, termState.typedInputCursor)
+        : previousCodePointIndex(termState.typedInputBuf, termState.typedInputCursor);
+      else if (final === 'C') termState.typedInputCursor = wordModified
+        ? nextWordIndex(termState.typedInputBuf, termState.typedInputCursor)
+        : nextCodePointIndex(termState.typedInputBuf, termState.typedInputCursor);
+      else if (final === 'H' || (final === '~' && (params === '1' || params === '7'))) termState.typedInputCursor = 0;
+      else if (final === 'F' || (final === '~' && (params === '4' || params === '8'))) termState.typedInputCursor = termState.typedInputBuf.length;
+      else if (final === '~' && params === '3') {
+        const next = nextCodePointIndex(termState.typedInputBuf, termState.typedInputCursor);
+        termState.typedInputBuf = termState.typedInputBuf.slice(0, termState.typedInputCursor) + termState.typedInputBuf.slice(next);
+      }
+      // Bracketed-paste wrappers and vertical movement do not alter the editable line.
+      index += sequence.length;
+      continue;
+    }
+    const printable = rest.match(/^[^\x00-\x1f\x7f\x1b]+/);
+    if (printable) {
+      insertPendingTerminalText(termState, printable[0]);
+      index += printable[0].length;
+      continue;
+    }
+    const character = String.fromCodePoint(raw.codePointAt(index));
+    index += character.length;
+    if (character === '\r' || character === '\n' || character === '\x03') {
+      termState.typedInputBuf = '';
+      termState.typedInputCursor = 0;
+    } else if (character === '\x01') termState.typedInputCursor = 0;
+    else if (character === '\x05') termState.typedInputCursor = termState.typedInputBuf.length;
+    else if (character === '\x15') {
+      termState.typedInputBuf = termState.typedInputBuf.slice(termState.typedInputCursor);
+      termState.typedInputCursor = 0;
+    } else if (character === '\x0b') termState.typedInputBuf = termState.typedInputBuf.slice(0, termState.typedInputCursor);
+    else if (character === '\x17') {
+      const before = termState.typedInputBuf.slice(0, termState.typedInputCursor);
+      const start = previousWordIndex(before, before.length);
+      termState.typedInputBuf = before.slice(0, start) + termState.typedInputBuf.slice(termState.typedInputCursor);
+      termState.typedInputCursor = start;
+    } else if (character === '\b' || character === '\x7f') {
+      const previous = previousCodePointIndex(termState.typedInputBuf, termState.typedInputCursor);
+      termState.typedInputBuf = termState.typedInputBuf.slice(0, previous) + termState.typedInputBuf.slice(termState.typedInputCursor);
+      termState.typedInputCursor = previous;
+    } else if (character === '\t' || character >= ' ') insertPendingTerminalText(termState, character);
+  }
+}
+
 function trackTypedPreviewSuppressions(session, data) {
   if (!session || !data) return;
   const t = session.term;
-  for (const ch of String(data)) {
-    if (ch === '\r' || ch === '\n') {
-      const submitted = submittedInputText(t.typedInputBuf);
-      t.typedInputBuf = '';
-      if (!submitted) continue;
-      const hits = scanLineForPreviews(submitted);
-      for (const hit of hits) {
-        t.previewSuppress.push({
-          url: hit.url,
-          source: hit.source,
-          submittedText: submitted,
-          remainingLines: PREVIEW_SUPPRESS_LINE_TTL,
-          ts: Date.now(),
-        });
-      }
-      if (t.previewSuppress.length > PREVIEW_SUPPRESS_MAX) {
-        t.previewSuppress.splice(0, t.previewSuppress.length - PREVIEW_SUPPRESS_MAX);
-      }
-    } else if (ch === '\x15' || ch === '\x03') {
-      t.typedInputBuf = '';
-    } else if (ch === '\b' || ch === '\x7f') {
-      t.typedInputBuf = t.typedInputBuf.slice(0, -1);
-    } else {
-      t.typedInputBuf += ch;
-      if (t.typedInputBuf.length > 4096) t.typedInputBuf = t.typedInputBuf.slice(-4096);
+  const submitted = /[\r\n]/.test(String(data)) ? submittedInputText(lineBufferAfterInput(t.typedInputBuf, String(data).split(/[\r\n]/, 1)[0])) : '';
+  updatePendingTerminalInput(t, data);
+  if (submitted) {
+    const hits = scanLineForPreviews(submitted);
+    for (const hit of hits) {
+      t.previewSuppress.push({ url: hit.url, source: hit.source, submittedText: submitted, remainingLines: PREVIEW_SUPPRESS_LINE_TTL, ts: Date.now() });
     }
+    if (t.previewSuppress.length > PREVIEW_SUPPRESS_MAX) t.previewSuppress.splice(0, t.previewSuppress.length - PREVIEW_SUPPRESS_MAX);
   }
 }
 
@@ -1116,6 +1198,7 @@ function newSessionShape({ id, name, cwd, agent }) {
       titleBuf: '',
       title: '',
       typedInputBuf: '',
+      typedInputCursor: 0,
       previewSuppress: [],
     },
     composer: {
@@ -1127,6 +1210,9 @@ function newSessionShape({ id, name, cwd, agent }) {
       query: '',
       recallIndex: -1,
       scratchDraft: null,
+      expanded: false,
+      expandedViewportY: null,
+      pendingInputChoice: null,
     },
     els: null,
   };
@@ -2272,7 +2358,7 @@ function lineBufferAfterInput(base, input) {
     else if (ch === '\b' || ch === '\x7f') buf = buf.slice(0, -1);
     else if (ch === '\t' || ch >= ' ') buf += ch;
   }
-  return buf.length > 4096 ? buf.slice(-4096) : buf;
+  return truncateComposerDraft(buf);
 }
 
 function submittedShellLineForInput(session, data) {
@@ -2482,8 +2568,21 @@ function buildSessionView(session) {
   const composerLabel = document.createElement('span'); composerLabel.className = 'microlabel'; composerLabel.textContent = 'PROMPT COMPOSER';
   const composerStatus = document.createElement('span'); composerStatus.className = 'composer-status'; composerStatus.textContent = '⌘⇧ENTER SENDS · ENTER NEWLINE';
   const historyBtn = document.createElement('button'); historyBtn.type = 'button'; historyBtn.className = 'head-btn'; historyBtn.textContent = 'HISTORY';
+  const expandComposerBtn = document.createElement('button'); expandComposerBtn.type = 'button'; expandComposerBtn.className = 'head-btn'; expandComposerBtn.textContent = 'EXPAND';
+  expandComposerBtn.setAttribute('aria-label', 'Expand prompt composer'); expandComposerBtn.setAttribute('aria-pressed', 'false');
   const closeComposerBtn = document.createElement('button'); closeComposerBtn.type = 'button'; closeComposerBtn.className = 'head-btn'; closeComposerBtn.textContent = 'CLOSE';
-  composerToolbar.append(composerLabel, composerStatus, historyBtn, closeComposerBtn);
+  composerToolbar.append(composerLabel, composerStatus, historyBtn, expandComposerBtn, closeComposerBtn);
+  const composerInputChoice = document.createElement('div');
+  composerInputChoice.className = 'composer-input-choice hidden'; composerInputChoice.setAttribute('role', 'alertdialog');
+  composerInputChoice.setAttribute('aria-modal', 'true'); composerInputChoice.setAttribute('aria-labelledby', `composer-input-choice-${session.id}`);
+  const composerInputChoiceLabel = document.createElement('span'); composerInputChoiceLabel.id = `composer-input-choice-${session.id}`;
+  composerInputChoiceLabel.textContent = 'Terminal input and a composer draft both exist. Choose how to continue.';
+  const composerInputChoiceActions = document.createElement('div'); composerInputChoiceActions.className = 'composer-input-choice-actions';
+  for (const [action, label] of [['append', 'APPEND'], ['replace', 'REPLACE'], ['copy', 'COPY'], ['dismiss', 'DISMISS']]) {
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'head-btn'; button.dataset.composerInputAction = action; button.textContent = label;
+    composerInputChoiceActions.appendChild(button);
+  }
+  composerInputChoice.append(composerInputChoiceLabel, composerInputChoiceActions);
   const composerTextarea = document.createElement('textarea');
   composerTextarea.className = 'composer-textarea'; composerTextarea.rows = 3; composerTextarea.spellcheck = true;
   composerTextarea.placeholder = 'Write a multiline prompt…'; composerTextarea.setAttribute('aria-label', 'Prompt text');
@@ -2502,7 +2601,7 @@ function buildSessionView(session) {
   historyControls.append(historySearch, clearHistoryBtn);
   const historyList = document.createElement('div'); historyList.className = 'composer-history-list';
   historyDrawer.append(historyControls, historyList);
-  composer.append(composerToolbar, composerTextarea, composerActions, historyDrawer);
+  composer.append(composerToolbar, composerInputChoice, composerTextarea, composerActions, historyDrawer);
   termPane.append(termHead, termHost, composer);
 
   // divider
@@ -2628,6 +2727,11 @@ function buildSessionView(session) {
   composeBtn.onclick = () => openComposer(session);
   closeComposerBtn.onclick = () => closeComposer(session);
   historyBtn.onclick = () => toggleComposerHistory(session);
+  expandComposerBtn.onclick = () => toggleComposerExpanded(session);
+  composerInputChoiceActions.onclick = (event) => {
+    const action = event.target && event.target.dataset && event.target.dataset.composerInputAction;
+    if (action) resolveComposerInputChoice(session, action);
+  };
   submitComposerBtn.onclick = () => submitComposer(session);
   composerTextarea.addEventListener('input', () => updateComposerDraftFromInput(session));
   composer.addEventListener('keydown', (event) => handleComposerKeydown(session, event));
@@ -2660,8 +2764,9 @@ function buildSessionView(session) {
   });
 
   return {
-    view, termLabel, termHost, scrollToBottom, composeBtn, composer, composerTextarea, composerStatus, composerCount,
-    submitComposerBtn, historyBtn, historyDrawer, historySearch, historyList, clearHistoryBtn,
+    view, termPane, termLabel, termHost, scrollToBottom, composeBtn, composer, composerTextarea, composerStatus, composerCount,
+    submitComposerBtn, historyBtn, expandComposerBtn, closeComposerBtn, composerInputChoice, composerInputChoiceActions,
+    historyDrawer, historySearch, historyList, clearHistoryBtn,
     urlBar, favoriteBtn, favoritesBtn, favoritesBadge, favoritesPanel, favoritesList, queueBtn, queueBadge, queuePanel, queueList,
     consoleChip, captureChip, pickBtn, captureBtn, webHost, placeholder, refreshFlash,
     divider, webPane, browserContent, browserRail, browserToolbar, collapseBtn,
@@ -2699,6 +2804,11 @@ function autosizeComposer(session) {
   const textarea = session.els && session.els.composerTextarea;
   const pane = session.els && session.els.termHost && session.els.termHost.parentElement;
   if (!textarea || !pane) return;
+  if (session.composer.expanded) {
+    textarea.style.height = 'auto';
+    textarea.style.overflowY = 'auto';
+    return;
+  }
   textarea.style.height = 'auto';
   const computed = getComputedStyle(textarea);
   const lineHeight = Number.parseFloat(computed.lineHeight) || 18;
@@ -2740,15 +2850,27 @@ function renderComposer(session) {
   const { composer } = session;
   const alive = Boolean(session.lifecycle.alive);
   session.els.composer.classList.toggle('hidden', !composer.open);
+  session.els.termPane.classList.toggle('composer-expanded', composer.open && composer.expanded);
   session.els.composeBtn.classList.toggle('active', composer.open);
   session.els.composeBtn.classList.toggle('has-draft', Boolean(composer.draft));
   session.els.composeBtn.textContent = 'COMPOSE';
   session.els.composerTextarea.value = composer.draft;
   session.els.composerCount.textContent = `${utf8ByteLength(composer.draft).toLocaleString()} / ${BOUNDS.composerDraftBytes.toLocaleString()} BYTES`;
   session.els.submitComposerBtn.disabled = !alive || !composer.draft.trim();
-  session.els.composerStatus.textContent = alive ? '⌘⇧ENTER SENDS · ENTER NEWLINE' : 'SESSION EXITED · DRAFT PRESERVED';
+  const appendOverflows = Boolean(composer.pendingInputChoice)
+    && utf8ByteLength(`${composer.draft}\n${composer.pendingInputChoice}`) > BOUNDS.composerDraftBytes;
+  session.els.composerStatus.textContent = !alive
+    ? 'SESSION EXITED · DRAFT PRESERVED'
+    : (appendOverflows ? 'APPEND EXCEEDS 64 KIB · CHOOSE REPLACE, COPY, OR DISMISS' : '⌘⇧ENTER SENDS · ENTER NEWLINE');
   session.els.historyBtn.classList.toggle('active', composer.drawerOpen);
   session.els.historyDrawer.classList.toggle('hidden', !composer.drawerOpen);
+  session.els.expandComposerBtn.textContent = composer.expanded ? 'COLLAPSE' : 'EXPAND';
+  session.els.expandComposerBtn.setAttribute('aria-label', composer.expanded ? 'Collapse prompt composer' : 'Expand prompt composer');
+  session.els.expandComposerBtn.setAttribute('aria-pressed', String(composer.expanded));
+  session.els.composerInputChoice.classList.toggle('hidden', !composer.pendingInputChoice);
+  const appendChoice = session.els.composerInputChoiceActions.querySelector('[data-composer-input-action="append"]');
+  appendChoice.disabled = appendOverflows;
+  appendChoice.title = appendOverflows ? 'Combined text exceeds the 64 KiB composer limit' : '';
   autosizeComposer(session);
 }
 
@@ -2765,16 +2887,83 @@ async function loadComposerHistory(session, { force = false } = {}) {
   return session.composer.history;
 }
 
+function clearPendingTerminalLine(session) {
+  if (!session.lifecycle.alive || !session.term.typedInputBuf) return false;
+  handleTerminalInput(session, '\x15\x0b');
+  return true;
+}
+
+async function resolveComposerInputChoice(session, action) {
+  const pending = session && session.composer.pendingInputChoice;
+  if (!pending) return false;
+  if (action === 'append') {
+    if (utf8ByteLength(`${session.composer.draft}\n${pending}`) > BOUNDS.composerDraftBytes) return false;
+    setComposerDraft(session, `${session.composer.draft}\n${pending}`);
+    clearPendingTerminalLine(session);
+  } else if (action === 'replace') {
+    setComposerDraft(session, pending);
+    clearPendingTerminalLine(session);
+  } else if (action === 'copy') {
+    if (!utf8WithinLimit(pending) || !await window.chromux.clipboardWriteText(pending)) return false;
+  } else if (action !== 'dismiss') return false;
+  session.composer.pendingInputChoice = null;
+  renderComposer(session);
+  requestAnimationFrame(() => {
+    session.els.composerTextarea.focus();
+    session.els.composerTextarea.setSelectionRange(session.composer.draft.length, session.composer.draft.length);
+    reportShortcutFocusContext();
+  });
+  return true;
+}
+
+function toggleComposerExpanded(session) {
+  if (!session || !session.composer.open) return false;
+  const restoringViewport = session.composer.expanded ? session.composer.expandedViewportY : null;
+  if (!session.composer.expanded) {
+    rememberTerminalViewport(session);
+    session.composer.expandedViewportY = session.term.viewportY;
+  }
+  session.composer.expanded = !session.composer.expanded;
+  renderComposer(session);
+  requestAnimationFrame(() => {
+    session.term.fit();
+    if (Number.isFinite(restoringViewport)) {
+      const buffer = session.term.term.buffer && session.term.term.buffer.active;
+      if (buffer && buffer.type === 'normal') {
+        const target = Math.min(buffer.baseY, Math.max(0, restoringViewport));
+        if (target !== buffer.viewportY) session.term.term.scrollLines(target - buffer.viewportY);
+        session.term.viewportY = buffer.viewportY;
+      }
+      session.composer.expandedViewportY = null;
+    }
+    autosizeComposer(session);
+    session.els.composerTextarea.focus();
+  });
+  return session.composer.expanded;
+}
+
 function openComposer(session) {
   if (!session || !session.els) return null;
+  if (session.composer.open) return { sessionId: session.id, open: true };
+  const pending = session.lifecycle.alive ? session.term.typedInputBuf : '';
   session.composer.open = true;
+  if (pending && !session.composer.draft) {
+    setComposerDraft(session, pending);
+    clearPendingTerminalLine(session);
+  } else if (pending && session.composer.draft) {
+    session.composer.pendingInputChoice = pending;
+  }
   renderComposer(session);
   loadComposerHistory(session).catch(() => {});
   requestAnimationFrame(() => {
     session.term.fit();
     autosizeComposer(session);
-    session.els.composerTextarea.focus();
-    session.els.composerTextarea.setSelectionRange(session.composer.draft.length, session.composer.draft.length);
+    if (session.composer.pendingInputChoice) {
+      session.els.composerInputChoiceActions.querySelector('button')?.focus();
+    } else {
+      session.els.composerTextarea.focus();
+      session.els.composerTextarea.setSelectionRange(session.composer.draft.length, session.composer.draft.length);
+    }
     reportShortcutFocusContext();
   });
   invalidate('shortcutDebug');
@@ -2783,10 +2972,25 @@ function openComposer(session) {
 
 function closeComposer(session) {
   if (!session || !session.els || !session.composer.open) return null;
+  const restoringViewport = session.composer.expanded ? session.composer.expandedViewportY : null;
   session.composer.open = false;
   session.composer.drawerOpen = false;
+  session.composer.expanded = false;
+  session.composer.pendingInputChoice = null;
   renderComposer(session);
-  requestAnimationFrame(() => { session.term.fit(); session.term.term.focus(); reportShortcutFocusContext(); });
+  requestAnimationFrame(() => {
+    session.term.fit();
+    if (Number.isFinite(restoringViewport)) {
+      const buffer = session.term.term.buffer && session.term.term.buffer.active;
+      if (buffer && buffer.type === 'normal') {
+        const target = Math.min(buffer.baseY, Math.max(0, restoringViewport));
+        if (target !== buffer.viewportY) session.term.term.scrollLines(target - buffer.viewportY);
+        session.term.viewportY = buffer.viewportY;
+      }
+    }
+    session.composer.expandedViewportY = null;
+    session.term.term.focus(); reportShortcutFocusContext();
+  });
   invalidate('shortcutDebug');
   return { sessionId: session.id, open: false };
 }
@@ -4005,7 +4209,7 @@ function rememberTerminalViewport(session) {
 function fitTerminalPreservingViewport(session, fit) {
   const termState = session && session.term;
   const term = termState && termState.term;
-  if (!term || typeof fit !== 'function') return;
+  if (!term || typeof fit !== 'function' || session.composer.expanded) return;
   const before = term.buffer && term.buffer.active;
   const preservingNormal = Boolean(before && before.type === 'normal');
   const targetY = preservingNormal && Number.isFinite(termState.viewportY)
@@ -6022,6 +6226,9 @@ if (window.chromuxTest) {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', metaKey: true, shiftKey: true, bubbles: true, cancelable: true }));
     },
     close(id) { closeComposer(testSession(id)); },
+    toggleExpand(id) { return toggleComposerExpanded(testSession(id)); },
+    resolveConflict(id, action) { return resolveComposerInputChoice(testSession(id), action); },
+    pendingInput: (id) => testSession(id).term.typedInputBuf,
     escape(id) {
       const textarea = testSession(id).els.composerTextarea;
       textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
@@ -6078,15 +6285,22 @@ if (window.chromuxTest) {
       const session = testSession(id); const textarea = session.els.composerTextarea;
       const paneRect = session.els.termHost.parentElement.getBoundingClientRect();
       const helper = session.els.termHost.querySelector('.xterm-helper-textarea');
+      const composerRect = session.els.composer.getBoundingClientRect();
       return {
         open: session.composer.open,
+        expanded: session.composer.expanded,
+        conflictOpen: Boolean(session.composer.pendingInputChoice) && !session.els.composerInputChoice.classList.contains('hidden'),
         drawerOpen: session.composer.drawerOpen,
         focused: document.activeElement === textarea,
         terminalFocused: terminalFocused(),
         submitDisabled: session.els.submitComposerBtn.disabled,
         hasDraftIndicator: session.els.composeBtn.classList.contains('has-draft'),
         textareaHeight: textarea.getBoundingClientRect().height,
+        composerHeight: composerRect.height,
         paneHeight: paneRect.height,
+        termHostVisible: getComputedStyle(session.els.termHost).display !== 'none',
+        expandLabel: session.els.expandComposerBtn.textContent,
+        toolbarActions: [...session.els.composer.querySelectorAll('.composer-toolbar button')].map((button) => button.textContent),
         helperCount: session.els.termHost.querySelectorAll('.xterm-helper-textarea').length,
         helperInlineStyle: helper?.getAttribute('style') || '',
         helperBackground: helper ? getComputedStyle(helper).backgroundColor : '',

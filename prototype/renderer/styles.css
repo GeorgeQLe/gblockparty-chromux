@@ -891,11 +891,23 @@ body[data-thread-preview-size="large"] .thread-terminal-preview { width: min(720
   background: color-mix(in srgb, var(--bg1) 94%, var(--amber) 6%);
   box-shadow: 0 -8px 24px color-mix(in srgb, var(--bg0) 82%, transparent);
 }
+.term-pane.composer-expanded .term-host { display: none; }
+.term-pane.composer-expanded .terminal-composer { display: flex; flex: 1; flex-direction: column; border-top: 0; }
+.term-pane.composer-expanded .composer-textarea { flex: 1; }
+.term-pane.composer-expanded .composer-history { min-height: 0; }
+.term-pane.composer-expanded .composer-history-list { max-height: min(240px, 30vh); }
 .composer-toolbar, .composer-actions, .composer-history-controls {
   display: flex; align-items: center; gap: 8px;
 }
 .composer-toolbar { margin-bottom: 6px; }
 .composer-toolbar .microlabel { color: var(--amber); }
+.composer-input-choice {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-bottom: 8px; padding: 8px 10px; border: 1px solid var(--amber);
+  background: color-mix(in srgb, var(--bg2) 90%, var(--amber) 10%);
+  color: var(--text); font: 11px/1.35 var(--font-mono);
+}
+.composer-input-choice-actions { display: flex; flex: none; gap: 6px; }
 .composer-status { flex: 1; color: var(--faint); font: 700 9px/1 var(--font-display); letter-spacing: .08em; text-align: right; }
 .composer-textarea {
   display: block; width: 100%; min-height: 0; box-sizing: border-box; resize: none;

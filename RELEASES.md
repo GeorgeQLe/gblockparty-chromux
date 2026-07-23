@@ -1,5 +1,14 @@
 # Release Notes
 
+## GBlockParty Chromux v0.46.0
+
+Tag: `chromux-v0.46.0`
+
+- Move a session's pending editable terminal line into an empty composer when it opens, preserving Unicode and common cursor/edit controls while clearing the live PTY line exactly once.
+- Resolve terminal-input/draft conflicts with accessible Append, Replace, Copy, and Dismiss choices; Copy uses a main-process-enforced 64 KiB clipboard bridge and leaves both sources intact.
+- Add an `EXPAND` / `COLLAPSE` composer control between History and Close so the editor can replace the terminal body, retain per-session state and history, and restore xterm scrollback position on collapse.
+- Reset expansion on Close or Escape and add real-Electron coverage for transfer, conflicts, bounds, exited and independent sessions, shortcuts, focus, history, themes, and viewport preservation.
+
 ## GBlockParty Chromux v0.45.0
 
 Tag: `chromux-v0.45.0`

@@ -3,7 +3,7 @@
 // claude -p delivery adapter, and webview popup interception (review-queue routing).
 'use strict';
 
-const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Menu, clipboard } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -1809,6 +1809,12 @@ ipcMain.handle('prompt-history-read', (_e, cwd) => promptHistory.readProject(cwd
 ipcMain.handle('prompt-history-append', (_e, cwd, entry) => promptHistory.append(cwd, entry));
 ipcMain.handle('prompt-history-delete', (_e, cwd, id) => promptHistory.remove(cwd, id));
 ipcMain.handle('prompt-history-clear', (_e, cwd) => promptHistory.clear(cwd));
+ipcMain.handle('clipboard-write-text', (_e, text) => {
+  if (typeof text !== 'string' || Buffer.byteLength(text, 'utf8') > MAX_DRAFT_BYTES) return false;
+  clipboard.writeText(text);
+  return true;
+});
+if (SMOKE) ipcMain.handle('test-clipboard-read-text', () => clipboard.readText());
 ipcMain.handle('project-config', (_e, cwd) => packageProjectConfig(cwd));
 ipcMain.handle('git-root', (_e, cwd) => gitRoot(cwd));
 ipcMain.handle('git-diff-summary', (_e, cwd) => gitDiffSummary(cwd));

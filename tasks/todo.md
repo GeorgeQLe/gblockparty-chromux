@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Transfer bounded session-local editable terminal input into the composer with accessible draft-conflict choices, add full-terminal composer expansion with viewport restoration, and ship as v0.46.0. _(source: user-approved implementation plan; evidence: `prototype/main.js`, `prototype/preload.js`, `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`, `prototype/scripts/test-composer-renderer.js`, `RELEASES.md`)_
+
 - [x] Preserve session-scoped Needs Attention records through restart snapshots as bounded schema v5 history, keep restored records separate from live state, and ship as v0.45.0. _(source: user-approved implementation plan; evidence: `prototype/main.js`, `prototype/renderer/renderer.js`, focused restore/attention/update tests, local-data docs, `RELEASES.md`)_
 
 - [x] Preserve Threads row identity and click continuity through presentation-only terminal title changes, add 6px-separated inset Needs Attention cards, and ship as v0.44.2. _(source: user-approved implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`, `prototype/scripts/test-session-rail-renderer.js`, `RELEASES.md`)_

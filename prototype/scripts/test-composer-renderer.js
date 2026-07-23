@@ -51,6 +51,10 @@ fs.writeFileSync(e2ePath, `
   await wait(80); await tick();
   const openRoutes = await window.chromuxTest.shortcutRouteLog();
   expect(c.state(first).open && c.state(first).focused, 'Command+Shift+Enter should open and focus the editor: ' + JSON.stringify(openRoutes.slice(-3)));
+  expect(c.draft(first) === 'native' && c.ptyInputs(first).join('') === '\\x15\\x0b',
+    'shortcut open should transfer pending terminal input and clear the live line exactly once');
+  c.open(first); await tick();
+  expect(c.ptyInputs(first).join('') === '\\x15\\x0b', 'opening an already-open composer must not retransmit or clear again');
   c.close(first); await tick(); c.clickOpen(first); await tick();
   expect(c.state(first).open && c.state(first).focused, 'COMPOSE button should open and focus the editor');
   c.setDraft(first, '   '); c.clearPtyInputs(first);
@@ -96,6 +100,56 @@ fs.writeFileSync(e2ePath, `
   expect(new TextEncoder().encode(c.draft(restored)).byteLength <= 65536 && !c.draft(restored).endsWith('�'),
     'renderer should enforce the 64 KiB UTF-8 bound without splitting a character');
   c.close(restored);
+
+  const transfer = c.addSession({ name: 'transfer', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16 });
+  c.nativeInput(transfer, 'abc'); c.nativeInput(transfer, '\\x1b[D'); c.nativeInput(transfer, 'Z');
+  c.nativeInput(transfer, '\\x1b[3~'); c.nativeInput(transfer, '\\x1b[200~paste😀\\x1b[201~');
+  c.clearPtyInputs(transfer); c.clickOpen(transfer); await tick();
+  expect(c.draft(transfer) === 'abZpaste😀' && c.ptyInputs(transfer).join('') === '\\x15\\x0b',
+    'edited lines and bracketed Unicode paste should transfer as the current editable line');
+  c.close(transfer); c.nativeInput(transfer, 'cancelled'); c.nativeInput(transfer, '\\x03'); c.clearPtyInputs(transfer); c.open(transfer); await tick();
+  expect(c.draft(transfer) === 'abZpaste😀' && c.ptyInputs(transfer).length === 0,
+    'cancelled terminal input should not conflict with the preserved composer draft');
+
+  const editing = c.addSession({ name: 'editing', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16 });
+  c.nativeInput(editing, 'one two'); c.nativeInput(editing, '\\x1bb'); c.nativeInput(editing, 'X');
+  c.nativeInput(editing, '\\x01'); c.nativeInput(editing, '\\x0b'); c.nativeInput(editing, 'done');
+  c.nativeInput(editing, '\\x1b[H'); c.nativeInput(editing, 'Q'); c.nativeInput(editing, '\\x1b[F'); c.nativeInput(editing, 'Z');
+  c.clearPtyInputs(editing); c.open(editing); await tick();
+  expect(c.draft(editing) === 'QdoneZ' && c.ptyInputs(editing).join('') === '\\x15\\x0b',
+    'word movement, Home/End, and line clearing controls should track the editable line');
+
+  const bounded = c.addSession({ name: 'bounded', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16 });
+  c.nativeInput(bounded, '😀'.repeat(20000)); c.clearPtyInputs(bounded); c.open(bounded); await tick();
+  expect(new TextEncoder().encode(c.draft(bounded)).byteLength === 65536 && !c.draft(bounded).endsWith('�')
+    && c.ptyInputs(bounded).join('') === '\\x15\\x0b', 'terminal input transfer should enforce the 64 KiB UTF-8 bound');
+  expect(await window.chromux.clipboardWriteText('x'.repeat(65537)) === false,
+    'clipboard preload bridge should reject text above the composer bound');
+
+  const conflict = c.addSession({ name: 'conflict', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, composerDraft: 'draft', rows: 16 });
+  c.nativeInput(conflict, 'terminal'); c.clearPtyInputs(conflict); c.open(conflict); await tick();
+  expect(c.state(conflict).conflictOpen && c.draft(conflict) === 'draft', 'conflicting sources should open an accessible choice prompt');
+  c.resolveConflict(conflict, 'append'); await tick();
+  expect(c.draft(conflict) === 'draft\\nterminal' && c.ptyInputs(conflict).join('') === '\\x15\\x0b', 'Append should merge then clear the PTY line once');
+  c.close(conflict); c.setDraft(conflict, 'keep'); c.nativeInput(conflict, 'replacement'); c.clearPtyInputs(conflict); c.open(conflict); await tick();
+  c.resolveConflict(conflict, 'replace'); await tick();
+  expect(c.draft(conflict) === 'replacement' && c.ptyInputs(conflict).join('') === '\\x15\\x0b', 'Replace should use terminal text then clear the PTY line once');
+  c.close(conflict); c.setDraft(conflict, 'copy-draft'); c.nativeInput(conflict, 'copy-terminal'); c.clearPtyInputs(conflict); c.open(conflict); await tick();
+  await c.resolveConflict(conflict, 'copy'); await tick();
+  expect(c.draft(conflict) === 'copy-draft' && c.pendingInput(conflict) === 'copy-terminal' && c.ptyInputs(conflict).length === 0
+    && await window.chromuxTest.clipboardReadText() === 'copy-terminal', 'Copy should preserve both sources and use the preload clipboard bridge');
+  c.close(conflict); c.open(conflict); await tick(); c.resolveConflict(conflict, 'dismiss'); await tick();
+  expect(c.draft(conflict) === 'copy-draft' && c.pendingInput(conflict) === 'copy-terminal' && c.ptyInputs(conflict).length === 0,
+    'dismissing the prompt should preserve both sources');
+
+  const independent = c.addSession({ name: 'independent', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16 });
+  c.nativeInput(independent, 'separate');
+  expect(c.pendingInput(independent) === 'separate' && c.pendingInput(conflict) === 'copy-terminal', 'pending input must remain session scoped');
+  c.nativeInput(independent, '\\r'); c.clearPtyInputs(independent); c.open(independent); await tick();
+  expect(c.draft(independent) === '' && c.ptyInputs(independent).length === 0, 'submitted lines should not transfer');
+  c.close(independent); c.nativeInput(independent, 'dead'); c.exit(independent, 0); c.clearPtyInputs(independent); c.open(independent); await tick();
+  expect(c.draft(independent) === '' && c.pendingInput(independent) === 'dead' && c.ptyInputs(independent).length === 0,
+    'exited sessions should preserve pending input without attempting a transfer');
 
   c.focus(first); c.open(first); await tick();
   c.setDraft(first, 'scratch text');
@@ -145,6 +199,23 @@ fs.writeFileSync(e2ePath, `
   const geometry = c.state(first);
   expect(geometry.textareaHeight <= geometry.paneHeight * 0.4 + 2,
     'composer textarea should cap at 40% of terminal pane height: ' + JSON.stringify(geometry));
+  expect(c.state(first).toolbarActions.join(',') === 'HISTORY,EXPAND,CLOSE', 'Expand should appear between History and Close');
+  const viewportBeforeExpand = c.state(first).viewportY;
+  c.toggleExpand(first); await tick();
+  const expanded = c.state(first);
+  expect(expanded.expanded && expanded.expandLabel === 'COLLAPSE' && !expanded.termHostVisible
+    && expanded.composerHeight > expanded.paneHeight * 0.75, 'expanded composer should replace the terminal body and fill the pane');
+  await c.toggleHistory(first); await tick();
+  expect(c.state(first).drawerOpen && c.state(first).expanded, 'history should remain available while expanded');
+  c.focus(second); await tick(); c.focus(first); await tick();
+  expect(c.state(first).expanded, 'expanded state should survive tab switching while open');
+  c.toggleExpand(first); await tick();
+  expect(!c.state(first).expanded && c.state(first).viewportY === viewportBeforeExpand,
+    'collapse should restore xterm viewport: ' + JSON.stringify({ before: viewportBeforeExpand, after: c.state(first) }));
+  c.toggleExpand(first); c.close(first); await tick(); c.open(first); await tick();
+  expect(!c.state(first).expanded, 'Close should reset expansion to compact');
+  c.toggleExpand(first); c.escape(first); await tick(); c.open(first); await tick();
+  expect(!c.state(first).expanded, 'Escape should reset expansion to compact');
   for (const theme of ['blueprint', 'retro-os', 'streak', 'liquid-glass']) {
     themes.select(theme);
     for (const mode of ['light', 'dark']) {

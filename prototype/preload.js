@@ -31,6 +31,7 @@ contextBridge.exposeInMainWorld('chromux', {
   promptHistoryAppend: (cwd, entry) => ipcRenderer.invoke('prompt-history-append', cwd, entry),
   promptHistoryDelete: (cwd, id) => ipcRenderer.invoke('prompt-history-delete', cwd, id),
   promptHistoryClear: (cwd) => ipcRenderer.invoke('prompt-history-clear', cwd),
+  clipboardWriteText: (text) => ipcRenderer.invoke('clipboard-write-text', text),
   projectConfig: (cwd) => ipcRenderer.invoke('project-config', cwd),
   gitRoot: (cwd) => ipcRenderer.invoke('git-root', cwd),
   gitDiffSummary: (cwd) => ipcRenderer.invoke('git-diff-summary', cwd),
@@ -86,5 +87,6 @@ if (process.env.CHROMUX_E2E) {
     sendHostInput: (input) => ipcRenderer.invoke('test-send-host-input', input),
     shortcutRouteLog: () => ipcRenderer.invoke('test-shortcut-route-log'),
     classifyPtyAgentDescendants: (payload) => ipcRenderer.invoke('test-classify-pty-agent-descendants', payload || {}),
+    clipboardReadText: () => ipcRenderer.invoke('test-clipboard-read-text'),
   });
 }
