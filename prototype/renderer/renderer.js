@@ -984,10 +984,9 @@ function apply(event) {
       // Only state-changing input is worth ring space — raw typing is noise.
       recorded = true;
       if (session) trackTypedPreviewSuppressions(session, event.data);
-      if (session && window.chromuxAttention.applyUserInputTurnTransition(session, event.data, Date.now())) {
-        tabStateChanged = true;
-        recordEvent({ type: 'user-input', sessionId: session.id, turnState: session.turn.state });
-      }
+      if (!session || !window.chromuxAttention.applyUserInputTurnTransition(session, event.data, Date.now())) return;
+      tabStateChanged = true;
+      recordEvent({ type: 'user-input', sessionId: session.id, turnState: session.turn.state });
       break;
     case 'session-exited':
       if (session) {

@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Preserve working Threads spinner DOM nodes while typing unsubmitted terminal input, retain genuine submitted-input turn transitions, and ship as v0.48.1. _(source: user-approved implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-tab-activity-indicators-renderer.js`, focused activity/session-rail/turn/composer/update tests, `RELEASES.md`)_
+
 - [x] Gate all Chromux-managed Codex launches behind one source-aware update preflight, suppress per-PTY native prompts, release queued resumes deterministically after update/current/bypass decisions, and ship as v0.48.0. _(source: user-approved implementation plan; evidence: `prototype/codex-update-service.js`, `prototype/main.js`, `prototype/preload.js`, `prototype/renderer/renderer.js`, focused service/renderer/command/restore tests, `RELEASES.md`)_
 
 - [x] Transfer bounded session-local editable terminal input into the composer with accessible draft-conflict choices, add full-terminal composer expansion with viewport restoration, and ship as v0.46.0. _(source: user-approved implementation plan; evidence: `prototype/main.js`, `prototype/preload.js`, `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`, `prototype/scripts/test-composer-renderer.js`, `RELEASES.md`)_

@@ -47,6 +47,22 @@ fs.writeFileSync(e2ePath, `
   expect(tabs.state(background).indicator === 'working', 'signaled background working state should show spinner');
   expect(tabs.state(active).ariaLabel.includes('Agent working'), 'working status should be accessible on the tab');
 
+  const workingRow = document.querySelector('#thread-list .rail-session-row[data-session-id="' + CSS.escape(background) + '"]');
+  const workingStatus = workingRow?.querySelector('.rail-status');
+  expect(workingStatus?.getAttribute('aria-label') === 'Working',
+    'working background session should expose a Threads status node');
+  for (const input of ['d', 'raft', '\\x1b[A', '\\x1b[B', '\\t', '\\x1b[<0;12;8M']) {
+    tabs.typeInput(background, input);
+    const currentStatus = document.querySelector('#thread-list .rail-session-row[data-session-id="'
+      + CSS.escape(background) + '"] .rail-status');
+    expect(currentStatus === workingStatus,
+      'terminal control input and unsubmitted drafts must preserve the working Threads status node: '
+        + JSON.stringify(input));
+    expect(currentStatus?.getAttribute('aria-label') === 'Working'
+      && tabs.state(background).indicator === 'working',
+    'terminal control input and unsubmitted drafts must preserve working state: ' + JSON.stringify(input));
+  }
+
   tabs.emitSignal(active, 'turn-end');
   tabs.emitSignal(background, 'turn-end');
   expect(tabs.state(active).indicator === 'idle', 'active completed turn should transition directly to idle');
@@ -59,8 +75,14 @@ fs.writeFileSync(e2ePath, `
     expect(tabs.state(background).indicator === 'completed',
       'control input and unsubmitted typing should not activate the spinner: ' + JSON.stringify(input));
   }
+  const completedStatus = document.querySelector('#thread-list .rail-session-row[data-session-id="'
+    + CSS.escape(background) + '"] .rail-status');
   tabs.typeInput(background, 'continue\\r');
   expect(tabs.state(background).indicator === 'working', 'submitted input should return completed tab to spinner');
+  const submittedStatus = document.querySelector('#thread-list .rail-session-row[data-session-id="'
+    + CSS.escape(background) + '"] .rail-status');
+  expect(submittedStatus !== completedStatus && submittedStatus?.getAttribute('aria-label') === 'Working',
+    'submitted input should render the completed-to-working Threads transition');
 
   const grok = tabs.addSession({ name: 'grok-agent', agent: 'grok', turnState: 'completed' });
   tabs.emitSignal(grok, 'turn-start');

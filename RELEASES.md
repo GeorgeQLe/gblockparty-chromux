@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.48.1
+
+Tag: `chromux-v0.48.1`
+
+- Keep working Threads spinner nodes mounted while ordinary characters, terminal controls, and other unsubmitted input update the live terminal draft.
+- Continue tracking pending terminal input and preview suppressions without rebuilding unrelated sidebar state when turn state does not change.
+- Preserve the existing submitted-input transition to Working, including the expected Threads render when status or group membership changes.
+
 ## GBlockParty Chromux v0.48.0
 
 Tag: `chromux-v0.48.0`
