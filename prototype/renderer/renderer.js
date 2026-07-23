@@ -3763,6 +3763,29 @@ function appendNeedsAttentionGroup(host, sessionRows) {
   details.append(summary, rows); host.appendChild(details);
 }
 
+function workingSessionRows() {
+  return orderedSessions().filter((session) => session.lifecycle && session.lifecycle.alive
+    && session.turn && session.turn.state === 'working');
+}
+
+function appendWorkingSessionsGroup(host, sessions) {
+  if (sessions.length === 0) return;
+  const details = document.createElement('details');
+  details.className = 'rail-group working-thread-group';
+  details.dataset.groupKey = 'status:working';
+  details.open = true;
+  details.addEventListener('toggle', () => {
+    if (!details.open) details.open = true;
+  });
+  const summary = document.createElement('summary'); summary.title = 'Sessions with an agent turn in progress';
+  const label = document.createElement('span'); label.className = 'rail-group-label'; label.textContent = 'WORKING';
+  const count = document.createElement('span'); count.className = 'rail-group-count'; count.textContent = String(sessions.length);
+  summary.append(label, count);
+  const rows = document.createElement('div'); rows.className = 'rail-group-rows';
+  for (const session of sessions) appendThreadSessionRow(rows, session);
+  details.append(summary, rows); host.appendChild(details);
+}
+
 function renderAttentionQueue() {
   const host = $('#thread-list');
   if (!host) return;
@@ -3775,9 +3798,14 @@ function renderAttentionQueue() {
   }
   const update = items.find((row) => row.item.scope === 'global') || null;
   const attentive = attentionSessionRows(items);
+  const working = workingSessionRows();
   appendUpdateAttentionRow(host, update);
   appendNeedsAttentionGroup(host, attentive);
-  renderGroupedSessionRail(host, 'threads', new Set(attentive.map((row) => row.session.id)));
+  appendWorkingSessionsGroup(host, working);
+  renderGroupedSessionRail(host, 'threads', new Set([
+    ...attentive.map((row) => row.session.id),
+    ...working.map((session) => session.id),
+  ]));
 }
 
 function renderRailNavigation(attentionCount) {

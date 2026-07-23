@@ -195,6 +195,20 @@ fs.writeFileSync(e2ePath, `
 
   rail.select('threads');
   rail.emit(webTwo, 'turn-start');
+  const worker = rail.addSession({ name: 'api-worker', agent: 'claude', cwd: ${JSON.stringify(looseDir)} });
+  rail.emit(worker, 'turn-start');
+  let workingGroup = rail.groups().find((group) => group.key === 'status:working');
+  expect(workingGroup && workingGroup.label === 'WORKING' && workingGroup.open && workingGroup.count === 2,
+    'Threads should pin every actively working session in an expanded Working section');
+  expect(workingGroup.rows.map((row) => row.id).sort().join(',') === [webTwo, worker].sort().join(','),
+    'Working section membership should include all and only sessions with an agent turn in progress');
+  expect(!rail.groups().filter((group) => group.key.startsWith('cwd:')).flatMap((group) => group.rows)
+    .some((row) => row.id === webTwo || row.id === worker),
+  'working sessions should be deduplicated from working-directory groups');
+  rail.close(worker);
+  workingGroup = rail.groups().find((group) => group.key === 'status:working');
+  expect(workingGroup && workingGroup.count === 1 && workingGroup.rows[0].id === webTwo,
+    'Working section should remove a session immediately when it closes');
   const workingRowBeforeTitle = document.querySelector('#thread-list .rail-session-row[data-session-id="' + CSS.escape(webTwo) + '"]');
   workingRowBeforeTitle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
   rail.title(webTwo, '\u2839 Dynamic review title');
@@ -229,6 +243,9 @@ fs.writeFileSync(e2ePath, `
   rail.previewClick();
   await wait(40);
   expect(rail.activeId() === webTwo && !rail.preview(), 'clicking anywhere in the preview should activate its session');
+  rail.emit(webTwo, 'turn-end');
+  expect(!rail.groups().some((group) => group.key === 'status:working'),
+    'Working section should disappear when its final active turn completes');
   rail.focus(holder);
   rail.clickRow(webTwo);
   await wait(40);

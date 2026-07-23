@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.47.0
+
+Tag: `chromux-v0.47.0`
+
+- Pin every live session with an agent turn in progress in an always-expanded `WORKING` section in Threads.
+- Update the section immediately as turns start, finish, or sessions close, while keeping working sessions out of duplicate working-directory groups.
+- Preserve higher-priority Needs Attention visibility and add real-Electron coverage for complete membership, deduplication, and removal.
+
 ## GBlockParty Chromux v0.46.0
 
 Tag: `chromux-v0.46.0`
