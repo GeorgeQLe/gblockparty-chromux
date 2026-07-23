@@ -47,6 +47,23 @@ fs.writeFileSync(e2ePath, `
   expect(Math.abs(firstState.bottomInset - 14) < 1, 'control should sit 14px above the host bottom, got ' + firstState.bottomInset);
   expect(Math.abs(firstState.centerOffset) < 1, 'control should be horizontally centered, got ' + firstState.centerOffset);
 
+  terminal.nativeScroll(first, 'bottom');
+  await tick();
+  firstState = terminal.state(first);
+  expect(firstState.viewportY === firstState.baseY,
+    'native viewport scrolling should update the logical viewport to baseY: ' + JSON.stringify(firstState));
+  expect(Math.abs(firstState.physicalViewportY - firstState.physicalViewportMaximum) < 1,
+    'native viewport should reach its physical maximum: ' + JSON.stringify(firstState));
+  expect(firstState.hidden, 'control should hide after the native viewport settles at the bottom');
+
+  terminal.nativeScroll(first, 'page-up');
+  await tick();
+  firstState = terminal.state(first);
+  expect(firstState.behind === firstState.rows,
+    'native upward scrolling should move exactly one visible page behind: ' + JSON.stringify(firstState));
+  expect(!firstState.hidden && firstState.visible,
+    'native upward scrolling should reveal the control at the one-page threshold');
+
   for (const theme of ['blueprint', 'retro-os', 'streak', 'liquid-glass']) {
     themes.select(theme);
     for (const mode of ['light', 'dark']) {

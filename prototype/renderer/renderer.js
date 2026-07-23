@@ -4518,10 +4518,12 @@ function installTerminalScrollToBottom(session, { reducedMotion = null } = {}) {
   const term = session.term.term;
   const host = session.els.termHost;
   const control = session.els.scrollToBottom;
+  const viewport = host.querySelector('.xterm-viewport');
   const disposables = [];
   const tracker = {
     animationFrame: null,
     animationStartedAt: 0,
+    viewportUpdateTimer: null,
     disposed: false,
     reducedMotion: typeof reducedMotion === 'function'
       ? reducedMotion
@@ -4530,6 +4532,8 @@ function installTerminalScrollToBottom(session, { reducedMotion = null } = {}) {
       if (tracker.disposed) return;
       tracker.disposed = true;
       cancelTerminalScrollAnimation(session, { render: false });
+      if (tracker.viewportUpdateTimer) clearTimeout(tracker.viewportUpdateTimer);
+      tracker.viewportUpdateTimer = null;
       for (const disposable of disposables) disposable.dispose();
       host.removeEventListener('wheel', cancelFromUser, true);
       host.removeEventListener('pointerdown', cancelFromUser, true);
@@ -4541,6 +4545,13 @@ function installTerminalScrollToBottom(session, { reducedMotion = null } = {}) {
     rememberTerminalViewport(session);
     renderTerminalScrollToBottom(session);
   };
+  const updateFromViewport = () => {
+    if (tracker.viewportUpdateTimer) return;
+    tracker.viewportUpdateTimer = setTimeout(() => {
+      tracker.viewportUpdateTimer = null;
+      if (!tracker.disposed) update();
+    }, 0);
+  };
   const cancelFromUser = () => cancelTerminalScrollAnimation(session);
   const activate = () => animateTerminalScrollToBottom(session);
 
@@ -4548,6 +4559,14 @@ function installTerminalScrollToBottom(session, { reducedMotion = null } = {}) {
   disposables.push(term.onScroll(update));
   disposables.push(term.onWriteParsed(update));
   disposables.push(term.onResize(update));
+  if (viewport) {
+    viewport.addEventListener('scroll', updateFromViewport);
+    disposables.push({
+      dispose() {
+        viewport.removeEventListener('scroll', updateFromViewport);
+      },
+    });
+  }
   host.addEventListener('wheel', cancelFromUser, true);
   host.addEventListener('pointerdown', cancelFromUser, true);
   control.addEventListener('click', activate);
@@ -7915,6 +7934,18 @@ if (window.chromuxTest) {
     },
     scrollLines(id, amount) { testSession(id).term.term.scrollLines(amount); },
     scrollToBottom(id) { testSession(id).term.term.scrollToBottom(); },
+    nativeScroll(id, position) {
+      const viewport = testSession(id).els.termHost.querySelector('.xterm-viewport');
+      if (!viewport) throw new Error('Missing native xterm viewport');
+      const maximum = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
+      const { baseY } = testSession(id).term.term.buffer.active;
+      if (position === 'bottom') viewport.scrollTop = maximum;
+      else if (position === 'page-up') {
+        const pageHeight = baseY > 0 ? (maximum / baseY) * testSession(id).term.term.rows : 0;
+        viewport.scrollTop = Math.max(0, maximum - pageHeight);
+      }
+      else viewport.scrollTop = Math.max(0, Math.min(maximum, Number(position) || 0));
+    },
     resize(id, cols, rows) { testSession(id).term.term.resize(cols, rows); },
     setHostHeight(id, height) {
       const session = testSession(id);
@@ -7954,6 +7985,7 @@ if (window.chromuxTest) {
       const controlRect = control.getBoundingClientRect();
       const controlStyle = getComputedStyle(control);
       const xterm = session.els.termHost.querySelector('.xterm');
+      const viewport = session.els.termHost.querySelector('.xterm-viewport');
       const screen = session.els.termHost.querySelector('.xterm-screen');
       const xtermRect = xterm ? xterm.getBoundingClientRect() : null;
       const screenRect = screen ? screen.getBoundingClientRect() : null;
@@ -7964,6 +7996,8 @@ if (window.chromuxTest) {
         fitCalls: session._fitCalls,
         fitViewportMoves: session._fitViewportMoves,
         scrollEvents: session._scrollEvents,
+        physicalViewportY: viewport ? viewport.scrollTop : null,
+        physicalViewportMaximum: viewport ? Math.max(0, viewport.scrollHeight - viewport.clientHeight) : null,
         focused: document.activeElement === session.els.termHost.querySelector('.xterm-helper-textarea'),
         label: control.textContent,
         title: control.title,

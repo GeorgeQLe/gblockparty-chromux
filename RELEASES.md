@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.50.2
+
+Tag: `chromux-v0.50.2`
+
+- Hide “↓ SKIP TO BOTTOM” when native xterm viewport scrolling reaches the physical bottom, including scrollbar dragging and other DOM scroll paths that do not emit xterm's public scroll event.
+- Keep saved terminal viewport state and the one-page skip-control threshold synchronized with native viewport scrolling.
+- Extend the real-Electron terminal scroll suite with native viewport bottom and upward-threshold coverage.
+
 ## GBlockParty Chromux v0.50.1
 
 Tag: `chromux-v0.50.1`
