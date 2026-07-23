@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Normalize Codex spinner-prefixed display titles, unify tab and Threads status projection and animation, preserve action/exit precedence with activity indicators disabled, and ship as v0.44.0. _(source: user-approved implementation plan; evidence: `prototype/renderer/attention.js`, `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`, focused renderer tests, `RELEASES.md`)_
+
 - [x] Center the full-height paired-browser BROWSER / COLLAPSE rail control in both states, add geometry regression coverage, and ship as v0.43.1. _(source: user-approved implementation plan; evidence: `prototype/renderer/styles.css`, `prototype/renderer/renderer.js`, `prototype/scripts/test-browser-collapse-renderer.js`, `RELEASES.md`)_
 
 - [x] Unify outstanding work into Threads, remove the standalone Attention rail mode, aggregate attentive sessions without duplication, pin managed-update status, preserve direct actions and previews, and ship as v0.43.0. _(source: user-approved implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-session-rail-renderer.js`, `prototype/scripts/test-update-queue-renderer.js`, `prototype/README.md`, `RELEASES.md`)_

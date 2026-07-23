@@ -178,14 +178,18 @@ fs.writeFileSync(e2ePath, `
     'opening actionable session must not clear its state or attention');
 
   rail.select('threads');
-  rail.title(webTwo, 'Dynamic review title');
+  rail.title(webTwo, '\u2839 Dynamic review title');
   expect(rail.groups().flatMap((group) => group.rows).some((row) => row.name === 'Dynamic review title'),
-    'grouped rows should update dynamic session titles');
+    'grouped rows should normalize Codex spinner prefixes in dynamic session titles');
   rail.emit(webTwo, 'turn-start');
   rail.emit(api, 'permission-required');
   let rows = rail.groups().flatMap((group) => group.rows);
   expect(rows.find((row) => row.id === webTwo).status === 'Working', 'working status should appear in Threads');
   expect(rows.find((row) => row.id === api).status === 'Action required', 'action-required status should appear in Threads');
+  expect(rows.find((row) => row.id === webTwo).statusCount === 1 && rows.find((row) => row.id === api).statusCount === 1,
+    'each Threads row should contain exactly one status element');
+  expect(rows.find((row) => row.id === webTwo).animationName === 'tabActivitySpin',
+    'Threads working spinner should use the same animation as tabs');
 
   rail.focus(holder);
   rail.clickRow(web);

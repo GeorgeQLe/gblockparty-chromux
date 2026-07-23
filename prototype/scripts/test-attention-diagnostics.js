@@ -12,6 +12,17 @@ const diagnostic = (target, activeId = null) => attention.projectAttentionDiagno
   updateQueue: { phase: 'idle' }, updateStatus: null, activityIndicators: true,
 });
 
+assert.deepStrictEqual(attention.projectSessionStatus(session({ alive: false, state: 'working' }), false),
+  { kind: 'dead', icon: '', label: 'Exited', status: 'Session exited' });
+for (const state of ['needsInput', 'permission', 'authentication', 'rateLimited', 'toolFailed']) {
+  assert.deepStrictEqual(attention.projectSessionStatus(session({ state }), false),
+    { kind: 'action', icon: '!', label: 'Action required', status: 'Action required' });
+}
+assert.strictEqual(attention.projectSessionStatus(session({ state: 'working' })).kind, 'working');
+assert.strictEqual(attention.projectSessionStatus(session({ state: 'completed' })).kind, 'completed');
+assert.strictEqual(attention.projectSessionStatus(session({ state: 'idle' })).kind, 'idle');
+assert.strictEqual(attention.projectSessionStatus(session({ state: 'working' }), false).kind, 'live');
+
 let row = diagnostic(session({ state: 'completed' }), 's1');
 assert.strictEqual(row.suppression, 'active-session');
 assert.strictEqual(row.expectedTabIndicator, 'completed');

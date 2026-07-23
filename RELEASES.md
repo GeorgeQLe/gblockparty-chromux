@@ -1,5 +1,14 @@
 # Release Notes
 
+## GBlockParty Chromux v0.44.0
+
+Tag: `chromux-v0.44.0`
+
+- Remove Codex's leading animated Braille title frame from every Chromux-presented session label while preserving raw OSC title data and falling back to the launch name.
+- Project tab, Threads, tooltip, ARIA, preview, search, and diagnostic status from one shared session-status model with red exit, amber action-required, cyan working, green completed, gray idle, and green live indicators.
+- Keep exit and action-required indicators visible when activity indicators are disabled, and animate tab and Threads working spinners with the same reduced-motion-safe keyframes.
+- Add renderer coverage for title frames, provider state agreement, single-indicator rendering, disabled preferences, status precedence, animation, and diagnostics.
+
 ## GBlockParty Chromux v0.43.1
 
 Tag: `chromux-v0.43.1`

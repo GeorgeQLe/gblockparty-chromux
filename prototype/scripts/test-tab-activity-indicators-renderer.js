@@ -11,6 +11,15 @@ const homeDir = path.join(tmpDir, 'home');
 const e2ePath = path.join(tmpDir, 'tab-activity-e2e.js');
 const e2eOutPath = path.join(tmpDir, 'e2e.out');
 
+const styles = fs.readFileSync(path.join(appDir, 'renderer', 'styles.css'), 'utf8');
+if (!/\.tab-dot\.working\s*\{[^}]*animation:\s*tabActivitySpin/.test(styles)
+  || !/\.rail-status\.working\s*\{[^}]*animation:\s*tabActivitySpin/.test(styles)) {
+  throw new Error('tab and Threads working indicators must use tabActivitySpin');
+}
+if (!/@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*?\.tab-dot\.working,\s*\.rail-status\.working\s*\{\s*animation:\s*none/.test(styles)) {
+  throw new Error('tab and Threads working indicators must stop under reduced motion');
+}
+
 fs.mkdirSync(homeDir, { recursive: true });
 
 fs.writeFileSync(e2ePath, `
@@ -57,15 +66,34 @@ fs.writeFileSync(e2ePath, `
   tabs.emitSignal(grok, 'turn-start');
   expect(tabs.state(grok).indicator === 'working', 'Grok turn-start signal should activate the spinner');
 
+  for (const agent of ['codex', 'claude', 'grok']) {
+    const id = tabs.addSession({ name: agent + '-projection', agent, turnState: 'idle' });
+    tabs.focus(id);
+    expect(tabs.state(id).indicator === 'idle', agent + ' active idle state should use the gray dot');
+    tabs.focus(active);
+    tabs.emitSignal(id, 'turn-start');
+    const railRow = document.querySelector('#thread-list .rail-session-row[data-session-id="' + CSS.escape(id) + '"]');
+    expect(tabs.state(id).indicator === 'working'
+      && tabs.state(id).title.includes('Agent working')
+      && tabs.state(id).ariaLabel.includes('Agent working'),
+    agent + ' background working state should agree across class, tooltip, and ARIA');
+    expect(railRow?.querySelectorAll('.rail-status').length === 1
+      && railRow.querySelector('.rail-status').getAttribute('aria-label') === 'Working',
+    agent + ' background working state should agree with its single Threads status');
+  }
+
   const input = tabs.addSession({ name: 'input-agent', agent: 'claude' });
   const permission = tabs.addSession({ name: 'permission-agent', agent: 'claude' });
   tabs.emitSignal(input, 'input-needed');
   tabs.emitSignal(permission, 'permission-required');
   tabs.focus(active);
-  expect(tabs.state(input).indicator === 'live', 'input-required should retain lifecycle dot');
-  expect(tabs.state(permission).indicator === 'live', 'permission-required should retain lifecycle dot');
   expect(tabs.attentionKinds().includes('INPUT NEEDED'), 'input-required attention handling should remain unchanged');
   expect(tabs.attentionKinds().includes('PERMISSION'), 'permission attention handling should remain unchanged');
+
+  expect(tabs.state(input).indicator === 'action', 'input-required should show the amber action indicator');
+  expect(tabs.state(permission).indicator === 'action', 'permission-required should show the amber action indicator');
+  expect(tabs.state(input).indicatorCount === 1 && tabs.state(permission).indicatorCount === 1,
+    'each tab should contain exactly one status element');
 
   tabs.setActivityPreference(false);
   expect(tabs.activityPreference() === false, 'switch should disable activity indicators');
@@ -73,6 +101,11 @@ fs.writeFileSync(e2ePath, `
   expect(tabs.activityToggleState() === false, 'settings switch should reflect disabled preference');
   expect(tabs.state(active).indicator === 'live', 'disabled setting should restore active lifecycle dot');
   expect(tabs.state(background).indicator === 'live', 'disabled setting should restore background lifecycle dot');
+  expect(tabs.state(input).indicator === 'action' && tabs.state(permission).indicator === 'action',
+    'disabled activity preference must preserve action-required indicators');
+  expect(document.querySelector('#thread-list .rail-session-row[data-session-id="' + CSS.escape(input) + '"] .rail-status')
+    ?.getAttribute('aria-label') === 'Action required',
+  'disabled activity preference must preserve action-required status in Threads');
 
   tabs.setActivityPreference(true);
   expect(tabs.activityPreferenceStored() === 'true', 'enabled preference should persist');
@@ -84,6 +117,9 @@ fs.writeFileSync(e2ePath, `
   expect(tabs.state(background).ariaLabel.includes('Session exited'), 'exit status should be accessible');
   tabs.exit(active, 0);
   expect(tabs.state(active).indicator === 'dead', 'exited session should override idle state');
+  tabs.setActivityPreference(false);
+  expect(tabs.state(background).indicator === 'dead' && tabs.state(active).indicator === 'dead',
+    'disabled activity preference must preserve exited indicators');
 
   return JSON.stringify({ ok: true, active: tabs.state(active), background: tabs.state(background) });
 })()

@@ -54,6 +54,24 @@ fs.writeFileSync(e2ePath, `
   expect(tabs.tooltip(first).includes('launch-a'), 'dynamic tooltip should retain launch name');
   expect(tabs.written(first).includes(firstTitle), 'title OSC bytes should pass through to terminal output');
 
+  for (const frame of ['\u280b', '\u2819', '\u2839', '\u2838']) {
+    const raw = frame + ' Codex is working';
+    const osc = titleOsc('0', raw);
+    tabs.feed(first, osc);
+    expect(tabs.terminalTitle(first) === raw, 'raw Braille-prefixed title should remain intact internally');
+    expect(tabs.label(first) === 'Codex is working', 'leading Codex Braille frame should be removed from the visible tab label');
+    expect(!tabs.tooltip(first).includes(frame), 'leading Codex Braille frame should be removed from the tooltip');
+    expect(!tabs.state(first).ariaLabel.includes(frame), 'leading Codex Braille frame should be removed from ARIA');
+    expect(tabs.written(first).includes(osc), 'Braille-prefixed OSC bytes should pass through to terminal output');
+  }
+  tabs.feed(first, titleOsc('0', '\u280b   '));
+  expect(tabs.label(first) === 'launch-a', 'spinner-only display title should fall back to launch name');
+  tabs.feed(first, titleOsc('0', '\u280bCodex without whitespace'));
+  expect(tabs.label(first) === '\u280bCodex without whitespace', 'leading Braille without whitespace should remain legitimate title text');
+  tabs.feed(first, titleOsc('0', 'Build \u280b phase'));
+  expect(tabs.label(first) === 'Build \u280b phase', 'non-leading Braille symbols should remain unchanged');
+  tabs.feed(first, firstTitle);
+
   const split = titleOsc('2', 'Split Chunk Title', '\\x1b\\\\');
   tabs.feed(first, split.slice(0, 5));
   expect(tabs.label(first) === 'Agent: planning build', 'partial title OSC should not update label early');

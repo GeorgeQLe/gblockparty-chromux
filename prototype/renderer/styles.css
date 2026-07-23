@@ -327,8 +327,9 @@ body {
 .rail-session-row[aria-expanded="true"] { background: var(--bg2); box-shadow: inset 3px 0 var(--cyan); }
 .rail-session-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rail-status { width: 14px; height: 14px; flex: none; display: grid; place-items: center; font: 800 10px/1 var(--font-display); }
+.rail-status.dead { border-radius: 50%; background: var(--red); }
 .rail-status.action { border-radius: 50%; background: var(--amber); color: var(--on-amber); }
-.rail-status.working { border: 2px solid color-mix(in srgb, var(--cyan) 28%, transparent); border-top-color: var(--cyan); border-radius: 50%; animation: tabWorkingSpin .8s linear infinite; }
+.rail-status.working { border: 2px solid color-mix(in srgb, var(--cyan) 28%, transparent); border-top-color: var(--cyan); border-radius: 50%; animation: tabActivitySpin .8s linear infinite; }
 .rail-status.completed { color: var(--green); }
 .rail-status.idle::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--faint); opacity: .7; }
 .rail-status.live::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
@@ -637,6 +638,17 @@ body[data-thread-preview-size="large"] .thread-terminal-preview { width: min(720
 .tab-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; box-sizing: border-box; }
 .tab-dot.live { background: var(--green); box-shadow: 0 0 6px var(--green); }
 .tab-dot.dead { background: var(--red); box-shadow: none; }
+.tab-dot.action {
+  width: 10px;
+  height: 10px;
+  display: grid;
+  place-items: center;
+  background: var(--amber);
+  color: var(--on-amber);
+  box-shadow: none;
+  font: 800 8px/1 var(--font-display);
+}
+.tab-dot.action::before { content: "!"; }
 .tab-dot.working {
   width: 10px;
   height: 10px;

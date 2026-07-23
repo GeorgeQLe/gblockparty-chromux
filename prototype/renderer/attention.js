@@ -359,12 +359,24 @@
     return items;
   }
 
-  function expectedTabIndicator(session, activityIndicators = true) {
-    if (!session || !session.lifecycle || !session.lifecycle.alive) return 'dead';
-    if (activityIndicators && session.turn && session.turn.state === 'working') return 'working';
-    if (activityIndicators && session.turn && session.turn.state === 'completed') return 'completed';
-    if (activityIndicators && session.turn && session.turn.state === 'idle') return 'idle';
-    return 'live';
+  function projectSessionStatus(session, activityIndicators = true) {
+    if (!session || !session.lifecycle || !session.lifecycle.alive) {
+      return { kind: 'dead', icon: '', label: 'Exited', status: 'Session exited' };
+    }
+    const turnState = session.turn && session.turn.state;
+    if (['needsInput', 'permission', 'authentication', 'rateLimited', 'toolFailed'].includes(turnState)) {
+      return { kind: 'action', icon: '!', label: 'Action required', status: 'Action required' };
+    }
+    if (activityIndicators && turnState === 'working') {
+      return { kind: 'working', icon: '', label: 'Working', status: 'Agent working' };
+    }
+    if (activityIndicators && turnState === 'completed') {
+      return { kind: 'completed', icon: '✓', label: 'Completed', status: 'Turn completed' };
+    }
+    if (activityIndicators && turnState === 'idle') {
+      return { kind: 'idle', icon: '', label: 'Idle', status: 'Agent idle' };
+    }
+    return { kind: 'live', icon: '', label: 'Live', status: 'Session live' };
   }
 
   function projectAttentionDiagnostic({ session, sessions, activeId, captures, updateQueue,
@@ -386,7 +398,7 @@
       expectedItem: sessionItems[0] || null,
       suppression,
       safety: sessionUpdateSafety(session),
-      expectedTabIndicator: expectedTabIndicator(session, activityIndicators),
+      expectedTabIndicator: projectSessionStatus(session, activityIndicators).kind,
       projectedKinds: sessionItems.map((item) => item.kind),
       projectedOrder: projected.map((item) => item.id),
       queueCount: session.browser && Array.isArray(session.browser.queue) ? session.browser.queue.length : 0,
@@ -401,6 +413,7 @@
     applyUserInputTurnTransition,
     consumeCompletedTurn,
     applyCodexRenderedCompletionFallback,
+    projectSessionStatus,
     projectAttentionItems,
     projectAttentionDiagnostic,
     sessionUpdateSafety,

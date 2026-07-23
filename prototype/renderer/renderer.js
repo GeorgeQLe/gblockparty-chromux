@@ -379,8 +379,7 @@ function applyTabActivityIndicators(enabled, { persist = true } = {}) {
     try { window.localStorage.setItem(TAB_ACTIVITY_STORAGE_KEY, String(state.ui.tabActivityIndicators)); } catch { /* unavailable */ }
   }
   renderTabActivityControls();
-  renderTabs();
-  if (state.env && state.env.devMode) invalidate('diagnostics');
+  invalidate('tabs', 'attention', ...(state.env && state.env.devMode ? ['diagnostics'] : []));
   return state.ui.tabActivityIndicators;
 }
 
@@ -2919,30 +2918,23 @@ function orderedSessions() {
 }
 
 function sessionDisplayLabel(session) {
-  return (session.term && session.term.title) || session.name;
+  const rawTitle = session.term && session.term.title;
+  if (!rawTitle) return session.name;
+  const normalized = rawTitle.replace(/^[\u2800-\u28ff](?:\s+|$)/u, '').trim();
+  return normalized || session.name;
 }
 
 function sessionTabTooltip(session) {
   const label = sessionDisplayLabel(session);
   const cwd = session.cwd || '~';
-  const base = session.term && session.term.title && session.term.title !== session.name
+  const base = label !== session.name
     ? `${label} — ${cwd}\nLaunch name: ${session.name}`
     : `${label} — ${cwd}`;
   return `${base}\n${sessionTabIndicator(session).status}`;
 }
 
 function sessionTabIndicator(session) {
-  if (!session.lifecycle.alive) return { kind: 'dead', status: 'Session exited' };
-  if (state.ui.tabActivityIndicators && session.turn.state === 'working') {
-    return { kind: 'working', status: 'Agent working' };
-  }
-  if (state.ui.tabActivityIndicators && session.turn.state === 'completed') {
-    return { kind: 'completed', status: 'Turn completed' };
-  }
-  if (state.ui.tabActivityIndicators && session.turn.state === 'idle') {
-    return { kind: 'idle', status: 'Agent idle' };
-  }
-  return { kind: 'live', status: 'Session live' };
+  return window.chromuxAttention.projectSessionStatus(session, state.ui.tabActivityIndicators);
 }
 
 function updateSessionTabIndicator(session) {
@@ -3176,7 +3168,8 @@ function diagnosticGroup(label, cells) {
 
 function actualTabIndicator(session) {
   if (!session.els || !session.els.dot) return 'missing';
-  return ['dead', 'working', 'completed', 'idle', 'live'].find((kind) => session.els.dot.classList.contains(kind)) || 'unknown';
+  return ['dead', 'action', 'working', 'completed', 'idle', 'live']
+    .find((kind) => session.els.dot.classList.contains(kind)) || 'unknown';
 }
 
 function renderDeveloperDiagnostics() {
@@ -3511,14 +3504,7 @@ function directoryBasename(directory) {
 }
 
 function sessionRailStatus(session) {
-  const stateName = session.turn && session.turn.state;
-  if (['needsInput', 'permission', 'authentication', 'rateLimited', 'toolFailed'].includes(stateName)) {
-    return { kind: 'action', icon: '!', label: 'Action required' };
-  }
-  if (stateName === 'working') return { kind: 'working', icon: '', label: 'Working' };
-  if (stateName === 'completed') return { kind: 'completed', icon: '✓', label: 'Completed' };
-  if (stateName === 'idle') return { kind: 'idle', icon: '', label: 'Idle' };
-  return { kind: 'live', icon: '', label: 'Live' };
+  return window.chromuxAttention.projectSessionStatus(session, state.ui.tabActivityIndicators);
 }
 
 function ensureGitRoot(cwd) {
@@ -4627,7 +4613,7 @@ function applyTerminalTitleUpdates(session, data) {
   const latest = res.titles[res.titles.length - 1].title;
   if (!latest || latest === session.term.title) return;
   session.term.title = latest;
-  invalidate('tabs', 'attention');
+  invalidate('tabs', 'attention', ...(state.env && state.env.devMode ? ['diagnostics'] : []));
 }
 
 function renderedTerminalCursorContext(term) {
@@ -6014,7 +6000,8 @@ if (window.chromuxTest) {
         marquee: tab.classList.contains('marquee'),
         paused: tab.classList.contains('paused'),
         hoverScroll: tab.classList.contains('hover-scroll'),
-        indicator: ['dead', 'working', 'completed', 'idle', 'live'].find((kind) => session.els.dot.classList.contains(kind)) || 'unknown',
+        indicator: ['dead', 'action', 'working', 'completed', 'idle', 'live'].find((kind) => session.els.dot.classList.contains(kind)) || 'unknown',
+        indicatorCount: tab.querySelectorAll('.tab-dot').length,
         label: label.textContent,
         title: tab.title,
         ariaLabel: tab.getAttribute('aria-label') || '',
@@ -6086,6 +6073,8 @@ if (window.chromuxTest) {
         id: row.dataset.sessionId,
         name: row.querySelector('.rail-session-name')?.textContent || '',
         status: row.querySelector('.rail-status')?.getAttribute('aria-label') || '',
+        statusCount: row.querySelectorAll('.rail-status').length,
+        animationName: getComputedStyle(row.querySelector('.rail-status')).animationName,
         title: row.title,
         ariaLabel: row.getAttribute('aria-label') || '',
       })),
