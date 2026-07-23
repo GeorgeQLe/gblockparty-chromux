@@ -36,6 +36,64 @@ fs.writeFileSync(e2ePath, `
   const api = rail.addSession({ name: 'api-agent', agent: 'claude', cwd: ${JSON.stringify(repoApiDir)} });
   const webTwo = rail.addTerminalSession({ name: 'web-review', agent: 'grok', cwd: ${JSON.stringify(repoAppDir)}, cols: 54, rows: 14 });
   rail.focus(holder);
+  expect(rail.threadSort() === 'recent' && rail.storedThreadSort() === 'recent',
+    'Recent should be the validated and persisted default thread order');
+  expect(JSON.stringify(rail.migrateThreadSort('invalid')) === JSON.stringify({ mode: 'recent', stored: 'recent' }),
+    'invalid thread order preferences should migrate to Recent');
+  expect(rail.threadSortControl().text === 'RECENT' && !rail.threadSortControl().hidden
+    && rail.threadSortControl().label === 'Thread order: Recent',
+  'Threads should expose a compact accessible Recent sort control');
+  rail.focusThreadSortControl();
+  expect(rail.threadSortControl().focused, 'thread sort control should accept keyboard focus');
+
+  rail.setActivity(holder, 1000);
+  rail.setActivity(web, 3000);
+  rail.setActivity(api, 2000);
+  rail.setActivity(webTwo, 4000);
+  let sortedGroups = rail.groups().filter((group) => group.key.startsWith('cwd:'));
+  expect(sortedGroups.map((group) => group.label).join(',') === 'web,api,scratch',
+    'Recent should order directory groups by their newest contained session');
+  expect(sortedGroups[0].rows.map((row) => row.id).join(',') === [webTwo, web].join(','),
+    'Recent should order rows within a directory newest first');
+  rail.selectThreadSort('az');
+  sortedGroups = rail.groups().filter((group) => group.key.startsWith('cwd:'));
+  expect(rail.storedThreadSort() === 'az' && rail.threadSortControl().text === 'A–Z',
+    'A–Z should update and persist the header control');
+  expect(sortedGroups.map((group) => group.label).join(',') === 'api,scratch,web',
+    'A–Z should alphabetize directory display labels');
+  expect(sortedGroups.find((group) => group.label === 'web').rows.map((row) => row.name).join(',') === 'web-agent,web-review',
+    'A–Z should alphabetize session display labels within a directory');
+  rail.selectThreadSort('recent');
+
+  const activityProbe = rail.addTerminalSession({
+    name: 'activity-probe', agent: 'codex', cwd: ${JSON.stringify(looseDir)}, cols: 44, rows: 10,
+  });
+  rail.focus(holder);
+  rail.setActivity(activityProbe, 5000);
+  rail.ptyOutput(activityProbe, 'streaming output\\r\\n');
+  expect(rail.activityAt(activityProbe) === 5000, 'streaming PTY output must not change recent activity');
+  await wait(5);
+  rail.focus(activityProbe);
+  expect(rail.activityAt(activityProbe) > 5000, 'focusing a session should update recent activity');
+  rail.focus(holder);
+  rail.setActivity(activityProbe, 6000);
+  await wait(5);
+  rail.submit(activityProbe, 'terminal prompt\\r');
+  const terminalSubmittedAt = rail.activityAt(activityProbe);
+  expect(terminalSubmittedAt > 6000, 'submitted terminal input should update recent activity');
+  rail.setActivity(activityProbe, 7000);
+  await wait(5);
+  expect(await rail.submitComposer(activityProbe, 'composer prompt'), 'composer fixture should submit');
+  expect(rail.activityAt(activityProbe) > 7000, 'submitted composer input should update recent activity');
+  rail.setActivity(activityProbe, 8000);
+  await wait(5);
+  rail.emit(activityProbe, 'turn-end');
+  const transitionedAt = rail.activityAt(activityProbe);
+  expect(transitionedAt > 8000, 'an actual turn-state transition should update recent activity');
+  rail.emit(activityProbe, 'turn-end');
+  expect(rail.activityAt(activityProbe) === transitionedAt, 'a duplicate turn signal must not change recent activity');
+  rail.close(activityProbe);
+
   await rail.write(web, Array.from({ length: 340 }, (_, index) => 'older line ' + index + '\\r\\n').join('')
     + '\\x1b[31mRECENT RED\\x1b[0m\\r\\ninitial output');
   rail.sourceScroll(web, -9);
@@ -177,6 +235,15 @@ fs.writeFileSync(e2ePath, `
   expect(apiCard && apiCard.reasons.map((reason) => reason.kind).join(',') === 'PERMISSION,QUEUE 1',
     'one attentive thread should aggregate simultaneous reasons in priority order');
   expect(rail.attentionCount() === 3, 'badge should continue to count individual reasons, not attentive sessions');
+  const attentionOrder = rail.groups().find((group) => group.key === 'attention:needs').rows.map((row) => row.id);
+  rail.selectThreadSort('az');
+  expect(rail.groups().find((group) => group.key === 'attention:needs').rows.map((row) => row.id).join(',')
+    === attentionOrder.join(','),
+  'A–Z must leave Needs Attention urgency ordering unchanged');
+  rail.selectThreadSort('recent');
+  expect(rail.groups().find((group) => group.key === 'attention:needs').rows.map((row) => row.id).join(',')
+    === attentionOrder.join(','),
+  'Recent must leave Needs Attention urgency ordering unchanged');
   const initialAttentionGeometry = rail.attentionGeometry();
   expect(initialAttentionGeometry.cards.length >= 2 && initialAttentionGeometry.gaps.every((gap) => gap >= 5.9),
     'Needs Attention cards should have at least 6px of visual separation');
@@ -197,11 +264,20 @@ fs.writeFileSync(e2ePath, `
   rail.emit(webTwo, 'turn-start');
   const worker = rail.addSession({ name: 'api-worker', agent: 'claude', cwd: ${JSON.stringify(looseDir)} });
   rail.emit(worker, 'turn-start');
+  rail.setActivity(webTwo, 3000);
+  rail.setActivity(worker, 2000);
   let workingGroup = rail.groups().find((group) => group.key === 'status:working');
   expect(workingGroup && workingGroup.label === 'WORKING' && workingGroup.open && workingGroup.count === 2,
     'Threads should pin every actively working session in an expanded Working section');
   expect(workingGroup.rows.map((row) => row.id).sort().join(',') === [webTwo, worker].sort().join(','),
     'Working section membership should include all and only sessions with an agent turn in progress');
+  expect(workingGroup.rows.map((row) => row.id).join(',') === [webTwo, worker].join(','),
+    'Recent should order Working rows newest first');
+  rail.selectThreadSort('az');
+  workingGroup = rail.groups().find((group) => group.key === 'status:working');
+  expect(workingGroup.rows.map((row) => row.id).join(',') === [worker, webTwo].join(','),
+    'A–Z should alphabetize Working rows by session display label');
+  rail.selectThreadSort('recent');
   expect(!rail.groups().filter((group) => group.key.startsWith('cwd:')).flatMap((group) => group.rows)
     .some((row) => row.id === webTwo || row.id === worker),
   'working sessions should be deduplicated from working-directory groups');
@@ -331,6 +407,7 @@ fs.writeFileSync(e2ePath, `
   expect(!rail.preview(), 'inline attention action double-clicks should not open a row preview');
 
   rail.select('git');
+  expect(rail.threadSortControl().hidden, 'Git mode should hide the Threads sorting control');
   await rail.waitForGit();
   expect(rail.heading() === 'GIT CHANGES', 'Git should identify itself as a change tracker');
   expect(await rail.resolveGitRoot('relative/path') === null, 'gitRoot should reject relative cwd values');
@@ -348,6 +425,7 @@ fs.writeFileSync(e2ePath, `
 
   const themes = window.chromuxTestThemes;
   rail.select('threads');
+  expect(!rail.threadSortControl().hidden, 'Threads mode should restore the sorting control');
   rail.focus(holder);
   for (const theme of themes.ids()) {
     themes.select(theme);

@@ -64,7 +64,11 @@ browser previews, or unseen background completions. Each session appears once, w
 actions together, and returns to its directory group as soon as the last reason clears. Managed
 **Chromux Update** status appears in a pinned system row above Needs Attention. Opening or dismissing a
 completion consumes it to a quiet Idle state, while completions already visible in the active session become
-Idle immediately. Click an inactive Threads row to inspect a live, read-only terminal preview without
+Idle immediately. The Threads header defaults to **Recent**, ordering Working sessions and working-directory
+groups by deliberate activity (focus, submitted input, or turn-state changes); **A–Z** alphabetizes group and
+session display labels instead. The validated choice stays in renderer local storage, does not affect Needs
+Attention urgency, and is hidden in Git Changes. Streaming terminal output does not reorder rows. Click an
+inactive Threads row to inspect a live, read-only terminal preview without
 changing sessions; click anywhere in the preview (or press Enter/Space) to open that session, and press
 Escape or click outside to close it. Clicking the already-active Threads row confirms the connection with
 a linked row-to-terminal highlight. Choose **Settings → Thread Preview Size → Compact, Comfortable, or
@@ -178,7 +182,7 @@ See [`docs/troubleshooting.md`](docs/troubleshooting.md) for the full support gu
 | --- | --- |
 | Capture payloads + screenshots | `~/.chromux/captures/<timestamp>/` |
 | Delivery log | `~/.chromux/delivery-log.jsonl` |
-| Restore snapshot | `~/.chromux/restore-sessions.json` (schema v6; includes validated provider conversation IDs, ordered browser page/explorer tabs, optional 64 KiB composer drafts, and up to 20 bounded historical Needs Attention records per session) |
+| Restore snapshot | `~/.chromux/restore-sessions.json` (schema v7; includes validated provider conversation IDs, last deliberate activity, ordered browser page/explorer tabs, optional 64 KiB composer drafts, and up to 20 bounded historical Needs Attention records per session) |
 | Prompt history | `~/.chromux/prompt-history.json` (local plaintext, mode `0600`, 100 entries/project, 5 MiB total) |
 | Saved projects | `~/.chromux/projects.json` |
 | Update cache/source/install log | `~/.chromux/update-cache.json`, `~/.chromux/update-source.json`, `~/.chromux/update-install.log` |

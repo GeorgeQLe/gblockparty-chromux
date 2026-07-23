@@ -57,6 +57,35 @@ fs.writeFileSync(e2ePath, `
   const legacy = await window.chromux.getRestoreSnapshot();
   expect(legacy.schemaVersion === 2 && legacy.sessions[0].resumeId === null,
     'schema v2 snapshot must remain readable');
+  expect(legacy.sessions[0].lastActivityAt === '1970-01-01T00:00:00.000Z',
+    'legacy snapshots without savedAt should share the epoch fallback for alphabetical ties');
+
+  const legacySavedAt = '2026-07-21T10:11:12.000Z';
+  for (let schemaVersion = 1; schemaVersion <= 6; schemaVersion += 1) {
+    const compatible = await window.chromuxTest.restorePayload({
+      schemaVersion,
+      savedAt: legacySavedAt,
+      sessions: [{ name: 'legacy-' + schemaVersion, cwd: ${JSON.stringify(shared)}, agent: 'claude',
+        lastActivityAt: '2099-01-01T00:00:00.000Z' }],
+    });
+    expect(compatible.schemaVersion === schemaVersion
+      && compatible.sessions[0].lastActivityAt === legacySavedAt,
+    'schema v' + schemaVersion + ' should use snapshot savedAt instead of an unsupported session activity field');
+  }
+
+  const schemaSeven = await window.chromuxTest.restorePayload({
+    schemaVersion: 7,
+    savedAt: legacySavedAt,
+    sessions: [
+      { name: 'valid-activity', cwd: ${JSON.stringify(shared)}, agent: 'claude',
+        lastActivityAt: '2026-07-22T12:34:56Z' },
+      { name: 'bad-activity', cwd: ${JSON.stringify(shared)}, agent: 'claude', lastActivityAt: 'not-a-time' },
+    ],
+  });
+  expect(schemaSeven.sessions[0].lastActivityAt === '2026-07-22T12:34:56.000Z',
+    'schema v7 should normalize valid session activity timestamps');
+  expect(schemaSeven.sessions[1].lastActivityAt === legacySavedAt,
+    'schema v7 should replace malformed session activity timestamps with snapshot savedAt');
 
   const exact = await window.chromux.resolveRestoreSessions({ sessions: [
     { name: 'tab-a', cwd: ${JSON.stringify(shared)}, agent: 'claude', resumeId: ${JSON.stringify(ids.exactA)} },
@@ -107,6 +136,7 @@ fs.writeFileSync(e2ePath, `
 
   const saved = await window.chromux.saveRestoreSnapshot({ reason: 'manual', sessions: [
     { name: 'valid', cwd: ${JSON.stringify(shared)}, agent: 'claude', resumeId: ${JSON.stringify(ids.exactB)}, composerDraft: 'saved draft',
+      lastActivityAt: '2026-07-23T01:02:03.000Z',
       browserTabs: [
         { id: 'page-a', type: 'page', url: 'https://example.com/a', title: 'A' },
         { id: 'explorer-a', type: 'explorer', path: 'docs', query: 'guide' },
@@ -124,7 +154,10 @@ fs.writeFileSync(e2ePath, `
         { id: 'bad-time:1', type: 'delivery', detail: 'no', occurredAt: 0 },
       ] },
   ] });
-  expect(saved.schemaVersion === 6, 'new snapshot must use schema v6');
+  expect(saved.schemaVersion === 7, 'new snapshot must use schema v7');
+  expect(saved.sessions[0].lastActivityAt === '2026-07-23T01:02:03.000Z'
+    && typeof saved.sessions[1].lastActivityAt === 'string',
+  'schema v7 should round-trip valid activity and provide a valid fallback for malformed or absent activity');
   expect(saved.sessions[0].resumeId === ${JSON.stringify(ids.exactB)}, 'valid resumeId not persisted');
   expect(saved.sessions[1].resumeId === null, 'malformed resumeId persisted');
   expect(saved.sessions[0].composerDraft === 'saved draft', 'bounded composer draft not persisted');

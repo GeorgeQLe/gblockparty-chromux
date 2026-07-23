@@ -198,6 +198,21 @@ body {
   justify-content: space-between;
   padding: 12px 12px 10px;
 }
+.thread-sort-toggle {
+  flex: none;
+  min-width: 46px;
+  height: 22px;
+  padding: 0 5px;
+  border: 1px solid var(--line);
+  background: var(--bg0);
+  color: var(--dim);
+  font: 700 8px/20px var(--font-display);
+  letter-spacing: .08em;
+  cursor: pointer;
+}
+.thread-sort-toggle:hover { color: var(--text); border-color: var(--line-hi); }
+.thread-sort-toggle:focus-visible { outline: 2px solid var(--cyan); outline-offset: 1px; }
+.thread-sort-toggle.hidden { display: none; }
 
 #thread-list {
   flex: 1;

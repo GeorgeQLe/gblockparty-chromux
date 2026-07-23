@@ -10,6 +10,7 @@ const THEME_STORAGE_KEY = 'chromux.theme';
 const THEME_MODE_STORAGE_KEY = 'chromux.themeMode';
 const TAB_ACTIVITY_STORAGE_KEY = 'chromux.tabActivityIndicators';
 const RAIL_MODE_STORAGE_KEY = 'chromux.railMode';
+const THREAD_SORT_STORAGE_KEY = 'chromux.threadSort';
 const THREAD_PREVIEW_SIZE_STORAGE_KEY = 'chromux.threadPreviewSize';
 const THEME_IDS = new Set(['blueprint', 'retro-os', 'streak', 'liquid-glass']);
 const THEME_MODE_IDS = new Set(['light', 'dark']);
@@ -20,6 +21,7 @@ const THEME_LABELS = {
   'liquid-glass': 'Liquid Glass',
 };
 const RAIL_MODES = new Set(['threads', 'git']);
+const THREAD_SORT_MODES = new Set(['recent', 'az']);
 const THREAD_PREVIEW_SIZES = new Set(['compact', 'comfortable', 'large']);
 const RESTORE_ATTENTION_TYPES = new Set([
   'permission', 'authentication', 'input', 'rateLimited', 'toolFailed', 'delivery', 'completed',
@@ -58,6 +60,15 @@ function storedRailMode() {
   } catch { return 'threads'; }
 }
 
+function storedThreadSort() {
+  try {
+    const value = window.localStorage.getItem(THREAD_SORT_STORAGE_KEY);
+    const normalized = THREAD_SORT_MODES.has(value) ? value : 'recent';
+    if (value !== normalized) window.localStorage.setItem(THREAD_SORT_STORAGE_KEY, normalized);
+    return normalized;
+  } catch { return 'recent'; }
+}
+
 function storedThreadPreviewSize() {
   try {
     const value = window.localStorage.getItem(THREAD_PREVIEW_SIZE_STORAGE_KEY);
@@ -83,6 +94,7 @@ const state = {
     windowButtonPosition: null,
     tabActivityIndicators: storedTabActivityIndicators(),
     railMode: storedRailMode(),
+    threadSort: storedThreadSort(),
     threadPreviewSize: storedThreadPreviewSize(),
     gitRoots: new Map(), // exact cwd -> { value: string|null|undefined, promise }
     gitDiffs: new Map(), // repository root -> { value: summary|null|undefined, promise }
@@ -1092,9 +1104,11 @@ function apply(event) {
   switch (event.type) {
     case 'turn-signal':
       if (session) {
+        const previousTurnState = session.turn.state;
         tabStateChanged = window.chromuxAttention.applyTurnSignal(
           session.turn, event.signal, event.detail, Date.now(), event.envelope || null,
         );
+        if (session.turn.state !== previousTurnState) session.lastActivityAt = Date.now();
         if (tabStateChanged && session.id === state.activeId && session.turn.state === 'completed') {
           session.turn.attentionSeenAt = Math.max(session.turn.attentionSeenAt || 0, session.turn.since || 0);
           window.chromuxAttention.consumeCompletedTurn(session.turn, Date.now());
@@ -1103,11 +1117,18 @@ function apply(event) {
       break;
     case 'user-input':
       // Only state-changing input is worth ring space — raw typing is noise.
-      recorded = true;
       const submittedLine = session ? trackTypedPreviewSuppressions(session, event.data) : '';
-      if (!session || !window.chromuxAttention.applyUserInputTurnTransition(
+      if (!session) return;
+      const submitted = /[\r\n]/.test(String(event.data || ''));
+      if (submitted) session.lastActivityAt = Date.now();
+      const inputTurnChanged = window.chromuxAttention.applyUserInputTurnTransition(
         session, event.data, Date.now(), submittedLine,
-      )) return;
+      );
+      if (!inputTurnChanged) {
+        if (submitted) invalidate('attention');
+        return;
+      }
+      recorded = true;
       tabStateChanged = true;
       recordEvent({ type: 'user-input', sessionId: session.id, turnState: session.turn.state });
       break;
@@ -1121,6 +1142,7 @@ function apply(event) {
       break;
     case 'session-focused':
       state.activeId = event.sessionId;
+      if (session && event.recordActivity !== false) session.lastActivityAt = Date.now();
       if (session && event.consumeRestoredCompletion !== false) {
         session.restoredAttentionRecords = session.restoredAttentionRecords
           .filter((record) => record.type !== 'completed');
@@ -1140,6 +1162,7 @@ function apply(event) {
     case 'attention-dismissed':
       if (session && session.turn.state === 'completed') {
         tabStateChanged = window.chromuxAttention.consumeCompletedTurn(session.turn, Date.now());
+        if (tabStateChanged) session.lastActivityAt = Date.now();
       } else if (session) {
         session.turn.acknowledged = true;
       }
@@ -1290,7 +1313,7 @@ function newSessionShape({ id, name, cwd, agent }) {
     '': { turnStarted: 'unavailable', inputRequired: 'unavailable', permissionRequired: 'unavailable', authenticationRequired: 'unavailable', rateLimited: 'unavailable', toolFailed: 'unavailable', turnCompleted: 'unavailable' },
   }[agent];
   return {
-    id, name, cwd, agent, resumeId: null,
+    id, name, cwd, agent, resumeId: null, lastActivityAt: Date.now(),
     restoredAttentionRecords: [], // historical snapshot records; separate from live turn/capture state
     capabilities,
     lifecycle: { alive: true, exitCode: null, exitedAt: null, resumeLaunch: null },
@@ -4268,6 +4291,19 @@ function syncThreadSessionPresentation(session) {
   syncThreadPreviewPresentation(session);
 }
 
+function reorderMountedThreadRows() {
+  if (state.ui.railMode !== 'threads') return;
+  document.querySelectorAll('#thread-list .rail-group:not(.attention-thread-group) > .rail-group-rows')
+    .forEach((rows) => {
+      const mounted = [...rows.children].filter((row) => row.classList.contains('rail-session-row'));
+      const sessions = mounted.map((row) => state.sessions.get(row.dataset.sessionId)).filter(Boolean);
+      for (const session of sortThreadSessions(sessions)) {
+        const row = mounted.find((candidate) => candidate.dataset.sessionId === session.id);
+        if (row) rows.appendChild(row);
+      }
+    });
+}
+
 function appendThreadSessionRow(host, session, { attention = null } = {}) {
   const row = document.createElement('button');
   row.className = 'rail-session-row';
@@ -4343,8 +4379,8 @@ function appendNeedsAttentionGroup(host, sessionRows) {
 }
 
 function workingSessionRows() {
-  return orderedSessions().filter((session) => session.lifecycle && session.lifecycle.alive
-    && session.turn && session.turn.state === 'working');
+  return sortThreadSessions(orderedSessions().filter((session) => session.lifecycle && session.lifecycle.alive
+    && session.turn && session.turn.state === 'working'));
 }
 
 function appendWorkingSessionsGroup(host, sessions) {
@@ -4391,6 +4427,15 @@ function renderRailNavigation(attentionCount) {
   const mode = RAIL_MODES.has(state.ui.railMode) ? state.ui.railMode : 'threads';
   const heading = $('#rail-heading');
   if (heading) heading.textContent = mode === 'git' ? 'GIT CHANGES' : mode.toUpperCase();
+  const sortToggle = $('#thread-sort-toggle');
+  if (sortToggle) {
+    const recent = state.ui.threadSort === 'recent';
+    sortToggle.textContent = recent ? 'RECENT' : 'A–Z';
+    sortToggle.classList.toggle('hidden', mode !== 'threads');
+    sortToggle.setAttribute('aria-label', `Thread order: ${recent ? 'Recent' : 'A–Z'}`);
+    sortToggle.title = recent ? 'Sort threads A–Z' : 'Sort threads by recent activity';
+    sortToggle.setAttribute('aria-pressed', String(!recent));
+  }
   const count = $('#rail-thread-count');
   if (count) {
     count.textContent = String(attentionCount);
@@ -4415,9 +4460,39 @@ function selectRailMode(mode, { persist = true } = {}) {
   return mode;
 }
 
+function selectThreadSort(mode, { persist = true } = {}) {
+  const next = THREAD_SORT_MODES.has(mode) ? mode : 'recent';
+  state.ui.threadSort = next;
+  if (persist) {
+    try { window.localStorage.setItem(THREAD_SORT_STORAGE_KEY, next); } catch { /* unavailable */ }
+  }
+  invalidate('attention');
+  return next;
+}
+
 function directoryBasename(directory) {
   const clean = String(directory || '~').replace(/\/+$/, '');
   return clean.split('/').filter(Boolean).pop() || clean || '/';
+}
+
+function compareThreadText(a, b) {
+  return String(a || '').localeCompare(String(b || ''), undefined, { sensitivity: 'base' });
+}
+
+function compareSessionTieBreakers(a, b) {
+  return compareThreadText(sessionDisplayLabel(a), sessionDisplayLabel(b))
+    || compareThreadText(a.cwd, b.cwd)
+    || compareThreadText(a.id, b.id);
+}
+
+function sessionActivityAt(session) {
+  return Number.isFinite(session && session.lastActivityAt) ? session.lastActivityAt : 0;
+}
+
+function sortThreadSessions(sessions) {
+  return [...sessions].sort((a, b) => (state.ui.threadSort === 'recent'
+    ? sessionActivityAt(b) - sessionActivityAt(a)
+    : 0) || compareSessionTieBreakers(a, b));
 }
 
 function sessionRailStatus(session) {
@@ -4537,8 +4612,21 @@ function groupedRailSessions(mode, excludedSessionIds = new Set()) {
     else if (entry.value === null) add('git:none', 'Not a Git repository', 'Sessions outside a Git repository', session, 2);
     else add(`git:${entry.value}`, directoryBasename(entry.value), entry.value, session, 0);
   }
+  if (mode === 'threads') {
+    for (const group of groups.values()) {
+      group.sessions = sortThreadSessions(group.sessions);
+      group.newestActivityAt = Math.max(0, ...group.sessions.map(sessionActivityAt));
+    }
+    return [...groups.values()].sort((a, b) => (state.ui.threadSort === 'recent'
+      ? b.newestActivityAt - a.newestActivityAt
+      : 0)
+      || (state.ui.threadSort === 'recent' ? compareSessionTieBreakers(a.sessions[0], b.sessions[0]) : 0)
+      || compareThreadText(a.label, b.label)
+      || compareThreadText(a.title, b.title)
+      || compareThreadText(a.key, b.key));
+  }
   return [...groups.values()].sort((a, b) => (a.order - b.order)
-    || (a.key === 'git:none' ? 1 : b.key === 'git:none' ? -1 : a.label.localeCompare(b.label)));
+    || (a.key === 'git:none' ? 1 : b.key === 'git:none' ? -1 : compareThreadText(a.label, b.label)));
 }
 
 function renderGroupedSessionRail(host, mode, excludedSessionIds = new Set()) {
@@ -5099,10 +5187,13 @@ async function createSession(options) {
 async function createSessionNow({
   name, cwd, agent, initialUrl = null, initialBrowserTabs = [], initialActiveBrowserTabId = null,
   initialQueue = [], initialAttentionRecords = [], command = undefined, resumeLaunch = null, composerDraft = '',
+  initialLastActivityAt = null,
 }) {
   state.counter += 1;
   const id = 's' + state.counter;
   const session = newSessionShape({ id, name, cwd, agent });
+  const restoredActivityAt = Date.parse(initialLastActivityAt || '');
+  if (Number.isFinite(restoredActivityAt)) session.lastActivityAt = restoredActivityAt;
   session.composer.draft = utf8WithinLimit(composerDraft) ? String(composerDraft || '') : '';
   if (resumeLaunch) {
     session.lifecycle.resumeLaunch = {
@@ -5198,7 +5289,10 @@ async function createSessionNow({
   renderQueue(session);
   if (session.browser.activeTabId) activateBrowserTab(session, session.browser.activeTabId);
   else if (initialUrl) openInPane(session, initialUrl);
-  activateSession(id, { consumeRestoredCompletion: false });
+  activateSession(id, {
+    consumeRestoredCompletion: false,
+    recordActivity: !Number.isFinite(restoredActivityAt),
+  });
   session.restoredAttentionRecords = Array.isArray(initialAttentionRecords)
     ? initialAttentionRecords.filter((record) => record && RESTORE_ATTENTION_TYPES.has(record.type))
       .slice(0, MAX_RESTORE_ATTENTION_RECORDS).map((record) => ({ ...record }))
@@ -5229,10 +5323,10 @@ function revealFocusedSessionTab(id) {
   }
 }
 
-function activateSession(id, { consumeRestoredCompletion = true } = {}) {
+function activateSession(id, { consumeRestoredCompletion = true, recordActivity = true } = {}) {
   dismissThreadPreview();
   if (!state.ui.diagnosticSessionId || !state.sessions.has(state.ui.diagnosticSessionId)) state.ui.diagnosticSessionId = id;
-  apply({ type: 'session-focused', sessionId: id, consumeRestoredCompletion });
+  apply({ type: 'session-focused', sessionId: id, consumeRestoredCompletion, recordActivity });
   for (const s of state.sessions.values()) {
     const active = s.id === id;
     s.els.view.classList.toggle('offstage', !active);
@@ -5488,6 +5582,7 @@ function snapshotOpenSessions() {
       ? { attentionRecords: attentionBySession.get(session.id) }
       : {}),
     ...(session.composer.draft ? { composerDraft: session.composer.draft } : {}),
+    lastActivityAt: new Date(sessionActivityAt(session)).toISOString(),
     savedAt: new Date().toISOString(),
   }));
   const heldCodex = state.codexUpdate.queue
@@ -5506,6 +5601,8 @@ function snapshotOpenSessions() {
         ? { attentionRecords: options.initialAttentionRecords }
         : {}),
       ...(options.composerDraft ? { composerDraft: options.composerDraft } : {}),
+      lastActivityAt: new Date(Number.isFinite(Date.parse(options.initialLastActivityAt || ''))
+        ? Date.parse(options.initialLastActivityAt) : Date.now()).toISOString(),
       savedAt: new Date().toISOString(),
     }));
   return [...open, ...heldCodex];
@@ -5767,6 +5864,7 @@ function applyTerminalTitleUpdates(session, data) {
   if (!latest || latest === session.term.title) return;
   session.term.title = latest;
   syncThreadSessionPresentation(session);
+  reorderMountedThreadRows();
   invalidate('tabs', ...(state.env && state.env.devMode ? ['diagnostics'] : []));
 }
 
@@ -5786,6 +5884,7 @@ function recoverCodexCompletionFromRenderedTerminal(session, expectedGeneration)
   if (!session || session.turn.generation !== expectedGeneration) return false;
   const rendered = renderedTerminalCursorContext(session && session.term && session.term.term);
   if (!rendered || !window.chromuxAttention.applyCodexRenderedCompletionFallback(session, rendered, Date.now())) return false;
+  session.lastActivityAt = Date.now();
   if (session.id === state.activeId) {
     session.turn.attentionSeenAt = Math.max(session.turn.attentionSeenAt || 0, session.turn.since || 0);
     window.chromuxAttention.consumeCompletedTurn(session.turn, Date.now());
@@ -6071,6 +6170,7 @@ async function openRestoredSession(row) {
     initialActiveBrowserTabId: resolved.activeBrowserTabId || row.activeBrowserTabId || null,
     initialQueue: resolved.queue || [],
     composerDraft: resolved.composerDraft || '',
+    initialLastActivityAt: resolved.lastActivityAt || row.lastActivityAt || state.restoreSessions?.savedAt || null,
     command,
     resumeLaunch: resumeLaunchForRow(resolved, {
       name,
@@ -6520,6 +6620,7 @@ async function autoRestoreWorkspace() {
         initialQueue: row.queue || [],
         initialAttentionRecords: row.attentionRecords || [],
         composerDraft: row.composerDraft || '',
+        initialLastActivityAt: row.lastActivityAt || snapshot.savedAt || null,
         command,
         resumeLaunch: resumeLaunchForRow(row, {
           name,
@@ -6600,6 +6701,9 @@ $('#session-search-results').addEventListener('keydown', (event) => {
 $('#btn-first-session').onclick = openNewSessionModal;
 document.querySelectorAll('[data-rail-mode]').forEach((button) => {
   button.addEventListener('click', () => selectRailMode(button.dataset.railMode));
+});
+$('#thread-sort-toggle').addEventListener('click', () => {
+  selectThreadSort(state.ui.threadSort === 'recent' ? 'az' : 'recent');
 });
 $('#btn-detect').onclick = openDetectModal;
 $('#btn-first-detect').onclick = openDetectModal;
@@ -7112,7 +7216,10 @@ if (window.chromuxTest) {
     return session.id;
   };
 
-  const addRenderableTestSession = ({ name = 'tab-test', agent = 'codex', cwd = '/tmp', turnState = 'unknown', alive = true, realTerminal = false, cols = 64, rows = 16, composerDraft = '' } = {}) => {
+  const addRenderableTestSession = ({
+    name = 'tab-test', agent = 'codex', cwd = '/tmp', turnState = 'unknown', alive = true,
+    realTerminal = false, cols = 64, rows = 16, composerDraft = '', lastActivityAt = null,
+  } = {}) => {
     state.counter += 1;
     const session = newSessionShape({ id: 's' + state.counter, name, cwd, agent });
     session.turn.state = turnState;
@@ -7141,6 +7248,7 @@ if (window.chromuxTest) {
     apply({ type: 'session-created', sessionId: session.id, name, cwd, agent });
     renderQueue(session);
     activateSession(session.id);
+    if (Number.isFinite(lastActivityAt)) session.lastActivityAt = lastActivityAt;
     flushRender();
     return session.id;
   };
@@ -7344,6 +7452,15 @@ if (window.chromuxTest) {
     addTerminalSession: (options = {}) => addRenderableTestSession({ ...options, realTerminal: true }),
     focus(id) { activateSession(id); flushRender(); },
     emit(id, event, detail = null) { apply({ type: 'turn-signal', sessionId: id, signal: event, detail }); flushRender(); },
+    submit(id, data = 'prompt\r') { handleTerminalInput(testSession(id), data); flushRender(); },
+    async submitComposer(id, text = 'composed prompt') {
+      const session = testSession(id);
+      setComposerDraft(session, text);
+      const result = await submitComposer(session);
+      flushRender();
+      return result;
+    },
+    ptyOutput(id, data = 'streaming output') { handlePtyData(id, data); flushRender(); },
     exit(id, exitCode = 0) { apply({ type: 'session-exited', sessionId: id, exitCode }); flushRender(); },
     title(id, value) { handlePtyData(id, `\x1b]0;${value}\x07`); flushRender(); },
     mode: () => state.ui.railMode,
@@ -7360,6 +7477,38 @@ if (window.chromuxTest) {
       const button = document.querySelector(`[data-rail-mode="${mode}"]`);
       if (!button) throw new Error(`Unknown rail mode: ${mode}`);
       button.click(); flushRender(); return state.ui.railMode;
+    },
+    threadSort: () => state.ui.threadSort,
+    storedThreadSort: () => {
+      try { return window.localStorage.getItem(THREAD_SORT_STORAGE_KEY); } catch { return null; }
+    },
+    migrateThreadSort(value) {
+      if (value === null) window.localStorage.removeItem(THREAD_SORT_STORAGE_KEY);
+      else window.localStorage.setItem(THREAD_SORT_STORAGE_KEY, value);
+      const mode = storedThreadSort();
+      state.ui.threadSort = mode;
+      invalidate('attention');
+      flushRender();
+      return { mode, stored: window.localStorage.getItem(THREAD_SORT_STORAGE_KEY) };
+    },
+    selectThreadSort(mode) { selectThreadSort(mode); flushRender(); return state.ui.threadSort; },
+    threadSortControl: () => {
+      const button = $('#thread-sort-toggle');
+      return {
+        text: button?.textContent || '',
+        hidden: Boolean(button?.classList.contains('hidden')),
+        label: button?.getAttribute('aria-label') || '',
+        title: button?.title || '',
+        pressed: button?.getAttribute('aria-pressed') || '',
+        focused: document.activeElement === button,
+      };
+    },
+    focusThreadSortControl() { $('#thread-sort-toggle')?.focus(); },
+    activityAt: (id) => testSession(id).lastActivityAt,
+    setActivity(id, value) {
+      testSession(id).lastActivityAt = Number(value);
+      invalidate('attention');
+      flushRender();
     },
     heading: () => $('#rail-heading')?.textContent || '',
     attentionCount: () => Number($('#rail-thread-count')?.textContent || 0),

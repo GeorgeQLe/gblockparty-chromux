@@ -779,6 +779,13 @@ function grokCommand(resumeId = null) {
   return resumeId ? `grok --resume ${shellQuote(resumeId)}` : 'grok';
 }
 
+function normalizedActivityTimestamp(value, fallback = null) {
+  const parsed = typeof value === 'string' ? Date.parse(value) : NaN;
+  if (Number.isFinite(parsed)) return new Date(parsed).toISOString();
+  const fallbackParsed = typeof fallback === 'string' ? Date.parse(fallback) : NaN;
+  return Number.isFinite(fallbackParsed) ? new Date(fallbackParsed).toISOString() : null;
+}
+
 function sanitizeRestoreSession(session) {
   if (!session || typeof session !== 'object') return null;
   const cwd = typeof session.cwd === 'string' && session.cwd ? session.cwd : os.homedir();
@@ -863,6 +870,9 @@ function sanitizeRestoreSession(session) {
     browserTabs,
     activeBrowserTabId,
     queue,
+    ...(normalizedActivityTimestamp(session.lastActivityAt)
+      ? { lastActivityAt: normalizedActivityTimestamp(session.lastActivityAt) }
+      : {}),
     savedAt: typeof session.savedAt === 'string' ? session.savedAt : new Date().toISOString(),
     opened: Boolean(session.opened),
     restoredAt: typeof session.restoredAt === 'string' ? session.restoredAt : null,
@@ -873,12 +883,17 @@ function sanitizeRestoreSession(session) {
 
 function writeRestoreSnapshot({ sessions, reason = 'manual', restoreId = null, savedAt = null, consumed = false, consumedAt = null }) {
   ensureDirs();
-  const clean = Array.isArray(sessions) ? sessions.map(sanitizeRestoreSession).filter(Boolean) : [];
+  const snapshotSavedAt = normalizedActivityTimestamp(savedAt) || new Date().toISOString();
+  const clean = Array.isArray(sessions) ? sessions.map(sanitizeRestoreSession).filter(Boolean)
+    .map((session) => ({
+      ...session,
+      lastActivityAt: normalizedActivityTimestamp(session.lastActivityAt, snapshotSavedAt),
+    })) : [];
   const payload = {
-    schemaVersion: 6,
+    schemaVersion: 7,
     restoreId: restoreId || `restore-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     reason,
-    savedAt: savedAt || new Date().toISOString(),
+    savedAt: snapshotSavedAt,
     consumed: Boolean(consumed),
     consumedAt: consumedAt || null,
     sessions: clean,
@@ -890,14 +905,23 @@ function writeRestoreSnapshot({ sessions, reason = 'manual', restoreId = null, s
 function readRestoreSnapshot() {
   const payload = readJson(RESTORE_SESSIONS);
   if (!payload || !Array.isArray(payload.sessions)) return null;
+  const schemaVersion = Number.isSafeInteger(payload.schemaVersion) && payload.schemaVersion > 0
+    ? payload.schemaVersion : 1;
+  const snapshotSavedAt = normalizedActivityTimestamp(payload.savedAt) || new Date(0).toISOString();
   return {
-    schemaVersion: payload.schemaVersion || 1,
+    schemaVersion,
     restoreId: payload.restoreId || `legacy-${payload.savedAt || 'unknown'}`,
     reason: payload.reason || 'unknown',
-    savedAt: payload.savedAt || null,
+    savedAt: snapshotSavedAt,
     consumed: Boolean(payload.consumed),
     consumedAt: payload.consumedAt || null,
-    sessions: payload.sessions.map(sanitizeRestoreSession).filter(Boolean),
+    sessions: payload.sessions.map(sanitizeRestoreSession).filter(Boolean).map((session) => ({
+      ...session,
+      lastActivityAt: normalizedActivityTimestamp(
+        schemaVersion >= 7 ? session.lastActivityAt : null,
+        snapshotSavedAt,
+      ),
+    })),
   };
 }
 
@@ -1993,6 +2017,11 @@ ipcMain.handle('save-restore-snapshot', (_e, { reason = 'manual', sessions = [] 
 ));
 
 ipcMain.handle('get-restore-snapshot', () => readRestoreSnapshot());
+if (SMOKE) ipcMain.handle('test-restore-payload', (_e, payload = {}) => {
+  ensureDirs();
+  fs.writeFileSync(RESTORE_SESSIONS, JSON.stringify(payload, null, 2) + '\n');
+  return readRestoreSnapshot();
+});
 
 ipcMain.handle('mark-restore-snapshot-consumed', (_e, { restoreId, restoredSessions = [] } = {}) => (
   markRestoreSnapshotConsumed(restoreId, restoredSessions)

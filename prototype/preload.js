@@ -93,5 +93,6 @@ if (process.env.CHROMUX_E2E) {
     shortcutRouteLog: () => ipcRenderer.invoke('test-shortcut-route-log'),
     classifyPtyAgentDescendants: (payload) => ipcRenderer.invoke('test-classify-pty-agent-descendants', payload || {}),
     clipboardReadText: () => ipcRenderer.invoke('test-clipboard-read-text'),
+    restorePayload: (payload) => ipcRenderer.invoke('test-restore-payload', payload || {}),
   });
 }

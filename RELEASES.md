@@ -1,5 +1,14 @@
 # Release Notes
 
+## GBlockParty Chromux v0.52.0
+
+Tag: `chromux-v0.52.0`
+
+- Default Threads to a persisted **Recent** order with a compact, keyboard-accessible **RECENT** / **A–Z** header toggle that stays hidden in Git Changes.
+- Track deliberate per-session activity on creation or focus, submitted terminal/composer input, and real turn-state transitions without letting streaming PTY output or duplicate signals jump rows.
+- Sort Working rows, directory groups, and contained sessions by newest activity in Recent mode; alphabetize directory and session display labels in A–Z mode with deterministic label, cwd, and session-ID tie-breakers.
+- Preserve Chromux Update and Needs Attention urgency ordering, and upgrade restore snapshots to schema v7 while keeping schemas v1-v6 readable through shared snapshot-time fallback activity.
+
 ## GBlockParty Chromux v0.51.0
 
 Tag: `chromux-v0.51.0`
