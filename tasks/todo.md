@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Keep exact Codex `/clear` submissions idle, harden rendered completion recovery with per-turn generations and a busy-render latch, and ship as v0.50.1. _(source: user-approved implementation plan; evidence: `prototype/renderer/attention.js`, `prototype/renderer/renderer.js`, `prototype/scripts/test-turn-signals-renderer.js`, focused renderer suites, `RELEASES.md`)_
+
 - [x] Add native double-click activation to every Threads session row, preserve immediate single-click previews and inline attention actions, restore terminal focus, and ship as v0.50.0. _(source: user-approved implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-session-rail-renderer.js`, focused renderer suites, packaged Electron verification, `RELEASES.md`)_
 
 - [x] Transfer the current rendered Codex prompt value into COMPOSE and every draft-conflict outcome, retain conservative shadow fallback behavior, and ship as v0.49.0. _(source: user-approved implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-composer-renderer.js`, focused renderer suites, packaged Electron verification, `RELEASES.md`)_

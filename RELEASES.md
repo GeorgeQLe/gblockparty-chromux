@@ -1,5 +1,14 @@
 # Release Notes
 
+## GBlockParty Chromux v0.50.1
+
+Tag: `chromux-v0.50.1`
+
+- Keep exact `/clear` submissions and subsequent unsubmitted typing idle instead of inferring a new Codex turn.
+- Track submitted Codex turns with a monotonic generation so a delayed terminal-render callback cannot complete newer work.
+- Require the rendered composer fallback to observe a busy post-submission render before accepting the composer's return as completion, while retaining native completion notifications as authoritative and the explicit rate-limit chooser as a conservative terminal state.
+- Project the corrected shared turn state consistently through tabs, Threads, attention, diagnostics, and update safety.
+
 ## GBlockParty Chromux v0.50.0
 
 Tag: `chromux-v0.50.0`

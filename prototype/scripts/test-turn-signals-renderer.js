@@ -153,6 +153,7 @@ fs.writeFileSync(e2ePath, `
   sig.focus(holder);
   sig.typeInput(codexSubmit, 'implement this\\r');
   expect(sig.turnState(codexSubmit).state === 'working', 'Codex submitted line from unknown should infer working');
+  expect(sig.turnState(codexSubmit).generation === 1, 'ordinary Codex submission should advance the turn generation');
   expect(itemsFor('COMPLETED', 'codex-submit').length === 0, 'Codex submitted line should not create completed attention');
   sig.feedPtyChunk(codexSubmit, 'Choose an option:\\r\\n1. Wait until the rate limit resets\\r\\n› ');
   await wait(30); sig.flushRender();
@@ -171,6 +172,27 @@ fs.writeFileSync(e2ePath, `
   expect(sig.turnState(codexSubmit).state === 'working', 'new Codex input after fallback completion returns to working');
   expect(itemsFor('COMPLETED', 'codex-submit').length === 0,
     'new Codex input clears fallback completed attention');
+
+  const codexClear = sig.addTerminalSession({ name: 'codex-clear', agent: 'codex', turnState: 'idle' });
+  sig.focus(holder);
+  const clearGeneration = sig.turnState(codexClear).generation;
+  sig.typeInput(codexClear, '   /clear   \\r');
+  expect(sig.turnState(codexClear).state === 'idle',
+    'exact whitespace-trimmed /clear should keep an idle Codex session idle');
+  expect(sig.turnState(codexClear).generation === clearGeneration,
+    '/clear must not advance or reset the existing turn generation');
+  sig.typeInput(codexClear, 'unsubmitted draft');
+  expect(sig.turnState(codexClear).state === 'idle',
+    'typing after /clear without submission should remain idle');
+
+  const clearDuringTurn = sig.addTerminalSession({ name: 'codex-clear-during-turn', agent: 'codex' });
+  sig.focus(holder);
+  sig.typeInput(clearDuringTurn, 'ordinary request\\r');
+  const activeGeneration = sig.turnState(clearDuringTurn).generation;
+  sig.typeInput(clearDuringTurn, '/clear\\r');
+  expect(sig.turnState(clearDuringTurn).state === 'working'
+    && sig.turnState(clearDuringTurn).generation === activeGeneration,
+  '/clear must not restart an existing working generation');
 
   const codexV2Recovery = sig.addTerminalSession({ name: 'codex-v2-recovery', agent: 'codex' });
   sig.focus(holder);
@@ -207,10 +229,19 @@ fs.writeFileSync(e2ePath, `
   const alternateFooter = sig.addTerminalSession({ name: 'codex-alt-footer', agent: 'codex' });
   sig.focus(holder);
   sig.typeInput(alternateFooter, 'alternate footer\\r');
+  sig.feedPtyChunk(alternateFooter, 'Working without an idle composer\\r\\n');
   sig.feedPtyChunk(alternateFooter, '\\u203a \\x1b[s\\r\\n? for shortcuts\\x1b[u');
   await wait(30); sig.flushRender();
   expect(sig.turnState(alternateFooter).state === 'completed',
     'Codex footer rendered below a saved composer cursor should recover completion');
+
+  const liveComposer = sig.addTerminalSession({ name: 'codex-live-composer', agent: 'codex' });
+  sig.focus(holder);
+  sig.typeInput(liveComposer, 'keep composer visible\\r');
+  sig.feedPtyChunk(liveComposer, '? for shortcuts\\r\\n\\u203a \\x1b[s\\r\\nRunning tests...\\x1b[u');
+  await wait(30); sig.flushRender();
+  expect(sig.turnState(liveComposer).state === 'working',
+    'a composer that remains rendered immediately after submission must not complete live work');
 
   const falseGlyph = sig.addTerminalSession({ name: 'codex-false-glyph', agent: 'codex' });
   sig.focus(holder);
@@ -223,10 +254,12 @@ fs.writeFileSync(e2ePath, `
   const staleComposer = sig.addTerminalSession({ name: 'codex-stale-composer', agent: 'codex' });
   sig.focus(holder);
   sig.typeInput(staleComposer, 'first request\\r');
+  const staleGeneration = sig.turnState(staleComposer).generation;
   sig.feedPtyChunk(staleComposer, '? for shortcuts\\r\\n\\u203a ');
   sig.typeInput(staleComposer, 'second request\\r');
   await wait(30); sig.flushRender();
-  expect(sig.turnState(staleComposer).state === 'working',
+  expect(sig.turnState(staleComposer).state === 'working'
+    && sig.turnState(staleComposer).generation === staleGeneration + 1,
     'a prior turn composer callback must not complete newly submitted input');
 
   const activeCodex = sig.addFakeSession({ name: 'codex-active', agent: 'codex' });

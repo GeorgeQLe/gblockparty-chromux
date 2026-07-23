@@ -102,16 +102,19 @@
     return true;
   }
 
-  function applyUserInputTurnTransition(session, input, now) {
+  function applyUserInputTurnTransition(session, input, now, submittedLine = '') {
     const turn = session && session.turn;
     if (!turn) return false;
     const submitted = /[\r\n]/.test(input || '');
     if (!submitted) return false;
+    if (session.agent === 'codex' && String(submittedLine || '').trim() === '/clear') return false;
     if (['idle', 'needsInput', 'permission', 'authentication', 'rateLimited', 'toolFailed', 'completed'].includes(turn.state)) {
       turn.state = 'working';
       turn.detail = null;
       turn.since = now;
       turn.acknowledged = false;
+      turn.generation = (Number(turn.generation) || 0) + 1;
+      turn.sawBusyRender = false;
       resetTurnProtocol(turn, now);
       return true;
     }
@@ -120,6 +123,8 @@
       turn.detail = null;
       turn.since = now;
       turn.acknowledged = false;
+      turn.generation = (Number(turn.generation) || 0) + 1;
+      turn.sawBusyRender = false;
       resetTurnProtocol(turn, now);
       return true;
     }
@@ -127,6 +132,8 @@
       turn.detail = null;
       turn.since = now;
       turn.acknowledged = false;
+      turn.generation = (Number(turn.generation) || 0) + 1;
+      turn.sawBusyRender = false;
       resetTurnProtocol(turn, now);
       return true;
     }
@@ -150,7 +157,13 @@
       ? rendered.nearbyLines.map((line) => normalizeTerminalOutput(line)) : [];
     const composerAtCursor = /^\s*[›❯]\s*$/.test(cursorLine);
     const codexChrome = nearbyLines.some((line) => /(?:\?\s+for shortcuts|\bcontext left\b|^\s*Choose an option:)/i.test(line));
-    if (!composerAtCursor || !codexChrome) return false;
+    const rateLimitChooser = nearbyLines.some((line) => /^\s*Choose an option:/i.test(line))
+      && nearbyLines.some((line) => /Wait until the rate limit resets/i.test(line));
+    if (!composerAtCursor || !codexChrome) {
+      turn.sawBusyRender = true;
+      return false;
+    }
+    if (!rateLimitChooser && !turn.sawBusyRender) return false;
     turn.state = 'completed';
     turn.detail = 'Codex turn finished';
     turn.since = Math.max(now, (Number(turn.attentionSeenAt) || 0) + 1);
@@ -158,6 +171,7 @@
     turn.protocol = 'output';
     turn.source = 'codex:terminal-idle';
     turn.confidence = 'low';
+    turn.stopped = rateLimitChooser;
     return true;
   }
 

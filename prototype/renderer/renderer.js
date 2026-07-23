@@ -844,7 +844,7 @@ function resolveCurrentTerminalPrompt(session) {
 }
 
 function trackTypedPreviewSuppressions(session, data) {
-  if (!session || !data) return;
+  if (!session || !data) return '';
   const t = session.term;
   const raw = String(data);
   if (/[\r\n]/.test(raw)) t.promptSnapshotInvalidated = true;
@@ -858,6 +858,7 @@ function trackTypedPreviewSuppressions(session, data) {
     }
     if (t.previewSuppress.length > PREVIEW_SUPPRESS_MAX) t.previewSuppress.splice(0, t.previewSuppress.length - PREVIEW_SUPPRESS_MAX);
   }
+  return submitted;
 }
 
 function consumeTypedPreviewSuppression(session, hit, line) {
@@ -1089,8 +1090,10 @@ function apply(event) {
     case 'user-input':
       // Only state-changing input is worth ring space — raw typing is noise.
       recorded = true;
-      if (session) trackTypedPreviewSuppressions(session, event.data);
-      if (!session || !window.chromuxAttention.applyUserInputTurnTransition(session, event.data, Date.now())) return;
+      const submittedLine = session ? trackTypedPreviewSuppressions(session, event.data) : '';
+      if (!session || !window.chromuxAttention.applyUserInputTurnTransition(
+        session, event.data, Date.now(), submittedLine,
+      )) return;
       tabStateChanged = true;
       recordEvent({ type: 'user-input', sessionId: session.id, turnState: session.turn.state });
       break;
@@ -1287,6 +1290,7 @@ function newSessionShape({ id, name, cwd, agent }) {
       token: null, protocol: null, authoritative: false, hasV2: false, inputAt: 0, reason: null,
       source: null, confidence: null, turnId: null, eventId: null,
       eventIds: [], sequence: -1, stopped: false, authoritativeAt: 0,
+      generation: 0, sawBusyRender: false,
     },
     browser: {
       webview: null, webContentsId: null, currentUrl: null, lastReload: 0,
@@ -5279,8 +5283,8 @@ function renderedTerminalCursorContext(term) {
   return { cursorLine, nearbyLines };
 }
 
-function recoverCodexCompletionFromRenderedTerminal(session, expectedInputAt) {
-  if (!session || session.turn.inputAt !== expectedInputAt) return false;
+function recoverCodexCompletionFromRenderedTerminal(session, expectedGeneration) {
+  if (!session || session.turn.generation !== expectedGeneration) return false;
   const rendered = renderedTerminalCursorContext(session && session.term && session.term.term);
   if (!rendered || !window.chromuxAttention.applyCodexRenderedCompletionFallback(session, rendered, Date.now())) return false;
   if (session.id === state.activeId) {
@@ -5340,8 +5344,8 @@ function handlePtyData(id, data) {
     }
   }
   if (res.clean) {
-    const recoveryInputAt = s.turn.inputAt;
-    s.term.term.write(res.clean, () => recoverCodexCompletionFromRenderedTerminal(s, recoveryInputAt));
+    const recoveryGeneration = s.turn.generation;
+    s.term.term.write(res.clean, () => recoverCodexCompletionFromRenderedTerminal(s, recoveryGeneration));
     feedDetector(s, res.clean);
   }
   if (s.agent === '' && s.lifecycle.alive) scanPtyAgentDescendants(false).catch(() => {});
