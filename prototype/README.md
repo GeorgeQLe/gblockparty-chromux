@@ -172,7 +172,7 @@ See [`docs/troubleshooting.md`](docs/troubleshooting.md) for the full support gu
 | --- | --- |
 | Capture payloads + screenshots | `~/.chromux/captures/<timestamp>/` |
 | Delivery log | `~/.chromux/delivery-log.jsonl` |
-| Restore snapshot | `~/.chromux/restore-sessions.json` (schema v4; includes validated provider conversation IDs and optional 64 KiB composer drafts) |
+| Restore snapshot | `~/.chromux/restore-sessions.json` (schema v5; includes validated provider conversation IDs, optional 64 KiB composer drafts, and up to 20 bounded historical Needs Attention records per session) |
 | Prompt history | `~/.chromux/prompt-history.json` (local plaintext, mode `0600`, 100 entries/project, 5 MiB total) |
 | Saved projects | `~/.chromux/projects.json` |
 | Update cache/source/install log | `~/.chromux/update-cache.json`, `~/.chromux/update-source.json`, `~/.chromux/update-install.log` |

@@ -316,6 +316,16 @@ fs.writeFileSync(e2ePath, `
   expect(indexOf(entryKinds, 'INPUT NEEDED') < indexOf(entryKinds, 'DELIVERY FAIL'), 'input thread should outrank delivery thread');
   expect(indexOf(entryKinds, 'DELIVERY FAIL') < indexOf(entryKinds, 'QUEUE 1'), 'delivery thread should outrank queued-preview thread');
   expect(indexOf(entryKinds, 'QUEUE 1') < indexOf(entryKinds, 'COMPLETED'), 'queued-preview thread should outrank completion-only threads');
+  const attentionSnapshots = q.snapshot();
+  const snapshotTypes = attentionSnapshots.flatMap((row) => (row.attentionRecords || []).map((record) => record.type));
+  expect(snapshotTypes.includes('input') && snapshotTypes.includes('delivery') && snapshotTypes.includes('completed'),
+    'visible session-scoped attention reasons should enter restore snapshots');
+  expect(!snapshotTypes.some((type) => type.startsWith('update')),
+    'global update rows must not enter session restore records');
+  const queueOnlySnapshot = attentionSnapshots.find((row) => row.name === 'order-queue');
+  expect(queueOnlySnapshot.queue.length === 1
+    && !(queueOnlySnapshot.attentionRecords || []).some((record) => record.type === 'queue'),
+  'browser queue attention must not be duplicated into attention records');
 
   q.setSession(orderQueue, { turnState: 'unknown' });
   kinds = q.attentionKinds();

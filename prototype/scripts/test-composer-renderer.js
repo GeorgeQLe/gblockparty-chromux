@@ -85,7 +85,7 @@ fs.writeFileSync(e2ePath, `
 
   const snapshotRows = c.snapshot();
   const saved = await window.chromux.saveRestoreSnapshot({ reason: 'manual', sessions: snapshotRows });
-  expect(saved.schemaVersion === 4, 'composer drafts should upgrade restore snapshots to schema v4');
+  expect(saved.schemaVersion === 5, 'composer drafts should remain readable in restore snapshot schema v5');
   expect(saved.sessions.find((row) => row.name === 'codex-one').composerDraft === 'first-tab-draft',
     'first draft should round-trip through main-process snapshot validation');
   const restored = c.addSession({ name: 'restored', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, composerDraft: saved.sessions[0].composerDraft });

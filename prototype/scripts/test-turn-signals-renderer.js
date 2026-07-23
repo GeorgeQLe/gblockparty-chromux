@@ -35,6 +35,50 @@ fs.writeFileSync(e2ePath, `
   // Focused session is display-excluded from unified Threads attention.
   const holder = sig.addFakeSession({ name: 'holder', agent: '' });
 
+  // Restored attention remains historical and independent from live turn state.
+  const beforeRestart = Date.now() - 5000;
+  const historical = sig.addFakeSession({ name: 'historical', agent: 'claude', attentionRecords: [
+    { id: 'attention:permission:1:turn', type: 'permission', detail: 'Allow deployment?', occurredAt: beforeRestart },
+    { id: 'attention:completed:2:turn', type: 'completed', detail: 'Earlier turn finished', occurredAt: beforeRestart + 1 },
+  ] });
+  expect(itemsFor('PERMISSION', 'historical')[0].detail === 'Before restart · Allow deployment?',
+    'restored permission should be labeled as historical');
+  expect(itemsFor('COMPLETED', 'historical').length === 1,
+    'restored completion should return under its resumed thread');
+  const historicalSnapshot = sig.snapshot().find((row) => row.name === 'historical');
+  expect(historicalSnapshot.attentionRecords.length === 2,
+    'snapshot should retain restored records while they remain outstanding');
+  expect(JSON.stringify(historicalSnapshot.attentionRecords.map((record) => record.id))
+    === JSON.stringify(sig.snapshot().find((row) => row.name === 'historical').attentionRecords.map((record) => record.id)),
+  'repeated snapshots should preserve stable attention record identifiers');
+  sig.focus(historical);
+  sig.focus(holder);
+  expect(itemsFor('COMPLETED', 'historical').length === 0,
+    'opening a resumed thread should consume its historical completion');
+  expect(itemsFor('PERMISSION', 'historical').length === 1,
+    'opening a resumed thread must not consume historical actionable records');
+  sig.emitSignal(historical, 'input-needed', 'New live question');
+  expect(itemsFor('PERMISSION', 'historical').length === 1
+    && itemsFor('INPUT NEEDED', 'historical').length === 1,
+  'new live attention should coexist with restored historical records');
+  sig.dismissItem('PERMISSION', 'historical');
+  expect(itemsFor('PERMISSION', 'historical').length === 0
+    && itemsFor('INPUT NEEDED', 'historical').length === 1,
+  'historical actionable records should clear only through explicit dismissal');
+
+  const queueOnly = sig.addFakeSession({ name: 'queue-only', agent: 'codex', queue: [
+    { url: 'http://localhost:4321', source: 'TERM', reason: 'Local preview', ts: Date.now() },
+  ] });
+  const queueSnapshot = sig.snapshot().find((row) => row.name === 'queue-only');
+  expect(queueSnapshot.queue.length === 1 && !queueSnapshot.attentionRecords,
+    'browser queues should persist only through queue storage, not attention records');
+  const boundedDetail = sig.addFakeSession({ name: 'bounded-detail', agent: 'claude' });
+  sig.emitSignal(boundedDetail, 'input-needed', '😀'.repeat(2000));
+  const boundedRecord = sig.snapshot().find((row) => row.name === 'bounded-detail').attentionRecords[0];
+  expect(new TextEncoder().encode(boundedRecord.detail).byteLength === 4096
+    && !boundedRecord.detail.endsWith('�'),
+  'live attention detail should be UTF-8 safely bounded before persistence');
+
   const secure = sig.addFakeSession({ name: 'secure', agent: 'claude' });
   sig.setSignalToken(secure, 'secret');
   const base = { v: 2, sessionId: secure, token: 'secret', agent: 'claude',

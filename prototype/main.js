@@ -39,6 +39,12 @@ const UPDATE_CACHE = path.join(CHROMUX_HOME, 'update-cache.json');
 const UPDATE_SOURCE = path.join(CHROMUX_HOME, 'update-source.json');
 const UPDATE_INSTALL_LOG = path.join(CHROMUX_HOME, 'update-install.log');
 const RESTORE_SESSIONS = path.join(CHROMUX_HOME, 'restore-sessions.json');
+const RESTORE_ATTENTION_TYPES = new Set([
+  'permission', 'authentication', 'input', 'rateLimited', 'toolFailed', 'delivery', 'completed',
+]);
+const MAX_RESTORE_ATTENTION_RECORDS = 20;
+const MAX_RESTORE_ATTENTION_DETAIL_BYTES = 4096;
+const MAX_RESTORE_ATTENTION_ID_CHARS = 200;
 const PREFERENCES_FILE = path.join(CHROMUX_HOME, 'preferences.json');
 const FAVORITES_FILE = path.join(CHROMUX_HOME, 'favorites.json');
 const PROJECTS_FILE = path.join(CHROMUX_HOME, 'projects.json');
@@ -781,6 +787,23 @@ function sanitizeRestoreSession(session) {
     && Buffer.byteLength(session.composerDraft, 'utf8') <= MAX_DRAFT_BYTES
     ? session.composerDraft
     : null;
+  const attentionRecords = Array.isArray(session.attentionRecords)
+    ? session.attentionRecords.slice(0, MAX_RESTORE_ATTENTION_RECORDS).map((record) => {
+      if (!record || typeof record !== 'object' || !RESTORE_ATTENTION_TYPES.has(record.type)) return null;
+      if (typeof record.id !== 'string' || record.id.length === 0
+        || record.id.length > MAX_RESTORE_ATTENTION_ID_CHARS
+        || !/^[A-Za-z0-9:_-]+$/.test(record.id)) return null;
+      if (typeof record.detail !== 'string'
+        || Buffer.byteLength(record.detail, 'utf8') > MAX_RESTORE_ATTENTION_DETAIL_BYTES) return null;
+      if (!Number.isFinite(record.occurredAt) || record.occurredAt <= 0) return null;
+      return {
+        id: record.id,
+        type: record.type,
+        detail: record.detail,
+        occurredAt: record.occurredAt,
+      };
+    }).filter(Boolean)
+    : [];
   return {
     name: String(session.name || path.basename(cwd) || 'session').slice(0, 80),
     cwd,
@@ -792,6 +815,7 @@ function sanitizeRestoreSession(session) {
     savedAt: typeof session.savedAt === 'string' ? session.savedAt : new Date().toISOString(),
     opened: Boolean(session.opened),
     restoredAt: typeof session.restoredAt === 'string' ? session.restoredAt : null,
+    ...(attentionRecords.length > 0 ? { attentionRecords } : {}),
     ...(composerDraft ? { composerDraft } : {}),
   };
 }
@@ -800,7 +824,7 @@ function writeRestoreSnapshot({ sessions, reason = 'manual', restoreId = null, s
   ensureDirs();
   const clean = Array.isArray(sessions) ? sessions.map(sanitizeRestoreSession).filter(Boolean) : [];
   const payload = {
-    schemaVersion: 4,
+    schemaVersion: 5,
     restoreId: restoreId || `restore-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     reason,
     savedAt: savedAt || new Date().toISOString(),

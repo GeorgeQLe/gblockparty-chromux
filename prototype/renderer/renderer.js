@@ -21,6 +21,10 @@ const THEME_LABELS = {
 };
 const RAIL_MODES = new Set(['threads', 'git']);
 const THREAD_PREVIEW_SIZES = new Set(['compact', 'comfortable', 'large']);
+const RESTORE_ATTENTION_TYPES = new Set([
+  'permission', 'authentication', 'input', 'rateLimited', 'toolFailed', 'delivery', 'completed',
+]);
+const MAX_RESTORE_ATTENTION_RECORDS = 20;
 
 function storedTheme() {
   try {
@@ -130,6 +134,7 @@ const BOUNDS = {
   shortcutDebugStaleMs: 1500,
   resumeStartupExitMs: 15000,
   composerDraftBytes: 64 * 1024,
+  restoreAttentionDetailBytes: 4096,
 };
 
 function normalizeFavoriteUrl(rawUrl) {
@@ -902,6 +907,10 @@ function apply(event) {
       break;
     case 'session-focused':
       state.activeId = event.sessionId;
+      if (session && event.consumeRestoredCompletion !== false) {
+        session.restoredAttentionRecords = session.restoredAttentionRecords
+          .filter((record) => record.type !== 'completed');
+      }
       if (session && session.turn.state === 'completed') {
         session.turn.attentionSeenAt = Math.max(session.turn.attentionSeenAt || 0, session.turn.since || 0);
         tabStateChanged = window.chromuxAttention.consumeCompletedTurn(session.turn, Date.now());
@@ -1068,6 +1077,7 @@ function newSessionShape({ id, name, cwd, agent }) {
   }[agent];
   return {
     id, name, cwd, agent, resumeId: null,
+    restoredAttentionRecords: [], // historical snapshot records; separate from live turn/capture state
     capabilities,
     lifecycle: { alive: true, exitCode: null, exitedAt: null, resumeLaunch: null },
     turn: {
@@ -2666,19 +2676,23 @@ function utf8WithinLimit(value) {
   return typeof value === 'string' && utf8ByteLength(value) <= BOUNDS.composerDraftBytes;
 }
 
-function truncateComposerDraft(value) {
+function truncateUtf8(value, maxBytes) {
   const text = String(value || '');
-  if (utf8WithinLimit(text)) return text;
+  if (utf8ByteLength(text) <= maxBytes) return text;
   let bytes = 0;
   let result = '';
   const encoder = new TextEncoder();
   for (const character of text) {
     const size = encoder.encode(character).byteLength;
-    if (bytes + size > BOUNDS.composerDraftBytes) break;
+    if (bytes + size > maxBytes) break;
     result += character;
     bytes += size;
   }
   return result;
+}
+
+function truncateComposerDraft(value) {
+  return truncateUtf8(value, BOUNDS.composerDraftBytes);
 }
 
 function autosizeComposer(session) {
@@ -3212,14 +3226,21 @@ function renderDeveloperDiagnostics() {
     ? [...document.querySelectorAll(`#thread-list .attention-item[data-session-id="${CSS.escape(inspected.id)}"] .attention-kind`)]
       .map((element) => element.textContent)
     : [];
-  const expectedKinds = projection.projectedKinds;
+  const expectedItems = [
+    ...window.chromuxAttention.projectAttentionItems({
+      sessions, activeId: state.activeId, captures: state.captures.values(),
+      updateQueue: state.updateQueue, updateStatus: state.updateStatus,
+    }).filter((item) => item.sessionId === inspected.id),
+    ...(inspected.id !== state.activeId && inspected.lifecycle.alive ? restoredAttentionItems(inspected) : []),
+  ].sort((a, b) => (a.priority - b.priority) || (a.createdAt - b.createdAt) || a.id.localeCompare(b.id));
+  const expectedKinds = expectedItems.map((item) => item.kind);
   const indicator = actualTabIndicator(inspected);
   const expectedIndicator = projection.expectedTabIndicator;
   const tab = inspected.els && inspected.els.tab;
   const expectedStatus = sessionTabIndicator(inspected).status;
   groups.append(
     diagnosticGroup('EXPECTED', [
-      diagnosticCell('OUTCOME', projection.expectedItem ? projection.expectedItem.kind : `SUPPRESS ${projection.suppression}`),
+      diagnosticCell('OUTCOME', expectedItems[0] ? expectedItems[0].kind : `SUPPRESS ${projection.suppression}`),
       diagnosticCell('TAB', expectedIndicator),
       diagnosticCell('UPDATE SAFE', `${projection.safety.safe ? 'YES' : 'NO'} · ${projection.safety.reason}`),
     ]),
@@ -3271,18 +3292,62 @@ function renderDeveloperDiagnostics() {
 
 function attentionItems() {
   reconcileUpdateQueue();
-  return window.chromuxAttention.projectAttentionItems({
-    sessions: orderedSessions(),
+  const sessions = orderedSessions();
+  const projected = window.chromuxAttention.projectAttentionItems({
+    sessions,
     activeId: state.activeId,
     captures: state.captures.values(),
     updateQueue: state.updateQueue,
     updateStatus: state.updateStatus,
-  }).map((item) => ({
+  });
+  for (const session of sessions) {
+    if (session.id === state.activeId || !session.lifecycle.alive) continue;
+    projected.push(...restoredAttentionItems(session));
+  }
+  const sessionOrder = new Map(sessions.map((session, index) => [session.id, index]));
+  projected.sort((a, b) => (a.priority - b.priority)
+    || (a.createdAt - b.createdAt)
+    || ((sessionOrder.get(a.sessionId) ?? Number.MAX_SAFE_INTEGER)
+      - (sessionOrder.get(b.sessionId) ?? Number.MAX_SAFE_INTEGER))
+    || a.id.localeCompare(b.id));
+  return projected.map((item) => ({
     session: item.sessionId
       ? state.sessions.get(item.sessionId)
       : { name: 'Chromux Update', cwd: '' },
     item,
   })).filter((row) => row.session);
+}
+
+const RESTORED_ATTENTION_PRESENTATION = {
+  permission: ['PERMISSION', 'permission', 5],
+  authentication: ['AUTH REQUIRED', 'authentication', 6],
+  input: ['INPUT NEEDED', 'input', 10],
+  rateLimited: ['RATE LIMITED', 'rateLimited', 12],
+  toolFailed: ['TOOL FAILED', 'toolFailed', 14],
+  delivery: ['DELIVERY FAIL', 'exited', 20],
+  completed: ['COMPLETED', 'completed', 50],
+};
+
+function restoredAttentionItems(session) {
+  return (session.restoredAttentionRecords || []).map((record) => {
+    const [kind, cls, priority] = RESTORED_ATTENTION_PRESENTATION[record.type];
+    return {
+      id: `restored:${session.id}:${record.id}`,
+      recordId: record.id,
+      type: record.type,
+      kind,
+      scope: 'session',
+      sessionId: session.id,
+      captureId: null,
+      detail: record.detail ? `Before restart · ${record.detail}` : 'Before restart',
+      cls,
+      priority,
+      createdAt: record.occurredAt,
+      acknowledged: false,
+      primaryAction: record.type === 'completed' ? 'VIEW' : 'FOCUS',
+      historical: true,
+    };
+  });
 }
 
 function attentionAction(item) {
@@ -3312,7 +3377,14 @@ function dismissAttentionItem(item) {
     if (item.type !== 'updateRunning') dismissUpdateQueue();
     return;
   }
-  if (item.type === 'delivery' && item.captureId) {
+  if (item.historical) {
+    const session = state.sessions.get(item.sessionId);
+    if (session) {
+      session.restoredAttentionRecords = session.restoredAttentionRecords
+        .filter((record) => record.id !== item.recordId);
+      invalidate('attention', 'badges');
+    }
+  } else if (item.type === 'delivery' && item.captureId) {
     apply({ type: 'capture-acknowledged', captureId: item.captureId });
   } else if (item.type === 'input' || item.type === 'completed') {
     apply({ type: 'attention-dismissed', sessionId: item.sessionId });
@@ -3321,6 +3393,7 @@ function dismissAttentionItem(item) {
 
 function attentionItemDismissible(item) {
   if (item.scope === 'global') return item.type !== 'updateRunning';
+  if (item.historical) return true;
   return ['delivery', 'input', 'completed'].includes(item.type);
 }
 
@@ -4089,7 +4162,7 @@ function installTerminalScrollToBottom(session, { reducedMotion = null } = {}) {
   return tracker;
 }
 
-async function createSession({ name, cwd, agent, initialUrl = null, initialQueue = [], command = undefined, resumeLaunch = null, composerDraft = '' }) {
+async function createSession({ name, cwd, agent, initialUrl = null, initialQueue = [], initialAttentionRecords = [], command = undefined, resumeLaunch = null, composerDraft = '' }) {
   state.counter += 1;
   const id = 's' + state.counter;
   const session = newSessionShape({ id, name, cwd, agent });
@@ -4153,7 +4226,12 @@ async function createSession({ name, cwd, agent, initialUrl = null, initialQueue
     : [];
   renderQueue(session);
   if (initialUrl) openInPane(session, initialUrl);
-  activateSession(id);
+  activateSession(id, { consumeRestoredCompletion: false });
+  session.restoredAttentionRecords = Array.isArray(initialAttentionRecords)
+    ? initialAttentionRecords.filter((record) => record && RESTORE_ATTENTION_TYPES.has(record.type))
+      .slice(0, MAX_RESTORE_ATTENTION_RECORDS).map((record) => ({ ...record }))
+    : [];
+  invalidate('attention', 'badges');
   renderTabs();
   state.lastCwd = cwd;
   return session;
@@ -4179,10 +4257,10 @@ function revealFocusedSessionTab(id) {
   }
 }
 
-function activateSession(id) {
+function activateSession(id, { consumeRestoredCompletion = true } = {}) {
   dismissThreadPreview();
   if (!state.ui.diagnosticSessionId || !state.sessions.has(state.ui.diagnosticSessionId)) state.ui.diagnosticSessionId = id;
-  apply({ type: 'session-focused', sessionId: id });
+  apply({ type: 'session-focused', sessionId: id, consumeRestoredCompletion });
   for (const s of state.sessions.values()) {
     const active = s.id === id;
     s.els.view.classList.toggle('offstage', !active);
@@ -4386,8 +4464,36 @@ async function checkUpdates(manual = false) {
   }
 }
 
+function snapshotAttentionRecordsBySession(sessions) {
+  const bySession = new Map(sessions.map((session) => [session.id,
+    new Map((session.restoredAttentionRecords || []).map((record) => [record.id, { ...record }]))]));
+  const visible = window.chromuxAttention.projectAttentionItems({
+    sessions,
+    activeId: state.activeId,
+    captures: state.captures.values(),
+    updateQueue: state.updateQueue,
+    updateStatus: state.updateStatus,
+  });
+  for (const item of visible) {
+    if (item.scope !== 'session' || item.type === 'queue' || !RESTORE_ATTENTION_TYPES.has(item.type)) continue;
+    const occurredAt = Number.isFinite(item.createdAt) && item.createdAt > 0 ? item.createdAt : Date.now();
+    const suffix = item.captureId ? `:${item.captureId}` : ':turn';
+    const id = `attention:${item.type}:${Math.trunc(occurredAt)}${suffix}`;
+    bySession.get(item.sessionId)?.set(id, {
+      id,
+      type: item.type,
+      detail: truncateUtf8(item.detail || '', BOUNDS.restoreAttentionDetailBytes),
+      occurredAt,
+    });
+  }
+  return new Map([...bySession].map(([sessionId, records]) => [sessionId,
+    [...records.values()].sort((a, b) => a.occurredAt - b.occurredAt).slice(-MAX_RESTORE_ATTENTION_RECORDS)]));
+}
+
 function snapshotOpenSessions() {
-  return orderedSessions().map((session) => ({
+  const sessions = orderedSessions();
+  const attentionBySession = snapshotAttentionRecordsBySession(sessions);
+  return sessions.map((session) => ({
     name: session.name,
     cwd: session.cwd,
     agent: session.agent || '',
@@ -4401,6 +4507,9 @@ function snapshotOpenSessions() {
       detectedText: item.detectedText || null,
       ts: item.ts || Date.now(),
     })),
+    ...(attentionBySession.get(session.id)?.length
+      ? { attentionRecords: attentionBySession.get(session.id) }
+      : {}),
     ...(session.composer.draft ? { composerDraft: session.composer.draft } : {}),
     savedAt: new Date().toISOString(),
   }));
@@ -5330,6 +5439,7 @@ async function autoRestoreWorkspace() {
         agent: row.agent || '',
         initialUrl: row.currentUrl || null,
         initialQueue: row.queue || [],
+        initialAttentionRecords: row.attentionRecords || [],
         composerDraft: row.composerDraft || '',
         command,
         resumeLaunch: resumeLaunchForRow(row, {
@@ -5825,7 +5935,7 @@ if (window.chromuxTest) {
     return session;
   };
 
-  const addFakeSession = ({ name = 'test-session', agent = 'codex', cwd = '/tmp', alive = true, turnState = 'unknown', queue = [], resumeLaunch = null } = {}) => {
+  const addFakeSession = ({ name = 'test-session', agent = 'codex', cwd = '/tmp', alive = true, turnState = 'unknown', queue = [], attentionRecords = [], resumeLaunch = null } = {}) => {
     state.counter += 1;
     const session = newSessionShape({ id: 's' + state.counter, name, cwd, agent });
     session.lifecycle.alive = alive;
@@ -5840,6 +5950,10 @@ if (window.chromuxTest) {
     if (turnState !== 'unknown') session.turn.since = Date.now();
     session.browser.queue = Array.isArray(queue)
       ? queue.map((item) => normalizeQueueItem(item, 'RESTORE')).filter(Boolean)
+      : [];
+    session.restoredAttentionRecords = Array.isArray(attentionRecords)
+      ? attentionRecords.filter((record) => record && RESTORE_ATTENTION_TYPES.has(record.type))
+        .slice(0, MAX_RESTORE_ATTENTION_RECORDS).map((record) => ({ ...record }))
       : [];
     const written = [];
     session._written = written;
@@ -6403,9 +6517,11 @@ if (window.chromuxTest) {
     snapshot: () => snapshotOpenSessions().map((row) => ({ ...row })),
     activeId: () => state.activeId,
     written: (id) => (testSession(id)._written || []).join(''),
-    attentionItems: () => [...document.querySelectorAll('#thread-list .attention-item')].map((el) => ({
+    attentionItems: () => [...document.querySelectorAll('#thread-list .attention-reason, #thread-list .attention-system-row')].map((el) => ({
       kind: el.querySelector('.attention-kind')?.textContent || '',
-      name: el.querySelector('.attention-name')?.textContent || '',
+      name: el.closest('.attention-item')?.querySelector('.attention-name')?.textContent || '',
+      detail: el.querySelector('.attention-detail')?.textContent || '',
+      actions: [...el.querySelectorAll('.attention-actions .qi-btn')].map((button) => button.textContent),
     })),
     dismissItem(kind, name) {
       for (const el of document.querySelectorAll('#thread-list .attention-item')) {

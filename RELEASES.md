@@ -1,5 +1,14 @@
 # Release Notes
 
+## GBlockParty Chromux v0.45.0
+
+Tag: `chromux-v0.45.0`
+
+- Preserve session-scoped Needs Attention reasons through managed updates, Developer Mode restarts, and app-close workspace restores.
+- Label restored reasons as `Before restart`, keep them separate from resumed live turn state, consume historical completion on thread open, and retain other historical reasons until dismissal.
+- Upgrade restore snapshots to bounded schema v5 records while retaining schema v1-v4 readability and excluding browser-queue duplication and global update rows.
+- Add main-process validation and renderer coverage for bounds, malformed records, stable identifiers, mixed historical/live attention, completion consumption, dismissal, queue exclusion, update exclusion, and failed-delivery persistence.
+
 ## GBlockParty Chromux v0.44.2
 
 Tag: `chromux-v0.44.2`

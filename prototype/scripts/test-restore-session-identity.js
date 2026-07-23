@@ -106,14 +106,29 @@ fs.writeFileSync(e2ePath, `
     'malformed saved ID must be discarded and inferred safely');
 
   const saved = await window.chromux.saveRestoreSnapshot({ reason: 'manual', sessions: [
-    { name: 'valid', cwd: ${JSON.stringify(shared)}, agent: 'claude', resumeId: ${JSON.stringify(ids.exactB)}, composerDraft: 'saved draft' },
-    { name: 'invalid', cwd: ${JSON.stringify(shared)}, agent: 'claude', resumeId: 'not/a/session', composerDraft: 'x'.repeat(65537) },
+    { name: 'valid', cwd: ${JSON.stringify(shared)}, agent: 'claude', resumeId: ${JSON.stringify(ids.exactB)}, composerDraft: 'saved draft',
+      attentionRecords: Array.from({ length: 25 }, (_, index) => ({
+        id: 'attention:completed:' + index, type: 'completed', detail: 'Finished ' + index,
+        occurredAt: Date.now() + index,
+      })) },
+    { name: 'invalid', cwd: ${JSON.stringify(shared)}, agent: 'claude', resumeId: 'not/a/session', composerDraft: 'x'.repeat(65537),
+      attentionRecords: [
+        { id: 'unknown:1', type: 'mystery', detail: 'no', occurredAt: Date.now() },
+        { id: 'bad id', type: 'permission', detail: 'no', occurredAt: Date.now() },
+        { id: 'oversized:1', type: 'input', detail: 'x'.repeat(4097), occurredAt: Date.now() },
+        { id: 'bad-time:1', type: 'delivery', detail: 'no', occurredAt: 0 },
+      ] },
   ] });
-  expect(saved.schemaVersion === 4, 'new snapshot must use schema v4');
+  expect(saved.schemaVersion === 5, 'new snapshot must use schema v5');
   expect(saved.sessions[0].resumeId === ${JSON.stringify(ids.exactB)}, 'valid resumeId not persisted');
   expect(saved.sessions[1].resumeId === null, 'malformed resumeId persisted');
   expect(saved.sessions[0].composerDraft === 'saved draft', 'bounded composer draft not persisted');
   expect(!Object.prototype.hasOwnProperty.call(saved.sessions[1], 'composerDraft'), 'oversized composer draft persisted');
+  expect(saved.sessions[0].attentionRecords.length === 20, 'attention record count bound not enforced');
+  expect(saved.sessions[0].attentionRecords[0].type === 'completed'
+    && saved.sessions[0].attentionRecords[0].detail === 'Finished 0', 'valid attention record changed');
+  expect(!Object.prototype.hasOwnProperty.call(saved.sessions[1], 'attentionRecords'),
+    'malformed or oversized attention records persisted');
   return JSON.stringify({ ok: true });
 })()
 `);
