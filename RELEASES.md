@@ -1,5 +1,14 @@
 # Release Notes
 
+## GBlockParty Chromux v0.51.0
+
+Tag: `chromux-v0.51.0`
+
+- Give every terminal session a compact paired-browser tab strip with page-local history, title, console, capture, and picker state while preserving one persistent Chromium partition per session.
+- Route plain and OSC 8 terminal HTTP(S) links, approved queue items, favorites, and project HTML selections into new-or-focused foreground tabs with normalized URL deduplication; unsafe schemes remain inactive and page popups stay approval-gated.
+- Add a project-scoped HTML explorer with Git-root fallback, live-PTY/launch/project path resolution, unique repository fallback, folder navigation, filtering, URL-field autocomplete, refresh, and safe encoded `file://` URLs.
+- Restore ordered page tabs and explorer path/query lazily through schema-v6 snapshots while migrating legacy `currentUrl` snapshots into one active page tab.
+
 ## GBlockParty Chromux v0.50.2
 
 Tag: `chromux-v0.50.2`

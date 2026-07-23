@@ -229,7 +229,7 @@ function renderFavoritesPicker(session) {
     const title = document.createElement('span'); title.className = 'favorite-title'; title.textContent = favorite.title;
     const url = document.createElement('span'); url.className = 'qi-url'; url.textContent = favorite.url;
     main.append(title, url);
-    main.onclick = () => { openInPane(state.sessions.get(state.activeId) || session, favorite.url); };
+    main.onclick = () => { openOrFocusBrowserTab(state.sessions.get(state.activeId) || session, favorite.url, favorite.title); };
     const remove = document.createElement('button'); remove.className = 'qi-btn'; remove.textContent = 'UNPIN';
     remove.onclick = () => setFavorite(favorite.url, favorite.title, false);
     row.append(main, remove); host.appendChild(row);
@@ -919,6 +919,7 @@ function feedDetector(session, chunk) {
 // ───────────────────────────────────────────────────────────────────────────
 
 const LINK_URL_RE = /https?:\/\/[^\s"'<>\[\]{}]+/g;
+const LINK_QUOTED_HTML_RE = /(["'`])((?:file:\/\/)?(?:~\/|\/|\.{1,2}\/)?[^"'`\r\n]+\.html?)\1/gi;
 const LINK_ABS_HTML_RE = /(?:file:\/\/)?(\/(?:[^\s"'<>:*?]+\/)*[^\s"'<>:*?]+\.html?)\b/gi;
 const LINK_REL_HTML_RE = /(?:^|[\s"'`(=])((?:~\/|\.{1,2}\/)?(?:[\w.@+-]+\/)*[\w.@+-]+\.html?)\b/gi;
 
@@ -938,7 +939,15 @@ function fileUrlFor(p) {
 
 function activateTerminalLink(session, url, event) {
   event.preventDefault();
-  openInPane(session, url);
+  openOrFocusBrowserTab(session, url);
+}
+
+function activateOsc8TerminalLink(session, text, event) {
+  const url = normalizedBrowserUrl(text);
+  if (!url || !/^https?:/i.test(url)) return false;
+  event.preventDefault();
+  openOrFocusBrowserTab(session, url);
+  return true;
 }
 
 // Assemble the logical (unwrapped) line containing bufferRow. Each buffer row
@@ -977,30 +986,27 @@ function registerTerminalLinks(session) {
       }
       const { start, text } = logicalLineAt(term, row);
       const cols = term.cols;
-      const home = state.env ? state.env.home : null;
-
       const candidates = [];
       const overlaps = (a, b) => a.index < b.index + b.text.length && b.index < a.index + a.text.length;
       const push = (index, matchText, kind, resolve) => {
         candidates.push({ index, text: matchText, kind, resolve });
       };
-      const resolveFile = (p) => {
-        let abs = p;
-        if (p.startsWith('~/')) {
-          if (!home) return Promise.resolve(null);
-          abs = home + p.slice(1);
-        } else if (!p.startsWith('/')) {
-          abs = session.cwd + '/' + p;
-        }
-        abs = normalizeLocalPath(abs);
-        return window.chromux.fileExists(abs).then((ok) => (ok ? fileUrlFor(abs) : null));
-      };
+      const resolveFile = (p) => window.chromux.resolveProjectHtml({
+        sessionId: session.id,
+        launchCwd: session.cwd,
+        reference: p,
+      });
 
       let m;
       LINK_URL_RE.lastIndex = 0;
       while ((m = LINK_URL_RE.exec(text)) !== null) {
         const cleaned = normalizePreviewUrl(m[0]);
         push(m.index, cleaned, 'url', () => Promise.resolve(cleaned));
+      }
+      LINK_QUOTED_HTML_RE.lastIndex = 0;
+      while ((m = LINK_QUOTED_HTML_RE.exec(text)) !== null) {
+        const p = m[2];
+        push(m.index + m[0].indexOf(p), p, 'file', () => resolveFile(p));
       }
       LINK_ABS_HTML_RE.lastIndex = 0;
       while ((m = LINK_ABS_HTML_RE.exec(text)) !== null) {
@@ -1014,13 +1020,18 @@ function registerTerminalLinks(session) {
       }
 
       Promise.all(candidates.map(async (c) => {
-        try { c.url = await c.resolve(); } catch { c.url = null; }
+        try {
+          const result = await c.resolve();
+          if (typeof result === 'string') c.url = normalizedBrowserUrl(result);
+          else if (result && result.ok && result.url) c.url = normalizedBrowserUrl(result.url);
+          else if (result && result.status === 'ambiguous') c.explorerQuery = result.query || c.text;
+        } catch { c.url = null; }
       })).then(() => {
         // Overlap resolution happens only among candidates that resolved, so a
         // bogus absolute suffix (the "/index.html" inside "alignment/index.html")
         // can't shadow the real relative path. URLs win over file paths (a path
         // inside "http://host/x.html" stays part of the URL), then longer text.
-        const resolved = candidates.filter((c) => c.url);
+        const resolved = candidates.filter((c) => c.url || c.explorerQuery);
         resolved.sort((a, b) => (a.kind !== b.kind
           ? (a.kind === 'url' ? -1 : 1)
           : b.text.length - a.text.length));
@@ -1031,6 +1042,7 @@ function registerTerminalLinks(session) {
           claimed.push(c);
           const endIndex = c.index + c.text.length - 1;
           const url = c.url;
+          const explorerQuery = c.explorerQuery;
           links.push({
             text: c.text,
             range: {
@@ -1039,7 +1051,9 @@ function registerTerminalLinks(session) {
             },
             decorations: { pointerCursor: true, underline: true },
             activate(event) {
-              activateTerminalLink(session, url, event);
+              event.preventDefault();
+              if (url) openOrFocusBrowserTab(session, url);
+              else openHtmlExplorer(session, { query: explorerQuery });
             },
           });
         }
@@ -1292,18 +1306,7 @@ function newSessionShape({ id, name, cwd, agent }) {
       eventIds: [], sequence: -1, stopped: false, authoritativeAt: 0,
       generation: 0, sawBusyRender: false,
     },
-    browser: {
-      webview: null, webContentsId: null, currentUrl: null, lastReload: 0,
-      partitionId: globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function'
-        ? globalThis.crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-      queue: [], consoleBuf: [], consoleTotal: 0, picking: false,
-      guestEditableFocused: false,
-      // Terminal-first: new sessions start with the paired browser shut.
-      // Detected previews queue until the user opens one (QUEUE OPEN, link click, URL bar).
-      collapsed: true,
-      expandedGridTemplate: 'minmax(320px, 46%) 6px minmax(360px, 1fr)',
-    },
+    browser: createBrowserState(),
     term: {
       term: null,
       fitAddon: null,
@@ -1338,6 +1341,60 @@ function newSessionShape({ id, name, cwd, agent }) {
   };
 }
 
+function createBrowserState() {
+  const browser = {
+    tabs: [],
+    activeTabId: null,
+    tabCounter: 0,
+    partitionId: globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function'
+      ? globalThis.crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    queue: [],
+    collapsed: true,
+    expandedGridTemplate: 'minmax(320px, 46%) 6px minmax(360px, 1fr)',
+  };
+  const activePage = () => browser.tabs.find((tab) => tab.id === browser.activeTabId && tab.type === 'page') || null;
+  const ensurePage = () => {
+    let tab = activePage();
+    if (!tab) {
+      browser.tabCounter += 1;
+      tab = createPageTabState(`page-${browser.tabCounter}`, null, 'New tab');
+      browser.tabs.push(tab);
+      browser.activeTabId = tab.id;
+    }
+    return tab;
+  };
+  for (const key of ['webview', 'webContentsId', 'currentUrl', 'lastReload', 'consoleBuf', 'consoleTotal', 'picking', 'guestEditableFocused']) {
+    Object.defineProperty(browser, key, {
+      enumerable: false,
+      configurable: false,
+      get() {
+        const tab = activePage();
+        if (!tab) return ['consoleBuf'].includes(key) ? [] : (['consoleTotal', 'lastReload'].includes(key) ? 0 : (['picking', 'guestEditableFocused'].includes(key) ? false : null));
+        return tab[key];
+      },
+      set(value) { ensurePage()[key] = value; },
+    });
+  }
+  return browser;
+}
+
+function createPageTabState(id, url, title = '') {
+  return {
+    id,
+    type: 'page',
+    currentUrl: url || null,
+    title: String(title || url || 'New tab').slice(0, 200),
+    webview: null,
+    webContentsId: null,
+    lastReload: 0,
+    consoleBuf: [],
+    consoleTotal: 0,
+    picking: false,
+    guestEditableFocused: false,
+  };
+}
+
 // ───────────────────────────────────────────────────────────────────────────
 // Review queue — approval-gated. Detected previews always queue; never auto-
 // open the pane. Refresh only when the pane's own (already open) URL is
@@ -1346,11 +1403,12 @@ function newSessionShape({ id, name, cwd, agent }) {
 
 function routePreview(session, url, source, detail = {}) {
   const b = session.browser;
-  if (b.currentUrl && b.currentUrl === url) {
+  const openTab = pageTabForUrl(session, url);
+  if (openTab) {
     const now = Date.now();
-    if (now - b.lastReload > BOUNDS.reloadThrottleMs && b.webview) {
-      b.lastReload = now;
-      try { b.webview.reload(); } catch { /* not ready */ }
+    if (now - openTab.lastReload > BOUNDS.reloadThrottleMs && openTab.webview) {
+      openTab.lastReload = now;
+      try { openTab.webview.reload(); } catch { /* not ready */ }
       flashRefresh(session);
     }
     return;
@@ -1407,7 +1465,7 @@ function renderQueue(session) {
     open.textContent = 'OPEN';
     open.onclick = () => {
       apply({ type: 'preview-opened', sessionId: session.id, url: item.url });
-      openInPane(session, item.url);
+      openOrFocusBrowserTab(session, item.url);
       renderQueue(session);
     };
     const pin = document.createElement('button');
@@ -1833,85 +1891,434 @@ function renderShortcutDebug() {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// Browser pane — one webview per session, created on first preview.
+// Browser pane — page and project-explorer tabs scoped to one terminal session.
 // ───────────────────────────────────────────────────────────────────────────
 
-function openInPane(session, url) {
-  const b = session.browser;
-  // Explicit open always restores a shut browser so the approved URL is visible.
-  if (b.collapsed) setBrowserCollapsed(session, false);
-  b.currentUrl = url;
-  b.lastReload = Date.now();
-  session.els.urlBar.value = url;
+function normalizedBrowserUrl(raw) {
+  try {
+    const parsed = new URL(String(raw || '').trim());
+    if (!['http:', 'https:', 'file:'].includes(parsed.protocol) || parsed.username || parsed.password) return null;
+    return parsed.href;
+  } catch { return null; }
+}
+
+function browserTabId(session, prefix) {
+  session.browser.tabCounter += 1;
+  return `${prefix}-${session.browser.tabCounter}`;
+}
+
+function activeBrowserTab(session) {
+  return session.browser.tabs.find((tab) => tab.id === session.browser.activeTabId) || null;
+}
+
+function activePageTab(session) {
+  const tab = activeBrowserTab(session);
+  return tab && tab.type === 'page' ? tab : null;
+}
+
+function pageTabForUrl(session, url) {
+  const normalized = normalizedBrowserUrl(url);
+  return normalized
+    ? session.browser.tabs.find((tab) => tab.type === 'page' && normalizedBrowserUrl(tab.currentUrl) === normalized) || null
+    : null;
+}
+
+function updateActiveBrowserControls(session) {
+  if (!session.els) return;
+  const tab = activePageTab(session);
+  session.els.urlBar.value = tab ? (tab.currentUrl || '') : '';
+  if (session.els.back) session.els.back.disabled = !tab || !tab.webview;
+  if (session.els.reload) session.els.reload.disabled = !tab || !tab.webview;
+  session.els.pickBtn.disabled = !tab || !tab.webview;
+  session.els.captureBtn.disabled = !tab || !tab.webview;
+  renderConsoleChip(session);
   renderFavoriteToolbar(session);
-  invalidate('captureChips');
-  if (!b.webview) {
-    const wv = document.createElement('webview');
-    // Each paired browser is an explicit target with isolated cookies/storage.
-    // This prevents two sessions from inheriting a shared "current browser".
-    wv.setAttribute('partition', `persist:chromux-${session.browser.partitionId}`);
-    wv.setAttribute('preload', window.chromux.webviewPreloadPath);
-    wv.setAttribute('src', url);
-    wv.dataset.sessionId = session.id;
-    b.webview = wv;
+  invalidate('captureChips', 'shortcutDebug');
+}
 
-    wv.addEventListener('console-message', (e) => {
-      const levels = ['debug', 'info', 'warn', 'error'];
-      b.consoleBuf.push({
-        ts: new Date().toISOString(),
-        level: levels[e.level] || String(e.level),
-        message: String(e.message).slice(0, BOUNDS.consoleMsgChars),
-      });
-      b.consoleTotal += 1;
-      if (b.consoleBuf.length > BOUNDS.consoleTail) b.consoleBuf.shift();
-      renderConsoleChip(session);
-    });
-    wv.addEventListener('did-navigate', (e) => {
-      b.guestEditableFocused = false;
-      b.currentUrl = e.url;
-      session.els.urlBar.value = e.url;
-      renderFavoriteToolbar(session);
-      invalidate('captureChips', 'shortcutDebug');
-    });
-    wv.addEventListener('did-navigate-in-page', (e) => {
-      if (e.isMainFrame) {
-        b.currentUrl = e.url;
-        session.els.urlBar.value = e.url;
-        renderFavoriteToolbar(session);
-        invalidate('captureChips');
-      }
-    });
-    wv.addEventListener('dom-ready', () => {
-      try { b.webContentsId = wv.getWebContentsId(); } catch { /* ok */ }
-      invalidate('shortcutDebug');
-    });
-    wv.addEventListener('blur', () => {
-      b.guestEditableFocused = false;
-      invalidate('shortcutDebug');
-    });
-    wv.addEventListener('ipc-message', (e) => {
-      if (e.channel === 'chromux-pick') onElementPicked(session, e.args[0] || {});
-      else if (e.channel === 'chromux-pick-cancel') setPicking(session, false);
-      else if (e.channel === 'chromux-focused-editable') {
-        b.guestEditableFocused = Boolean((e.args[0] || {}).editable);
-        invalidate('shortcutDebug');
-      }
-    });
+function activateBrowserTab(session, tabId) {
+  const tab = session.browser.tabs.find((item) => item.id === tabId);
+  if (!tab) return false;
+  const previous = activePageTab(session);
+  if (previous && previous.picking && previous.id !== tab.id) cancelPicking(session, previous);
+  session.browser.activeTabId = tab.id;
+  for (const item of session.browser.tabs) {
+    if (item.type === 'page' && item.webview) item.webview.classList.toggle('hidden', item.id !== tab.id);
+  }
+  if (session.els.explorerHost) session.els.explorerHost.classList.toggle('hidden', tab.type !== 'explorer');
+  if (session.els.placeholder) session.els.placeholder.classList.toggle('hidden', tab.type === 'explorer' || Boolean(tab.currentUrl));
+  if (tab.type === 'explorer') renderHtmlExplorer(session, tab);
+  else ensurePageWebview(session, tab);
+  renderBrowserTabs(session);
+  updateActiveBrowserControls(session);
+  return true;
+}
 
-    session.els.placeholder.classList.add('hidden');
-    session.els.webHost.appendChild(wv);
-    session.els.pickBtn.disabled = false;
-    session.els.captureBtn.disabled = false;
+function createPageBrowserTab(session, url = null, title = '', { activate = true, lazy = false } = {}) {
+  const normalized = url ? normalizedBrowserUrl(url) : null;
+  if (url && !normalized) return null;
+  const tab = createPageTabState(browserTabId(session, 'page'), normalized, title);
+  session.browser.tabs.push(tab);
+  if (activate) {
+    session.browser.activeTabId = tab.id;
+    if (!lazy) activateBrowserTab(session, tab.id);
+    else renderBrowserTabs(session);
   } else {
-    b.webview.loadURL(url).catch(() => {});
+    renderBrowserTabs(session);
+  }
+  return tab;
+}
+
+function ensurePageWebview(session, tab) {
+  if (!tab || tab.type !== 'page' || !tab.currentUrl || tab.webview) return;
+  const wv = document.createElement('webview');
+  wv.setAttribute('partition', `persist:chromux-${session.browser.partitionId}`);
+  wv.setAttribute('preload', window.chromux.webviewPreloadPath);
+  wv.setAttribute('src', tab.currentUrl);
+  wv.dataset.sessionId = session.id;
+  wv.dataset.browserTabId = tab.id;
+  tab.webview = wv;
+  wv.classList.toggle('hidden', session.browser.activeTabId !== tab.id);
+
+  wv.addEventListener('console-message', (e) => {
+    const levels = ['debug', 'info', 'warn', 'error'];
+    tab.consoleBuf.push({
+      ts: new Date().toISOString(),
+      level: levels[e.level] || String(e.level),
+      message: String(e.message).slice(0, BOUNDS.consoleMsgChars),
+    });
+    tab.consoleTotal += 1;
+    if (tab.consoleBuf.length > BOUNDS.consoleTail) tab.consoleBuf.shift();
+    if (activePageTab(session) === tab) renderConsoleChip(session);
+  });
+  const navigated = (url) => {
+    tab.guestEditableFocused = false;
+    tab.currentUrl = url;
+    if (!tab.title || tab.title === 'New tab') tab.title = url;
+    if (activePageTab(session) === tab) updateActiveBrowserControls(session);
+    renderBrowserTabs(session);
+  };
+  wv.addEventListener('did-navigate', (e) => navigated(e.url));
+  wv.addEventListener('did-navigate-in-page', (e) => { if (e.isMainFrame) navigated(e.url); });
+  wv.addEventListener('page-title-updated', (e) => {
+    tab.title = String(e.title || tab.currentUrl || 'Page').slice(0, 200);
+    renderBrowserTabs(session);
+  });
+  wv.addEventListener('dom-ready', () => {
+    try { tab.webContentsId = wv.getWebContentsId(); } catch { /* ok */ }
+    try {
+      const title = String(wv.getTitle ? wv.getTitle() : '').trim();
+      if (title) tab.title = title.slice(0, 200);
+    } catch { /* ok */ }
+    renderBrowserTabs(session);
+    invalidate('shortcutDebug');
+  });
+  wv.addEventListener('blur', () => {
+    tab.guestEditableFocused = false;
+    invalidate('shortcutDebug');
+  });
+  wv.addEventListener('ipc-message', (e) => {
+    if (e.channel === 'chromux-pick') onElementPicked(session, e.args[0] || {}, tab);
+    else if (e.channel === 'chromux-pick-cancel') setPicking(session, false, tab);
+    else if (e.channel === 'chromux-focused-editable') {
+      tab.guestEditableFocused = Boolean((e.args[0] || {}).editable);
+      invalidate('shortcutDebug');
+    }
+  });
+  session.els.webHost.appendChild(wv);
+}
+
+function openInPane(session, url) {
+  const normalized = normalizedBrowserUrl(url);
+  if (!normalized) return null;
+  const b = session.browser;
+  if (b.collapsed) setBrowserCollapsed(session, false);
+  let tab = activePageTab(session);
+  if (!tab) tab = createPageBrowserTab(session, normalized, normalized, { activate: true });
+  else {
+    tab.currentUrl = normalized;
+    tab.lastReload = Date.now();
+    tab.title = normalized;
+    const hadWebview = Boolean(tab.webview);
+    ensurePageWebview(session, tab);
+    if (hadWebview && tab.webview) tab.webview.loadURL(normalized).catch(() => {});
+    activateBrowserTab(session, tab.id);
+  }
+  return tab;
+}
+
+function openOrFocusBrowserTab(session, url, title = '') {
+  const normalized = normalizedBrowserUrl(url);
+  if (!normalized) return null;
+  if (session.browser.collapsed) setBrowserCollapsed(session, false);
+  const existing = pageTabForUrl(session, normalized);
+  if (existing) {
+    activateBrowserTab(session, existing.id);
+    return existing;
+  }
+  return createPageBrowserTab(session, normalized, title || normalized, { activate: true });
+}
+
+function closeBrowserTab(session, tabId) {
+  const index = session.browser.tabs.findIndex((tab) => tab.id === tabId);
+  if (index < 0) return;
+  const [tab] = session.browser.tabs.splice(index, 1);
+  if (tab.type === 'page' && tab.webview) tab.webview.remove();
+  if (session.browser.activeTabId === tabId) {
+    const next = session.browser.tabs[Math.min(index, session.browser.tabs.length - 1)] || null;
+    session.browser.activeTabId = next ? next.id : null;
+  }
+  if (session.browser.activeTabId) activateBrowserTab(session, session.browser.activeTabId);
+  else {
+    if (session.els.explorerHost) session.els.explorerHost.classList.add('hidden');
+    session.els.placeholder.classList.remove('hidden');
+    renderBrowserTabs(session);
+    updateActiveBrowserControls(session);
   }
 }
 
+function renderBrowserTabs(session) {
+  if (!session.els || !session.els.browserTabs) return;
+  const host = session.els.browserTabs;
+  host.innerHTML = '';
+  for (const tab of session.browser.tabs) {
+    const item = document.createElement('button');
+    item.className = `browser-tab${tab.id === session.browser.activeTabId ? ' active' : ''}`;
+    item.type = 'button';
+    item.title = tab.type === 'explorer' ? 'Project HTML explorer' : (tab.currentUrl || tab.title);
+    const label = document.createElement('span');
+    label.className = 'browser-tab-title';
+    label.textContent = tab.type === 'explorer' ? '⌕ Project HTML' : (tab.title || tab.currentUrl || 'New tab');
+    const close = document.createElement('span');
+    close.className = 'browser-tab-close';
+    close.textContent = '×';
+    close.setAttribute('role', 'button');
+    close.setAttribute('aria-label', `Close ${label.textContent}`);
+    close.onclick = (event) => { event.stopPropagation(); closeBrowserTab(session, tab.id); };
+    item.append(label, close);
+    item.onclick = () => activateBrowserTab(session, tab.id);
+    host.appendChild(item);
+  }
+  const add = document.createElement('button');
+  add.className = 'browser-tab-add';
+  add.type = 'button';
+  add.textContent = '+';
+  add.title = 'New browser tab';
+  add.onclick = () => {
+    if (session.browser.collapsed) setBrowserCollapsed(session, false);
+    const tab = createPageBrowserTab(session, null, 'New tab', { activate: true });
+    session.els.placeholder.classList.remove('hidden');
+    session.els.urlBar.focus();
+    return tab;
+  };
+  host.appendChild(add);
+}
+
+function looksLikeHtmlExplorerEntry(value) {
+  const text = String(value || '').trim();
+  return /^(?:file:|\/|\.{1,2}\/|~\/)/i.test(text) || /\.html?(?:[?#].*)?$/i.test(text);
+}
+
+function htmlExplorerTab(session) {
+  return session.browser.tabs.find((tab) => tab.type === 'explorer') || null;
+}
+
+function openHtmlExplorer(session, { query = '', path: explorerPath = '' } = {}) {
+  if (session.browser.collapsed) setBrowserCollapsed(session, false);
+  let tab = htmlExplorerTab(session);
+  if (!tab) {
+    tab = {
+      id: browserTabId(session, 'explorer'),
+      type: 'explorer',
+      title: 'Project HTML',
+      path: '',
+      query: '',
+      index: null,
+      requestId: 0,
+    };
+    session.browser.tabs.push(tab);
+  }
+  if (typeof explorerPath === 'string') tab.path = explorerPath.replace(/^\/+|\/+$/g, '');
+  if (typeof query === 'string') tab.query = query.slice(0, 500);
+  activateBrowserTab(session, tab.id);
+  return tab;
+}
+
+async function refreshHtmlExplorer(session, tab = htmlExplorerTab(session)) {
+  if (!tab) return;
+  tab.index = null;
+  await renderHtmlExplorer(session, tab);
+}
+
+function htmlExplorerFolderRows(files, currentPath) {
+  const prefix = currentPath ? `${currentPath}/` : '';
+  const folders = new Set();
+  const directFiles = [];
+  for (const file of files) {
+    if (!file.path.startsWith(prefix)) continue;
+    const rest = file.path.slice(prefix.length);
+    const slash = rest.indexOf('/');
+    if (slash >= 0) folders.add(rest.slice(0, slash));
+    else directFiles.push(file);
+  }
+  return {
+    folders: [...folders].sort((a, b) => a.localeCompare(b)),
+    files: directFiles.sort((a, b) => a.path.localeCompare(b.path)),
+  };
+}
+
+function appendExplorerMessage(host, message, kind = '') {
+  const row = document.createElement('div');
+  row.className = `html-explorer-message${kind ? ` ${kind}` : ''}`;
+  row.textContent = message;
+  host.appendChild(row);
+}
+
+async function renderHtmlExplorer(session, tab) {
+  if (!session.els || activeBrowserTab(session) !== tab) return;
+  const host = session.els.explorerHost;
+  host.classList.remove('hidden');
+  const requestId = ++tab.requestId;
+  host.innerHTML = '';
+  appendExplorerMessage(host, 'INDEXING PROJECT HTML…');
+  if (!tab.index) {
+    try {
+      tab.index = await window.chromux.projectHtmlIndex({ sessionId: session.id, launchCwd: session.cwd });
+    } catch (error) {
+      tab.index = { ok: false, error: error?.message || 'Unable to index project HTML.', files: [] };
+    }
+  }
+  if (requestId !== tab.requestId || activeBrowserTab(session) !== tab) return;
+  host.innerHTML = '';
+  const toolbar = document.createElement('div');
+  toolbar.className = 'html-explorer-toolbar';
+  const breadcrumb = document.createElement('div');
+  breadcrumb.className = 'html-breadcrumb';
+  const rootButton = document.createElement('button');
+  rootButton.textContent = tab.index.root ? tab.index.root.split('/').filter(Boolean).pop() || '/' : 'project';
+  rootButton.title = tab.index.root || '';
+  rootButton.onclick = () => { tab.path = ''; tab.query = ''; renderHtmlExplorer(session, tab); };
+  breadcrumb.appendChild(rootButton);
+  let accumulated = '';
+  for (const segment of tab.path.split('/').filter(Boolean)) {
+    const slash = document.createElement('span'); slash.textContent = '/';
+    const button = document.createElement('button'); button.textContent = segment;
+    accumulated = accumulated ? `${accumulated}/${segment}` : segment;
+    const target = accumulated;
+    button.onclick = () => { tab.path = target; tab.query = ''; renderHtmlExplorer(session, tab); };
+    breadcrumb.append(slash, button);
+  }
+  const filter = document.createElement('input');
+  filter.className = 'html-explorer-filter';
+  filter.type = 'search';
+  filter.placeholder = 'Filter HTML files';
+  filter.value = tab.query || '';
+  filter.oninput = () => { tab.query = filter.value.slice(0, 500); renderHtmlExplorer(session, tab); };
+  const refresh = document.createElement('button');
+  refresh.className = 'head-btn'; refresh.textContent = 'REFRESH';
+  refresh.onclick = () => refreshHtmlExplorer(session, tab);
+  toolbar.append(breadcrumb, filter, refresh);
+  host.appendChild(toolbar);
+  if (!tab.index.ok) {
+    appendExplorerMessage(host, tab.index.error || 'Unable to read this project.', 'error');
+    return;
+  }
+  const files = Array.isArray(tab.index.files) ? tab.index.files : [];
+  const query = String(tab.query || '').trim().toLowerCase();
+  if (query) {
+    const matches = files.filter((file) => file.path.toLowerCase().includes(query));
+    if (!matches.length) appendExplorerMessage(host, `No project HTML matches “${tab.query}”.`);
+    for (const file of matches) appendHtmlExplorerFile(session, host, file);
+    return;
+  }
+  const rows = htmlExplorerFolderRows(files, tab.path);
+  for (const folder of rows.folders) {
+    const button = document.createElement('button');
+    button.className = 'html-explorer-row folder';
+    button.innerHTML = `<span aria-hidden="true">▸</span><span>${escapeHtml(folder)}</span>`;
+    button.onclick = () => {
+      tab.path = tab.path ? `${tab.path}/${folder}` : folder;
+      renderHtmlExplorer(session, tab);
+    };
+    host.appendChild(button);
+  }
+  for (const file of rows.files) appendHtmlExplorerFile(session, host, file);
+  if (!rows.folders.length && !rows.files.length) appendExplorerMessage(host, files.length ? 'No HTML files in this folder.' : 'No HTML files found in this project.');
+}
+
+function appendHtmlExplorerFile(session, host, file) {
+  const button = document.createElement('button');
+  button.className = 'html-explorer-row file';
+  const name = document.createElement('span'); name.className = 'html-file-name'; name.textContent = file.name;
+  const relative = document.createElement('span'); relative.className = 'html-file-path'; relative.textContent = file.path;
+  button.append(name, relative);
+  button.onclick = async () => {
+    const result = await window.chromux.resolveProjectHtml({
+      sessionId: session.id,
+      launchCwd: session.cwd,
+      reference: file.path,
+    });
+    if (result && result.ok && result.url) openOrFocusBrowserTab(session, result.url, file.name);
+  };
+  host.appendChild(button);
+}
+
+async function resolveHtmlEntry(session, value) {
+  const result = await window.chromux.resolveProjectHtml({
+    sessionId: session.id,
+    launchCwd: session.cwd,
+    reference: String(value || '').trim(),
+  });
+  if (result && result.ok && result.url) return openOrFocusBrowserTab(session, result.url, result.path || value);
+  openHtmlExplorer(session, { query: result?.query || String(value || '').split('/').pop() || '' });
+  return null;
+}
+
+function submitBrowserUrlEntry(session, raw) {
+  const value = String(raw || '').trim();
+  if (!value) return;
+  session.els.urlSuggestions.classList.add('hidden');
+  if (looksLikeHtmlExplorerEntry(value)) {
+    resolveHtmlEntry(session, value);
+    return;
+  }
+  let candidate = value;
+  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(candidate)) candidate = `http://${candidate}`;
+  openInPane(session, candidate);
+}
+
+async function handleBrowserUrlInput(session, raw) {
+  const value = String(raw || '').trim();
+  const suggestions = session.els.urlSuggestions;
+  if (!looksLikeHtmlExplorerEntry(value)) {
+    suggestions.classList.add('hidden');
+    return;
+  }
+  const tab = openHtmlExplorer(session, { query: value.split('/').pop() || value });
+  session.els.urlBar.value = raw;
+  let index;
+  try { index = await window.chromux.projectHtmlIndex({ sessionId: session.id, launchCwd: session.cwd }); } catch { index = null; }
+  if (!index || !index.ok || activeBrowserTab(session) !== tab) return;
+  const needle = value.replace(/^file:/i, '').replace(/^.*\//, '').toLowerCase();
+  const matches = index.files.filter((file) => file.path.toLowerCase().includes(needle)).slice(0, 8);
+  suggestions.innerHTML = '';
+  for (const file of matches) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = file.path;
+    button.onmousedown = (event) => event.preventDefault();
+    button.onclick = () => resolveHtmlEntry(session, file.path);
+    suggestions.appendChild(button);
+  }
+  suggestions.classList.toggle('hidden', matches.length === 0);
+}
+
 function renderConsoleChip(session) {
-  const b = session.browser;
-  const errors = b.consoleBuf.filter((c) => c.level === 'error').length;
+  const b = activePageTab(session);
+  const errors = b ? b.consoleBuf.filter((c) => c.level === 'error').length : 0;
   const chip = session.els.consoleChip;
-  chip.textContent = errors > 0 ? `⚠ ${errors} err · ${b.consoleTotal} logs` : `${b.consoleTotal} logs`;
+  const total = b ? b.consoleTotal : 0;
+  chip.textContent = errors > 0 ? `⚠ ${errors} err · ${total} logs` : `${total} logs`;
   chip.classList.toggle('has-errors', errors > 0);
 }
 
@@ -2053,24 +2460,36 @@ const PICKER_JS = String.raw`
   addEventListener('keydown', key, true);
 })();`;
 
-function setPicking(session, on) {
-  session.browser.picking = on;
+function setPicking(session, on, targetTab = activePageTab(session)) {
+  if (targetTab) targetTab.picking = on;
   session.els.pickBtn.classList.toggle('armed', on);
   session.els.pickBtn.textContent = on ? 'PICKING… ESC' : '⌖ PICK ELEMENT';
 }
 
-async function startPick(session) {
-  if (!session.browser.webview || session.browser.picking) return;
-  setPicking(session, true);
-  try {
-    await session.browser.webview.executeJavaScript(PICKER_JS);
-  } catch {
-    setPicking(session, false);
+function cancelPicking(session, targetTab = activePageTab(session)) {
+  if (!targetTab) return;
+  setPicking(session, false, targetTab);
+  if (targetTab.webview) {
+    targetTab.webview.executeJavaScript(
+      "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))"
+    ).catch(() => {});
   }
 }
 
-function onElementPicked(session, data) {
-  setPicking(session, false);
+async function startPick(session) {
+  const tab = activePageTab(session);
+  if (!tab || !tab.webview || tab.picking) return;
+  setPicking(session, true, tab);
+  try {
+    await tab.webview.executeJavaScript(PICKER_JS);
+  } catch {
+    setPicking(session, false, tab);
+  }
+}
+
+function onElementPicked(session, data, targetTab = activePageTab(session)) {
+  setPicking(session, false, targetTab);
+  if (!targetTab || activePageTab(session) !== targetTab) return;
   openCaptureModal(session, {
     selector: data.selector || null,
     outerHTML: data.outerHTML || null,
@@ -2084,8 +2503,9 @@ function onElementPicked(session, data) {
 // file-drop. The payload contract lives in docs/capture-payload.md.
 // ───────────────────────────────────────────────────────────────────────────
 
-async function openCaptureModal(session, selection) {
-  const b = session.browser;
+async function openCaptureModal(session, selection, targetTab = activePageTab(session)) {
+  const b = targetTab;
+  if (!b || !b.webview) return;
   let pngBase64 = null;
   let shotDataUrl = null;
   try {
@@ -2758,6 +3178,8 @@ function buildSessionView(session) {
 
   const back = document.createElement('button'); back.className = 'nav-btn'; back.textContent = '‹'; back.title = 'Back';
   const reload = document.createElement('button'); reload.className = 'nav-btn'; reload.textContent = '⟳'; reload.title = 'Reload';
+  const searchHtmlBtn = document.createElement('button');
+  searchHtmlBtn.className = 'nav-btn html-search-btn'; searchHtmlBtn.textContent = '⌕'; searchHtmlBtn.title = 'Explore project HTML';
   const collapseBtn = document.createElement('button');
   collapseBtn.className = 'head-btn browser-rail-toggle collapse-btn';
   collapseBtn.title = 'Open paired browser (⌘⇧B)';
@@ -2765,7 +3187,10 @@ function buildSessionView(session) {
   renderBrowserRailToggle(collapseBtn, true);
   const urlBar = document.createElement('input');
   urlBar.className = 'url-bar'; urlBar.type = 'text'; urlBar.spellcheck = false;
+  urlBar.setAttribute('autocomplete', 'off');
   urlBar.placeholder = 'awaiting preview — or type a URL and hit ⏎';
+  const urlSuggestions = document.createElement('div');
+  urlSuggestions.className = 'url-suggestions hidden';
   const favoriteBtn = document.createElement('button');
   favoriteBtn.className = 'nav-btn favorite-btn'; favoriteBtn.textContent = '☆';
   favoriteBtn.title = 'Add current page to favorites'; favoriteBtn.disabled = true;
@@ -2797,8 +3222,11 @@ function buildSessionView(session) {
   captureBtn.className = 'head-btn'; captureBtn.textContent = '⚡ CAPTURE'; captureBtn.disabled = true;
   captureBtn.title = 'Capture page (console + screenshot + URL) without picking an element';
 
-  browserToolbar.append(back, reload, urlBar, favoriteBtn, consoleChip, captureChip, queueBtn, favoritesBtn, pickBtn, captureBtn);
+  browserToolbar.append(back, reload, searchHtmlBtn, urlBar, favoriteBtn, consoleChip, captureChip, queueBtn, favoritesBtn, pickBtn, captureBtn);
   webHead.append(webLabel, browserToolbar);
+
+  const browserTabs = document.createElement('div');
+  browserTabs.className = 'browser-tabs';
 
   const queuePanel = document.createElement('div');
   queuePanel.className = 'queue-panel hidden';
@@ -2817,6 +3245,8 @@ function buildSessionView(session) {
 
   const webHost = document.createElement('div');
   webHost.className = 'web-host';
+  const explorerHost = document.createElement('div');
+  explorerHost.className = 'html-explorer hidden';
   const placeholder = document.createElement('div');
   placeholder.className = 'web-placeholder';
   placeholder.innerHTML = `
@@ -2829,27 +3259,32 @@ function buildSessionView(session) {
   const refreshFlash = document.createElement('div');
   refreshFlash.className = 'refresh-flash';
   refreshFlash.textContent = 'AUTO-REFRESHED';
-  webHost.append(placeholder, refreshFlash);
+  webHost.append(placeholder, explorerHost, refreshFlash, urlSuggestions);
 
   const browserRail = document.createElement('div');
   browserRail.className = 'browser-rail';
   browserRail.appendChild(collapseBtn);
-  browserContent.append(webHead, queuePanel, favoritesPanel, webHost);
+  browserContent.append(webHead, browserTabs, queuePanel, favoritesPanel, webHost);
   webPane.append(browserContent, browserRail);
   view.append(termPane, divider, webPane);
   $('#views').appendChild(view);
 
   // wiring
-  back.onclick = () => { if (session.browser.webview) session.browser.webview.goBack(); };
-  reload.onclick = () => { if (session.browser.webview) session.browser.webview.reload(); };
+  back.onclick = () => { const tab = activePageTab(session); if (tab && tab.webview) tab.webview.goBack(); };
+  reload.onclick = () => {
+    const tab = activePageTab(session);
+    if (tab && tab.webview) tab.webview.reload();
+    else if (activeBrowserTab(session)?.type === 'explorer') refreshHtmlExplorer(session, activeBrowserTab(session));
+  };
+  searchHtmlBtn.onclick = () => openHtmlExplorer(session);
   urlBar.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
-      let u = urlBar.value.trim();
-      if (!u) return;
-      if (!/^(https?|file):\/\//.test(u)) u = u.startsWith('/') ? 'file://' + u : 'http://' + u;
-      openInPane(session, u);
+      submitBrowserUrlEntry(session, urlBar.value);
     }
+    if (e.key === 'Escape') urlSuggestions.classList.add('hidden');
   });
+  urlBar.addEventListener('input', () => handleBrowserUrlInput(session, urlBar.value));
+  urlBar.addEventListener('blur', () => setTimeout(() => urlSuggestions.classList.add('hidden'), 120));
   queueBtn.onclick = () => {
     favoritesPanel.classList.add('hidden');
     queuePanel.classList.toggle('hidden');
@@ -2858,7 +3293,7 @@ function buildSessionView(session) {
     queuePanel.classList.add('hidden');
     favoritesPanel.classList.toggle('hidden');
   };
-  favoriteBtn.onclick = () => toggleFavorite(session, session.browser.currentUrl || urlBar.value);
+  favoriteBtn.onclick = () => toggleFavorite(session, activePageTab(session)?.currentUrl || urlBar.value);
   composeBtn.onclick = () => openComposer(session);
   closeComposerBtn.onclick = () => closeComposer(session);
   historyBtn.onclick = () => toggleComposerHistory(session);
@@ -2874,7 +3309,7 @@ function buildSessionView(session) {
   clearHistoryBtn.onclick = () => clearComposerHistory(session);
   collapseBtn.onclick = () => setBrowserCollapsed(session, !session.browser.collapsed);
   pickBtn.onclick = () => (session.browser.picking ? null : startPick(session));
-  captureBtn.onclick = () => openCaptureModal(session, { selector: null, outerHTML: null, pageTitle: null, pageUrl: session.browser.currentUrl });
+  captureBtn.onclick = () => openCaptureModal(session, { selector: null, outerHTML: null, pageTitle: null, pageUrl: activePageTab(session)?.currentUrl || null });
 
   // divider drag
   divider.addEventListener('mousedown', (e) => {
@@ -2902,9 +3337,9 @@ function buildSessionView(session) {
     view, termPane, termLabel, termHost, scrollToBottom, composeBtn, composer, composerTextarea, composerStatus, composerCount,
     submitComposerBtn, historyBtn, expandComposerBtn, closeComposerBtn, composerInputChoice, composerInputChoiceActions,
     historyDrawer, historySearch, historyList, clearHistoryBtn,
-    urlBar, favoriteBtn, favoritesBtn, favoritesBadge, favoritesPanel, favoritesList, queueBtn, queueBadge, queuePanel, queueList,
+    back, reload, searchHtmlBtn, urlBar, urlSuggestions, favoriteBtn, favoritesBtn, favoritesBadge, favoritesPanel, favoritesList, queueBtn, queueBadge, queuePanel, queueList,
     consoleChip, captureChip, pickBtn, captureBtn, webHost, placeholder, refreshFlash,
-    divider, webPane, browserContent, browserRail, browserToolbar, collapseBtn,
+    explorerHost, browserTabs, divider, webPane, browserContent, browserRail, browserToolbar, collapseBtn,
   };
 }
 
@@ -4661,7 +5096,10 @@ async function createSession(options) {
   return createSessionNow(options);
 }
 
-async function createSessionNow({ name, cwd, agent, initialUrl = null, initialQueue = [], initialAttentionRecords = [], command = undefined, resumeLaunch = null, composerDraft = '' }) {
+async function createSessionNow({
+  name, cwd, agent, initialUrl = null, initialBrowserTabs = [], initialActiveBrowserTabId = null,
+  initialQueue = [], initialAttentionRecords = [], command = undefined, resumeLaunch = null, composerDraft = '',
+}) {
   state.counter += 1;
   const id = 's' + state.counter;
   const session = newSessionShape({ id, name, cwd, agent });
@@ -4679,6 +5117,35 @@ async function createSessionNow({ name, cwd, agent, initialUrl = null, initialQu
   const viewEls = buildSessionView(session);
   const tabEls = buildSessionTab(session);
   session.els = { ...viewEls, ...tabEls };
+  if (Array.isArray(initialBrowserTabs)) {
+    for (const saved of initialBrowserTabs.slice(0, 50)) {
+      if (!saved || typeof saved !== 'object') continue;
+      if (saved.type === 'explorer' && !htmlExplorerTab(session)) {
+        session.browser.tabs.push({
+          id: String(saved.id || browserTabId(session, 'explorer')),
+          type: 'explorer',
+          title: 'Project HTML',
+          path: String(saved.path || ''),
+          query: String(saved.query || ''),
+          index: null,
+          requestId: 0,
+        });
+      } else if (saved.type === 'page' && normalizedBrowserUrl(saved.url)) {
+        session.browser.tabs.push(createPageTabState(
+          String(saved.id || browserTabId(session, 'page')),
+          normalizedBrowserUrl(saved.url),
+          saved.title || saved.url,
+        ));
+      }
+    }
+  }
+  if (session.browser.tabs.length) {
+    session.browser.tabCounter = Math.max(session.browser.tabCounter, session.browser.tabs.length);
+    session.browser.activeTabId = session.browser.tabs.some((tab) => tab.id === initialActiveBrowserTabId)
+      ? initialActiveBrowserTabId
+      : session.browser.tabs[0].id;
+  }
+  renderBrowserTabs(session);
   renderComposer(session);
   applyBrowserLayout(session);
 
@@ -4690,6 +5157,11 @@ async function createSessionNow({ name, cwd, agent, initialUrl = null, initialQu
     scrollback: 8000,
     macOptionIsMeta: true,
     theme: terminalThemeFor(),
+    linkHandler: {
+      activate(event, text) {
+        activateOsc8TerminalLink(session, text, event);
+      },
+    },
   });
   const fitAddon = new FitAddon.FitAddon();
   term.loadAddon(fitAddon);
@@ -4724,7 +5196,8 @@ async function createSessionNow({ name, cwd, agent, initialUrl = null, initialQu
     ? initialQueue.map((item) => normalizeQueueItem(item, 'RESTORE')).filter(Boolean)
     : [];
   renderQueue(session);
-  if (initialUrl) openInPane(session, initialUrl);
+  if (session.browser.activeTabId) activateBrowserTab(session, session.browser.activeTabId);
+  else if (initialUrl) openInPane(session, initialUrl);
   activateSession(id, { consumeRestoredCompletion: false });
   session.restoredAttentionRecords = Array.isArray(initialAttentionRecords)
     ? initialAttentionRecords.filter((record) => record && RESTORE_ATTENTION_TYPES.has(record.type))
@@ -4998,7 +5471,12 @@ function snapshotOpenSessions() {
     agent: session.agent || '',
     resumeId: session.resumeId || null,
     alive: Boolean(session.lifecycle.alive),
-    currentUrl: session.browser.currentUrl || null,
+    currentUrl: activePageTab(session)?.currentUrl || null,
+    browserTabs: session.browser.tabs.map((tab) => (tab.type === 'explorer'
+      ? { id: tab.id, type: 'explorer', title: 'Project HTML', path: tab.path || '', query: tab.query || '' }
+      : { id: tab.id, type: 'page', url: tab.currentUrl, title: tab.title || tab.currentUrl || 'Page' }))
+      .filter((tab) => tab.type === 'explorer' || tab.url),
+    activeBrowserTabId: session.browser.activeTabId || null,
     queue: session.browser.queue.map((item) => ({
       url: item.url,
       source: item.source || 'RESTORE',
@@ -5021,6 +5499,8 @@ function snapshotOpenSessions() {
       resumeId: options.resumeLaunch?.resumeId || null,
       alive: true,
       currentUrl: options.initialUrl || null,
+      browserTabs: Array.isArray(options.initialBrowserTabs) ? options.initialBrowserTabs : [],
+      activeBrowserTabId: options.initialActiveBrowserTabId || null,
       queue: Array.isArray(options.initialQueue) ? options.initialQueue : [],
       ...(Array.isArray(options.initialAttentionRecords) && options.initialAttentionRecords.length
         ? { attentionRecords: options.initialAttentionRecords }
@@ -5450,8 +5930,9 @@ window.chromux.onPtyExit(handlePtyExit);
 // popups intercepted in main → paired session's review queue
 window.chromux.onWebviewPopup(({ webContentsId, url }) => {
   for (const s of state.sessions.values()) {
-    if (s.browser.webContentsId === webContentsId) {
-      routePreview(s, normalizePreviewUrl(url), 'POPUP');
+    if (s.browser.tabs.some((tab) => tab.type === 'page' && tab.webContentsId === webContentsId)) {
+      const safeUrl = normalizedBrowserUrl(url);
+      if (safeUrl) routePreview(s, safeUrl, 'POPUP');
       return;
     }
   }
@@ -5586,6 +6067,8 @@ async function openRestoredSession(row) {
     cwd: resolved.cwd || (state.env ? state.env.home : '~'),
     agent: resolved.agent || '',
     initialUrl: resolved.currentUrl || null,
+    initialBrowserTabs: resolved.browserTabs || row.browserTabs || [],
+    initialActiveBrowserTabId: resolved.activeBrowserTabId || row.activeBrowserTabId || null,
     initialQueue: resolved.queue || [],
     composerDraft: resolved.composerDraft || '',
     command,
@@ -6032,6 +6515,8 @@ async function autoRestoreWorkspace() {
         cwd: row.cwd || (state.env ? state.env.home : '~'),
         agent: row.agent || '',
         initialUrl: row.currentUrl || null,
+        initialBrowserTabs: row.browserTabs || [],
+        initialActiveBrowserTabId: row.activeBrowserTabId || null,
         initialQueue: row.queue || [],
         initialAttentionRecords: row.attentionRecords || [],
         composerDraft: row.composerDraft || '',
@@ -6637,7 +7122,7 @@ if (window.chromuxTest) {
     const viewEls = buildSessionView(session);
     const tabEls = buildSessionTab(session);
     const written = [];
-    session.els = { ...viewEls, ...tabEls };
+  session.els = { ...viewEls, ...tabEls };
     renderComposer(session);
     applyBrowserLayout(session);
     session._written = written;
@@ -7648,11 +8133,66 @@ if (window.chromuxTest) {
       flushRender();
       return true;
     },
+    openNew(id, url, title = '') {
+      const tab = openOrFocusBrowserTab(testSession(id), url, title);
+      flushRender();
+      return tab ? tab.id : null;
+    },
+    tabs(id) {
+      const session = testSession(id);
+      return session.browser.tabs.map((tab) => ({
+        id: tab.id,
+        type: tab.type,
+        url: tab.currentUrl || null,
+        title: tab.title,
+        path: tab.path || '',
+        query: tab.query || '',
+        active: tab.id === session.browser.activeTabId,
+        consoleTotal: tab.consoleTotal || 0,
+      }));
+    },
+    activateTab(id, tabId) {
+      const result = activateBrowserTab(testSession(id), tabId);
+      flushRender();
+      return result;
+    },
+    closeTab(id, tabId) {
+      closeBrowserTab(testSession(id), tabId);
+      flushRender();
+    },
+    setTabConsole(id, tabId, total) {
+      const session = testSession(id);
+      const tab = session.browser.tabs.find((item) => item.id === tabId);
+      if (tab && tab.type === 'page') {
+        tab.consoleTotal = total;
+        tab.consoleBuf = total ? [{ level: 'error', message: 'fixture' }] : [];
+      }
+      if (activePageTab(session) === tab) renderConsoleChip(session);
+    },
+    consoleText(id) {
+      return testSession(id).els.consoleChip.textContent;
+    },
+    explore(id, options = {}) {
+      const tab = openHtmlExplorer(testSession(id), options);
+      flushRender();
+      return tab.id;
+    },
+    submit(id, value) {
+      submitBrowserUrlEntry(testSession(id), value);
+      flushRender();
+    },
+    snapshot: () => snapshotOpenSessions().map((row) => ({ ...row })),
     clickTerminalLink(id, url) {
       let prevented = false;
       activateTerminalLink(testSession(id), url, { preventDefault() { prevented = true; } });
       flushRender();
       return prevented;
+    },
+    clickOsc8Link(id, url) {
+      let prevented = false;
+      const activated = activateOsc8TerminalLink(testSession(id), url, { preventDefault() { prevented = true; } });
+      flushRender();
+      return { activated, prevented };
     },
     webview(id) {
       return testSession(id).browser.webview;

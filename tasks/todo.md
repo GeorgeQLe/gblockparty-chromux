@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Add per-session paired-browser tabs, internal terminal HTTP(S) link routing, a project-scoped HTML explorer with live-cwd resolution/autocomplete, schema-compatible restore persistence, and ship as v0.51.0. _(source: user-supplied implementation plan; evidence: `prototype/main.js`, `prototype/preload.js`, `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`, `prototype/scripts/test-browser-tabs-html-explorer.js`, complete prototype suite, packaged smoke, `RELEASES.md`)_
+
 - [x] Keep exact Codex `/clear` submissions idle, harden rendered completion recovery with per-turn generations and a busy-render latch, and ship as v0.50.1. _(source: user-approved implementation plan; evidence: `prototype/renderer/attention.js`, `prototype/renderer/renderer.js`, `prototype/scripts/test-turn-signals-renderer.js`, focused renderer suites, `RELEASES.md`)_
 
 - [x] Add native double-click activation to every Threads session row, preserve immediate single-click previews and inline attention actions, restore terminal focus, and ship as v0.50.0. _(source: user-approved implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-session-rail-renderer.js`, focused renderer suites, packaged Electron verification, `RELEASES.md`)_

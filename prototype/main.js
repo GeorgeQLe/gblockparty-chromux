@@ -8,6 +8,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const crypto = require('crypto');
+const { pathToFileURL } = require('url');
 const { spawn, execFile } = require('child_process');
 const pty = require('node-pty');
 const yaml = require('js-yaml');
@@ -76,6 +77,13 @@ const PACKAGE_JSON_BYTES_MAX = 1024 * 1024;
 const WINDOW_BUTTON_COORD_MAX = 200;
 const GIT_CWD_MAX = 4096;
 const GIT_ROOT_TIMEOUT_MS = 2500;
+const HTML_INDEX_MAX_FILES = 10000;
+const HTML_INDEX_INPUT_MAX = 4096;
+const HTML_INDEX_EXCLUDED_DIRS = new Set([
+  '.git', '.hg', '.svn', 'node_modules', 'bower_components',
+  '.npm', '.pnpm-store', '.yarn', '.cache', '.turbo',
+  'vendor', '.venv', 'venv', 'Pods',
+]);
 
 let win = null;
 const ptys = new Map(); // sessionId -> IPty
@@ -809,6 +817,42 @@ function sanitizeRestoreSession(session) {
       };
     }).filter(Boolean)
     : [];
+  const browserTabIds = new Set();
+  const browserTabs = Array.isArray(session.browserTabs)
+    ? session.browserTabs.slice(0, 50).map((tab, index) => {
+      if (!tab || typeof tab !== 'object') return null;
+      const type = tab.type === 'explorer' ? 'explorer' : 'page';
+      let id = typeof tab.id === 'string' && tab.id ? tab.id.slice(0, 100) : `${type}-${index}`;
+      while (browserTabIds.has(id)) id = `${type}-${index}-${browserTabIds.size}`;
+      browserTabIds.add(id);
+      if (tab.type === 'explorer') {
+        return {
+          id,
+          type: 'explorer',
+          title: 'Project HTML',
+          path: typeof tab.path === 'string' ? tab.path.slice(0, HTML_INDEX_INPUT_MAX) : '',
+          query: typeof tab.query === 'string' ? tab.query.slice(0, 500) : '',
+        };
+      }
+      if (tab.type !== 'page' || typeof tab.url !== 'string' || !tab.url) return null;
+      try {
+        const parsed = new URL(tab.url);
+        if (!['http:', 'https:', 'file:'].includes(parsed.protocol) || parsed.username || parsed.password) return null;
+      } catch { return null; }
+      return {
+        id,
+        type: 'page',
+        url: tab.url.slice(0, 8192),
+        title: typeof tab.title === 'string' && tab.title ? tab.title.slice(0, 200) : tab.url.slice(0, 200),
+      };
+    }).filter(Boolean)
+    : [];
+  if (browserTabs.length === 0 && typeof session.currentUrl === 'string' && session.currentUrl) {
+    browserTabs.push({ id: 'legacy-page', type: 'page', url: session.currentUrl, title: session.currentUrl.slice(0, 200) });
+  }
+  const activeBrowserTabId = browserTabs.some((tab) => tab.id === session.activeBrowserTabId)
+    ? session.activeBrowserTabId
+    : (browserTabs[0] ? browserTabs[0].id : null);
   return {
     name: String(session.name || path.basename(cwd) || 'session').slice(0, 80),
     cwd,
@@ -816,6 +860,8 @@ function sanitizeRestoreSession(session) {
     resumeId: sanitizeResumeId(session.resumeId),
     alive: session.alive !== false,
     currentUrl: typeof session.currentUrl === 'string' && session.currentUrl ? session.currentUrl : null,
+    browserTabs,
+    activeBrowserTabId,
     queue,
     savedAt: typeof session.savedAt === 'string' ? session.savedAt : new Date().toISOString(),
     opened: Boolean(session.opened),
@@ -829,7 +875,7 @@ function writeRestoreSnapshot({ sessions, reason = 'manual', restoreId = null, s
   ensureDirs();
   const clean = Array.isArray(sessions) ? sessions.map(sanitizeRestoreSession).filter(Boolean) : [];
   const payload = {
-    schemaVersion: 5,
+    schemaVersion: 6,
     restoreId: restoreId || `restore-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     reason,
     savedAt: savedAt || new Date().toISOString(),
@@ -1333,6 +1379,114 @@ async function gitDiffSummary(cwd) {
   };
 }
 
+function isWithinProject(root, candidate) {
+  const relative = path.relative(root, candidate);
+  return relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative));
+}
+
+async function htmlProjectContext({ sessionId, launchCwd } = {}) {
+  let liveCwd = null;
+  const ptySession = typeof sessionId === 'string' ? ptys.get(sessionId) : null;
+  if (ptySession && Number.isInteger(ptySession.pid)) {
+    try { liveCwd = (await lsofCwds([ptySession.pid])).get(ptySession.pid) || null; } catch { liveCwd = null; }
+  }
+  const launch = typeof launchCwd === 'string' && launchCwd.length <= HTML_INDEX_INPUT_MAX && path.isAbsolute(launchCwd)
+    ? launchCwd
+    : null;
+  const base = liveCwd || launch;
+  if (!base) return { ok: false, error: 'Project directory is unavailable.', root: null, liveCwd: null, launchCwd: launch };
+  let root = await gitRoot(launch || base);
+  if (!root) {
+    try { root = fs.realpathSync(launch || base); } catch { return { ok: false, error: 'Project directory is unavailable.', root: null, liveCwd, launchCwd: launch }; }
+  }
+  return { ok: true, root, liveCwd: liveCwd || base, launchCwd: launch || base };
+}
+
+function walkProjectHtml(root) {
+  const files = [];
+  const visit = (directory) => {
+    if (files.length >= HTML_INDEX_MAX_FILES) return;
+    let rows;
+    try { rows = fs.readdirSync(directory, { withFileTypes: true }); } catch { return; }
+    rows.sort((a, b) => a.name.localeCompare(b.name));
+    for (const row of rows) {
+      if (files.length >= HTML_INDEX_MAX_FILES) break;
+      if (row.isSymbolicLink()) continue;
+      if (row.isDirectory()) {
+        if (!HTML_INDEX_EXCLUDED_DIRS.has(row.name)) visit(path.join(directory, row.name));
+        continue;
+      }
+      if (!row.isFile() || !/\.html?$/i.test(row.name)) continue;
+      const absolute = path.join(directory, row.name);
+      let real;
+      try { real = fs.realpathSync(absolute); } catch { continue; }
+      if (!isWithinProject(root, real)) continue;
+      files.push({ path: path.relative(root, real).split(path.sep).join('/'), name: row.name });
+    }
+  };
+  visit(root);
+  return { files, truncated: files.length >= HTML_INDEX_MAX_FILES };
+}
+
+async function projectHtmlIndex(options = {}) {
+  const context = await htmlProjectContext(options);
+  if (!context.ok) return { ...context, files: [] };
+  return { ...context, ...walkProjectHtml(context.root) };
+}
+
+function htmlFileUrl(absolute) {
+  return pathToFileURL(absolute).href;
+}
+
+async function resolveProjectHtml(options = {}) {
+  const reference = typeof options.reference === 'string' ? options.reference.trim() : '';
+  if (!reference || reference.length > HTML_INDEX_INPUT_MAX || reference.includes('\0') || !/\.html?(?:[?#].*)?$/i.test(reference)) {
+    return { ok: false, status: 'invalid', error: 'Enter an HTML file path.' };
+  }
+  const context = await htmlProjectContext(options);
+  if (!context.ok) return { ...context, status: 'error' };
+  let decoded = reference.replace(/^file:\/\//i, '');
+  try { decoded = decodeURIComponent(decoded); } catch { return { ...context, ok: false, status: 'invalid', error: 'Malformed path encoding.' }; }
+  const decodedWithoutUrlSuffix = decoded.replace(/[?#].*$/, '');
+  const candidates = [];
+  const addCandidate = (candidate) => {
+    const absolute = path.resolve(candidate);
+    if (!/\.html?$/i.test(absolute)) return;
+    try {
+      const real = fs.realpathSync(absolute);
+      if (isWithinProject(context.root, real) && fs.statSync(real).isFile() && !candidates.includes(real)) candidates.push(real);
+    } catch { /* absent */ }
+  };
+  const explicitReferences = decoded === decodedWithoutUrlSuffix ? [decoded] : [decoded, decodedWithoutUrlSuffix];
+  for (const explicitReference of explicitReferences) {
+    if (explicitReference.startsWith('~/')) addCandidate(path.join(os.homedir(), explicitReference.slice(2)));
+    else if (path.isAbsolute(explicitReference)) addCandidate(explicitReference);
+    else {
+      addCandidate(path.join(context.liveCwd, explicitReference));
+      addCandidate(path.join(context.launchCwd, explicitReference));
+      addCandidate(path.join(context.root, explicitReference));
+    }
+  }
+  if (candidates.length === 1) {
+    return { ...context, ok: true, status: 'resolved', path: path.relative(context.root, candidates[0]).split(path.sep).join('/'), url: htmlFileUrl(candidates[0]) };
+  }
+  const { files } = walkProjectHtml(context.root);
+  const normalized = decodedWithoutUrlSuffix.replace(/\\/g, '/').replace(/^\.?\//, '');
+  const fallback = files.filter((file) => file.path === normalized || file.path.endsWith(`/${normalized}`) || file.name === path.basename(normalized));
+  if (fallback.length === 1) {
+    const absolute = path.join(context.root, ...fallback[0].path.split('/'));
+    return { ...context, ok: true, status: 'resolved', path: fallback[0].path, url: htmlFileUrl(absolute) };
+  }
+  return {
+    ...context,
+    ok: false,
+    status: fallback.length > 1 ? 'ambiguous' : 'missing',
+    query: path.basename(normalized),
+    matches: fallback.slice(0, 100),
+    error: fallback.length > 1 ? 'Multiple project HTML files match.' : 'No matching project HTML file was found.',
+  };
+}
+
 async function listTtyProcesses() {
   const out = await runCmd('/bin/ps', ['-axo', 'pid=,ppid=,tty=,etime=,command=']);
   const procs = [];
@@ -1727,6 +1881,8 @@ ipcMain.handle('detect-pty-agents', async () => {
 ipcMain.handle('file-exists', (_e, p) => {
   try { return fs.existsSync(p); } catch { return false; }
 });
+ipcMain.handle('project-html-index', (_e, opts = {}) => projectHtmlIndex(opts));
+ipcMain.handle('resolve-project-html', (_e, opts = {}) => resolveProjectHtml(opts));
 
 ipcMain.handle('pick-directory', async () => {
   const res = await dialog.showOpenDialog(win, {

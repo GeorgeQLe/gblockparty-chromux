@@ -112,6 +112,12 @@ Open **RESOURCES** to inspect host-wide owners, FIFO queues, lease expiry, wait 
    Opening a URL also restores a shut browser. New sessions start with the paired browser
    shut; use **BROWSER** / **COLLAPSE** or `Command+Shift+B` to open/shut it. Re-emitting
    the same already-open URL auto-refreshes the pane (throttled). Popups queue too.
+
+   Each terminal session owns its own horizontally scrollable browser tab strip. Terminal
+   links, queue entries, favorites, and project HTML selections open a new tab or focus an
+   already-open normalized URL. Typing a web URL navigates the active page tab. Use **⌕**
+   (or type `file:`, `/`, `./`, `../`, `~/`, or an HTML filename) to open the project HTML
+   explorer without suspending live page tabs.
 ### Saved projects
 
 In **NEW SESSION**, choose a directory with a readable `package.json`, select a script, and save the
@@ -172,7 +178,7 @@ See [`docs/troubleshooting.md`](docs/troubleshooting.md) for the full support gu
 | --- | --- |
 | Capture payloads + screenshots | `~/.chromux/captures/<timestamp>/` |
 | Delivery log | `~/.chromux/delivery-log.jsonl` |
-| Restore snapshot | `~/.chromux/restore-sessions.json` (schema v5; includes validated provider conversation IDs, optional 64 KiB composer drafts, and up to 20 bounded historical Needs Attention records per session) |
+| Restore snapshot | `~/.chromux/restore-sessions.json` (schema v6; includes validated provider conversation IDs, ordered browser page/explorer tabs, optional 64 KiB composer drafts, and up to 20 bounded historical Needs Attention records per session) |
 | Prompt history | `~/.chromux/prompt-history.json` (local plaintext, mode `0600`, 100 entries/project, 5 MiB total) |
 | Saved projects | `~/.chromux/projects.json` |
 | Update cache/source/install log | `~/.chromux/update-cache.json`, `~/.chromux/update-source.json`, `~/.chromux/update-install.log` |
@@ -198,7 +204,7 @@ an attentive Threads reason. A background completion remains in Needs Attention 
 or that reason is explicitly dismissed; a completion received by the active session is already seen. Opening a session never
 dismisses permission, authentication, input, rate-limit, or tool-failure attention. Chromux does not post
 macOS Notification Center alerts.
-| Browser pane profiles | Session-specific Electron partitions `persist:chromux-<session ID>` |
+| Browser pane profiles | Session-specific persistent Electron partitions shared by that session's page tabs |
 
 Chromux has no account, cloud sync, Chromux-hosted capture upload, or product
 telemetry in the current prototype. Browser pages, update checks, agent CLIs,

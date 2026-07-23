@@ -3,6 +3,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { pathToFileURL } = require('url');
 const { spawn } = require('child_process');
 
 const appDir = path.resolve(__dirname, '..');
@@ -23,7 +24,9 @@ const guestHtml = `<!doctype html>
   <div id="edit" contenteditable="true">contenteditable target</div>
 </body>
 </html>`;
-const guestUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(guestHtml);
+const guestPath = path.join(tmpDir, 'hotkey-debug-smoke.html');
+fs.writeFileSync(guestPath, guestHtml);
+const guestUrl = pathToFileURL(guestPath).href;
 
 fs.writeFileSync(e2ePath, `
 (async () => {

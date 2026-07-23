@@ -50,6 +50,8 @@ contextBridge.exposeInMainWorld('chromux', {
   // utilities
   toYaml: (obj) => yaml.dump(obj, { lineWidth: 120, noRefs: true }),
   fileExists: (p) => ipcRenderer.invoke('file-exists', p),
+  projectHtmlIndex: (opts) => ipcRenderer.invoke('project-html-index', opts || {}),
+  resolveProjectHtml: (opts) => ipcRenderer.invoke('resolve-project-html', opts || {}),
   pickDirectory: () => ipcRenderer.invoke('pick-directory'),
   revealPath: (p) => ipcRenderer.send('reveal-path', { p }),
   setWindowButtonPosition: (position) => ipcRenderer.send('set-window-button-position', position),

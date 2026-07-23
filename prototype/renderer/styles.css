@@ -1166,6 +1166,166 @@ body.dragging webview { pointer-events: none; }
 
 .web-host { flex: 1; position: relative; min-height: 0; background: #0a0c10; }
 .web-host webview { position: absolute; inset: 0; }
+.web-host webview.hidden { display: none; }
+
+.browser-tabs {
+  flex: none;
+  min-width: 0;
+  height: 30px;
+  display: flex;
+  align-items: stretch;
+  gap: 3px;
+  padding: 3px 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg2);
+  scrollbar-width: thin;
+}
+.browser-tab,
+.browser-tab-add {
+  flex: 0 0 auto;
+  height: 23px;
+  border: 1px solid var(--line);
+  background: var(--bg3);
+  color: var(--dim);
+  font: 600 10px/1 var(--font-mono);
+  cursor: pointer;
+}
+.browser-tab {
+  width: clamp(105px, 24vw, 190px);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 4px 0 8px;
+  text-align: left;
+}
+.browser-tab.active {
+  border-color: var(--cyan);
+  color: var(--text);
+  background: color-mix(in srgb, var(--bg3) 84%, var(--cyan));
+}
+.browser-tab-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.browser-tab-close {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  border-radius: 2px;
+  color: var(--faint);
+  font-size: 14px;
+}
+.browser-tab-close:hover { color: var(--text); background: color-mix(in srgb, var(--bg3) 72%, var(--red)); }
+.browser-tab-add { width: 25px; font-size: 15px; }
+.browser-tab:hover,
+.browser-tab-add:hover { border-color: var(--amber); }
+
+.html-explorer {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  overflow: auto;
+  color: var(--text);
+  background: var(--bg1);
+}
+.html-explorer-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) minmax(120px, 220px) auto;
+  gap: 7px;
+  padding: 8px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg2);
+}
+.html-breadcrumb {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.html-breadcrumb button {
+  border: 0;
+  padding: 2px 3px;
+  background: transparent;
+  color: var(--cyan);
+  font: 600 10.5px/1.2 var(--font-mono);
+  cursor: pointer;
+}
+.html-explorer-filter {
+  min-width: 0;
+  height: 25px;
+  border: 1px solid var(--line);
+  background: var(--bg3);
+  color: var(--text);
+  padding: 0 8px;
+  font: 11px/1 var(--font-mono);
+}
+.html-explorer-row {
+  width: 100%;
+  min-height: 35px;
+  display: grid;
+  grid-template-columns: minmax(110px, .45fr) minmax(140px, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 7px 11px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  font: 11px/1.35 var(--font-mono);
+}
+.html-explorer-row.folder { grid-template-columns: 16px 1fr; color: var(--cyan); }
+.html-explorer-row:hover,
+.html-explorer-row:focus-visible { background: color-mix(in srgb, var(--bg2) 82%, var(--cyan)); outline: none; }
+.html-file-name,
+.html-file-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.html-file-path { color: var(--faint); font-size: 10px; }
+.html-explorer-message { padding: 24px 14px; color: var(--faint); font: 11px/1.6 var(--font-mono); }
+.html-explorer-message.error { color: var(--red); }
+.url-suggestions {
+  position: absolute;
+  z-index: 12;
+  top: 0;
+  left: 8px;
+  right: 8px;
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid var(--line-hi);
+  background: var(--bg2);
+  box-shadow: 0 8px 24px rgba(0,0,0,.35);
+}
+.url-suggestions button {
+  width: 100%;
+  display: block;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  padding: 7px 9px;
+  text-align: left;
+  font: 10.5px/1.3 var(--font-mono);
+  cursor: pointer;
+}
+.url-suggestions button:hover { background: var(--bg3); color: var(--cyan); }
+
+@media (max-width: 900px) {
+  .html-explorer-toolbar { grid-template-columns: 1fr auto; }
+  .html-explorer-filter { grid-column: 1 / -1; grid-row: 2; }
+}
 
 .web-placeholder {
   position: absolute; inset: 0;

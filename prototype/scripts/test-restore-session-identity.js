@@ -107,6 +107,11 @@ fs.writeFileSync(e2ePath, `
 
   const saved = await window.chromux.saveRestoreSnapshot({ reason: 'manual', sessions: [
     { name: 'valid', cwd: ${JSON.stringify(shared)}, agent: 'claude', resumeId: ${JSON.stringify(ids.exactB)}, composerDraft: 'saved draft',
+      browserTabs: [
+        { id: 'page-a', type: 'page', url: 'https://example.com/a', title: 'A' },
+        { id: 'explorer-a', type: 'explorer', path: 'docs', query: 'guide' },
+      ],
+      activeBrowserTabId: 'explorer-a',
       attentionRecords: Array.from({ length: 25 }, (_, index) => ({
         id: 'attention:completed:' + index, type: 'completed', detail: 'Finished ' + index,
         occurredAt: Date.now() + index,
@@ -119,10 +124,14 @@ fs.writeFileSync(e2ePath, `
         { id: 'bad-time:1', type: 'delivery', detail: 'no', occurredAt: 0 },
       ] },
   ] });
-  expect(saved.schemaVersion === 5, 'new snapshot must use schema v5');
+  expect(saved.schemaVersion === 6, 'new snapshot must use schema v6');
   expect(saved.sessions[0].resumeId === ${JSON.stringify(ids.exactB)}, 'valid resumeId not persisted');
   expect(saved.sessions[1].resumeId === null, 'malformed resumeId persisted');
   expect(saved.sessions[0].composerDraft === 'saved draft', 'bounded composer draft not persisted');
+  expect(saved.sessions[0].browserTabs.length === 2
+    && saved.sessions[0].activeBrowserTabId === 'explorer-a'
+    && saved.sessions[0].browserTabs[1].query === 'guide',
+  'browser page/explorer tab snapshot was not preserved');
   expect(!Object.prototype.hasOwnProperty.call(saved.sessions[1], 'composerDraft'), 'oversized composer draft persisted');
   expect(saved.sessions[0].attentionRecords.length === 20, 'attention record count bound not enforced');
   expect(saved.sessions[0].attentionRecords[0].type === 'completed'

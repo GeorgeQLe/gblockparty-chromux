@@ -34,18 +34,33 @@ If the same URL is printed again, Chromux refreshes the pane instead of adding a
 
 Chromux detects absolute `.html` and `.htm` paths only after confirming the file exists. The resulting preview loads through `file://`.
 
-For terminal link clicks, Chromux also supports existing relative paths such as `./index.html`, `../page.html`, and `~/path/page.html`. Click the link in the terminal to open it in that session's paired browser.
+For terminal link clicks, Chromux resolves HTML paths against the live PTY directory,
+the session launch directory, and the Git/project root. If those do not resolve, a
+repository-wide filename/suffix match opens only when it is unique. Ambiguous matches
+open the project HTML explorer prefiltered to the filename instead of guessing.
 
 If a file preview did not open:
 
-1. Use an absolute path first, for example `/Users/me/project/dist/index.html`.
-2. Confirm the path exists and ends in `.html` or `.htm`.
-3. Avoid shell output that splits the path across lines.
-4. Drag the file path into the terminal or paste it into the browser URL bar as `file:///Users/me/project/dist/index.html`.
+1. Click **⌕** to open the HTML explorer rooted at the session's Git root (or launch directory).
+2. Filter by filename, browse folders containing HTML descendants, and use **REFRESH** after generating a file.
+3. Confirm the path stays inside the project and ends in `.html` or `.htm`; dependency/cache/VCS trees and outside symlinks are excluded.
+4. Paste absolute, home-relative, live-terminal-relative, launch-relative, or project-relative paths into the URL bar. Spaces and `#` characters are encoded when the file opens.
+
+## Paired browser tabs
+
+Terminal HTTP(S) links, queue **OPEN**, favorites, and explorer file selections
+create or focus a page tab in the originating session. Exact normalized URLs are
+deduplicated. A typed web URL navigates the active page tab, or creates one from
+the explorer/blank state. Closing the active tab chooses its nearest neighbor;
+closing the last tab returns to the blank preview.
+
+Back, reload, favorite, console, picker, and capture controls always target the
+active page tab. Page tabs in one session share cookies/storage, while different
+terminal sessions remain isolated.
 
 ## Review queue
 
-Chromux never auto-opens a detected preview. Every localhost / loopback / local `.html` hit and every popup goes to QUEUE until you approve it. Opening a queued, typed, or clicked URL loads the paired pane and restores the browser if it was shut.
+Chromux never auto-opens a detected preview. Every localhost / loopback / local `.html` hit and every popup goes to QUEUE until you approve it. Opening a queued or favorite URL creates/focuses a page tab and restores the browser if it was shut.
 
 Use QUEUE to open the next preview intentionally. Command-J reveals and focuses the next queued OPEN button without opening it. If a page seems stale, check whether the updated URL is waiting in QUEUE.
 
