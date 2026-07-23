@@ -1,5 +1,14 @@
 # Release Notes
 
+## GBlockParty Chromux v0.44.1
+
+Tag: `chromux-v0.44.1`
+
+- Keep the focused session tab fully visible when Threads, search, attention actions, keyboard shortcuts, or other programmatic navigation activate an off-screen session.
+- Reveal tabs minimally in either direction while preserving the current horizontal scroll position whenever the focused tab is already visible.
+- Respect the sticky Search/Add action boundary so a newly focused tab and its controls are not hidden underneath the action group.
+- Add real-renderer coverage for right and left reveals, sticky-control clearance, and the visible-tab no-op.
+
 ## GBlockParty Chromux v0.44.0
 
 Tag: `chromux-v0.44.0`

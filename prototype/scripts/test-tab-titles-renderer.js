@@ -164,6 +164,32 @@ fs.writeFileSync(e2ePath, `
     (workspaceRectAtStart.right - actionsRectAtStart.right)
       - (listRectAtStart.left - workspaceRectAtStart.left),
   ) < 1, 'sticky actions should preserve the tab strip margin at the editor right edge');
+
+  tabList.scrollLeft = 0;
+  await tick();
+  const rightHiddenTab = tabActions.previousElementSibling;
+  tabs.focus(short);
+  await tick();
+  const rightRevealedRect = rightHiddenTab.getBoundingClientRect();
+  const rightActionsRect = tabActions.getBoundingClientRect();
+  expect(tabList.scrollLeft > 0, 'focusing an off-screen right tab should advance the tab strip');
+  expect(rightRevealedRect.right <= rightActionsRect.left - 5,
+    'focused right tab should be fully visible before the sticky search and add actions');
+
+  const visibleScrollLeft = tabList.scrollLeft;
+  tabs.focus(short);
+  await tick();
+  expect(Math.abs(tabList.scrollLeft - visibleScrollLeft) < 1,
+    'focusing an already-visible tab should preserve the tab strip position');
+
+  tabs.focus(first);
+  await tick();
+  const leftRevealedRect = firstTab.getBoundingClientRect();
+  expect(tabList.scrollLeft < visibleScrollLeft,
+    'focusing an off-screen left tab should rewind the tab strip');
+  expect(leftRevealedRect.left >= tabList.getBoundingClientRect().left - 1,
+    'focused left tab should be fully visible at the tab strip left edge');
+
   tabList.scrollLeft = tabList.scrollWidth;
   await tick();
   const finalTab = tabActions.previousElementSibling;

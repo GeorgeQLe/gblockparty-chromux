@@ -4132,6 +4132,26 @@ async function createSession({ name, cwd, agent, initialUrl = null, initialQueue
   return session;
 }
 
+function revealFocusedSessionTab(id) {
+  const session = state.sessions.get(id);
+  const tabList = $('#tab-list');
+  const tabActions = $('#tab-actions');
+  if (!session?.els?.tab || !tabList || !tabActions) return;
+
+  const tabRect = session.els.tab.getBoundingClientRect();
+  const listRect = tabList.getBoundingClientRect();
+  const actionsRect = tabActions.getBoundingClientRect();
+  const listStyle = getComputedStyle(tabList);
+  const tabGap = parseFloat(listStyle.columnGap || listStyle.gap) || 0;
+  const visibleRight = Math.min(listRect.right, actionsRect.left - tabGap);
+
+  if (tabRect.left < listRect.left) {
+    tabList.scrollLeft += tabRect.left - listRect.left;
+  } else if (tabRect.right > visibleRight) {
+    tabList.scrollLeft += tabRect.right - visibleRight;
+  }
+}
+
 function activateSession(id) {
   dismissThreadPreview();
   if (!state.ui.diagnosticSessionId || !state.sessions.has(state.ui.diagnosticSessionId)) state.ui.diagnosticSessionId = id;
@@ -4150,6 +4170,7 @@ function activateSession(id) {
   }
   $('#empty-state').classList.toggle('hidden', state.sessions.size > 0);
   renderTabs();
+  revealFocusedSessionTab(id);
   invalidate('shortcutDebug', ...(state.env && state.env.devMode ? ['diagnostics'] : []));
 }
 
