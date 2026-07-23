@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Add native double-click activation to every Threads session row, preserve immediate single-click previews and inline attention actions, restore terminal focus, and ship as v0.50.0. _(source: user-approved implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-session-rail-renderer.js`, focused renderer suites, packaged Electron verification, `RELEASES.md`)_
+
 - [x] Transfer the current rendered Codex prompt value into COMPOSE and every draft-conflict outcome, retain conservative shadow fallback behavior, and ship as v0.49.0. _(source: user-approved implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-composer-renderer.js`, focused renderer suites, packaged Electron verification, `RELEASES.md`)_
 
 - [x] Preserve working Threads spinner DOM nodes while typing unsubmitted terminal input, retain genuine submitted-input turn transitions, and ship as v0.48.1. _(source: user-approved implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-tab-activity-indicators-renderer.js`, focused activity/session-rail/turn/composer/update tests, `RELEASES.md`)_

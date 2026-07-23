@@ -3863,6 +3863,7 @@ function appendThreadSessionRow(host, session, { attention = null } = {}) {
       animateThreadSessionConfirmation(row, session);
     } else openThreadPreview(session, row);
   };
+  row.ondblclick = () => activateSession(session.id);
   syncThreadSessionRowPresentation(row, session);
   host.appendChild(row);
   return row;
@@ -6913,6 +6914,28 @@ if (window.chromuxTest) {
       const row = document.querySelector(`#thread-list .rail-session-row[data-session-id="${CSS.escape(id)}"]`);
       if (!row) throw new Error(`Missing rail row: ${id}`);
       row.click(); flushRender(); return state.activeId;
+    },
+    doubleClickRow(id) {
+      const row = document.querySelector(`#thread-list .rail-session-row[data-session-id="${CSS.escape(id)}"]`);
+      if (!row) throw new Error(`Missing rail row: ${id}`);
+      row.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+      row.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 2 }));
+      row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+      flushRender();
+      return state.activeId;
+    },
+    doubleClickAttentionAction(id, kind, label) {
+      const card = document.querySelector(`.attention-thread[data-session-id="${CSS.escape(id)}"]`);
+      const reason = [...(card?.querySelectorAll('.attention-reason') || [])]
+        .find((candidate) => candidate.querySelector('.attention-kind')?.textContent === kind);
+      const button = [...(reason?.querySelectorAll('.attention-actions .qi-btn') || [])]
+        .find((candidate) => candidate.textContent === label);
+      if (!button) throw new Error(`Missing ${label} action for ${kind} on ${id}`);
+      button.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+      button.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 2 }));
+      button.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+      flushRender();
+      return state.activeId;
     },
     write(id, data) {
       const term = testSession(id).term.term;

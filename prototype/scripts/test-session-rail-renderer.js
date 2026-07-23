@@ -267,6 +267,69 @@ fs.writeFileSync(e2ePath, `
   await wait(40);
   expect(!rail.preview(), 'closing the previewed session should dispose and dismiss its preview');
 
+  const ordinaryDouble = rail.addTerminalSession({
+    name: 'ordinary-double-click',
+    agent: 'codex',
+    cwd: ${JSON.stringify(looseDir)},
+  });
+  const workingDouble = rail.addTerminalSession({
+    name: 'working-double-click',
+    agent: 'claude',
+    cwd: ${JSON.stringify(repoAppDir)},
+  });
+  const attentionDouble = rail.addTerminalSession({
+    name: 'attention-double-click',
+    agent: 'grok',
+    cwd: ${JSON.stringify(repoApiDir)},
+  });
+  rail.focus(holder);
+  rail.emit(workingDouble, 'turn-start');
+  rail.emit(attentionDouble, 'turn-start');
+  rail.emit(attentionDouble, 'turn-end', 'Completed double-click fixture');
+  const doubleClickGroups = rail.groups();
+  expect(doubleClickGroups.filter((group) => group.key.startsWith('cwd:'))
+    .flatMap((group) => group.rows).some((row) => row.id === ordinaryDouble),
+  'ordinary double-click fixture should render in a working-directory section');
+  expect(doubleClickGroups.find((group) => group.key === 'status:working')
+    ?.rows.some((row) => row.id === workingDouble),
+  'working double-click fixture should render in the Working section');
+  expect(doubleClickGroups.find((group) => group.key === 'attention:needs')
+    ?.rows.some((row) => row.id === attentionDouble),
+  'attention double-click fixture should render in the Needs Attention section');
+
+  expect(rail.clickRow(ordinaryDouble) === holder,
+    'one click on an inactive ordinary row should preview without changing the active session');
+  await wait(40);
+  expect(rail.preview()?.sessionId === ordinaryDouble,
+    'one click on an inactive ordinary row should leave its preview open');
+  expect(rail.doubleClickRow(ordinaryDouble) === ordinaryDouble,
+    'double-clicking an ordinary row should activate its session');
+  await wait(80);
+  expect(!rail.preview(), 'ordinary-row double-click activation should leave no preview open');
+  expect(rail.sourceState(ordinaryDouble).focused,
+    'ordinary-row double-click activation should focus the terminal after scheduled rendering');
+
+  rail.focus(holder);
+  expect(rail.doubleClickRow(workingDouble) === workingDouble,
+    'double-clicking a Working row should activate its session');
+  await wait(80);
+  expect(!rail.preview() && rail.sourceState(workingDouble).focused,
+    'Working-row double-click activation should dismiss preview and focus its terminal');
+
+  rail.focus(holder);
+  expect(rail.doubleClickRow(attentionDouble) === attentionDouble,
+    'double-clicking a Needs Attention row should activate its session');
+  await wait(80);
+  expect(!rail.preview() && rail.sourceState(attentionDouble).focused,
+    'Needs Attention double-click activation should dismiss preview and focus its terminal');
+
+  rail.focus(holder);
+  rail.emit(attentionDouble, 'turn-start');
+  rail.emit(attentionDouble, 'turn-end', 'Completed inline-action fixture');
+  expect(rail.doubleClickAttentionAction(attentionDouble, 'COMPLETED', 'DISMISS') === holder,
+    'double-clicking an inline attention action should not activate its session row');
+  expect(!rail.preview(), 'inline attention action double-clicks should not open a row preview');
+
   rail.select('git');
   await rail.waitForGit();
   expect(rail.heading() === 'GIT CHANGES', 'Git should identify itself as a change tracker');

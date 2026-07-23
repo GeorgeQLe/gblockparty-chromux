@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.50.0
+
+Tag: `chromux-v0.50.0`
+
+- Double-click any session row in Threads to activate it in the terminal area, reveal its tab, and restore terminal or composer focus.
+- Keep the first and second clicks immediate: inactive rows can show the read-only terminal preview during the gesture, and completed double-click activation dismisses it.
+- Apply the same activation path to ordinary, Working, and Needs Attention rows while preserving inline attention actions, active-row confirmation, preview activation, and title-stable row DOM.
+
 ## GBlockParty Chromux v0.49.0
 
 Tag: `chromux-v0.49.0`
