@@ -6226,6 +6226,20 @@ function compactCwd(cwd) {
   return cwd ? (home ? cwd.replace(home, '~') : cwd) : '';
 }
 
+function detectedRepresentativeName(row) {
+  const name = row && row.agent === 'codex' && row.resume && typeof row.resume.name === 'string'
+    ? row.resume.name.trim()
+    : '';
+  return name || null;
+}
+
+function detectedAgentMessagePreview(row) {
+  return detectedRepresentativeName(row)
+    && typeof row.resume.agentMessagePreview === 'string'
+    ? row.resume.agentMessagePreview
+    : '';
+}
+
 function detectedRowSearchFields(row) {
   const sessionAge = row.resume ? `session ${formatAge(row.resume.ts)}` : '';
   const status = row.opened
@@ -6247,6 +6261,8 @@ function detectedRowSearchFields(row) {
     formatEtime(row.etime),
     sessionAge,
     row.resume && row.resume.id,
+    detectedRepresentativeName(row),
+    detectedAgentMessagePreview(row),
     status,
   ];
 }
@@ -6383,9 +6399,16 @@ function renderRestoreSessions() {
     : (visibleRows.length > 0 ? 'ALL OPENED' : 'OPEN ALL');
 }
 
-async function openDetectedRow(row, mode) {
+function detectedSessionName(row, mode) {
   const base = row.cwd ? row.cwd.split('/').filter(Boolean).pop() : row.tty;
-  const name = uniqueSessionName(mode === 'resume' ? `${base}-resumed` : base);
+  const candidate = mode === 'resume'
+    ? (detectedRepresentativeName(row) || `${base}-resumed`)
+    : base;
+  return uniqueSessionName(candidate);
+}
+
+async function openDetectedRow(row, mode) {
+  const name = detectedSessionName(row, mode);
   const command = mode === 'resume' ? resumeCommandFor(row) : agentCommand(row.agent);
   await createSession({
     name,
@@ -6415,6 +6438,7 @@ function renderDetectList() {
   for (const row of rows) {
     const el = document.createElement('div');
     el.className = 'detect-row' + (row.opened ? ' opened' : '');
+    el.dataset.tty = row.tty || '';
 
     const badge = document.createElement('span');
     badge.className = 'dr-badge ' + (row.agent || 'shell');
@@ -6424,14 +6448,22 @@ function renderDetectList() {
     main.className = 'dr-main';
     const title = document.createElement('div');
     title.className = 'dr-title';
-    title.textContent = (row.terminal && row.terminal.title) || row.command;
+    const representativeName = detectedRepresentativeName(row);
+    const agentMessagePreview = detectedAgentMessagePreview(row);
+    title.textContent = representativeName || (row.terminal && row.terminal.title) || row.command;
     title.title = row.command;
+    const message = document.createElement('div');
+    message.className = 'dr-message';
+    message.textContent = agentMessagePreview;
     const sub = document.createElement('div');
     sub.className = 'dr-sub';
     const home = state.env ? state.env.home : '';
     const cwdText = row.cwd ? (home ? row.cwd.replace(home, '~') : row.cwd) : 'cwd unknown';
+    const terminalBits = [row.terminal ? row.terminal.app : 'terminal'];
+    if (representativeName && row.terminal && row.terminal.title) terminalBits.push(row.terminal.title);
+    terminalBits.push(row.tty);
     const bits = [
-      (row.terminal ? row.terminal.app : 'terminal') + ' · ' + row.tty,
+      terminalBits.join(' · '),
       cwdText,
       'up ' + formatEtime(row.etime),
     ];
@@ -6440,7 +6472,17 @@ function renderDetectList() {
     }
     sub.textContent = bits.join('  —  ');
     sub.title = row.cwd || '';
-    main.append(title, sub);
+    main.appendChild(title);
+    if (agentMessagePreview) main.appendChild(message);
+    main.appendChild(sub);
+    el.setAttribute('role', 'group');
+    el.setAttribute('aria-label', [
+      agentLabel(row.agent),
+      title.textContent,
+      agentMessagePreview,
+      ...bits,
+      row.opened ? 'opened' : '',
+    ].filter(Boolean).join('. '));
 
     const actions = document.createElement('div');
     actions.className = 'dr-actions';
@@ -7297,6 +7339,19 @@ if (window.chromuxTest) {
       renderDetectList();
     },
     detectTitles: () => [...document.querySelectorAll('#detect-list .dr-title')].map((el) => el.textContent),
+    detectDetails: () => [...document.querySelectorAll('#detect-list .detect-row')].map((row) => ({
+      tty: row.dataset.tty || '',
+      title: row.querySelector('.dr-title')?.textContent || '',
+      titleTitle: row.querySelector('.dr-title')?.title || '',
+      message: row.querySelector('.dr-message')?.textContent || '',
+      messageTitle: row.querySelector('.dr-message')?.title || '',
+      sub: row.querySelector('.dr-sub')?.textContent || '',
+      ariaLabel: row.getAttribute('aria-label') || '',
+    })),
+    nextSessionName(tty, mode) {
+      const row = state.detect && state.detect.rows.find((candidate) => candidate.tty === tty);
+      return row ? detectedSessionName(row, mode) : null;
+    },
     restoreTitles: () => [...document.querySelectorAll('#restore-list .dr-title')].map((el) => el.textContent),
     detectEmpty: () => $('#detect-list .detect-empty')?.textContent || '',
     restoreEmpty: () => $('#restore-list .restore-empty')?.textContent || '',

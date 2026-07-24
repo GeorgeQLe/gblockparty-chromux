@@ -56,10 +56,24 @@ fs.writeFileSync(e2ePath, `
       etime: '01:02:00',
       cwd: '/workspace/web',
       terminal: { app: 'iTerm2', title: 'web codex' },
-      resume: null,
+      resume: {
+        id: '223e4567-e89b-12d3-a456-426614174000',
+        ts: Date.now() - 120000,
+        name: 'Payment retry plan',
+        agentMessagePreview: 'Handoff complete — retry path verified.',
+      },
     },
     {
       tty: 'ttys003',
+      agent: 'codex',
+      command: 'codex',
+      etime: '00:08:00',
+      cwd: '/workspace/legacy',
+      terminal: { app: 'Terminal', title: 'legacy codex' },
+      resume: { id: '323e4567-e89b-12d3-a456-426614174000', ts: Date.now() - 180000 },
+    },
+    {
+      tty: 'ttys004',
       agent: '',
       command: '-zsh',
       etime: '00:03:00',
@@ -69,9 +83,27 @@ fs.writeFileSync(e2ePath, `
     },
   ]);
 
-  expect(q.detectTitles().join('|') === 'api claude|web codex|shell tools', 'expected all detect rows before filtering');
+  expect(q.detectTitles().join('|') === 'api claude|Payment retry plan|legacy codex|shell tools',
+    'expected enriched Codex title and unchanged fallback/non-Codex titles');
   expect(q.restoreTitles().join('|') === 'api-restore|docs-restore', 'expected all restore rows before filtering');
-  expect(q.openAllText().startsWith('OPEN ALL AGENTS (2)'), 'expected unfiltered open-all count of 2');
+  expect(q.openAllText().startsWith('OPEN ALL AGENTS (3)'), 'expected unfiltered open-all count of 3');
+  const details = q.detectDetails();
+  const enriched = details.find((row) => row.title === 'Payment retry plan');
+  expect(enriched && enriched.message === 'Handoff complete — retry path verified.',
+    'enriched row should render a dedicated latest-agent-message line');
+  expect(enriched.sub.includes('iTerm2 · web codex · ttys002')
+    && enriched.sub.includes('/workspace/web')
+    && enriched.sub.includes('up 1h 2m')
+    && enriched.sub.includes('session 2m ago'),
+  'enriched row should retain terminal title, tty, cwd, process age, and resume age metadata: ' + enriched.sub);
+  expect(enriched.ariaLabel.includes('Payment retry plan')
+    && enriched.ariaLabel.includes('Handoff complete — retry path verified.')
+    && enriched.ariaLabel.includes('web codex'),
+  'accessible label should include representative title, excerpt, and terminal metadata');
+  expect(enriched.messageTitle === '' && !enriched.titleTitle.includes('Handoff complete'),
+    'truncated message text should not be exposed through a tooltip');
+  const legacy = details.find((row) => row.title === 'legacy codex');
+  expect(legacy && legacy.message === '', 'fallback Codex response shape should remain renderer-compatible');
 
   q.setQuery('api');
   expect(q.detectTitles().join('|') === 'api claude', 'api query should keep matching Claude row');
@@ -79,9 +111,16 @@ fs.writeFileSync(e2ePath, `
   expect(q.openAllText().startsWith('OPEN ALL AGENTS (1)'), 'api query should count one visible agent');
 
   q.setQuery('codex');
-  expect(q.detectTitles().join('|') === 'web codex', 'codex query should keep matching Codex row');
+  expect(q.detectTitles().join('|') === 'Payment retry plan|legacy codex', 'codex query should keep matching Codex rows');
   expect(q.restoreTitles().join('|') === 'docs-restore', 'codex query should keep matching Codex restore row');
-  expect(q.openAllText().startsWith('OPEN ALL AGENTS (1)'), 'codex query should count one visible agent');
+  expect(q.openAllText().startsWith('OPEN ALL AGENTS (2)'), 'codex query should count visible Codex agents');
+
+  q.setQuery('payment retry');
+  expect(q.detectTitles().join('|') === 'Payment retry plan', 'representative name should be searchable');
+  q.setQuery('handoff complete');
+  expect(q.detectTitles().join('|') === 'Payment retry plan', 'agent-message excerpt should be searchable');
+  q.setQuery('web codex');
+  expect(q.detectTitles().join('|') === 'Payment retry plan', 'enriched rows should remain searchable by terminal title');
 
   q.setQuery('shell-tools');
   expect(q.detectTitles().join('|') === 'shell tools', 'cwd query should keep matching shell row');
@@ -96,9 +135,20 @@ fs.writeFileSync(e2ePath, `
   expect(q.restoreEmpty() === 'No matches for ‘zzzz-no-match’.', 'restore no-match empty state should mention query');
 
   q.setQuery('');
-  expect(q.detectTitles().join('|') === 'api claude|web codex|shell tools', 'clearing query should restore all detect rows');
+  expect(q.detectTitles().join('|') === 'api claude|Payment retry plan|legacy codex|shell tools',
+    'clearing query should restore all detect rows');
   expect(q.restoreTitles().join('|') === 'api-restore|docs-restore', 'clearing query should restore all restore rows');
-  expect(q.openAllText().startsWith('OPEN ALL AGENTS (2)'), 'clearing query should restore open-all count');
+  expect(q.openAllText().startsWith('OPEN ALL AGENTS (3)'), 'clearing query should restore open-all count');
+
+  expect(q.nextSessionName('ttys002', 'resume') === 'Payment retry plan',
+    'Codex RESUME should use the representative thread label');
+  await window.chromuxTestSignals.addFakeSession({ name: 'Payment retry plan', agent: 'codex' });
+  expect(q.nextSessionName('ttys002', 'resume') === 'Payment retry plan-2',
+    'representative resume names should retain existing uniqueness suffixes');
+  expect(q.nextSessionName('ttys003', 'resume') === 'legacy-resumed',
+    'fallback Codex rows should retain the legacy directory-derived resume name');
+  expect(q.nextSessionName('ttys002', 'fresh') === 'web',
+    'Codex FRESH naming should remain directory-derived');
 
   q.setDetectRows([]);
   expect(q.detectEmpty() === 'No external terminal tabs found.', 'empty scan should use no-terminal empty state');

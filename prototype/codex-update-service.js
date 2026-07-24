@@ -57,6 +57,26 @@ function resolveOnPath(name, envPath = process.env.PATH || '') {
   return null;
 }
 
+function codexSearchPath({
+  envPath = process.env.PATH || '',
+  homeDir = os.homedir(),
+} = {}) {
+  return [
+    envPath,
+    '/opt/homebrew/bin',
+    '/usr/local/bin',
+    path.join(homeDir, '.local', 'bin'),
+    path.join(homeDir, '.npm-global', 'bin'),
+    path.join(homeDir, '.bun', 'bin'),
+    path.join(homeDir, '.volta', 'bin'),
+    path.join(homeDir, '.local', 'share', 'fnm', 'aliases', 'default', 'bin'),
+  ].filter(Boolean).join(path.delimiter);
+}
+
+function resolveCodexExecutable({ envPath = codexSearchPath() } = {}) {
+  return resolveOnPath('codex', envPath);
+}
+
 function installKindFor(executable) {
   let resolved = executable;
   try { resolved = fs.realpathSync(executable); } catch { /* retain the PATH entry */ }
@@ -119,20 +139,11 @@ function runFile(file, args, { timeoutMs = DEFAULT_TIMEOUT_MS, onOutput = null }
 }
 
 function createCodexUpdateService({
-  envPath = [
-    process.env.PATH || '',
-    '/opt/homebrew/bin',
-    '/usr/local/bin',
-    path.join(os.homedir(), '.local', 'bin'),
-    path.join(os.homedir(), '.npm-global', 'bin'),
-    path.join(os.homedir(), '.bun', 'bin'),
-    path.join(os.homedir(), '.volta', 'bin'),
-    path.join(os.homedir(), '.local', 'share', 'fnm', 'aliases', 'default', 'bin'),
-  ].filter(Boolean).join(path.delimiter),
+  envPath = codexSearchPath(),
   now = () => Date.now(),
   request = requestJson,
   run = runFile,
-  resolveExecutable = () => resolveOnPath('codex', envPath),
+  resolveExecutable = () => resolveCodexExecutable({ envPath }),
   cacheMs = DEFAULT_CACHE_MS,
   timeoutMs = DEFAULT_TIMEOUT_MS,
 } = {}) {
@@ -262,10 +273,12 @@ module.exports = {
   GITHUB_LATEST_URL,
   HOMEBREW_CASK_URL,
   NPM_PACKAGE_URL,
+  codexSearchPath,
   compareVersions,
   createCodexUpdateService,
   installKindFor,
   parseVersion,
+  resolveCodexExecutable,
   resolveOnPath,
   sanitizeError,
 };

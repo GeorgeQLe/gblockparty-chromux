@@ -13,6 +13,7 @@ const { spawn, execFile } = require('child_process');
 const pty = require('node-pty');
 const yaml = require('js-yaml');
 const { checkForUpdates } = require('./update-checker');
+const { createCodexDetectMetadata } = require('./codex-detect-metadata');
 const { createCodexUpdateService } = require('./codex-update-service');
 const { createDevModeRestart, resolveDevMode, restartArgs } = require('./dev-mode');
 const { BrokerClient } = require('./resource-broker/client');
@@ -99,6 +100,7 @@ const resourceClient = new BrokerClient({ client: {
   cooperative: true,
 } });
 const promptHistory = createPromptHistoryStore({ filePath: PROMPT_HISTORY_FILE });
+const codexDetectMetadata = createCodexDetectMetadata();
 const codexUpdateService = createCodexUpdateService();
 
 if (SMOKE && !process.env.CHROMUX_KEEP_USER_DATA) {
@@ -1342,7 +1344,7 @@ ipcMain.on('log-filedrop', (_e, { payloadPath, targetSession, cwd }) => {
 // External-session detection — scan the machine for open terminal tabs and the
 // claude/codex/grok sessions running inside them, so they can be adopted into
 // Chromux (resume the CLI's own saved conversation, or start fresh).
-// Read-only: ps + lsof + AppleScript + session-store file mtimes.
+// Read-only: ps + lsof + AppleScript + local agent session metadata.
 // ---------------------------------------------------------------------------
 
 function runCmd(cmd, args, timeout = 10000) {
@@ -1871,8 +1873,12 @@ ipcMain.handle('detect-external', async () => {
     row.cwd = cwds.get(row.pid) || null;
     if (!row.cwd) continue;
     if (row.agent === 'claude') row.resume = latestClaudeSession(row.cwd);
-    else if (row.agent === 'codex') row.resume = (codexIndex.get(row.cwd) || [])[0] || null;
     else if (row.agent === 'grok') row.resume = latestGrokSession(row.cwd);
+  }
+  const codexRows = rows.filter((row) => row.agent === 'codex' && row.cwd);
+  const enrichedCodex = await codexDetectMetadata.scan(codexRows.map((row) => row.cwd));
+  for (const row of codexRows) {
+    row.resume = enrichedCodex.get(row.cwd) || (codexIndex.get(row.cwd) || [])[0] || null;
   }
 
   const agentRank = { claude: 0, codex: 1, grok: 2, '': 3 };

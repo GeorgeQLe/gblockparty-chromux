@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.54.0
+
+Tag: `chromux-v0.54.0`
+
+- Enrich resumable Codex DETECT rows through a bounded, short-lived local app-server scan with the inferred thread's representative name and latest-agent-message excerpt.
+- Keep resume selection exact-directory and newest-interactive-thread based, retain terminal/process metadata and search/accessibility coverage, and use the representative name for new resumed tabs with existing uniqueness suffixes.
+- Preserve the rollout-file resume identity fallback when Codex is missing, slow, malformed, or lacks the required methods; excerpts remain transient and never enter restore snapshots.
+
 ## GBlockParty Chromux v0.53.0
 
 Tag: `chromux-v0.53.0`

@@ -1,6 +1,6 @@
 {
   "name": "chromux",
-  "version": "0.53.0",
+  "version": "0.54.0",
   "description": "OSS desktop front-end for local and GBlockParty-managed agent/browser workspaces.",
   "main": "main.js",
   "private": false,
@@ -27,6 +27,7 @@
     "test:resource-ui-renderer": "node scripts/test-resource-ui-renderer.js",
     "test:browser-isolation-smoke": "node scripts/test-browser-isolation-smoke.js",
     "smoke:simulator-broker": "node scripts/smoke-simulator-broker.js",
+    "test:codex-detect-metadata": "node scripts/test-codex-detect-metadata.js",
     "test:detect-filter-renderer": "node scripts/test-detect-filter-renderer.js",
     "test:attention-signals-renderer": "npm run test:turn-signals-renderer",
     "test:attention-diagnostics": "node scripts/test-attention-diagnostics.js && node scripts/test-attention-diagnostics-renderer.js",

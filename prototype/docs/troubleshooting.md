@@ -120,10 +120,12 @@ If evidence went to the wrong place:
 
 1. Check the target selector in the capture modal before sending.
 2. Confirm the target cwd shown in the modal.
-3. For DETECT rows, remember that RESUME opens the latest saved Claude or Codex conversation for that project directory. Two live agents in the same directory cannot be distinguished by saved-session lookup.
+3. For DETECT rows, remember that RESUME opens one inferred latest saved conversation for the exact project directory. Codex rows use the newest interactive CLI thread by `recency_at`; the displayed Codex name and latest-agent excerpt describe that inferred thread but do not correlate it to a particular live process. Two live agents in the same directory therefore remain indistinguishable. If the installed Codex does not support the required app-server methods, Chromux preserves the same resume identity through its bounded `~/.codex/sessions` rollout fallback and shows the legacy terminal/directory label.
 4. For external terminal adoption, DETECT is read-only: it starts a new Chromux PTY from the detected cwd or saved session; it does not attach to the original terminal tab.
 
 If DETECT rows are missing tab titles, grant Chromux Automation access to Terminal and iTerm2 in System Settings, Privacy & Security, Automation. The `ps` and `lsof` scan can still find processes without tab-title access.
+
+Codex thread names, first-user previews, and latest-agent excerpts are read locally through a short-lived `codex app-server --stdio` process. Labels are capped at 80 Unicode code points, excerpts at 160, and both are retained only in the active DETECT scan. App-server errors, malformed responses, or the four-second enrichment deadline do not fail DETECT or remove RESUME.
 
 ## Storage cleanup
 

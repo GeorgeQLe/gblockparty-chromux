@@ -1991,6 +1991,10 @@ input[type="text"]:focus, #cap-notes:focus, select:focus { border-color: var(--a
   color: var(--text); font-size: 12px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.dr-message {
+  color: var(--dim); font-size: 10.5px; margin-top: 3px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .dr-sub {
   color: var(--dim); font-size: 10.5px; margin-top: 2px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;

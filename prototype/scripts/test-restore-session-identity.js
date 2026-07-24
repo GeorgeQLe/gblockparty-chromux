@@ -129,13 +129,17 @@ fs.writeFileSync(e2ePath, `
     { name: 'grok', cwd: ${JSON.stringify(grokCwd)}, agent: 'grok' },
     { name: 'bad-id', cwd: ${JSON.stringify(shared)}, agent: 'claude', resumeId: '../../bad' },
   ] });
-  expect(mixed.sessions[0].resume.id === ${JSON.stringify(ids.codex)}, 'Codex candidate mismatch');
+  expect(mixed.sessions[0].resume.id === ${JSON.stringify(ids.codex)},
+    'Codex rollout fallback must preserve the inferred resume ID when app-server enrichment is unavailable');
   expect(mixed.sessions[1].resume.id === ${JSON.stringify(ids.grok)}, 'Grok candidate mismatch');
   expect(mixed.sessions[2].resume.id !== '../../bad' && mixed.inferred.length === 3,
     'malformed saved ID must be discarded and inferred safely');
 
   const saved = await window.chromux.saveRestoreSnapshot({ reason: 'manual', sessions: [
     { name: 'valid', cwd: ${JSON.stringify(shared)}, agent: 'claude', resumeId: ${JSON.stringify(ids.exactB)}, composerDraft: 'saved draft',
+      resume: { id: ${JSON.stringify(ids.exactB)}, name: 'transient detect name',
+        agentMessagePreview: 'transient detect excerpt' },
+      agentMessagePreview: 'transient detect excerpt',
       lastActivityAt: '2026-07-23T01:02:03.000Z',
       browserTabs: [
         { id: 'page-a', type: 'page', url: 'https://example.com/a', title: 'A' },
@@ -159,6 +163,9 @@ fs.writeFileSync(e2ePath, `
     && typeof saved.sessions[1].lastActivityAt === 'string',
   'schema v7 should round-trip valid activity and provide a valid fallback for malformed or absent activity');
   expect(saved.sessions[0].resumeId === ${JSON.stringify(ids.exactB)}, 'valid resumeId not persisted');
+  expect(!Object.prototype.hasOwnProperty.call(saved.sessions[0], 'resume')
+    && !Object.prototype.hasOwnProperty.call(saved.sessions[0], 'agentMessagePreview'),
+  'transient DETECT name/excerpt metadata must not enter restore snapshots');
   expect(saved.sessions[1].resumeId === null, 'malformed resumeId persisted');
   expect(saved.sessions[0].composerDraft === 'saved draft', 'bounded composer draft not persisted');
   expect(saved.sessions[0].browserTabs.length === 2

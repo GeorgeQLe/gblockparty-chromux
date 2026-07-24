@@ -111,7 +111,13 @@ Open **RESOURCES** to inspect host-wide owners, FIFO queues, lease expiry, wait 
    **FRESH** starts a new one in the same directory, **OPEN SHELL** adopts a shell tab's cwd.
    **OPEN ALL AGENTS** does the lot, resuming where a saved session exists. The original tabs
    are never touched — everything is read-only; if the agent is still running in the terminal,
-   the resumed copy diverges from the last save point.
+   the resumed copy diverges from the last save point. For Codex, DETECT still infers one target:
+   the newest interactive CLI thread whose recorded cwd exactly matches the detected process.
+   When supported by the installed Codex, the row uses that thread's explicit name (or first
+   user-message preview) and a bounded excerpt of its latest agent message. Chromux reads those
+   values locally through `codex app-server`; the excerpt exists only for the active DETECT scan
+   and is not added to workspace restore snapshots. Older Codex versions fall back to the local
+   rollout-file index and the existing terminal/directory label.
 2. **Approve the preview** — run your dev server (or ask the agent to). When the terminal
    prints `http://localhost:5173` (or any loopback URL, or an absolute `/path/to/page.html`),
    Chromux queues it in the badged **QUEUE** — nothing auto-opens. Approve with queue
@@ -174,10 +180,12 @@ See [`docs/troubleshooting.md`](docs/troubleshooting.md) for the full support gu
 - **DETECT shows tabs without titles** — grant Chromux Automation access to Terminal/iTerm2
   (System Settings → Privacy & Security → Automation; macOS prompts on the first scan).
   Detection itself (`ps`/`lsof`) works without it — you just lose the tab titles.
-- **DETECT's RESUME opens the wrong conversation** — resume targets the *latest saved*
-  session for the tab's project directory (`~/.claude/projects/<dir>` /
-  `~/.codex/sessions` / `~/.grok/sessions/<encoded-cwd>`); two agents in the same directory
-  can't be told apart.
+- **DETECT's RESUME opens the wrong conversation** — resume targets one *latest saved*
+  session for the tab's exact project directory (`~/.claude/projects/<dir>` /
+  Codex's local app-server with `~/.codex/sessions` compatibility fallback /
+  `~/.grok/sessions/<encoded-cwd>`). A Codex name or latest-agent excerpt helps identify the
+  inferred thread but does not correlate it to a particular live process; two agents in the
+  same directory still cannot be told apart.
 
 ## Storage map
 
