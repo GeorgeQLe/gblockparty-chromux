@@ -855,6 +855,18 @@ function resolveCurrentTerminalPrompt(session) {
   };
 }
 
+function captureCodexRenderedSubmission(session, data) {
+  if (!session || session.agent !== 'codex') return undefined;
+  const raw = String(data || '');
+  const submitIndex = raw.search(/[\r\n]/);
+  // A standalone Enter lets xterm's rendered editor reflect every preceding
+  // autocomplete/history edit. Combined paste-and-submit payloads have not
+  // rendered their prefix yet, so their keystroke shadow remains canonical.
+  if (submitIndex < 0 || raw.slice(0, submitIndex)) return undefined;
+  const rendered = readCodexRenderedPrompt(session);
+  return rendered.status === 'resolved' && rendered.text.trim() ? rendered.text : undefined;
+}
+
 function trackTypedPreviewSuppressions(session, data) {
   if (!session || !data) return '';
   const t = session.term;
@@ -1086,7 +1098,7 @@ const EVENT_RING_MAX = 500;
 
 function recordEvent(event) {
   // Keystroke payloads and bulky blobs stay out of the diagnostic ring.
-  const { data, patch, ...rest } = event;
+  const { data, patch, submittedLine, ...rest } = event;
   state.events.push({ ...rest, ts: Date.now() });
   if (state.events.length > EVENT_RING_MAX) {
     state.events.splice(0, state.events.length - EVENT_RING_MAX);
@@ -1117,12 +1129,15 @@ function apply(event) {
       break;
     case 'user-input':
       // Only state-changing input is worth ring space — raw typing is noise.
-      const submittedLine = session ? trackTypedPreviewSuppressions(session, event.data) : '';
+      const shadowSubmittedLine = session ? trackTypedPreviewSuppressions(session, event.data) : '';
       if (!session) return;
       const submitted = /[\r\n]/.test(String(event.data || ''));
       if (submitted) session.lastActivityAt = Date.now();
       const inputTurnChanged = window.chromuxAttention.applyUserInputTurnTransition(
-        session, event.data, Date.now(), submittedLine,
+        session,
+        event.data,
+        Date.now(),
+        typeof event.submittedLine === 'string' ? event.submittedLine : shadowSubmittedLine,
       );
       if (!inputTurnChanged) {
         if (submitted) invalidate('attention');
@@ -4262,10 +4277,11 @@ function syncThreadSessionRowPresentation(row, session) {
   row.setAttribute('aria-label', `${label}. ${status.label}.${attentionSummary ? ` Needs attention: ${attentionSummary}.` : ''} ${session.cwd || '~'}`);
   const icon = row.querySelector('.rail-status');
   if (icon) {
-    icon.className = `rail-status ${status.kind}`;
-    icon.textContent = status.icon;
-    icon.title = status.label;
-    icon.setAttribute('aria-label', status.label);
+    const nextClassName = `rail-status ${status.kind}`;
+    if (icon.className !== nextClassName) icon.className = nextClassName;
+    if (icon.textContent !== status.icon) icon.textContent = status.icon;
+    if (icon.title !== status.label) icon.title = status.label;
+    if (icon.getAttribute('aria-label') !== status.label) icon.setAttribute('aria-label', status.label);
   }
   const name = row.querySelector('.rail-session-name');
   if (name && name.textContent !== label) name.textContent = label;
@@ -4292,15 +4308,16 @@ function syncThreadSessionPresentation(session) {
 }
 
 function reorderMountedThreadRows() {
-  if (state.ui.railMode !== 'threads') return;
+  if (state.ui.railMode !== 'threads' || state.ui.threadSort !== 'az') return;
   document.querySelectorAll('#thread-list .rail-group:not(.attention-thread-group) > .rail-group-rows')
     .forEach((rows) => {
       const mounted = [...rows.children].filter((row) => row.classList.contains('rail-session-row'));
+      const mountedById = new Map(mounted.map((row) => [row.dataset.sessionId, row]));
       const sessions = mounted.map((row) => state.sessions.get(row.dataset.sessionId)).filter(Boolean);
-      for (const session of sortThreadSessions(sessions)) {
-        const row = mounted.find((candidate) => candidate.dataset.sessionId === session.id);
-        if (row) rows.appendChild(row);
-      }
+      const target = sortThreadSessions(sessions).map((session) => mountedById.get(session.id)).filter(Boolean);
+      if (target.length !== mounted.length
+        || target.every((row, index) => row === mounted[index])) return;
+      for (const row of target) rows.appendChild(row);
     });
 }
 
@@ -4904,7 +4921,8 @@ function handleTerminalInput(session, data) {
   }
   const outgoing = rewrite ? rewrite.data : data;
   if (rewrite) adoptSessionAgent(session, rewrite.agent, 'rewrite', { command: rewrite.command });
-  apply({ type: 'user-input', sessionId: session.id, data: outgoing });
+  const submittedLine = captureCodexRenderedSubmission(session, outgoing);
+  apply({ type: 'user-input', sessionId: session.id, data: outgoing, submittedLine });
   writePtyInput(session, outgoing);
   return rewrite;
 }

@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.52.2
+
+Tag: `chromux-v0.52.2`
+
+- Classify a standalone Codex submission from the rendered prompt before Enter, falling back to the keystroke shadow when the rendered editor cannot provide a trustworthy nonempty semantic value, so autocomplete and history edits cannot hide an exact `/clear`.
+- Preserve the existing idle boundary, generation invalidation, stale-completion barrier, and next-prompt re-arming for rendered `/clear` submissions without changing arguments, other slash commands, non-Codex sessions, combined paste submissions, or multiline composer behavior.
+- Keep animated Codex title frames from moving Recent Threads rows or restarting Working spinners, while retaining mounted-row A–Z reordering when the normalized display label genuinely changes.
+
 ## GBlockParty Chromux v0.52.1
 
 Tag: `chromux-v0.52.1`

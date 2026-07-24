@@ -281,6 +281,59 @@ fs.writeFileSync(e2ePath, `
   expect(!rail.groups().filter((group) => group.key.startsWith('cwd:')).flatMap((group) => group.rows)
     .some((row) => row.id === webTwo || row.id === worker),
   'working sessions should be deduplicated from working-directory groups');
+
+  const workingRowsHost = document.querySelector(
+    '#thread-list .working-thread-group > .rail-group-rows',
+  );
+  const workingRowBeforeFrames = workingRowsHost.querySelector(
+    '.rail-session-row[data-session-id="' + CSS.escape(webTwo) + '"]',
+  );
+  const spinnerBeforeFrames = workingRowBeforeFrames.querySelector('.rail-status');
+  const spinnerAnimation = spinnerBeforeFrames.getAnimations()[0];
+  expect(spinnerAnimation, 'working Threads status should expose a live CSS Animation object');
+  await wait(35);
+  let animationTime = Number(spinnerAnimation.currentTime) || 0;
+  const recentOrderBeforeFrames = [...workingRowsHost.querySelectorAll(':scope > .rail-session-row')]
+    .map((row) => row.dataset.sessionId);
+  let mountedRowMovements = 0;
+  const movementObserver = new MutationObserver((records) => {
+    mountedRowMovements += records.filter((record) => record.type === 'childList'
+      && (record.addedNodes.length || record.removedNodes.length)).length;
+  });
+  movementObserver.observe(workingRowsHost, { childList: true });
+  for (const frame of ['\u2839 Dynamic review title', '\u2838 Dynamic review title', '\u283c Dynamic review title']) {
+    rail.title(webTwo, frame);
+    await wait(35);
+    const frameRow = workingRowsHost.querySelector(
+      '.rail-session-row[data-session-id="' + CSS.escape(webTwo) + '"]',
+    );
+    const frameSpinner = frameRow.querySelector('.rail-status');
+    const frameAnimation = frameSpinner.getAnimations()[0];
+    const nextAnimationTime = Number(frameAnimation?.currentTime) || 0;
+    expect(frameRow === workingRowBeforeFrames && frameSpinner === spinnerBeforeFrames,
+      'animated Codex title frames should preserve the exact Working row and spinner element');
+    expect(frameAnimation === spinnerAnimation && nextAnimationTime >= animationTime,
+      'animated Codex title frames should preserve the spinner Animation object and elapsed time');
+    animationTime = nextAnimationTime;
+  }
+  movementObserver.disconnect();
+  const recentOrderAfterFrames = [...workingRowsHost.querySelectorAll(':scope > .rail-session-row')]
+    .map((row) => row.dataset.sessionId);
+  expect(mountedRowMovements === 0
+    && JSON.stringify(recentOrderAfterFrames) === JSON.stringify(recentOrderBeforeFrames),
+  'animated Codex title frames must not move mounted rows or change Recent order');
+
+  rail.selectThreadSort('az');
+  const azRowsHost = document.querySelector('#thread-list .working-thread-group > .rail-group-rows');
+  const azOrderBeforeRename = [...azRowsHost.querySelectorAll(':scope > .rail-session-row')]
+    .map((row) => row.dataset.sessionId);
+  rail.title(webTwo, '\u2839 Aardvark review');
+  const azOrderAfterRename = [...azRowsHost.querySelectorAll(':scope > .rail-session-row')]
+    .map((row) => row.dataset.sessionId);
+  expect(azOrderBeforeRename[0] === worker && azOrderAfterRename[0] === webTwo,
+    'A–Z should still reorder mounted Working rows when the normalized display label changes');
+  rail.selectThreadSort('recent');
+
   rail.close(worker);
   workingGroup = rail.groups().find((group) => group.key === 'status:working');
   expect(workingGroup && workingGroup.count === 1 && workingGroup.rows[0].id === webTwo,

@@ -20,6 +20,8 @@ fs.writeFileSync(e2ePath, `
 (async () => {
   const sig = window.chromuxTestSignals;
   if (!sig) throw new Error('Missing turn-signals test API');
+  const composer = window.chromuxTestComposer;
+  if (!composer) throw new Error('Missing composer test API');
   const expect = (cond, msg) => { if (!cond) throw new Error(msg); };
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const osc = (event, id) => '\\x1b]777;chromux;v1;' + event + ';' + id + '\\x07';
@@ -187,6 +189,30 @@ fs.writeFileSync(e2ePath, `
   expect(sig.turnState(codexClear).state === 'idle',
     'typing after /clear without submission should remain idle');
 
+  const renderedClearIdle = composer.addSession({
+    name: 'codex-rendered-clear-idle', agent: 'codex', turnState: 'idle', rows: 16, cols: 48,
+  });
+  sig.focus(holder);
+  composer.nativeInput(renderedClearIdle, '$cl');
+  await composer.renderPromptFixture(renderedClearIdle, '? for shortcuts\\r\\n› /clear', [
+    '  /clear   start a new conversation',
+  ]);
+  composer.nativeInput(renderedClearIdle, '\\r');
+  expect(sig.turnState(renderedClearIdle).state === 'idle'
+    && sig.turnState(renderedClearIdle).completionBlocked === true,
+  'rendered /clear should override a partial autocomplete shadow and keep idle Codex idle');
+
+  const composerClear = composer.addSession({
+    name: 'codex-composer-clear', agent: 'codex', turnState: 'idle', rows: 16, cols: 48,
+  });
+  sig.focus(holder);
+  await composer.renderPromptFixture(composerClear, '? for shortcuts\\r\\n› ');
+  composer.setDraft(composerClear, '/clear');
+  await composer.submit(composerClear);
+  expect(sig.turnState(composerClear).state === 'idle'
+    && sig.turnState(composerClear).completionBlocked === true,
+  'an empty rendered prompt should fall back to the composer shadow for exact /clear');
+
   const clearDuringTurn = sig.addTerminalSession({ name: 'codex-clear-during-turn', agent: 'codex' });
   sig.focus(holder);
   sig.typeInput(clearDuringTurn, 'ordinary request\\r');
@@ -216,6 +242,38 @@ fs.writeFileSync(e2ePath, `
   sig.emitSignal(clearDuringTurn, 'turn-end', 'new turn complete');
   expect(sig.turnState(clearDuringTurn).state === 'completed',
     'the ordinary prompt after /clear must accept its own completion');
+
+  const renderedClearDuringTurn = composer.addSession({
+    name: 'codex-rendered-clear-during-turn', agent: 'codex', rows: 16, cols: 48,
+  });
+  sig.focus(holder);
+  composer.nativeInput(renderedClearDuringTurn, 'ordinary rendered request\\r');
+  const renderedActiveGeneration = sig.turnState(renderedClearDuringTurn).generation;
+  sig.feedPtyChunk(renderedClearDuringTurn, 'busy rendered output\\r\\n');
+  composer.nativeInput(renderedClearDuringTurn, 'history draft');
+  composer.nativeInput(renderedClearDuringTurn, '\\x1b[H');
+  composer.nativeInput(renderedClearDuringTurn, 'edited ');
+  await composer.renderPromptFixture(renderedClearDuringTurn, '? for shortcuts\\r\\n› /clear');
+  composer.nativeInput(renderedClearDuringTurn, '\\r');
+  const renderedClearedTurn = sig.turnState(renderedClearDuringTurn);
+  expect(renderedClearedTurn.state === 'idle'
+    && renderedClearedTurn.generation === renderedActiveGeneration + 1
+    && renderedClearedTurn.completionBlocked === true,
+  'rendered /clear should override a history-edited shadow and end existing Codex work');
+  sig.feedPtyChunk(renderedClearDuringTurn, '? for shortcuts\\r\\n› ');
+  await wait(30); sig.flushRender();
+  expect(sig.turnState(renderedClearDuringTurn).state === 'idle',
+    'rendered completion recovery captured before rendered /clear must stay rejected');
+  sig.emitSignal(renderedClearDuringTurn, 'turn-end', 'stale rendered native completion');
+  expect(sig.turnState(renderedClearDuringTurn).state === 'idle',
+    'native completion captured before rendered /clear must stay rejected');
+  composer.nativeInput(renderedClearDuringTurn, 'next rendered request\\r');
+  expect(sig.turnState(renderedClearDuringTurn).state === 'working'
+    && sig.turnState(renderedClearDuringTurn).completionBlocked === false,
+  'the next ordinary rendered-session prompt must re-arm the normal lifecycle');
+  sig.emitSignal(renderedClearDuringTurn, 'turn-end', 'rendered follow-up complete');
+  expect(sig.turnState(renderedClearDuringTurn).state === 'completed',
+    'rendered-session completion after re-arming must be accepted');
 
   const clearVariants = sig.addFakeSession({ name: 'codex-clear-variants', agent: 'codex', turnState: 'idle' });
   sig.typeInput(clearVariants, '/clear foo\\r');
