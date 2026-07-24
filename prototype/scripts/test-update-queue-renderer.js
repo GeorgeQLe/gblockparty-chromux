@@ -315,8 +315,8 @@ fs.writeFileSync(e2ePath, `
 
   q.queue();
   let kinds = q.attentionKinds();
-  const entryKinds = [...document.querySelectorAll('.attention-thread .attention-reason:first-child .attention-kind')]
-    .map((element) => element.textContent);
+  const entryKinds = [...document.querySelectorAll('.attention-thread .attention-reason:first-child')]
+    .map((element) => element.dataset.attentionKind);
   expect(q.phase() === 'ready', 'all safe order sessions should make update ready');
   expect(kinds[0] === 'UPDATE READY', 'UPDATE READY should be pinned above Needs Attention');
   expect(indexOf(entryKinds, 'INPUT NEEDED') < indexOf(entryKinds, 'DELIVERY FAIL'), 'input thread should outrank delivery thread');

@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.56.2
+
+Tag: `chromux-v0.56.2`
+
+- Simplify Needs Attention session cards so the highest-priority reason appears once in the header, followed by `+N` when more reasons are present.
+- Remove the separate session-status icon and repeated primary-reason label while preserving accessible status descriptions, direct actions, ordering, counts, previews, and keyboard behavior.
+- Keep additional reasons identifiable with semantic colors and labels, and allow attention summaries to wrap to two lines before truncation.
+
 ## GBlockParty Chromux v0.56.1
 
 Tag: `chromux-v0.56.1`

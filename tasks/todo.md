@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Simplify Needs Attention session cards to one semantic header status, retain labeled additional reasons and direct actions, wrap summaries to two lines, and ship as v0.56.2. _(source: user-supplied implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`, session-rail and affected renderer regressions, all 45 prototype test files, source and packaged smoke, `RELEASES.md`)_
+
 - [x] Refresh the GIGACHADD integration-map Stage 2 artifact review, stabilize saved-project URL queue verification with a bounded condition poll, and ship as v0.56.1. _(source: current session; evidence: `alignment/devtool-integration-map-gigachadd-process.html`, `alignment/index.html`, `prototype/scripts/test-projects-renderer.js`, website and saved-project executable checks, `RELEASES.md`)_
 
 - [x] Keep focused sessions in Needs Attention for live input, permission, authentication, rate-limit, and tool-failure states; preserve other focused suppression and Threads deduplication; ship as v0.56.0. _(source: user-supplied implementation plan; evidence: `prototype/renderer/attention.js`, focused diagnostics/turn-signal/tab-activity/session-rail regressions, `RELEASES.md`)_

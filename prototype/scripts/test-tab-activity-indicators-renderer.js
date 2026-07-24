@@ -148,9 +148,12 @@ fs.writeFileSync(e2ePath, `
   expect(tabs.state(background).indicator === 'live', 'disabled setting should restore background lifecycle dot');
   expect(tabs.state(input).indicator === 'action' && tabs.state(permission).indicator === 'action',
     'disabled activity preference must preserve action-required indicators');
-  expect(document.querySelector('#thread-list .rail-session-row[data-session-id="' + CSS.escape(input) + '"] .rail-status')
-    ?.getAttribute('aria-label') === 'Action required',
-  'disabled activity preference must preserve action-required status in Threads');
+  const inputAttentionRow = document.querySelector(
+    '#thread-list .rail-session-row[data-session-id="' + CSS.escape(input) + '"]',
+  );
+  expect(inputAttentionRow?.querySelectorAll('.rail-status').length === 0
+    && inputAttentionRow.getAttribute('aria-label').includes('Action required'),
+  'disabled activity preference must preserve accessible action-required status without a separate attention-card icon');
 
   tabs.setActivityPreference(true);
   expect(tabs.activityPreferenceStored() === 'true', 'enabled preference should persist');

@@ -4068,8 +4068,8 @@ function renderDeveloperDiagnostics() {
   const railMode = RAIL_MODES.has(state.ui.railMode) ? state.ui.railMode : 'threads';
   const attentionMounted = railMode === 'threads';
   const actualKinds = attentionMounted
-    ? [...document.querySelectorAll(`#thread-list .attention-item[data-session-id="${CSS.escape(inspected.id)}"] .attention-kind`)]
-      .map((element) => element.textContent)
+    ? [...document.querySelectorAll(`#thread-list .attention-item[data-session-id="${CSS.escape(inspected.id)}"] .attention-reason`)]
+      .map((element) => element.dataset.attentionKind || '')
     : [];
   const expectedItems = [
     ...window.chromuxAttention.projectAttentionItems({
@@ -4271,6 +4271,7 @@ function appendUpdateAttentionRow(host, rowData) {
   const row = document.createElement('section');
   row.className = `attention-item attention-system-row ${item.cls || ''}`;
   row.dataset.attentionScope = 'system';
+  row.dataset.attentionKind = item.kind;
   row.setAttribute('aria-label', `Chromux Update. ${item.kind}. ${item.detail}`);
   const top = document.createElement('div'); top.className = 'attention-top';
   const kind = document.createElement('span'); kind.className = 'attention-kind'; kind.textContent = item.kind;
@@ -4298,6 +4299,7 @@ function syncThreadSessionRowPresentation(row, session) {
   const status = sessionRailStatus(session);
   const label = sessionDisplayLabel(session);
   const attentionSummary = row.dataset.attentionSummary || '';
+  row.dataset.sessionStatus = status.label;
   row.title = `${label} — ${status.label}${attentionSummary ? ` — ${attentionSummary}` : ''}\n${session.cwd || '~'}`;
   row.setAttribute('aria-label', `${label}. ${status.label}.${attentionSummary ? ` Needs attention: ${attentionSummary}.` : ''} ${session.cwd || '~'}`);
   const icon = row.querySelector('.rail-status');
@@ -4346,6 +4348,10 @@ function reorderMountedThreadRows() {
     });
 }
 
+function attentionHeaderKind(item) {
+  return item && item.kind === 'COMPLETED' ? 'COMPLETE' : (item && item.kind) || '';
+}
+
 function appendThreadSessionRow(host, session, { attention = null } = {}) {
   const row = document.createElement('button');
   let pointerFocusPending = false;
@@ -4361,13 +4367,20 @@ function appendThreadSessionRow(host, session, { attention = null } = {}) {
     ? `${attention.items[0].kind}${attention.items.length > 1 ? ` and ${attention.items.length - 1} more` : ''}`
     : null;
   row.dataset.attentionSummary = attentionSummary || '';
-  const icon = document.createElement('span');
-  icon.className = 'rail-status';
   const name = document.createElement('span');
   name.className = attention ? 'rail-session-name attention-name' : 'rail-session-name';
-  row.append(icon, name);
+  if (!attention) {
+    const icon = document.createElement('span');
+    icon.className = 'rail-status';
+    row.append(icon);
+  }
+  row.append(name);
   if (attention) {
-    const reason = document.createElement('span'); reason.className = 'attention-row-reason'; reason.textContent = attention.items[0].kind;
+    const primary = attention.items[0];
+    const reason = document.createElement('span');
+    reason.className = `attention-kind attention-row-reason ${primary.cls || ''}`;
+    reason.dataset.attentionKind = primary.kind;
+    reason.textContent = attentionHeaderKind(primary);
     row.appendChild(reason);
     if (attention.items.length > 1) {
       const more = document.createElement('span'); more.className = 'attention-row-more'; more.textContent = `+${attention.items.length - 1}`;
@@ -4451,15 +4464,23 @@ function appendNeedsAttentionGroup(host, sessionRows) {
     card.dataset.sessionId = attention.session.id;
     appendThreadSessionRow(card, attention.session, { attention });
     const reasons = document.createElement('div'); reasons.className = 'attention-reasons';
-    for (const item of attention.items) {
-      const reason = document.createElement('div'); reason.className = 'attention-reason'; reason.dataset.attentionKind = item.kind;
+    attention.items.forEach((item, index) => {
+      const reason = document.createElement('div');
+      reason.className = `attention-reason ${index === 0 ? 'primary ' : ''}${item.cls || ''}`.trim();
+      reason.dataset.attentionKind = item.kind;
       const copy = document.createElement('div'); copy.className = 'attention-reason-copy';
-      const kind = document.createElement('span'); kind.className = 'attention-kind'; kind.textContent = item.kind;
       const detail = document.createElement('span'); detail.className = 'attention-detail'; detail.textContent = item.detail || attention.session.cwd; detail.title = detail.textContent;
-      copy.append(kind, detail);
+      if (index > 0) {
+        const kind = document.createElement('span');
+        kind.className = `attention-kind ${item.cls || ''}`;
+        kind.dataset.attentionKind = item.kind;
+        kind.textContent = item.kind;
+        copy.appendChild(kind);
+      }
+      copy.appendChild(detail);
       const actions = document.createElement('div'); actions.className = 'attention-actions'; appendAttentionActions(actions, item);
       reason.append(copy, actions); reasons.appendChild(reason);
-    }
+    });
     card.appendChild(reasons); rows.appendChild(card);
   }
   details.append(summary, rows); host.appendChild(details);
@@ -7428,6 +7449,7 @@ if (window.chromuxTest) {
   const addRenderableTestSession = ({
     name = 'tab-test', agent = 'codex', cwd = '/tmp', turnState = 'unknown', alive = true,
     realTerminal = false, cols = 64, rows = 16, composerDraft = '', lastActivityAt = null,
+    attentionRecords = [],
   } = {}) => {
     state.counter += 1;
     const session = newSessionShape({ id: 's' + state.counter, name, cwd, agent });
@@ -7457,6 +7479,9 @@ if (window.chromuxTest) {
     apply({ type: 'session-created', sessionId: session.id, name, cwd, agent });
     renderQueue(session);
     activateSession(session.id);
+    session.restoredAttentionRecords = Array.isArray(attentionRecords)
+      ? attentionRecords.filter((record) => record && RESTORE_ATTENTION_TYPES.has(record.type))
+      : [];
     if (Number.isFinite(lastActivityAt)) session.lastActivityAt = lastActivityAt;
     flushRender();
     return session.id;
@@ -7620,7 +7645,8 @@ if (window.chromuxTest) {
     label: (id) => testSession(id).els.tabLabel.textContent,
     terminalTitle: (id) => testSession(id).term.title,
     tooltip: (id) => testSession(id).els.tab.title,
-    attentionKinds: () => [...document.querySelectorAll('#thread-list .attention-kind')].map((el) => el.textContent),
+    attentionKinds: () => [...document.querySelectorAll('#thread-list .attention-system-row, #thread-list .attention-reason')]
+      .map((el) => el.dataset.attentionKind || ''),
     activityPreference: () => state.ui.tabActivityIndicators,
     activityPreferenceStored: () => {
       try { return window.localStorage.getItem(TAB_ACTIVITY_STORAGE_KEY); } catch { return null; }
@@ -7752,14 +7778,28 @@ if (window.chromuxTest) {
     },
     heading: () => $('#rail-heading')?.textContent || '',
     attentionCount: () => Number($('#rail-thread-count')?.textContent || 0),
-    attentionCards: () => [...document.querySelectorAll('.attention-thread')].map((card) => ({
-      id: card.dataset.sessionId,
-      reasons: [...card.querySelectorAll('.attention-reason')].map((reason) => ({
-        kind: reason.querySelector('.attention-kind')?.textContent || '',
-        detail: reason.querySelector('.attention-detail')?.textContent || '',
-        actions: [...reason.querySelectorAll('.attention-actions .qi-btn')].map((button) => button.textContent),
-      })),
-    })),
+    attentionCards: () => [...document.querySelectorAll('.attention-thread')].map((card) => {
+      const primary = card.querySelector('.attention-row-reason');
+      return {
+        id: card.dataset.sessionId,
+        primaryKind: primary?.textContent || '',
+        primaryColor: primary ? getComputedStyle(primary).color : '',
+        more: card.querySelector('.attention-row-more')?.textContent || '',
+        reasons: [...card.querySelectorAll('.attention-reason')].map((reason) => {
+          const visibleKind = reason.querySelector('.attention-kind');
+          const detail = reason.querySelector('.attention-detail');
+          const lineHeight = detail ? parseFloat(getComputedStyle(detail).lineHeight) : 0;
+          return {
+            kind: reason.dataset.attentionKind || '',
+            visibleKind: visibleKind?.textContent || '',
+            detail: detail?.textContent || '',
+            color: visibleKind || primary ? getComputedStyle(visibleKind || primary).color : '',
+            summaryLines: detail && lineHeight ? Math.round(detail.clientHeight / lineHeight) : 0,
+            actions: [...reason.querySelectorAll('.attention-actions .qi-btn')].map((button) => button.textContent),
+          };
+        }),
+      };
+    }),
     attentionGeometry() {
       const rows = document.querySelector('.attention-thread-group > .rail-group-rows');
       const cards = [...(rows?.querySelectorAll(':scope > .attention-thread') || [])];
@@ -7775,7 +7815,7 @@ if (window.chromuxTest) {
     clickAttentionAction(id, kind, label) {
       const card = document.querySelector(`.attention-thread[data-session-id="${CSS.escape(id)}"]`);
       const reason = [...(card?.querySelectorAll('.attention-reason') || [])]
-        .find((candidate) => candidate.querySelector('.attention-kind')?.textContent === kind);
+        .find((candidate) => candidate.dataset.attentionKind === kind);
       const button = [...(reason?.querySelectorAll('.attention-actions .qi-btn') || [])]
         .find((candidate) => candidate.textContent === label);
       if (!button) throw new Error(`Missing ${label} action for ${kind} on ${id}`);
@@ -7800,9 +7840,11 @@ if (window.chromuxTest) {
       rows: [...group.querySelectorAll('.rail-session-row')].map((row) => ({
         id: row.dataset.sessionId,
         name: row.querySelector('.rail-session-name')?.textContent || '',
-        status: row.querySelector('.rail-status')?.getAttribute('aria-label') || '',
+        status: row.querySelector('.rail-status')?.getAttribute('aria-label') || row.dataset.sessionStatus || '',
         statusCount: row.querySelectorAll('.rail-status').length,
-        animationName: getComputedStyle(row.querySelector('.rail-status')).animationName,
+        animationName: row.querySelector('.rail-status')
+          ? getComputedStyle(row.querySelector('.rail-status')).animationName
+          : 'none',
         title: row.title,
         ariaLabel: row.getAttribute('aria-label') || '',
       })),
@@ -7848,7 +7890,7 @@ if (window.chromuxTest) {
     doubleClickAttentionAction(id, kind, label) {
       const card = document.querySelector(`.attention-thread[data-session-id="${CSS.escape(id)}"]`);
       const reason = [...(card?.querySelectorAll('.attention-reason') || [])]
-        .find((candidate) => candidate.querySelector('.attention-kind')?.textContent === kind);
+        .find((candidate) => candidate.dataset.attentionKind === kind);
       const button = [...(reason?.querySelectorAll('.attention-actions .qi-btn') || [])]
         .find((candidate) => candidate.textContent === label);
       if (!button) throw new Error(`Missing ${label} action for ${kind} on ${id}`);
@@ -7980,7 +8022,8 @@ if (window.chromuxTest) {
     },
     activeId: () => state.activeId,
     turnState: (id) => ({ ...testSession(id).turn }),
-    attentionKinds: () => [...document.querySelectorAll('#thread-list .attention-kind')].map((el) => el.textContent),
+    attentionKinds: () => [...document.querySelectorAll('#thread-list .attention-system-row, #thread-list .attention-reason')]
+      .map((el) => el.dataset.attentionKind || ''),
     resolveGitRoot: (cwd) => window.chromux.gitRoot(cwd),
     gitCacheSize: () => state.ui.gitRoots.size,
     async waitForGit() {
@@ -8022,17 +8065,18 @@ if (window.chromuxTest) {
     },
     phase: () => state.updateQueue.phase,
     blockers: () => updateBlockers().map((row) => row.session.name),
-    attentionKinds: () => [...document.querySelectorAll('#thread-list .attention-kind')].map((el) => el.textContent),
+    attentionKinds: () => [...document.querySelectorAll('#thread-list .attention-system-row, #thread-list .attention-reason')]
+      .map((el) => el.dataset.attentionKind || ''),
     attentionButtons(kind) {
-      for (const el of document.querySelectorAll('#thread-list .attention-item')) {
-        if (el.querySelector('.attention-kind')?.textContent !== kind) continue;
+      for (const el of document.querySelectorAll('#thread-list .attention-system-row, #thread-list .attention-reason')) {
+        if (el.dataset.attentionKind !== kind) continue;
         return [...el.querySelectorAll('.attention-actions .qi-btn')].map((button) => button.textContent);
       }
       return [];
     },
     clickAttentionPrimary(kind) {
-      for (const el of document.querySelectorAll('#thread-list .attention-item')) {
-        if (el.querySelector('.attention-kind')?.textContent !== kind) continue;
+      for (const el of document.querySelectorAll('#thread-list .attention-system-row, #thread-list .attention-reason')) {
+        if (el.dataset.attentionKind !== kind) continue;
         const primary = el.querySelector('.attention-actions .qi-btn.open');
         if (!primary) throw new Error(`No primary action on ${kind}`);
         primary.click();
@@ -8042,8 +8086,8 @@ if (window.chromuxTest) {
       throw new Error(`No attention item ${kind}`);
     },
     dismissItem(kind) {
-      for (const el of document.querySelectorAll('#thread-list .attention-item')) {
-        if (el.querySelector('.attention-kind')?.textContent !== kind) continue;
+      for (const el of document.querySelectorAll('#thread-list .attention-system-row, #thread-list .attention-reason')) {
+        if (el.dataset.attentionKind !== kind) continue;
         const dismiss = [...el.querySelectorAll('.attention-actions .qi-btn')]
           .find((button) => button.textContent === 'DISMISS');
         if (!dismiss) throw new Error(`No DISMISS on ${kind}`);
@@ -8130,15 +8174,16 @@ if (window.chromuxTest) {
     activeId: () => state.activeId,
     written: (id) => (testSession(id)._written || []).join(''),
     attentionItems: () => [...document.querySelectorAll('#thread-list .attention-reason, #thread-list .attention-system-row')].map((el) => ({
-      kind: el.querySelector('.attention-kind')?.textContent || '',
+      kind: el.dataset.attentionKind || '',
       name: el.closest('.attention-item')?.querySelector('.attention-name')?.textContent || '',
       detail: el.querySelector('.attention-detail')?.textContent || '',
       actions: [...el.querySelectorAll('.attention-actions .qi-btn')].map((button) => button.textContent),
     })),
     dismissItem(kind, name) {
-      for (const el of document.querySelectorAll('#thread-list .attention-item')) {
-        if (el.querySelector('.attention-kind')?.textContent !== kind) continue;
-        if (name && el.querySelector('.attention-name')?.textContent !== name) continue;
+      for (const el of document.querySelectorAll('#thread-list .attention-reason, #thread-list .attention-system-row')) {
+        if (el.dataset.attentionKind !== kind) continue;
+        const item = el.closest('.attention-item');
+        if (name && item?.querySelector('.attention-name')?.textContent !== name) continue;
         const buttons = [...el.querySelectorAll('.attention-actions .qi-btn')];
         const dismiss = buttons.find((b) => b.textContent === 'DISMISS');
         if (!dismiss) throw new Error(`No DISMISS on ${kind}`);
@@ -8261,9 +8306,9 @@ if (window.chromuxTest) {
       activateSession(id);
       flushRender();
     },
-    attentionItems: () => [...document.querySelectorAll('#thread-list .attention-item')].map((el) => ({
-      kind: el.querySelector('.attention-kind')?.textContent || '',
-      name: el.querySelector('.attention-name')?.textContent || '',
+    attentionItems: () => [...document.querySelectorAll('#thread-list .attention-reason, #thread-list .attention-system-row')].map((el) => ({
+      kind: el.dataset.attentionKind || '',
+      name: el.closest('.attention-item')?.querySelector('.attention-name')?.textContent || '',
       detail: el.querySelector('.attention-detail')?.textContent || '',
     })),
     openQueued(id, url) {
@@ -9152,9 +9197,9 @@ if (window.chromuxTest) {
     selectRail(mode) { selectRailMode(mode); flushRender(); },
     setUpdatePhase(phase) { setUpdateQueuePhase(phase); flushRender(); },
     injectAttentionKind(id, kind) {
-      const node = document.querySelector(`#thread-list .attention-item[data-session-id="${CSS.escape(id)}"] .attention-kind`);
+      const node = document.querySelector(`#thread-list .attention-item[data-session-id="${CSS.escape(id)}"] .attention-reason`);
       if (!node) throw new Error(`Missing attention row: ${id}`);
-      node.textContent = kind;
+      node.dataset.attentionKind = kind;
       invalidate('diagnostics');
       flushRender();
     },

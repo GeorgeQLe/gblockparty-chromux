@@ -7,9 +7,11 @@ const { spawn } = require('child_process');
 
 const appDir = path.resolve(__dirname, '..');
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'chromux-themes-'));
+const homeDir = path.join(tmpDir, 'home');
 const e2ePath = path.join(tmpDir, 'themes-e2e.js');
 const e2eOutPath = path.join(tmpDir, 'e2e.out');
 
+fs.mkdirSync(homeDir, { recursive: true });
 fs.writeFileSync(e2ePath, `
 (async () => {
   const themes = window.chromuxTestThemes;
@@ -319,7 +321,7 @@ fs.writeFileSync(e2ePath, `
 const electronCli = path.join(appDir, 'node_modules', '.bin', 'electron');
 const child = spawn(process.execPath, [electronCli, '.', '--smoke'], {
   cwd: appDir,
-  env: { ...process.env, CHROMUX_E2E: e2ePath, CHROMUX_E2E_OUT: e2eOutPath },
+  env: { ...process.env, HOME: homeDir, CHROMUX_E2E: e2ePath, CHROMUX_E2E_OUT: e2eOutPath },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 let stdout = ''; let stderr = '';

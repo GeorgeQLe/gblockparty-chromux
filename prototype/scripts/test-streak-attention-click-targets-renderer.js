@@ -32,7 +32,8 @@ fs.writeFileSync(e2ePath, `
     }
   };
   const attentionRow = (kind, name) => [...document.querySelectorAll('#thread-list .attention-item')]
-    .find((row) => row.querySelector('.attention-kind')?.textContent === kind
+    .find((row) => [...row.querySelectorAll('.attention-reason, .attention-system-row')]
+      .some((reason) => reason.dataset.attentionKind === kind)
       && row.querySelector('.attention-name')?.textContent === name);
   const attentionButton = (row, label) => [...row.querySelectorAll('.attention-actions .qi-btn')]
     .find((button) => button.textContent === label);

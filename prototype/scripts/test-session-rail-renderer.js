@@ -139,6 +139,22 @@ fs.writeFileSync(e2ePath, `
   expect(threadGroups.some((group) => group.title === ${JSON.stringify(repoApiDir)} && group.count === 1),
     'different exact cwd should form another Threads group');
   expect(needsAttention.rows.find((row) => row.id === web).status === 'Completed', 'attentive row needs accessible status');
+  const completionCard = document.querySelector('.attention-thread[data-session-id="' + CSS.escape(web) + '"]');
+  const completionHeader = completionCard.querySelector('.rail-session-row');
+  const completionPrimary = completionCard.querySelector('.attention-reason:first-child');
+  const completionVisibleKinds = [...completionCard.querySelectorAll('.attention-kind')].map((node) => node.textContent);
+  expect(completionHeader.querySelectorAll('.rail-status').length === 0,
+    'completion-only card should omit the separate green session-status check');
+  expect(completionHeader.querySelector('.attention-row-reason')?.textContent === 'COMPLETE'
+    && completionVisibleKinds.join(',') === 'COMPLETE',
+  'completion-only card should visibly contain exactly one COMPLETE status');
+  expect(!completionPrimary.querySelector('.attention-kind'),
+    'the primary completion summary should not repeat its status label');
+  const completionTitleStyle = getComputedStyle(completionHeader.querySelector('.rail-session-name'));
+  expect(completionTitleStyle.whiteSpace === 'nowrap' && completionTitleStyle.textOverflow === 'ellipsis',
+    'attention-card titles should remain single-line and ellipsized');
+  expect(completionHeader.getAttribute('aria-label').includes('Completed'),
+    'completion card should retain its natural-language accessible status');
 
   const sourceBefore = rail.sourceState(web);
   expect(sourceBefore.baseY > sourceBefore.viewportY, 'source fixture should begin scrolled away from its latest output');
@@ -276,11 +292,42 @@ fs.writeFileSync(e2ePath, `
     'completion in active session should never appear later');
   rail.emit(api, 'permission-required', 'Approve command');
   expect(rail.attentionKinds().includes('PERMISSION'), 'background actionable state should appear');
-  rail.queue(api, 'http://localhost:49151/api-preview');
+  const longQueueSummary = 'Detected a deliberately long browser preview request that should wrap across no more than two compact summary lines';
+  rail.queue(api, 'http://localhost:49151/api-preview', longQueueSummary);
   const apiCard = rail.attentionCards().find((card) => card.id === api);
-  expect(apiCard && apiCard.reasons.map((reason) => reason.kind).join(',') === 'PERMISSION,QUEUE 1',
+  expect(apiCard && apiCard.primaryKind === 'PERMISSION' && apiCard.more === '+1'
+    && apiCard.reasons.map((reason) => reason.kind).join(',') === 'PERMISSION,QUEUE 1',
     'one attentive thread should aggregate simultaneous reasons in priority order');
+  expect(apiCard.reasons[0].visibleKind === '' && apiCard.reasons[1].visibleKind === 'QUEUE 1',
+    'primary reason should omit its body label while additional reasons remain identified');
+  expect(apiCard.reasons[0].actions.join(',') === 'FOCUS'
+    && apiCard.reasons[1].actions.join(',') === 'OPEN',
+  'primary and additional attention reasons should retain their direct actions');
+  expect(apiCard.reasons[0].color === apiCard.primaryColor
+    && apiCard.reasons[1].color === apiCard.primaryColor,
+  'permission and queued-preview reasons should retain their semantic attention color');
+  expect(apiCard.reasons[1].summaryLines <= 2 && apiCard.reasons[1].summaryLines > 1,
+    'long attention summaries should wrap to no more than two lines before truncation: ' + JSON.stringify(apiCard.reasons[1]));
   expect(rail.attentionCount() === 3, 'badge should continue to count individual reasons, not attentive sessions');
+  const semanticReasons = rail.addSession({
+    name: 'semantic-reasons',
+    agent: 'codex',
+    cwd: ${JSON.stringify(looseDir)},
+    attentionRecords: [
+      { id: 'permission-semantic', type: 'permission', detail: 'Approve historical action', occurredAt: 10 },
+      { id: 'completed-semantic', type: 'completed', detail: 'Historical turn finished', occurredAt: 20 },
+    ],
+  });
+  rail.focus(holder);
+  const semanticCard = rail.attentionCards().find((card) => card.id === semanticReasons);
+  expect(semanticCard.primaryKind === 'PERMISSION' && semanticCard.more === '+1'
+    && semanticCard.reasons.map((reason) => reason.kind).join(',') === 'PERMISSION,COMPLETED'
+    && semanticCard.reasons.map((reason) => reason.visibleKind).join(',') === ',COMPLETED',
+  'mixed semantic reasons should retain priority order and label only the additional completion: ' + JSON.stringify(semanticCard));
+  expect(semanticCard.reasons[1].actions.join(',') === 'VIEW,DISMISS'
+    && semanticCard.reasons[1].color !== semanticCard.primaryColor,
+  'additional completion should retain its actions and green semantic color');
+  rail.close(semanticReasons);
   const attentionOrder = rail.groups().find((group) => group.key === 'attention:needs').rows.map((row) => row.id);
   rail.selectThreadSort('az');
   expect(rail.groups().find((group) => group.key === 'attention:needs').rows.map((row) => row.id).join(',')
@@ -431,8 +478,8 @@ fs.writeFileSync(e2ePath, `
   let rows = rail.groups().flatMap((group) => group.rows);
   expect(rows.find((row) => row.id === webTwo).status === 'Working', 'working status should appear in Threads');
   expect(rows.find((row) => row.id === api).status === 'Action required', 'action-required status should appear in Threads');
-  expect(rows.find((row) => row.id === webTwo).statusCount === 1 && rows.find((row) => row.id === api).statusCount === 1,
-    'each Threads row should contain exactly one status element');
+  expect(rows.find((row) => row.id === webTwo).statusCount === 1 && rows.find((row) => row.id === api).statusCount === 0,
+    'ordinary and Working rows should retain one status element while attention cards omit it');
   expect(rows.find((row) => row.id === webTwo).animationName === 'tabActivitySpin',
     'Threads working spinner should use the same animation as tabs');
 
