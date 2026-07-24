@@ -198,19 +198,48 @@ body {
   justify-content: space-between;
   padding: 12px 12px 10px;
 }
+.rail-detect-btn.btn {
+  width: 52px;
+  height: 22px;
+  padding: 0 6px;
+  font-size: 8px;
+  line-height: 20px;
+  letter-spacing: .1em;
+}
+.thread-toolbar {
+  flex: none;
+  display: flex;
+  justify-content: flex-end;
+  padding: 7px 8px 0;
+}
+.thread-toolbar.hidden { display: none; }
 .thread-sort-toggle {
   flex: none;
-  min-width: 46px;
+  display: grid;
+  place-items: center;
+  width: 24px;
   height: 22px;
-  padding: 0 5px;
+  padding: 0;
   border: 1px solid var(--line);
   background: var(--bg0);
   color: var(--dim);
-  font: 700 8px/20px var(--font-display);
-  letter-spacing: .08em;
   cursor: pointer;
 }
+.thread-sort-toggle svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 .thread-sort-toggle:hover { color: var(--text); border-color: var(--line-hi); }
+.thread-sort-toggle[aria-pressed="true"] {
+  color: var(--amber);
+  border-color: var(--line-hi);
+  background: var(--bg2);
+}
 .thread-sort-toggle:focus-visible { outline: 2px solid var(--cyan); outline-offset: 1px; }
 .thread-sort-toggle.hidden { display: none; }
 
@@ -222,6 +251,7 @@ body {
   flex-direction: column;
   gap: 6px;
 }
+.thread-toolbar:not(.hidden) + #thread-list { padding-top: 6px; }
 
 .attention-empty {
   border: 1px solid var(--line);

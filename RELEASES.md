@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.55.0
+
+Tag: `chromux-v0.55.0`
+
+- Shrink the Threads-header Detect action to the same compact height as the existing thread-order control.
+- Move thread ordering below the header into an icon-only funnel toggle while preserving persisted Recent/A–Z behavior, keyboard focus, tooltips, and accessible current-state labels.
+- Collapse the filter toolbar in Git Changes and preserve the compact layout across every supported theme and light/dark appearance.
+
 ## GBlockParty Chromux v0.54.1
 
 Tag: `chromux-v0.54.1`

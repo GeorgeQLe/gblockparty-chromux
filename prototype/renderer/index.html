@@ -54,9 +54,15 @@
         </nav>
         <div class="rail-head">
           <span id="rail-heading" class="microlabel">THREADS</span>
-          <button id="thread-sort-toggle" class="thread-sort-toggle" type="button" aria-label="Thread order: Recent" title="Sort threads A–Z">RECENT</button>
-          <button id="btn-detect" class="btn" title="Detect open terminal tabs & agent sessions (⌘D)">⛶ DETECT</button>
+          <button id="btn-detect" class="btn rail-detect-btn" title="Detect open terminal tabs & agent sessions (⌘D)">DETECT</button>
         </div>
+      </div>
+      <div id="thread-toolbar" class="thread-toolbar" role="toolbar" aria-label="Thread list controls">
+        <button id="thread-sort-toggle" class="thread-sort-toggle" type="button" data-order="recent" aria-controls="thread-list" aria-label="Thread order: Recent" aria-pressed="false" title="Sort threads A–Z">
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path d="M3 4h14l-5.4 6.2v4.3l-3.2 1.6v-4.9z"/>
+          </svg>
+        </button>
       </div>
       <div id="thread-list"></div>
       <div class="rail-foot">

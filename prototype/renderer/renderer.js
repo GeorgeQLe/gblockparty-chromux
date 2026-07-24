@@ -4517,12 +4517,13 @@ function renderRailNavigation(attentionCount) {
   const sortToggle = $('#thread-sort-toggle');
   if (sortToggle) {
     const recent = state.ui.threadSort === 'recent';
-    sortToggle.textContent = recent ? 'RECENT' : 'A–Z';
+    sortToggle.dataset.order = recent ? 'recent' : 'az';
     sortToggle.classList.toggle('hidden', mode !== 'threads');
     sortToggle.setAttribute('aria-label', `Thread order: ${recent ? 'Recent' : 'A–Z'}`);
     sortToggle.title = recent ? 'Sort threads A–Z' : 'Sort threads by recent activity';
     sortToggle.setAttribute('aria-pressed', String(!recent));
   }
+  $('#thread-toolbar')?.classList.toggle('hidden', mode !== 'threads');
   const count = $('#rail-thread-count');
   if (count) {
     count.textContent = String(attentionCount);
@@ -7702,13 +7703,44 @@ if (window.chromuxTest) {
     selectThreadSort(mode) { selectThreadSort(mode); flushRender(); return state.ui.threadSort; },
     threadSortControl: () => {
       const button = $('#thread-sort-toggle');
+      const icon = button?.querySelector('svg');
+      const rect = button?.getBoundingClientRect();
       return {
         text: button?.textContent || '',
         hidden: Boolean(button?.classList.contains('hidden')),
         label: button?.getAttribute('aria-label') || '',
         title: button?.title || '',
         pressed: button?.getAttribute('aria-pressed') || '',
+        order: button?.dataset.order || '',
+        hasIcon: Boolean(icon),
         focused: document.activeElement === button,
+        geometry: rect ? {
+          top: rect.top,
+          right: rect.right,
+          bottom: rect.bottom,
+          width: rect.width,
+          height: rect.height,
+        } : null,
+      };
+    },
+    railHeaderControls: () => {
+      const toolbarElement = $('#thread-toolbar');
+      const header = $('.rail-header')?.getBoundingClientRect();
+      const head = $('.rail-head')?.getBoundingClientRect();
+      const detect = $('#btn-detect')?.getBoundingClientRect();
+      const toolbar = toolbarElement?.getBoundingClientRect();
+      return {
+        header: header ? { top: header.top, bottom: header.bottom } : null,
+        head: head ? { top: head.top, bottom: head.bottom } : null,
+        detect: detect ? {
+          top: detect.top,
+          right: detect.right,
+          bottom: detect.bottom,
+          width: detect.width,
+          height: detect.height,
+        } : null,
+        toolbar: toolbar ? { top: toolbar.top, bottom: toolbar.bottom } : null,
+        toolbarHidden: Boolean(toolbarElement?.classList.contains('hidden')),
       };
     },
     focusThreadSortControl() { $('#thread-sort-toggle')?.focus(); },

@@ -40,9 +40,18 @@ fs.writeFileSync(e2ePath, `
     'Recent should be the validated and persisted default thread order');
   expect(JSON.stringify(rail.migrateThreadSort('invalid')) === JSON.stringify({ mode: 'recent', stored: 'recent' }),
     'invalid thread order preferences should migrate to Recent');
-  expect(rail.threadSortControl().text === 'RECENT' && !rail.threadSortControl().hidden
-    && rail.threadSortControl().label === 'Thread order: Recent',
-  'Threads should expose a compact accessible Recent sort control');
+  const recentControl = rail.threadSortControl();
+  const railHeaderControls = rail.railHeaderControls();
+  expect(recentControl.text.trim() === '' && recentControl.hasIcon && recentControl.order === 'recent'
+    && recentControl.pressed === 'false' && !recentControl.hidden
+    && recentControl.label === 'Thread order: Recent',
+  'Threads should expose an icon-only accessible Recent sort control');
+  expect(railHeaderControls.detect.height === recentControl.geometry.height
+    && railHeaderControls.detect.width <= 52.5
+    && railHeaderControls.detect.top >= railHeaderControls.head.top
+    && railHeaderControls.detect.bottom <= railHeaderControls.head.bottom
+    && recentControl.geometry.top >= railHeaderControls.header.bottom,
+  'Detect should match the compact control height while the filter moves below the Threads header');
   rail.focusThreadSortControl();
   expect(rail.threadSortControl().focused, 'thread sort control should accept keyboard focus');
 
@@ -57,8 +66,10 @@ fs.writeFileSync(e2ePath, `
     'Recent should order rows within a directory newest first');
   rail.selectThreadSort('az');
   sortedGroups = rail.groups().filter((group) => group.key.startsWith('cwd:'));
-  expect(rail.storedThreadSort() === 'az' && rail.threadSortControl().text === 'A–Z',
-    'A–Z should update and persist the header control');
+  expect(rail.storedThreadSort() === 'az' && rail.threadSortControl().order === 'az'
+    && rail.threadSortControl().pressed === 'true'
+    && rail.threadSortControl().label === 'Thread order: A–Z',
+    'A–Z should update and persist the filter control');
   expect(sortedGroups.map((group) => group.label).join(',') === 'api,scratch,web',
     'A–Z should alphabetize directory display labels');
   expect(sortedGroups.find((group) => group.label === 'web').rows.map((row) => row.name).join(',') === 'web-agent,web-review',
@@ -539,7 +550,8 @@ fs.writeFileSync(e2ePath, `
   expect(!rail.preview(), 'inline attention action double-clicks should not open a row preview');
 
   rail.select('git');
-  expect(rail.threadSortControl().hidden, 'Git mode should hide the Threads sorting control');
+  expect(rail.threadSortControl().hidden && rail.railHeaderControls().toolbarHidden,
+    'Git mode should hide the Threads sorting control and collapse its toolbar');
   await rail.waitForGit();
   expect(rail.heading() === 'GIT CHANGES', 'Git should identify itself as a change tracker');
   expect(await rail.resolveGitRoot('relative/path') === null, 'gitRoot should reject relative cwd values');
@@ -557,7 +569,8 @@ fs.writeFileSync(e2ePath, `
 
   const themes = window.chromuxTestThemes;
   rail.select('threads');
-  expect(!rail.threadSortControl().hidden, 'Threads mode should restore the sorting control');
+  expect(!rail.threadSortControl().hidden && !rail.railHeaderControls().toolbarHidden,
+    'Threads mode should restore the sorting control and toolbar');
   rail.focus(holder);
   for (const theme of themes.ids()) {
     themes.select(theme);
@@ -566,10 +579,17 @@ fs.writeFileSync(e2ePath, `
       const railRect = document.querySelector('#rail').getBoundingClientRect();
       const navRect = document.querySelector('.rail-nav').getBoundingClientRect();
       const headRect = document.querySelector('.rail-head').getBoundingClientRect();
+      const themedFilter = rail.threadSortControl();
+      const themedHeader = rail.railHeaderControls();
       expect(railRect.width >= 220 && railRect.width <= 260, theme + ' ' + mode + ' should keep narrow rail geometry');
       expect(navRect.bottom <= headRect.top + 1, theme + ' ' + mode + ' should keep two-row header order');
       expect(modeButtons.every((button) => button.getBoundingClientRect().right <= railRect.right + 1),
         theme + ' ' + mode + ' should keep icon controls inside rail');
+      expect(themedHeader.detect.height === themedFilter.geometry.height
+        && themedHeader.detect.width <= 52.5
+        && themedFilter.geometry.top >= themedHeader.header.bottom
+        && themedFilter.geometry.right <= railRect.right,
+      theme + ' ' + mode + ' should preserve compact Detect and the lower filter-icon layout');
       const attentionGeometry = rail.attentionGeometry();
       expect(attentionGeometry.cards.length >= 2 && attentionGeometry.gaps.every((gap) => gap >= 5.9)
         && attentionGeometry.firstInset >= 5.9 && attentionGeometry.lastInset >= 5.9,
