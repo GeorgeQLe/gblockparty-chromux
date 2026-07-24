@@ -201,10 +201,32 @@ fs.writeFileSync(e2ePath, `
     '\\x1b[7m  /clear   start a new conversation\\x1b[27m',
     '  /compact summarize the conversation',
   ]);
+  composer.nativeInput(renderedClearIdle, '\\t');
+  await composer.renderPromptFixture(renderedClearIdle, '? for shortcuts\\r\\n› /clear');
   composer.nativeInput(renderedClearIdle, '\\r');
   expect(sig.turnState(renderedClearIdle).state === 'idle'
     && sig.turnState(renderedClearIdle).completionBlocked === true,
-  'selected /clear autocomplete should resolve from the visible /cl prefix and keep idle Codex idle');
+  'Tab-autocompleted /clear should stay idle after the expanded command renders');
+
+  const racedClearIdle = composer.addSession({
+    name: 'codex-raced-clear-idle', agent: 'codex', turnState: 'idle', rows: 16, cols: 48,
+  });
+  composer.nativeInput(racedClearIdle, '/cle');
+  await composer.renderPromptFixture(racedClearIdle, '? for shortcuts\\r\\n› /cle', [
+    '\\x1b[7m  /clear   start a new conversation\\x1b[27m',
+  ]);
+  composer.nativeInput(racedClearIdle, '\\t');
+  composer.nativeInput(racedClearIdle, '\\r');
+  expect(sig.turnState(racedClearIdle).state === 'idle'
+    && sig.turnState(racedClearIdle).completionBlocked === true,
+  'Tab-autocompleted /clear must stay idle when Enter beats the PTY redraw');
+  sig.emitSignal(racedClearIdle, 'turn-end', 'stale completion after raced clear');
+  expect(sig.turnState(racedClearIdle).state === 'idle',
+    'the raced /clear path must retain the stale-completion barrier');
+  composer.nativeInput(racedClearIdle, 'next raced request\\r');
+  expect(sig.turnState(racedClearIdle).state === 'working'
+    && sig.turnState(racedClearIdle).completionBlocked === false,
+  'the next ordinary prompt after a raced /clear must return to working');
 
   const ambiguousClearPrefix = composer.addSession({
     name: 'codex-ambiguous-clear-prefix', agent: 'codex', turnState: 'idle', rows: 16, cols: 48,
@@ -214,6 +236,7 @@ fs.writeFileSync(e2ePath, `
     '\\x1b[7m  /clear   start a new conversation\\x1b[27m',
     '  /classic use the classic interaction mode',
   ]);
+  composer.nativeInput(ambiguousClearPrefix, '\\t');
   composer.nativeInput(ambiguousClearPrefix, '\\r');
   expect(sig.turnState(ambiguousClearPrefix).state === 'working'
     && sig.turnState(ambiguousClearPrefix).completionBlocked === false,
@@ -226,6 +249,7 @@ fs.writeFileSync(e2ePath, `
   await composer.renderPromptFixture(unrelatedSlashPrefix, '? for shortcuts\\r\\n› /comp', [
     '\\x1b[7m  /compact summarize the conversation\\x1b[27m',
   ]);
+  composer.nativeInput(unrelatedSlashPrefix, '\\t');
   composer.nativeInput(unrelatedSlashPrefix, '\\r');
   expect(sig.turnState(unrelatedSlashPrefix).state === 'working',
     'unrelated slash autocomplete prefixes must retain ordinary submission behavior');
@@ -237,9 +261,35 @@ fs.writeFileSync(e2ePath, `
   await composer.renderPromptFixture(renderedClearArguments, '? for shortcuts\\r\\n› /clear foo', [
     '  /clear   start a new conversation',
   ]);
+  composer.nativeInput(renderedClearArguments, '\\t');
   composer.nativeInput(renderedClearArguments, '\\r');
   expect(sig.turnState(renderedClearArguments).state === 'working',
     'rendered /clear with arguments must retain ordinary submission behavior');
+
+  const editedClearAutocomplete = composer.addSession({
+    name: 'codex-edited-clear-autocomplete', agent: 'codex', turnState: 'idle', rows: 16, cols: 48,
+  });
+  composer.nativeInput(editedClearAutocomplete, '/cle');
+  await composer.renderPromptFixture(editedClearAutocomplete, '? for shortcuts\\r\\n› /cle', [
+    '\\x1b[7m  /clear   start a new conversation\\x1b[27m',
+  ]);
+  composer.nativeInput(editedClearAutocomplete, '\\t');
+  composer.nativeInput(editedClearAutocomplete, '\\x7f');
+  composer.nativeInput(editedClearAutocomplete, '\\r');
+  expect(sig.turnState(editedClearAutocomplete).state === 'working',
+    'editing after /clear autocomplete must invalidate the transient intent');
+
+  const claudeClearAutocomplete = composer.addSession({
+    name: 'claude-clear-autocomplete', agent: 'claude', turnState: 'idle', rows: 16, cols: 48,
+  });
+  composer.nativeInput(claudeClearAutocomplete, '/cle');
+  await composer.renderPromptFixture(claudeClearAutocomplete, '? for shortcuts\\r\\n› /cle', [
+    '\\x1b[7m  /clear   start a new conversation\\x1b[27m',
+  ]);
+  composer.nativeInput(claudeClearAutocomplete, '\\t');
+  composer.nativeInput(claudeClearAutocomplete, '\\r');
+  expect(sig.turnState(claudeClearAutocomplete).state === 'working',
+    'Tab-autocompleted /clear must retain ordinary behavior outside Codex sessions');
 
   const composerClear = composer.addSession({
     name: 'codex-composer-clear', agent: 'codex', turnState: 'idle', rows: 16, cols: 48,

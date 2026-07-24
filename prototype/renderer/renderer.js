@@ -846,7 +846,7 @@ function updatePendingTerminalInput(termState, data) {
       const previous = previousCodePointIndex(termState.typedInputBuf, termState.typedInputCursor);
       termState.typedInputBuf = termState.typedInputBuf.slice(0, previous) + termState.typedInputBuf.slice(termState.typedInputCursor);
       termState.typedInputCursor = previous;
-    } else if (character === '\t' || character >= ' ') insertPendingTerminalText(termState, character);
+    } else if (character >= ' ') insertPendingTerminalText(termState, character);
   }
 }
 
@@ -979,14 +979,41 @@ function resolveCodexClearAutocompleteSubmission(session, renderedText) {
 function captureCodexRenderedSubmission(session, data) {
   if (!session || session.agent !== 'codex') return undefined;
   const raw = String(data || '');
+  const t = session.term;
+  if (raw === '\t') {
+    const rendered = readCodexRenderedPrompt(session);
+    const command = rendered.status === 'resolved'
+      ? resolveCodexClearAutocompleteSubmission(session, rendered.text)
+      : undefined;
+    t.clearAutocompleteIntent = command
+      ? { command, prefix: rendered.text.trim() }
+      : null;
+    t.clearAutocompleteInferenceBlocked = false;
+    return undefined;
+  }
   const submitIndex = raw.search(/[\r\n]/);
+  if (submitIndex < 0) {
+    if (t.clearAutocompleteIntent) {
+      t.clearAutocompleteIntent = null;
+      t.clearAutocompleteInferenceBlocked = true;
+    }
+    return undefined;
+  }
   // A standalone Enter lets xterm's rendered editor reflect every preceding
   // autocomplete/history edit. Combined paste-and-submit payloads have not
   // rendered their prefix yet, so their keystroke shadow remains canonical.
-  if (submitIndex < 0 || raw.slice(0, submitIndex)) return undefined;
+  const intent = t.clearAutocompleteIntent;
+  const inferenceBlocked = t.clearAutocompleteInferenceBlocked;
+  t.clearAutocompleteIntent = null;
+  t.clearAutocompleteInferenceBlocked = false;
+  if (raw.slice(0, submitIndex)) return undefined;
   const rendered = readCodexRenderedPrompt(session);
   if (rendered.status !== 'resolved' || !rendered.text.trim()) return undefined;
-  return resolveCodexClearAutocompleteSubmission(session, rendered.text) || rendered.text;
+  const renderedText = rendered.text.trim();
+  if (renderedText === '/clear') return rendered.text;
+  if (intent && intent.command === '/clear' && renderedText === intent.prefix) return '/clear';
+  return (!inferenceBlocked && resolveCodexClearAutocompleteSubmission(session, rendered.text))
+    || rendered.text;
 }
 
 function trackTypedPreviewSuppressions(session, data) {
@@ -1483,6 +1510,8 @@ function newSessionShape({ id, name, cwd, agent }) {
       typedInputBuf: '',
       typedInputCursor: 0,
       promptSnapshotInvalidated: false,
+      clearAutocompleteIntent: null,
+      clearAutocompleteInferenceBlocked: false,
       previewSuppress: [],
     },
     composer: {

@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.58.1
+
+Tag: `chromux-v0.58.1`
+
+- Keep a Tab-autocompleted Codex `/clear` submission Idle even when Enter reaches Chromux before Codex redraws the expanded command.
+- Retain the existing `/clear` generation advance, stale-completion barrier, and next-prompt re-arming while invalidating transient autocomplete intent after edits, controls, ambiguous menus, arguments, unrelated commands, submission, or session replacement.
+- Exercise both PTY redraw orders plus ambiguous, edited, argument-bearing, unrelated-command, and non-Codex paths in the real-xterm turn-signal regression suite.
+
 ## GBlockParty Chromux v0.58.0
 
 Tag: `chromux-v0.58.0`
