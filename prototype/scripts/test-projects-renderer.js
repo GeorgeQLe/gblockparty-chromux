@@ -24,6 +24,14 @@ fs.writeFileSync(e2ePath, `
 (async () => {
   const p = window.chromuxTestProjects;
   const expect = (cond, msg) => { if (!cond) throw new Error(msg); };
+  const pollUntil = async (read, accept) => {
+    const deadline = Date.now() + 10000;
+    while (true) {
+      const value = read();
+      if (accept(value) || Date.now() >= deadline) return value;
+      await new Promise((resolve) => setTimeout(resolve, Math.min(50, deadline - Date.now())));
+    }
+  };
   await p.ready();
   const config = await p.config(${JSON.stringify(projectDir)});
   expect(config.valid && config.runner === 'npm' && config.scripts.includes('dev'), 'package config should validate');
@@ -34,8 +42,11 @@ fs.writeFileSync(e2ePath, `
   expect(saved[1].startCommand === "npm run 'odd;name'", 'allowlisted unusual script names must be shell quoted');
   await p.open(); await p.setCwd(${JSON.stringify(projectDir)}); p.setName('Started sample'); p.selectScript('dev');
   expect(p.startEnabled(), 'start should be enabled for a valid config');
-  await p.start(); await new Promise((resolve) => setTimeout(resolve, 1200));
-  const session = p.sessionState();
+  await p.start();
+  const session = await pollUntil(
+    () => p.sessionState(),
+    (candidate) => candidate && candidate.queue.some((item) => item.url === 'http://localhost:4173/'),
+  );
   expect(session && session.cwd === ${JSON.stringify(projectDir)}, 'start should create a project session');
   expect(session.collapsed && !session.currentUrl, 'start must not silently open the paired browser');
   expect(session.queue.some((item) => item.url === 'http://localhost:4173/'), 'server URL should enter the approval queue');

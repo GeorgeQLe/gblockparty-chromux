@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.56.1
+
+Tag: `chromux-v0.56.1`
+
+- Make the saved-project renderer regression wait for the server URL approval-queue outcome instead of relying on a fixed startup delay.
+- Keep the same ten-second failure bound so a missing project session or URL discovery still fails with the original behavioral assertions.
+- Publish the refreshed GIGACHADD integration-map artifact review and alignment index entry while preserving its Stage 2 approval boundary.
+
 ## GBlockParty Chromux v0.56.0
 
 Tag: `chromux-v0.56.0`
