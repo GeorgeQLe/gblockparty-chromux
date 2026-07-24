@@ -15,25 +15,35 @@ fs.mkdirSync(homeDir, { recursive: true });
 fs.writeFileSync(e2ePath, `
 (async () => {
   const d = window.chromuxTestDiagnostics;
+  const composer = window.chromuxTestComposer;
   const expect = (condition, message) => { if (!condition) throw new Error(message); };
   const settle = async () => { await new Promise((resolve) => setTimeout(resolve, 20)); d.flushRender(); };
   await settle();
-  expect(d && d.visible(), 'developer diagnostics should be visible with --dev-mode');
+  expect(d && composer && d.visible(), 'developer diagnostics and composer fixtures should be available with --dev-mode');
 
-  const first = d.addSession({ name: 'codex-working', agent: 'codex' });
+  const first = composer.addSession({ name: 'codex-working', agent: 'codex', rows: 16, cols: 48 });
   const second = d.addSession({ name: 'native-complete', agent: 'claude' });
   d.select(first);
   d.focus(second);
   expect(d.selected() === first, 'inspected session must remain independent of focus');
   d.emit(first, 'turn-start');
   expect(d.groupText().includes('working'), 'tracked Codex working state should render');
-  d.typeInput(first, '/clear\\r');
+  composer.nativeInput(first, '/cl');
+  await composer.renderPromptFixture(first, '? for shortcuts\\r\\n› /cl', [
+    '\\x1b[7m  /clear   start a new conversation\\x1b[27m',
+    '  /compact summarize the conversation',
+  ]);
+  composer.nativeInput(first, '\\r');
+  d.flushRender();
   expect(d.groupText().includes('TURNidle')
     && d.groupText().includes('TABidle')
     && d.groupText().includes('UPDATE SAFEYES · idle'),
-  'Codex /clear should project idle consistently through diagnostics and update safety');
-  expect(d.mismatches() === 0, 'cleared idle projections should agree with mounted Threads and tab state');
-  d.typeInput(first, 'new diagnostic turn\\r');
+  'autocomplete-dispatched Codex /clear should project idle through tracked/expected diagnostics and update safety');
+  expect(d.mismatches() === 0, 'autocomplete-cleared idle projections should agree with mounted Threads and tab state');
+  composer.nativeInput(first, 'new diagnostic turn\\r');
+  d.flushRender();
+  expect(d.groupText().includes('TURNworking') && d.groupText().includes('TABworking'),
+    'the next ordinary prompt after autocomplete-dispatched /clear should return tracked and tab state to working');
   d.emit(first, 'turn-end');
   expect(d.groupText().includes('COMPLETED'), 'background completion should agree with attention projection');
   expect(d.mismatches() === 0, 'projected completion should agree with rendered queue and tab');

@@ -758,6 +758,8 @@ const CODEX_PROMPT_PLACEHOLDER_RE = /^(?:ask codex(?: anything)?|type (?:a )?(?:
 const CODEX_PROMPT_CHROME_RE = /(?:\?\s+for shortcuts|\bcontext left\b|^\s*choose an option:)/iu;
 const CODEX_FRAME_EDGE_RE = /^\s*[╭╰┌└┏┗╔╚].*[╮╯┐┘┓┛╗╝]\s*$/u;
 const CODEX_FRAME_VERTICAL_RE = /^\s*[│┃║]\s?(.*?)(?:\s?[│┃║])?\s*$/u;
+const CODEX_SLASH_COMMAND_PREFIX_RE = /^\/[a-z][a-z0-9-]*$/u;
+const CODEX_SLASH_COMMAND_MENU_ROW_RE = /^\s*(\/[a-z][a-z0-9-]*)(?:\s+|$)/u;
 
 function terminalBufferRow(buffer, index) {
   const line = buffer && typeof buffer.getLine === 'function' ? buffer.getLine(index) : null;
@@ -856,6 +858,27 @@ function resolveCurrentTerminalPrompt(session) {
   };
 }
 
+function resolveCodexClearAutocompleteSubmission(session, renderedText) {
+  const prefix = String(renderedText || '').trim();
+  if (prefix === '/clear'
+    || !CODEX_SLASH_COMMAND_PREFIX_RE.test(prefix)
+    || !'/clear'.startsWith(prefix)) return undefined;
+  const term = session && session.term && session.term.term;
+  const buffer = term && term.buffer && term.buffer.active;
+  if (!buffer || !Number.isFinite(buffer.baseY) || !Number.isFinite(buffer.cursorY)) return undefined;
+
+  const cursorRow = buffer.baseY + buffer.cursorY;
+  const scanEnd = Math.min(buffer.length - 1, cursorRow + 16);
+  const matchingCandidates = new Set();
+  for (let index = cursorRow + 1; index <= scanEnd; index += 1) {
+    const row = terminalBufferRow(buffer, index);
+    if (!row || row.wrapped) continue;
+    const match = codexPromptRowContent(row.text).match(CODEX_SLASH_COMMAND_MENU_ROW_RE);
+    if (match && match[1].startsWith(prefix)) matchingCandidates.add(match[1]);
+  }
+  return matchingCandidates.size === 1 && matchingCandidates.has('/clear') ? '/clear' : undefined;
+}
+
 function captureCodexRenderedSubmission(session, data) {
   if (!session || session.agent !== 'codex') return undefined;
   const raw = String(data || '');
@@ -865,7 +888,8 @@ function captureCodexRenderedSubmission(session, data) {
   // rendered their prefix yet, so their keystroke shadow remains canonical.
   if (submitIndex < 0 || raw.slice(0, submitIndex)) return undefined;
   const rendered = readCodexRenderedPrompt(session);
-  return rendered.status === 'resolved' && rendered.text.trim() ? rendered.text : undefined;
+  if (rendered.status !== 'resolved' || !rendered.text.trim()) return undefined;
+  return resolveCodexClearAutocompleteSubmission(session, rendered.text) || rendered.text;
 }
 
 function trackTypedPreviewSuppressions(session, data) {

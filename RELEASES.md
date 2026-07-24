@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.54.1
+
+Tag: `chromux-v0.54.1`
+
+- Resolve an exact `/clear` submission when Codex dispatches the uniquely matching visible autocomplete candidate while its rendered composer still shows a prefix such as `/cl`.
+- Route autocomplete-dispatched `/clear` through the existing authoritative Idle boundary, stale-completion barrier, shared tab/Threads/diagnostics/update-safety projection, and next-prompt re-arming without changing ambiguous menus, arguments, unrelated slash commands, non-Codex input, direct typing, or Chromux composer submission.
+- Exercise the live prefix-plus-popup behavior in real xterm fixtures and isolate the Grok warning renderer test from the user's live Chromux profile so the complete prototype matrix cannot restore unrelated sessions during verification.
+
 ## GBlockParty Chromux v0.54.0
 
 Tag: `chromux-v0.54.0`

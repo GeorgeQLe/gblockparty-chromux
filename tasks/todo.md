@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Resolve Codex autocomplete-dispatched `/clear` from an unambiguous visible `/cl` prefix, preserve shared Idle/Working lifecycle behavior and negative cases, isolate renderer verification from the live user profile, and ship as v0.54.1. _(source: user-supplied implementation plan; evidence: `prototype/renderer/renderer.js`, real-xterm turn-signal and diagnostics regressions, focused lifecycle/composer/Threads/tab/update-safety suites, all 45 prototype test files, source and packaged smoke, `RELEASES.md`)_
+
 - [x] Enrich inferred Codex DETECT resume targets with bounded local thread names and latest-agent excerpts, preserve exact-cwd rollout fallback and transient privacy, use representative RESUME names, and ship as v0.54.0. _(source: user-supplied implementation plan; evidence: `prototype/codex-detect-metadata.js`, `prototype/main.js`, `prototype/renderer/renderer.js`, adapter/detect/restore regressions, all 45 prototype test files, source and packaged smoke, `prototype/README.md`, `RELEASES.md`)_
 
 - [x] Preview inactive ordinary, Working, and Needs Attention Threads rows on delayed hover or keyboard focus, activate sessions on one row click, preserve preview/attention/title stability, and ship as v0.53.0. _(source: user-supplied implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-session-rail-renderer.js`, complete prototype suite, source and packaged smoke, `prototype/README.md`, `RELEASES.md`)_

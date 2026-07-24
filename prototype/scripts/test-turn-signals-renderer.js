@@ -193,14 +193,50 @@ fs.writeFileSync(e2ePath, `
     name: 'codex-rendered-clear-idle', agent: 'codex', turnState: 'idle', rows: 16, cols: 48,
   });
   sig.focus(holder);
-  composer.nativeInput(renderedClearIdle, '$cl');
-  await composer.renderPromptFixture(renderedClearIdle, '? for shortcuts\\r\\n› /clear', [
-    '  /clear   start a new conversation',
+  composer.nativeInput(renderedClearIdle, '/cl');
+  await composer.renderPromptFixture(renderedClearIdle, '? for shortcuts\\r\\n› /cl', [
+    '\\x1b[7m  /clear   start a new conversation\\x1b[27m',
+    '  /compact summarize the conversation',
   ]);
   composer.nativeInput(renderedClearIdle, '\\r');
   expect(sig.turnState(renderedClearIdle).state === 'idle'
     && sig.turnState(renderedClearIdle).completionBlocked === true,
-  'rendered /clear should override a partial autocomplete shadow and keep idle Codex idle');
+  'selected /clear autocomplete should resolve from the visible /cl prefix and keep idle Codex idle');
+
+  const ambiguousClearPrefix = composer.addSession({
+    name: 'codex-ambiguous-clear-prefix', agent: 'codex', turnState: 'idle', rows: 16, cols: 48,
+  });
+  composer.nativeInput(ambiguousClearPrefix, '/cl');
+  await composer.renderPromptFixture(ambiguousClearPrefix, '? for shortcuts\\r\\n› /cl', [
+    '\\x1b[7m  /clear   start a new conversation\\x1b[27m',
+    '  /classic use the classic interaction mode',
+  ]);
+  composer.nativeInput(ambiguousClearPrefix, '\\r');
+  expect(sig.turnState(ambiguousClearPrefix).state === 'working'
+    && sig.turnState(ambiguousClearPrefix).completionBlocked === false,
+  'an ambiguous /cl autocomplete menu must retain ordinary submission behavior');
+
+  const unrelatedSlashPrefix = composer.addSession({
+    name: 'codex-unrelated-slash-prefix', agent: 'codex', turnState: 'idle', rows: 16, cols: 48,
+  });
+  composer.nativeInput(unrelatedSlashPrefix, '/comp');
+  await composer.renderPromptFixture(unrelatedSlashPrefix, '? for shortcuts\\r\\n› /comp', [
+    '\\x1b[7m  /compact summarize the conversation\\x1b[27m',
+  ]);
+  composer.nativeInput(unrelatedSlashPrefix, '\\r');
+  expect(sig.turnState(unrelatedSlashPrefix).state === 'working',
+    'unrelated slash autocomplete prefixes must retain ordinary submission behavior');
+
+  const renderedClearArguments = composer.addSession({
+    name: 'codex-rendered-clear-arguments', agent: 'codex', turnState: 'idle', rows: 16, cols: 48,
+  });
+  composer.nativeInput(renderedClearArguments, '/clear foo');
+  await composer.renderPromptFixture(renderedClearArguments, '? for shortcuts\\r\\n› /clear foo', [
+    '  /clear   start a new conversation',
+  ]);
+  composer.nativeInput(renderedClearArguments, '\\r');
+  expect(sig.turnState(renderedClearArguments).state === 'working',
+    'rendered /clear with arguments must retain ordinary submission behavior');
 
   const composerClear = composer.addSession({
     name: 'codex-composer-clear', agent: 'codex', turnState: 'idle', rows: 16, cols: 48,
