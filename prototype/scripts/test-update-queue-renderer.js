@@ -339,12 +339,12 @@ fs.writeFileSync(e2ePath, `
   expect(kinds[0] === 'UPDATE WAITING', 'UPDATE WAITING should remain the pinned system row');
 
   sig.focus(orderInput);
-  expect(!sig.attentionItems().some((i) => i.kind === 'INPUT NEEDED' && i.name === 'order-input'),
-    'focus hides input-needed display item for the focused session');
+  expect(sig.attentionItems().some((i) => i.kind === 'INPUT NEEDED' && i.name === 'order-input'),
+    'focus preserves input-needed display item for the focused session');
   expect(q.turnState(orderInput).state === 'needsInput', 'focus does not mutate input-needed state');
   sig.focus(orderHolder);
   expect(sig.attentionItems().some((i) => i.kind === 'INPUT NEEDED' && i.name === 'order-input'),
-    'blur re-shows still-actionable input-needed item');
+    'blur keeps the still-actionable input-needed item visible');
 
   return JSON.stringify({
     ok: true,

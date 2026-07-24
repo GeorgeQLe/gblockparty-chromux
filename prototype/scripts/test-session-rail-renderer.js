@@ -319,6 +319,36 @@ fs.writeFileSync(e2ePath, `
     'Working section membership should include all and only sessions with an agent turn in progress');
   expect(workingGroup.rows.map((row) => row.id).join(',') === [webTwo, worker].join(','),
     'Recent should order Working rows newest first');
+
+  const focusedAction = rail.addTerminalSession({
+    name: 'focused-action-required',
+    agent: 'claude',
+    cwd: ${JSON.stringify(looseDir)},
+  });
+  rail.emit(focusedAction, 'permission-required', 'Approve focused command');
+  let focusedAttention = rail.groups().find((group) => group.key === 'attention:needs');
+  expect(focusedAttention?.rows.some((row) => row.id === focusedAction),
+    'focused action-required session should appear in Needs Attention');
+  expect(!rail.groups().find((group) => group.key === 'status:working')?.rows.some((row) => row.id === focusedAction)
+    && !rail.groups().filter((group) => group.key.startsWith('cwd:')).flatMap((group) => group.rows)
+      .some((row) => row.id === focusedAction),
+  'focused action-required session should be absent from Working and its directory group');
+  const focusedActionRow = focusedAttention.rows.find((row) => row.id === focusedAction);
+  expect(focusedActionRow.status === 'Action required'
+    && rail.rowState(focusedAction).ariaCurrent === 'true'
+    && rail.attentionCount() >= 1,
+  'focused attention row should retain amber status, aria-current, and attention count');
+  rail.clickRow(focusedAction);
+  await wait(40);
+  expect(rail.rowState(focusedAction).confirm && rail.sourceState(focusedAction).focused,
+    'focused attention row should retain active-row confirmation and terminal focus behavior');
+  rail.emit(focusedAction, 'turn-start');
+  focusedAttention = rail.groups().find((group) => group.key === 'attention:needs');
+  expect(!focusedAttention?.rows.some((row) => row.id === focusedAction)
+    && rail.groups().find((group) => group.key === 'status:working')?.rows.some((row) => row.id === focusedAction),
+  'focused session should move from Needs Attention to Working when its turn resumes');
+  rail.close(focusedAction);
+
   rail.selectThreadSort('az');
   workingGroup = rail.groups().find((group) => group.key === 'status:working');
   expect(workingGroup.rows.map((row) => row.id).join(',') === [worker, webTwo].join(','),

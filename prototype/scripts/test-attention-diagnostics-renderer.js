@@ -64,6 +64,9 @@ fs.writeFileSync(e2ePath, `
   d.focus(first);
   expect(d.selected() === first, 'focus should not change explicit inspection');
   expect(d.groupText().includes('SUPPRESS active-session'), 'active attention should show suppression');
+  d.emit(first, 'permission-required', 'Approve focused diagnostic command');
+  expect(d.groupText().includes('PERMISSION') && !d.groupText().includes('SUPPRESS active-session'),
+    'focused action-required diagnostics should report the projected item instead of active-session suppression');
   d.queue(first, 'http://localhost:3100/');
   expect(d.groupText().includes('BROWSER QUEUE1'), 'queue count should update');
   expect(d.groupText().includes('localhost:3100'), 'queue head should update');

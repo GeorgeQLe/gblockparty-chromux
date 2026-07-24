@@ -33,8 +33,8 @@ fs.writeFileSync(e2ePath, `
 
   await wait(100);
 
-  // Focus holder: keeps the sessions under test in the background, since the
-  // Focused session is display-excluded from unified Threads attention.
+  // Focus holder: keeps background-only attention fixtures out of the active
+  // session. Live action-required states remain visible even while focused.
   const holder = sig.addFakeSession({ name: 'holder', agent: '' });
 
   // Restored attention remains historical and independent from live turn state.
@@ -54,6 +54,9 @@ fs.writeFileSync(e2ePath, `
     === JSON.stringify(sig.snapshot().find((row) => row.name === 'historical').attentionRecords.map((record) => record.id)),
   'repeated snapshots should preserve stable attention record identifiers');
   sig.focus(historical);
+  expect(itemsFor('PERMISSION', 'historical').length === 0
+    && itemsFor('COMPLETED', 'historical').length === 0,
+  'focused restored historical records should remain suppressed');
   sig.focus(holder);
   expect(itemsFor('COMPLETED', 'historical').length === 0,
     'opening a resumed thread should consume its historical completion');
@@ -440,13 +443,42 @@ fs.writeFileSync(e2ePath, `
   // 5 — focus hides, blur re-shows, DISMISS acknowledges without deleting.
   expect(itemsFor('INPUT NEEDED', 'claude-b').length === 1, 'background needsInput visible');
   sig.focus(b);
-  expect(itemsFor('INPUT NEEDED', 'claude-b').length === 0, 'focused session excluded from queue');
+  expect(itemsFor('INPUT NEEDED', 'claude-b').length === 1,
+    'focused live needsInput should remain visible');
   expect(sig.turnState(b).state === 'needsInput', 'focus must not touch turn state');
   sig.focus(holder);
   expect(itemsFor('INPUT NEEDED', 'claude-b').length === 1, 'item reappears on blur');
   sig.dismissItem('INPUT NEEDED', 'claude-b');
   expect(sig.turnState(b).acknowledged === true, 'DISMISS sets acknowledged');
   expect(sig.turnState(b).state === 'needsInput', 'DISMISS never deletes state');
+
+  const focusedActionCases = [
+    ['focused-input', 'input-needed', 'INPUT NEEDED', ['FOCUS', 'DISMISS']],
+    ['focused-permission', 'permission-required', 'PERMISSION', ['FOCUS']],
+    ['focused-auth', 'authentication-required', 'AUTH REQUIRED', ['FOCUS']],
+    ['focused-rate-limit', 'rate-limited', 'RATE LIMITED', ['FOCUS']],
+    ['focused-tool-failure', 'tool-failed', 'TOOL FAILED', ['FOCUS']],
+  ];
+  for (const [name, event, kind, actions] of focusedActionCases) {
+    const id = sig.addFakeSession({ name, agent: 'claude' });
+    sig.focus(id);
+    sig.emitSignal(id, event, kind + ' detail');
+    const item = itemsFor(kind, name)[0];
+    expect(item && JSON.stringify(item.actions) === JSON.stringify(actions),
+      name + ' should retain its focused label and actions: ' + JSON.stringify(item));
+  }
+  const focusedSuppressed = sig.addFakeSession({ name: 'focused-suppressed', agent: 'claude', queue: [
+    { url: 'http://localhost:4555', source: 'TERM', reason: 'Focused queue', ts: Date.now() },
+  ], attentionRecords: [
+    { id: 'attention:permission:focused-history', type: 'permission', detail: 'Historical action', occurredAt: Date.now() - 1000 },
+  ] });
+  sig.focus(focusedSuppressed);
+  expect(itemsFor('QUEUE 1', 'focused-suppressed').length === 0
+    && itemsFor('PERMISSION', 'focused-suppressed').length === 0,
+  'focused browser queues and restored historical records should remain suppressed');
+  sig.emitSignal(focusedSuppressed, 'turn-end', 'Focused completion');
+  expect(itemsFor('COMPLETED', 'focused-suppressed').length === 0,
+    'focused completion should remain suppressed');
   expect(itemsFor('INPUT NEEDED', 'claude-b').length === 0, 'acknowledged item hidden');
 
   // 6 — bare shell fed prompt-glyph/approval text: never agent attention.

@@ -26,6 +26,40 @@ assert.strictEqual(attention.projectSessionStatus(session({ state: 'working' }),
 let row = diagnostic(session({ state: 'completed' }), 's1');
 assert.strictEqual(row.suppression, 'active-session');
 assert.strictEqual(row.expectedTabIndicator, 'completed');
+const focusedActions = {
+  needsInput: ['INPUT NEEDED', 'FOCUS'],
+  permission: ['PERMISSION', 'FOCUS'],
+  authentication: ['AUTH REQUIRED', 'FOCUS'],
+  rateLimited: ['RATE LIMITED', 'FOCUS'],
+  toolFailed: ['TOOL FAILED', 'FOCUS'],
+};
+for (const [state, [kind, primaryAction]] of Object.entries(focusedActions)) {
+  row = diagnostic(session({ state }), 's1');
+  assert.strictEqual(row.suppression, null, `${state} should remain visible while focused`);
+  assert.deepStrictEqual(row.projectedKinds, [kind]);
+  assert.strictEqual(row.expectedItem.primaryAction, primaryAction);
+}
+row = diagnostic(session({ state: 'permission', acknowledged: true }), 's1');
+assert.strictEqual(row.suppression, 'active-session');
+assert.deepStrictEqual(row.projectedKinds, []);
+row = diagnostic(session({ queue: [{ url: 'http://localhost:3000', ts: 1 }] }), 's1');
+assert.strictEqual(row.suppression, 'active-session');
+assert.deepStrictEqual(row.projectedKinds, []);
+const focusedDeliverySession = session();
+assert.deepStrictEqual(attention.projectAttentionItems({
+  sessions: [focusedDeliverySession],
+  activeId: focusedDeliverySession.id,
+  captures: [{
+    id: 'capture-1',
+    sessionId: focusedDeliverySession.id,
+    status: 'failed',
+    acknowledged: false,
+    exitCode: 1,
+    ts: 1,
+  }],
+  updateQueue: { phase: 'idle' },
+  updateStatus: null,
+}), []);
 row = diagnostic(session({ alive: false, state: 'working' }));
 assert.strictEqual(row.suppression, 'exited');
 assert.deepStrictEqual(row.safety, { safe: true, reason: 'exited' });

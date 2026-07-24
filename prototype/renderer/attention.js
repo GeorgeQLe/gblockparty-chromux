@@ -246,12 +246,13 @@
   }
 
   function projectSessionItems(session, activeId) {
-    if (!session || session.id === activeId) return [];
+    if (!session) return [];
     if (!session.lifecycle || !session.lifecycle.alive) return [];
 
+    const focused = session.id === activeId;
     const items = [];
     const queue = session.browser && Array.isArray(session.browser.queue) ? session.browser.queue : [];
-    if (queue.length > 0) {
+    if (!focused && queue.length > 0) {
       const next = queue[0];
       const detail = next.reason ? `${next.reason}: ${next.url}` : next.url;
       items.push(scopedItem({
@@ -278,7 +279,7 @@
       items.push(scopedItem({ type, kind, session, detail: turn.detail || fallback,
         cls: type, primaryAction: 'FOCUS', createdAt: turn.since, acknowledged: false }));
     }
-    if (!turn.acknowledged && turn.state === 'completed'
+    if (!focused && !turn.acknowledged && turn.state === 'completed'
       && (Number(turn.since) || 0) > (Number(turn.attentionSeenAt) || 0)) {
       items.push(scopedItem({
         type: 'completed',
@@ -411,8 +412,8 @@
     const projected = projectAttentionItems({ sessions, activeId, captures, updateQueue, updateStatus });
     const sessionItems = projected.filter((item) => item.sessionId === session.id);
     let suppression = null;
-    if (session.id === activeId) suppression = 'active-session';
-    else if (!session.lifecycle || !session.lifecycle.alive) suppression = 'exited';
+    if (!session.lifecycle || !session.lifecycle.alive) suppression = 'exited';
+    else if (sessionItems.length === 0 && session.id === activeId) suppression = 'active-session';
     else if (session.turn && session.turn.acknowledged
       && ['completed', 'needsInput', 'permission', 'authentication', 'rateLimited', 'toolFailed'].includes(session.turn.state)) {
       suppression = 'acknowledged';

@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.56.0
+
+Tag: `chromux-v0.56.0`
+
+- Keep a focused session in **Needs Attention** while its live turn requires input, permission, authentication, rate-limit handling, or tool-failure handling.
+- Preserve the amber Action Required status, active-row interaction, attention count, and deduplication from Working and working-directory groups.
+- Continue suppressing focused completions, browser queues, delivery failures, acknowledged actions, and restored historical records; move the session normally when its turn resumes or resolves.
+
 ## GBlockParty Chromux v0.55.0
 
 Tag: `chromux-v0.55.0`

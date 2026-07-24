@@ -128,9 +128,12 @@ fs.writeFileSync(e2ePath, `
   const permission = tabs.addSession({ name: 'permission-agent', agent: 'claude' });
   tabs.emitSignal(input, 'input-needed');
   tabs.emitSignal(permission, 'permission-required');
-  tabs.focus(active);
   expect(tabs.attentionKinds().includes('INPUT NEEDED'), 'input-required attention handling should remain unchanged');
   expect(tabs.attentionKinds().includes('PERMISSION'), 'permission attention handling should remain unchanged');
+  tabs.focus(permission);
+  expect(tabs.attentionKinds().includes('PERMISSION'),
+    'focused permission-required attention should remain visible');
+  tabs.focus(active);
 
   expect(tabs.state(input).indicator === 'action', 'input-required should show the amber action indicator');
   expect(tabs.state(permission).indicator === 'action', 'permission-required should show the amber action indicator');
