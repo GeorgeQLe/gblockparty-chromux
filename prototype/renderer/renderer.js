@@ -467,7 +467,9 @@ function applyThreadPreviewSize(size, { persist = true } = {}) {
   if (persist) {
     try { window.localStorage.setItem(THREAD_PREVIEW_SIZE_STORAGE_KEY, next); } catch { /* unavailable */ }
   }
-  if (state.ui.threadPreview) requestAnimationFrame(() => {
+  const preview = state.ui.threadPreview;
+  if (preview) requestAnimationFrame(() => {
+    if (state.ui.threadPreview !== preview) return;
     positionThreadPreview();
     scaleThreadPreviewTerminal();
   });
@@ -4321,10 +4323,36 @@ function syncThreadPreviewPresentation(session) {
   const title = preview.popover.querySelector('.thread-preview-title');
   const status = preview.popover.querySelector('.thread-preview-status');
   const cwd = preview.popover.querySelector('.thread-preview-cwd');
+  const attention = preview.popover.querySelector('.thread-preview-attention');
+  const attentionRows = preview.popover.querySelector('.thread-preview-attention-rows');
+  const description = preview.popover.querySelector('.thread-preview-description');
   if (title) title.textContent = label;
   preview.popover.setAttribute('aria-label', `Preview ${label}. Click to open session.`);
   if (status) status.textContent = `${agentLabel(session.agent)} · ${sessionRailStatus(session).label}`;
   if (cwd) { cwd.title = session.cwd || '~'; cwd.textContent = session.cwd || '~'; }
+  const projected = attentionItems()
+    .filter(({ item }) => item.scope === 'session' && item.sessionId === session.id)
+    .map(({ item }) => item);
+  if (attention && attentionRows) {
+    attention.hidden = projected.length === 0;
+    attentionRows.replaceChildren(...projected.map((item) => {
+      const row = document.createElement('div');
+      row.className = `thread-preview-attention-row ${item.cls || ''}`.trim();
+      row.dataset.attentionKind = item.kind;
+      const kind = document.createElement('span');
+      kind.className = `thread-preview-attention-kind attention-kind ${item.cls || ''}`.trim();
+      kind.textContent = item.kind;
+      const detail = document.createElement('span');
+      detail.className = 'thread-preview-attention-detail';
+      detail.textContent = item.detail || session.cwd || '~';
+      row.append(kind, detail);
+      return row;
+    }));
+  }
+  if (description) {
+    const summary = projected.map((item) => `${item.kind}: ${item.detail || session.cwd || '~'}`).join('. ');
+    description.textContent = `Click to open session.${summary ? ` Needs attention: ${summary}.` : ''}`;
+  }
 }
 
 function syncThreadSessionPresentation(session) {
@@ -4985,16 +5013,24 @@ function openThreadPreview(session, anchor, { anchorHovered = false } = {}) {
   popover.setAttribute('role', 'region');
   popover.setAttribute('aria-label', `Preview ${sessionDisplayLabel(session)}. Click to open session.`);
   popover.setAttribute('aria-labelledby', 'thread-terminal-preview-title');
+  popover.setAttribute('aria-describedby', 'thread-terminal-preview-description');
   const header = document.createElement('header'); header.className = 'thread-preview-header';
   const title = document.createElement('strong'); title.id = 'thread-terminal-preview-title'; title.className = 'thread-preview-title'; title.textContent = sessionDisplayLabel(session);
   const status = document.createElement('span'); status.className = 'thread-preview-status'; status.textContent = `${agentLabel(session.agent)} · ${sessionRailStatus(session).label}`;
   const cwd = document.createElement('span'); cwd.className = 'thread-preview-cwd'; cwd.title = session.cwd || '~'; cwd.textContent = session.cwd || '~';
   header.append(title, status, cwd);
+  const attention = document.createElement('section'); attention.className = 'thread-preview-attention'; attention.hidden = true;
+  const attentionHeading = document.createElement('div'); attentionHeading.className = 'thread-preview-attention-heading'; attentionHeading.textContent = 'NEEDS ATTENTION';
+  const attentionRows = document.createElement('div'); attentionRows.className = 'thread-preview-attention-rows';
+  attention.append(attentionHeading, attentionRows);
   const terminalViewport = document.createElement('div'); terminalViewport.className = 'thread-preview-viewport';
   const terminalHost = document.createElement('div'); terminalHost.className = 'thread-preview-terminal'; terminalHost.setAttribute('aria-hidden', 'true'); terminalViewport.appendChild(terminalHost);
   const footer = document.createElement('footer'); footer.className = 'thread-preview-footer';
   footer.innerHTML = '<span>CLICK TO OPEN SESSION</span><span>ESC FROM ROW TO CLOSE</span>';
-  popover.append(header, terminalViewport, footer);
+  const description = document.createElement('span');
+  description.id = 'thread-terminal-preview-description';
+  description.className = 'thread-preview-description';
+  popover.append(header, attention, terminalViewport, footer, description);
   document.body.appendChild(popover);
   const terminal = new Terminal({
     cols: Math.max(2, session.term.term.cols || 80), rows: Math.max(1, session.term.term.rows || 24),
@@ -5030,6 +5066,7 @@ function openThreadPreview(session, anchor, { anchorHovered = false } = {}) {
     preview.popoverHovered = false;
     scheduleThreadPreviewClose(preview);
   });
+  syncThreadPreviewPresentation(session);
   anchor.setAttribute('aria-expanded', 'true');
   positionThreadPreview();
   refreshThreadPreview();
@@ -7922,9 +7959,11 @@ if (window.chromuxTest) {
       }
       const rect = preview.popover.getBoundingClientRect();
       const source = testSession(preview.sessionId).term.term;
+      const attention = preview.popover.querySelector('.thread-preview-attention');
       const surfaceBackgrounds = [
         preview.popover,
         preview.popover.querySelector('.thread-preview-header'),
+        ...(!attention?.hidden ? [attention] : []),
         preview.terminalViewport,
         preview.popover.querySelector('.thread-preview-footer'),
       ].map((element) => getComputedStyle(element).backgroundColor);
@@ -7940,6 +7979,8 @@ if (window.chromuxTest) {
         role: preview.popover.getAttribute('role'),
         ariaLabel: preview.popover.getAttribute('aria-label'),
         labelledBy: preview.popover.getAttribute('aria-labelledby'),
+        describedBy: preview.popover.getAttribute('aria-describedby'),
+        description: preview.popover.querySelector('.thread-preview-description')?.textContent || '',
         title: preview.popover.querySelector('.thread-preview-title')?.textContent || '',
         footer: preview.popover.querySelector('.thread-preview-footer')?.textContent || '',
         cwdTitle: preview.popover.querySelector('.thread-preview-cwd')?.title || '',
@@ -7951,6 +7992,21 @@ if (window.chromuxTest) {
         refreshCount: preview.refreshCount,
         coloredCells,
         surfaceBackgrounds,
+        attention: {
+          hidden: !attention || attention.hidden,
+          heading: attention?.querySelector('.thread-preview-attention-heading')?.textContent || '',
+          rows: [...(attention?.querySelectorAll('.thread-preview-attention-row') || [])].map((row) => ({
+            kind: row.dataset.attentionKind || '',
+            label: row.querySelector('.thread-preview-attention-kind')?.textContent || '',
+            detail: row.querySelector('.thread-preview-attention-detail')?.textContent || '',
+            color: getComputedStyle(row.querySelector('.thread-preview-attention-kind')).color,
+            actions: row.querySelectorAll('button').length,
+          })),
+          height: attention?.getBoundingClientRect().height || 0,
+          scrollHeight: attention?.scrollHeight || 0,
+          maxHeight: attention ? parseFloat(getComputedStyle(attention).maxHeight) : 0,
+        },
+        terminalHeight: viewportRect.height,
         padding: {
           headerLeft: headerTitleRect.left - rect.left,
           terminalLeft: screenRect.left - rect.left,

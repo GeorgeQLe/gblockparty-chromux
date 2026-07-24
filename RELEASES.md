@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.57.0
+
+Tag: `chromux-v0.57.0`
+
+- Show every projected session reason in a visible **Needs Attention** band between a terminal preview’s header and live terminal mirror.
+- Preserve priority order, semantic labels and colors, full expanded details, restored records, and queued-preview URLs while keeping preview clicks summary-only and action-free.
+- Live-sync open previews as attention changes, include the summary in the accessible description, and cap the independently scrolling band at 100px, 140px, or 180px while preserving at least 120px for the terminal.
+
 ## GBlockParty Chromux v0.56.2
 
 Tag: `chromux-v0.56.2`

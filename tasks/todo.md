@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Show projected session attention details in live terminal hover/focus previews, preserve bounded terminal geometry and interaction behavior, and ship as v0.57.0. _(source: user-supplied implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`, `prototype/scripts/test-session-rail-renderer.js`, adjacent queue/diagnostics/theme regressions, `RELEASES.md`)_
+
 - [x] Simplify Needs Attention session cards to one semantic header status, retain labeled additional reasons and direct actions, wrap summaries to two lines, and ship as v0.56.2. _(source: user-supplied implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`, session-rail and affected renderer regressions, all 45 prototype test files, source and packaged smoke, `RELEASES.md`)_
 
 - [x] Refresh the GIGACHADD integration-map Stage 2 artifact review, stabilize saved-project URL queue verification with a bounded condition poll, and ship as v0.56.1. _(source: current session; evidence: `alignment/devtool-integration-map-gigachadd-process.html`, `alignment/index.html`, `prototype/scripts/test-projects-renderer.js`, website and saved-project executable checks, `RELEASES.md`)_

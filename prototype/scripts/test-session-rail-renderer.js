@@ -33,7 +33,7 @@ fs.writeFileSync(e2ePath, `
 
   const holder = rail.addTerminalSession({ name: 'holder', agent: '', cwd: ${JSON.stringify(looseDir)} });
   const web = rail.addTerminalSession({ name: 'web-agent', agent: 'codex', cwd: ${JSON.stringify(repoAppDir)}, cols: 72, rows: 18 });
-  const api = rail.addSession({ name: 'api-agent', agent: 'claude', cwd: ${JSON.stringify(repoApiDir)} });
+  const api = rail.addTerminalSession({ name: 'api-agent', agent: 'claude', cwd: ${JSON.stringify(repoApiDir)} });
   const webTwo = rail.addTerminalSession({ name: 'web-review', agent: 'grok', cwd: ${JSON.stringify(repoAppDir)}, cols: 54, rows: 14 });
   rail.focus(holder);
   expect(rail.threadSort() === 'recent' && rail.storedThreadSort() === 'recent',
@@ -175,6 +175,15 @@ fs.writeFileSync(e2ePath, `
   expect(preview.ariaLabel.includes('web-agent') && preview.labelledBy === 'thread-terminal-preview-title'
     && preview.footer.includes('CLICK TO OPEN SESSION') && preview.footer.includes('ESC FROM ROW TO CLOSE'),
     'preview should expose its session and activation/dismissal instructions');
+  expect(preview.describedBy === 'thread-terminal-preview-description'
+    && preview.description.includes('COMPLETED: First background completion')
+    && !preview.attention.hidden
+    && preview.attention.heading === 'NEEDS ATTENTION'
+    && preview.attention.rows.map((row) => row.label).join(',') === 'COMPLETED'
+    && preview.attention.rows[0].detail === 'First background completion',
+  'preview should expose a single attention reason visibly and in its accessible description');
+  expect(preview.attention.rows[0].actions === 0,
+    'preview attention summaries should not contain inline actions');
   expect(preview.cwdTitle === ${JSON.stringify(repoAppDir)}, 'preview should preserve the full cwd in its tooltip');
   expect(preview.text.includes('RECENT RED') && preview.coloredCells > 0, 'serialized mirror should preserve recent terminal text and ANSI colors');
   expect(preview.bufferLength <= 300 + preview.rows, 'serialized mirror should bound recent scrollback to 300 rows');
@@ -230,7 +239,8 @@ fs.writeFileSync(e2ePath, `
   rail.focusThreadSortControl();
   rail.focusRow(web);
   expect(rail.preview()?.sessionId === web && rail.rowState(web).focused,
-    'keyboard focus should open the inactive row preview immediately without moving focus');
+    'keyboard focus should open the inactive row preview immediately without moving focus: '
+      + JSON.stringify({ preview: rail.preview()?.sessionId, row: rail.rowState(web) }));
   rail.unhoverRow(web);
   rail.unhoverPreview();
   rail.focusThreadSortControl();
@@ -292,8 +302,27 @@ fs.writeFileSync(e2ePath, `
     'completion in active session should never appear later');
   rail.emit(api, 'permission-required', 'Approve command');
   expect(rail.attentionKinds().includes('PERMISSION'), 'background actionable state should appear');
+  rail.focusRow(api);
+  let apiPreview = rail.preview();
+  expect(apiPreview?.sessionId === api
+    && apiPreview.attention.rows.map((row) => row.label).join(',') === 'PERMISSION'
+    && apiPreview.attention.rows[0].detail === 'Approve command',
+  'keyboard focus should open a single-reason attention preview without activating the session');
   const longQueueSummary = 'Detected a deliberately long browser preview request that should wrap across no more than two compact summary lines';
   rail.queue(api, 'http://localhost:49151/api-preview', longQueueSummary);
+  apiPreview = rail.preview();
+  expect(apiPreview?.sessionId === api
+    && apiPreview.attention.rows.map((row) => row.label).join(',') === 'PERMISSION,QUEUE 1'
+    && apiPreview.attention.rows[1].detail === longQueueSummary + ': http://localhost:49151/api-preview'
+    && apiPreview.description.includes('QUEUE 1: ' + longQueueSummary + ': http://localhost:49151/api-preview')
+    && apiPreview.attention.rows.every((row) => row.actions === 0),
+  'open preview should live-synchronize multiple projected reasons, priority order, full detail, and queued URL');
+  rail.emit(api, 'turn-start');
+  expect(rail.preview()?.attention.rows.map((row) => row.label).join(',') === 'QUEUE 1',
+    'open preview should remove a resolved reason without closing');
+  rail.emit(api, 'permission-required', 'Approve command');
+  expect(rail.preview()?.attention.rows.map((row) => row.label).join(',') === 'PERMISSION,QUEUE 1',
+    'open preview should restore projection priority order when attention changes');
   const apiCard = rail.attentionCards().find((card) => card.id === api);
   expect(apiCard && apiCard.primaryKind === 'PERMISSION' && apiCard.more === '+1'
     && apiCard.reasons.map((reason) => reason.kind).join(',') === 'PERMISSION,QUEUE 1',
@@ -327,6 +356,36 @@ fs.writeFileSync(e2ePath, `
   expect(semanticCard.reasons[1].actions.join(',') === 'VIEW,DISMISS'
     && semanticCard.reasons[1].color !== semanticCard.primaryColor,
   'additional completion should retain its actions and green semantic color');
+  const previewOverflow = rail.addTerminalSession({
+    name: 'preview-overflow',
+    agent: 'codex',
+    cwd: ${JSON.stringify(looseDir)},
+    attentionRecords: Array.from({ length: 10 }, (_, index) => ({
+      id: 'preview-overflow-' + index,
+      type: index % 2 ? 'completed' : 'permission',
+      detail: 'Expanded historical attention detail ' + index,
+      occurredAt: index + 1,
+    })),
+  });
+  rail.focus(holder);
+  const expectedAttentionCaps = { compact: 100, comfortable: 140, large: 180 };
+  for (const [size, cap] of Object.entries(expectedAttentionCaps)) {
+    rail.setPreviewSize(size);
+    rail.focusThreadSortControl();
+    rail.focusRow(previewOverflow);
+    await wait(50);
+    const overflowPreview = rail.preview();
+    expect(overflowPreview.attention.maxHeight === cap
+      && overflowPreview.attention.height <= cap + 1
+      && overflowPreview.attention.scrollHeight > overflowPreview.attention.height,
+    size + ' preview should independently scroll attention at its ' + cap + 'px cap: '
+      + JSON.stringify(overflowPreview.attention));
+    expect(overflowPreview.terminalHeight >= 120,
+      size + ' preview should preserve at least 120px for the terminal');
+    rail.outsideClick();
+  }
+  rail.setPreviewSize('comfortable');
+  rail.close(previewOverflow);
   rail.close(semanticReasons);
   const attentionOrder = rail.groups().find((group) => group.key === 'attention:needs').rows.map((row) => row.id);
   rail.selectThreadSort('az');
@@ -492,7 +551,10 @@ fs.writeFileSync(e2ePath, `
   await wait(170);
   expect(!rail.preview(), 'the prior row preview should close before a different row hover matures');
   await wait(100);
-  expect(rail.preview()?.sessionId === webTwo,
+  expect(rail.preview()?.sessionId === webTwo
+    && rail.preview().attention.hidden
+    && rail.preview().attention.rows.length === 0
+    && !rail.preview().description.includes('Needs attention:'),
     'closing the prior preview must not cancel a different row hover pending for 250 ms');
   rail.unhoverRow(webTwo);
   rail.outsideClick();
