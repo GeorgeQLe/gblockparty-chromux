@@ -368,7 +368,6 @@ body {
 }
 body[data-thread-preview-size="compact"] .thread-terminal-preview { width: min(430px, calc(100vw - 20px)); height: min(330px, calc(100vh - 20px)); }
 body[data-thread-preview-size="large"] .thread-terminal-preview { width: min(720px, calc(100vw - 20px)); height: min(500px, calc(100vh - 20px)); }
-.thread-terminal-preview:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 .thread-preview-header { min-width: 0; padding: 10px 12px 9px; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 10px; background: #f1f3f6; }
 .thread-preview-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 700 12px/1.2 var(--font-display); }
 .thread-preview-status { color: var(--cyan); font: 700 9px/1.2 var(--font-display); letter-spacing: .08em; text-transform: uppercase; }

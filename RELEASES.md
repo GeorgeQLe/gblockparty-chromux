@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.53.0
+
+Tag: `chromux-v0.53.0`
+
+- Preview any inactive ordinary, Working, or Needs Attention thread after a 250 ms pointer hover or immediately on keyboard focus, without moving focus into the non-modal preview region.
+- Keep the live terminal preview open across row-to-preview movement with a 150 ms exit grace; Escape closes from the focused row, while outside click and existing lifecycle dismissal remain available.
+- Activate every Threads session with one row click, revealing its tab and restoring terminal or composer focus, while retaining preview-click activation, active-row confirmation, inline attention actions, live preview refresh, and title-stable Working rows.
+
 ## GBlockParty Chromux v0.52.2
 
 Tag: `chromux-v0.52.2`

@@ -100,6 +100,7 @@ const state = {
     gitDiffs: new Map(), // repository root -> { value: summary|null|undefined, promise }
     railExpanded: new Map(),
     threadPreview: null,
+    threadPreviewOpenTimer: null,
     reducedMotionOverride: null,
     captureModal: null, // { captureId, pngBase64, payloadBase } while composing/delivering
     dirty: new Set(),
@@ -4323,6 +4324,7 @@ function reorderMountedThreadRows() {
 
 function appendThreadSessionRow(host, session, { attention = null } = {}) {
   const row = document.createElement('button');
+  let pointerFocusPending = false;
   row.className = 'rail-session-row';
   row.type = 'button';
   row.dataset.sessionId = session.id;
@@ -4349,13 +4351,57 @@ function appendThreadSessionRow(host, session, { attention = null } = {}) {
       row.appendChild(more);
     }
   }
+  row.addEventListener('pointerenter', () => {
+    if (session.id === state.activeId) return;
+    const preview = state.ui.threadPreview;
+    if (preview?.sessionId === session.id) {
+      preview.anchorHovered = true;
+      cancelThreadPreviewClose(preview);
+      return;
+    }
+    scheduleThreadPreviewOpen(session, row);
+  });
+  row.addEventListener('pointerleave', () => {
+    cancelThreadPreviewOpen(session.id);
+    const preview = state.ui.threadPreview;
+    if (preview?.sessionId !== session.id) return;
+    preview.anchorHovered = false;
+    scheduleThreadPreviewClose(preview);
+  });
+  row.addEventListener('pointerdown', () => {
+    pointerFocusPending = true;
+    cancelThreadPreviewOpen();
+  });
+  row.addEventListener('pointerup', () => { pointerFocusPending = false; });
+  row.addEventListener('pointercancel', () => { pointerFocusPending = false; });
+  row.addEventListener('focus', () => {
+    if (pointerFocusPending || session.id === state.activeId) return;
+    cancelThreadPreviewOpen();
+    openThreadPreview(session, row);
+  });
+  row.addEventListener('blur', () => {
+    const preview = state.ui.threadPreview;
+    if (preview?.sessionId === session.id) scheduleThreadPreviewClose(preview);
+  });
+  row.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    const pending = state.ui.threadPreviewOpenTimer?.sessionId === session.id;
+    const open = state.ui.threadPreview?.sessionId === session.id;
+    if (!pending && !open) return;
+    event.preventDefault();
+    cancelThreadPreviewOpen(session.id);
+    if (open) dismissThreadPreview();
+  });
   row.onclick = () => {
+    cancelThreadPreviewOpen();
     if (session.id === state.activeId) {
       dismissThreadPreview();
       animateThreadSessionConfirmation(row, session);
-    } else openThreadPreview(session, row);
+    } else {
+      dismissThreadPreview();
+      activateSession(session.id);
+    }
   };
-  row.ondblclick = () => activateSession(session.id);
   syncThreadSessionRowPresentation(row, session);
   host.appendChild(row);
   return row;
@@ -4688,6 +4734,57 @@ function renderGroupedSessionRail(host, mode, excludedSessionIds = new Set()) {
 }
 
 const THREAD_PREVIEW_SCROLLBACK = 300;
+const THREAD_PREVIEW_HOVER_DELAY_MS = 250;
+const THREAD_PREVIEW_EXIT_GRACE_MS = 150;
+
+function cancelThreadPreviewOpen(sessionId = null) {
+  const pending = state.ui.threadPreviewOpenTimer;
+  if (!pending || (sessionId && pending.sessionId !== sessionId)) return false;
+  clearTimeout(pending.timer);
+  state.ui.threadPreviewOpenTimer = null;
+  return true;
+}
+
+function cancelThreadPreviewClose(preview = state.ui.threadPreview) {
+  if (!preview?.closeTimer) return false;
+  clearTimeout(preview.closeTimer);
+  preview.closeTimer = null;
+  return true;
+}
+
+function threadPreviewContainsFocus(preview) {
+  const active = document.activeElement;
+  return Boolean(active && (preview.anchor.contains(active) || preview.popover.contains(active)));
+}
+
+function scheduleThreadPreviewClose(preview = state.ui.threadPreview) {
+  if (!preview || state.ui.threadPreview !== preview) return;
+  cancelThreadPreviewClose(preview);
+  preview.closeTimer = setTimeout(() => {
+    preview.closeTimer = null;
+    if (state.ui.threadPreview !== preview
+      || preview.anchorHovered
+      || preview.popoverHovered
+      || threadPreviewContainsFocus(preview)) return;
+    dismissThreadPreview({ cancelPendingOpen: false });
+  }, THREAD_PREVIEW_EXIT_GRACE_MS);
+}
+
+function scheduleThreadPreviewOpen(session, anchor) {
+  if (!session || session.id === state.activeId) return;
+  cancelThreadPreviewOpen();
+  state.ui.threadPreviewOpenTimer = {
+    sessionId: session.id,
+    timer: setTimeout(() => {
+      state.ui.threadPreviewOpenTimer = null;
+      if (session.id === state.activeId
+        || state.ui.railMode !== 'threads'
+        || !session.lifecycle?.alive
+        || !anchor.isConnected) return;
+      openThreadPreview(session, anchor, { anchorHovered: true });
+    }, THREAD_PREVIEW_HOVER_DELAY_MS),
+  };
+}
 
 function prefersReducedMotion() {
   if (typeof state.ui.reducedMotionOverride === 'boolean') return state.ui.reducedMotionOverride;
@@ -4792,10 +4889,12 @@ function syncThreadPreviewAnchor() {
   positionThreadPreview();
 }
 
-function dismissThreadPreview({ restoreFocus = false } = {}) {
+function dismissThreadPreview({ cancelPendingOpen = true } = {}) {
+  if (cancelPendingOpen) cancelThreadPreviewOpen();
   const preview = state.ui.threadPreview;
   if (!preview) return false;
   state.ui.threadPreview = null;
+  cancelThreadPreviewClose(preview);
   if (preview.refreshFrame) cancelAnimationFrame(preview.refreshFrame);
   preview.writeDisposable?.dispose();
   preview.resizeObserver?.disconnect();
@@ -4806,7 +4905,6 @@ function dismissThreadPreview({ restoreFocus = false } = {}) {
   preview.popover.remove();
   if (preview.anchor?.isConnected) {
     preview.anchor.setAttribute('aria-expanded', 'false');
-    if (restoreFocus) preview.anchor.focus();
   }
   return true;
 }
@@ -4819,12 +4917,18 @@ function activateThreadPreview() {
   activateSession(sessionId);
 }
 
-function openThreadPreview(session, anchor) {
-  dismissThreadPreview();
-  if (!session?.term?.term || typeof session.term.term.loadAddon !== 'function') {
-    activateSession(session.id);
-    return;
+function openThreadPreview(session, anchor, { anchorHovered = false } = {}) {
+  const current = state.ui.threadPreview;
+  if (current?.sessionId === session?.id && current.anchor === anchor) {
+    current.anchorHovered = current.anchorHovered || anchorHovered;
+    cancelThreadPreviewClose(current);
+    return true;
   }
+  cancelThreadPreviewOpen();
+  if (!session?.term?.term || typeof session.term.term.loadAddon !== 'function') {
+    return false;
+  }
+  dismissThreadPreview();
   if (!session.term.serializer) {
     session.term.serializer = new SerializeAddon.SerializeAddon();
     session.term.term.loadAddon(session.term.serializer);
@@ -4832,18 +4936,18 @@ function openThreadPreview(session, anchor) {
   const popover = document.createElement('section');
   popover.id = 'thread-terminal-preview';
   popover.className = 'thread-terminal-preview';
-  popover.tabIndex = 0;
-  popover.setAttribute('role', 'dialog');
+  popover.setAttribute('role', 'region');
   popover.setAttribute('aria-label', `Preview ${sessionDisplayLabel(session)}. Click to open session.`);
+  popover.setAttribute('aria-labelledby', 'thread-terminal-preview-title');
   const header = document.createElement('header'); header.className = 'thread-preview-header';
-  const title = document.createElement('strong'); title.className = 'thread-preview-title'; title.textContent = sessionDisplayLabel(session);
+  const title = document.createElement('strong'); title.id = 'thread-terminal-preview-title'; title.className = 'thread-preview-title'; title.textContent = sessionDisplayLabel(session);
   const status = document.createElement('span'); status.className = 'thread-preview-status'; status.textContent = `${agentLabel(session.agent)} · ${sessionRailStatus(session).label}`;
   const cwd = document.createElement('span'); cwd.className = 'thread-preview-cwd'; cwd.title = session.cwd || '~'; cwd.textContent = session.cwd || '~';
   header.append(title, status, cwd);
   const terminalViewport = document.createElement('div'); terminalViewport.className = 'thread-preview-viewport';
   const terminalHost = document.createElement('div'); terminalHost.className = 'thread-preview-terminal'; terminalHost.setAttribute('aria-hidden', 'true'); terminalViewport.appendChild(terminalHost);
   const footer = document.createElement('footer'); footer.className = 'thread-preview-footer';
-  footer.innerHTML = '<span>CLICK TO OPEN SESSION</span><span>ESC TO CLOSE</span>';
+  footer.innerHTML = '<span>CLICK TO OPEN SESSION</span><span>ESC FROM ROW TO CLOSE</span>';
   popover.append(header, terminalViewport, footer);
   document.body.appendChild(popover);
   const terminal = new Terminal({
@@ -4854,7 +4958,8 @@ function openThreadPreview(session, anchor) {
   terminal.open(terminalHost);
   const preview = {
     sessionId: session.id, anchor, popover, terminal, terminalViewport, terminalHost,
-    refreshFrame: null, refreshCount: 0, scale: 1, writeDisposable: null, resizeObserver: null,
+    refreshFrame: null, refreshCount: 0, scale: 1, writeDisposable: null, resizeObserver: null, closeTimer: null,
+    anchorHovered, popoverHovered: false,
     reposition: () => positionThreadPreview(), outsidePointer: null,
   };
   state.ui.threadPreview = preview;
@@ -4869,14 +4974,20 @@ function openThreadPreview(session, anchor) {
   $('#thread-list')?.addEventListener('scroll', preview.reposition, { passive: true });
   document.addEventListener('pointerdown', preview.outsidePointer, true);
   popover.addEventListener('click', activateThreadPreview);
-  popover.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); activateThreadPreview(); }
-    else if (event.key === 'Escape') { event.preventDefault(); dismissThreadPreview({ restoreFocus: true }); }
+  popover.addEventListener('pointerenter', () => {
+    if (state.ui.threadPreview !== preview || preview.ignorePointerPresence) return;
+    preview.popoverHovered = true;
+    cancelThreadPreviewClose(preview);
+  });
+  popover.addEventListener('pointerleave', () => {
+    if (state.ui.threadPreview !== preview) return;
+    preview.popoverHovered = false;
+    scheduleThreadPreviewClose(preview);
   });
   anchor.setAttribute('aria-expanded', 'true');
   positionThreadPreview();
   refreshThreadPreview();
-  popover.focus({ preventScroll: true });
+  return true;
 }
 
 function writePtyInput(session, data) {
@@ -7590,6 +7701,30 @@ if (window.chromuxTest) {
       if (!row) throw new Error(`Missing rail row: ${id}`);
       row.click(); flushRender(); return state.activeId;
     },
+    hoverRow(id) {
+      const row = document.querySelector(`#thread-list .rail-session-row[data-session-id="${CSS.escape(id)}"]`);
+      if (!row) throw new Error(`Missing rail row: ${id}`);
+      row.dispatchEvent(new PointerEvent('pointerenter'));
+      flushRender();
+    },
+    unhoverRow(id) {
+      const row = document.querySelector(`#thread-list .rail-session-row[data-session-id="${CSS.escape(id)}"]`);
+      if (!row) throw new Error(`Missing rail row: ${id}`);
+      row.dispatchEvent(new PointerEvent('pointerleave'));
+      flushRender();
+    },
+    focusRow(id) {
+      const row = document.querySelector(`#thread-list .rail-session-row[data-session-id="${CSS.escape(id)}"]`);
+      if (!row) throw new Error(`Missing rail row: ${id}`);
+      row.focus();
+      flushRender();
+    },
+    rowKey(id, key) {
+      const row = document.querySelector(`#thread-list .rail-session-row[data-session-id="${CSS.escape(id)}"]`);
+      if (!row) throw new Error(`Missing rail row: ${id}`);
+      row.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+      flushRender();
+    },
     doubleClickRow(id) {
       const row = document.querySelector(`#thread-list .rail-session-row[data-session-id="${CSS.escape(id)}"]`);
       if (!row) throw new Error(`Missing rail row: ${id}`);
@@ -7651,6 +7786,7 @@ if (window.chromuxTest) {
         focused: document.activeElement === preview.popover,
         role: preview.popover.getAttribute('role'),
         ariaLabel: preview.popover.getAttribute('aria-label'),
+        labelledBy: preview.popover.getAttribute('aria-labelledby'),
         title: preview.popover.querySelector('.thread-preview-title')?.textContent || '',
         footer: preview.popover.querySelector('.thread-preview-footer')?.textContent || '',
         cwdTitle: preview.popover.querySelector('.thread-preview-cwd')?.title || '',
@@ -7692,9 +7828,21 @@ if (window.chromuxTest) {
       };
     },
     previewClick() { state.ui.threadPreview?.popover.click(); flushRender(); },
-    previewKey(key) {
-      state.ui.threadPreview?.popover.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+    hoverPreview() {
+      state.ui.threadPreview?.popover.dispatchEvent(new PointerEvent('pointerenter'));
       flushRender();
+    },
+    unhoverPreview() {
+      state.ui.threadPreview?.popover.dispatchEvent(new PointerEvent('pointerleave'));
+      flushRender();
+    },
+    clearPreviewPointerPresence() {
+      const preview = state.ui.threadPreview;
+      if (!preview) return;
+      preview.ignorePointerPresence = true;
+      preview.anchorHovered = false;
+      preview.popoverHovered = false;
+      scheduleThreadPreviewClose(preview);
     },
     outsideClick() { document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); flushRender(); },
     collapseAnchor(id) {

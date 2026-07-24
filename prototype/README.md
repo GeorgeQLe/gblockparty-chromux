@@ -68,11 +68,14 @@ Idle immediately. The Threads header defaults to **Recent**, ordering Working se
 groups by deliberate activity (focus, submitted input, or turn-state changes); **A–Z** alphabetizes group and
 session display labels instead. The validated choice stays in renderer local storage, does not affect Needs
 Attention urgency, and is hidden in Git Changes. Streaming terminal output does not reorder rows. Click an
-inactive Threads row to inspect a live, read-only terminal preview without
-changing sessions; click anywhere in the preview (or press Enter/Space) to open that session, and press
-Escape or click outside to close it. Clicking the already-active Threads row confirms the connection with
-a linked row-to-terminal highlight. Choose **Settings → Thread Preview Size → Compact, Comfortable, or
-Large** to adjust effective preview text size without changing terminal wrapping; Comfortable is the default.
+inactive Threads row to activate that session, reveal its tab, and return focus to its terminal or open
+composer. Hover over an inactive row for a brief pause, or move keyboard focus to it, to inspect a live,
+read-only terminal preview without changing sessions. The preview stays open while the pointer is over
+either surface; keyboard focus remains on the row, where Enter/Space activates and Escape closes the preview.
+Clicking anywhere in the preview is a secondary activation path, while clicking outside closes it. Clicking
+the already-active Threads row confirms the connection with a linked row-to-terminal highlight. Choose
+**Settings → Thread Preview Size → Compact, Comfortable, or Large** to adjust effective preview text size
+without changing terminal wrapping; Comfortable is the default.
 **Git Changes** tracks the working-copy diffs in repositories used by live sessions,
 showing each changed file, its status, whether it has staged changes, and repository-level staged/unstaged
 totals. It refreshes automatically while selected. The badge on Threads counts individual outstanding items,

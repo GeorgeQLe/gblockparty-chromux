@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Preview inactive ordinary, Working, and Needs Attention Threads rows on delayed hover or keyboard focus, activate sessions on one row click, preserve preview/attention/title stability, and ship as v0.53.0. _(source: user-supplied implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-session-rail-renderer.js`, complete prototype suite, source and packaged smoke, `prototype/README.md`, `RELEASES.md`)_
+
 - [x] Recognize exact Codex `/clear` from the rendered prompt when the keystroke shadow is stale, preserve Recent Threads row and spinner animation continuity across animated titles, retain genuine A–Z title reordering, and ship as v0.52.2. _(source: user-supplied implementation plan; evidence: `prototype/renderer/renderer.js`, real-xterm turn-signal/session-rail coverage, focused lifecycle/composer/diagnostics/update-safety suites, complete prototype suite, source and packaged smoke, `RELEASES.md`)_
 
 - [x] Treat exact Codex `/clear` as an authoritative idle boundary, invalidate stale completion callbacks and notifications until the next ordinary prompt, project idle across every shared consumer, and ship as v0.52.1. _(source: user-supplied implementation plan; evidence: `prototype/renderer/attention.js`, `prototype/renderer/renderer.js`, focused turn-signal/tab-activity/session-rail/diagnostics/update-safety coverage, complete prototype suite, source and packaged smoke, `RELEASES.md`)_

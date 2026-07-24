@@ -131,12 +131,22 @@ fs.writeFileSync(e2ePath, `
 
   const sourceBefore = rail.sourceState(web);
   expect(sourceBefore.baseY > sourceBefore.viewportY, 'source fixture should begin scrolled away from its latest output');
-  expect(rail.clickRow(web) === holder, 'inactive Threads row should preview without changing the active session');
-  await wait(80);
+  rail.hoverRow(web);
+  await wait(120);
+  expect(!rail.preview() && rail.activeId() === holder,
+    'hover preview should remain closed before the 250 ms delay');
+  rail.unhoverRow(web);
+  await wait(170);
+  expect(!rail.preview(), 'leaving an inactive row before 250 ms should cancel its pending preview');
+  rail.hoverRow(web);
+  await wait(270);
   let preview = rail.preview();
-  expect(preview && preview.sessionId === web, 'inactive Threads row should open one anchored preview');
-  expect(preview.focused && preview.role === 'dialog', 'preview should receive keyboard focus as a dialog');
-  expect(preview.ariaLabel.includes('web-agent') && preview.footer.includes('CLICK TO OPEN SESSION') && preview.footer.includes('ESC TO CLOSE'),
+  expect(preview && preview.sessionId === web && rail.activeId() === holder,
+    '250 ms hover should open one anchored preview without changing the active session');
+  expect(!preview.focused && preview.role === 'region',
+    'preview should be a non-modal region that does not steal keyboard focus');
+  expect(preview.ariaLabel.includes('web-agent') && preview.labelledBy === 'thread-terminal-preview-title'
+    && preview.footer.includes('CLICK TO OPEN SESSION') && preview.footer.includes('ESC FROM ROW TO CLOSE'),
     'preview should expose its session and activation/dismissal instructions');
   expect(preview.cwdTitle === ${JSON.stringify(repoAppDir)}, 'preview should preserve the full cwd in its tooltip');
   expect(preview.text.includes('RECENT RED') && preview.coloredCells > 0, 'serialized mirror should preserve recent terminal text and ANSI colors');
@@ -149,6 +159,17 @@ fs.writeFileSync(e2ePath, `
   expect(rail.rowState(web).ariaExpanded === 'true' && rail.rowState(web).ariaControls === 'thread-terminal-preview',
     'inactive preview row should expose expanded and controls ARIA state');
   expect(rail.rowState(holder).ariaCurrent === 'true', 'active Threads row should expose aria-current');
+  rail.unhoverRow(web);
+  await wait(80);
+  rail.hoverPreview();
+  await wait(100);
+  expect(rail.preview()?.sessionId === web,
+    'moving from a row into its preview within the 150 ms grace period should keep it open');
+  rail.focusRow(web);
+  rail.unhoverPreview();
+  await wait(170);
+  expect(rail.preview()?.sessionId === web && rail.rowState(web).focused,
+    'row focus should keep its preview open after the pointer leaves both surfaces');
   await rail.write(web, '\\r\\nLIVE UPDATE');
   await wait(80);
   preview = rail.preview();
@@ -176,11 +197,24 @@ fs.writeFileSync(e2ePath, `
   expect(rail.preview()?.text.includes('LIVE UPDATE'), 'leaving alternate screen should restore the mirrored normal buffer');
   expect(rail.cue(web).ptyInput === '', 'preview rendering must never send PTY input');
 
-  rail.previewKey('Escape');
+  rail.rowKey(web, 'Escape');
   expect(!rail.preview() && rail.rowState(web).focused, 'Escape should dismiss preview and restore focus to its row');
   expect(rail.rowState(web).ariaExpanded === 'false', 'dismissal should reset expanded ARIA state');
+  rail.focusThreadSortControl();
+  rail.focusRow(web);
+  expect(rail.preview()?.sessionId === web && rail.rowState(web).focused,
+    'keyboard focus should open the inactive row preview immediately without moving focus');
+  rail.unhoverRow(web);
+  rail.unhoverPreview();
+  rail.focusThreadSortControl();
+  rail.clearPreviewPointerPresence();
+  await wait(80);
+  expect(rail.preview()?.sessionId === web,
+    'focus departure should retain the preview during the 150 ms grace period');
+  await wait(120);
+  expect(!rail.preview(), 'preview should close after focus and pointer leave both surfaces for 150 ms');
   rail.setPreviewSize('compact');
-  rail.clickRow(web);
+  rail.focusRow(web);
   await wait(40);
   const compactWidth = rail.preview().width;
   rail.setPreviewSize('large');
@@ -190,9 +224,10 @@ fs.writeFileSync(e2ePath, `
     'preview size should update state, Settings, and local persistence together');
   rail.setPreviewSize('comfortable');
   await wait(40);
-  rail.previewKey('Enter');
-  await wait(40);
-  expect(rail.activeId() === web && !rail.preview(), 'Enter on preview should activate the session and close the preview');
+  expect(rail.clickRow(web) === web, 'one click on an inactive ordinary row should activate its session');
+  await wait(80);
+  expect(!rail.preview() && rail.sourceState(web).focused,
+    'ordinary-row single-click activation should dismiss preview and restore terminal focus');
   expect(rail.turnState(web).state === 'idle', 'opening completed session should consume it to idle');
 
   rail.select('threads');
@@ -249,8 +284,8 @@ fs.writeFileSync(e2ePath, `
     'Needs Attention cards should have at least 6px of visual separation');
   expect(initialAttentionGeometry.firstInset >= 5.9 && initialAttentionGeometry.lastInset >= 5.9,
     'Needs Attention cards should remain inside the group padding');
-  rail.clickRow(web);
-  await wait(40);
+  rail.hoverRow(web);
+  await wait(270);
   expect(rail.preview()?.sessionId === web, 'ordinary row should still open a preview before inline action test');
   rail.clickAttentionAction(api, 'QUEUE 1', 'OPEN');
   expect(!rail.preview() && rail.activeId() === api, 'inline attention actions should act directly without opening a thread preview');
@@ -343,11 +378,12 @@ fs.writeFileSync(e2ePath, `
   rail.title(webTwo, '\u2839 Dynamic review title');
   const workingRowAfterTitle = document.querySelector('#thread-list .rail-session-row[data-session-id="' + CSS.escape(webTwo) + '"]');
   workingRowBeforeTitle.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
-  workingRowBeforeTitle.click();
-  await wait(40);
+  rail.hoverRow(webTwo);
+  await wait(270);
   expect(workingRowAfterTitle === workingRowBeforeTitle && rail.preview()?.sessionId === webTwo,
-    'a pointer interaction spanning a working title update should retain its row and open the expected preview');
-  rail.previewKey('Escape');
+    'a pointer interaction spanning a working title update should retain its row and hover preview');
+  rail.unhoverRow(webTwo);
+  rail.outsideClick();
   expect(rail.groups().flatMap((group) => group.rows).some((row) => row.name === 'Dynamic review title'),
     'grouped rows should normalize Codex spinner prefixes in dynamic session titles');
   rail.emit(api, 'permission-required');
@@ -360,17 +396,27 @@ fs.writeFileSync(e2ePath, `
     'Threads working spinner should use the same animation as tabs');
 
   rail.focus(holder);
-  rail.clickRow(web);
-  await wait(40);
-  rail.clickRow(webTwo);
-  await wait(60);
-  expect(rail.preview()?.sessionId === webTwo, 'opening another row should replace the existing preview');
+  rail.hoverRow(web);
+  await wait(270);
+  rail.unhoverRow(web);
+  rail.clearPreviewPointerPresence();
+  rail.hoverRow(webTwo);
+  await wait(170);
+  expect(!rail.preview(), 'the prior row preview should close before a different row hover matures');
+  await wait(100);
+  expect(rail.preview()?.sessionId === webTwo,
+    'closing the prior preview must not cancel a different row hover pending for 250 ms');
+  rail.unhoverRow(webTwo);
+  rail.outsideClick();
+  rail.focusRow(web);
+  rail.focusRow(webTwo);
+  expect(rail.preview()?.sessionId === webTwo, 'focusing another row should replace the existing preview');
   rail.outsideClick();
   expect(!rail.preview(), 'outside click should dismiss the preview');
-  rail.clickRow(webTwo);
-  await wait(40);
+  rail.hoverRow(webTwo);
+  await wait(270);
   rail.previewClick();
-  await wait(40);
+  await wait(80);
   expect(rail.activeId() === webTwo && !rail.preview(), 'clicking anywhere in the preview should activate its session');
   rail.emit(webTwo, 'turn-end');
   expect(!rail.groups().some((group) => group.key === 'status:working'),
@@ -392,13 +438,13 @@ fs.writeFileSync(e2ePath, `
   'exact Codex /clear should immediately leave Working and return to its cwd group as Idle');
   rail.close(clearRailCodex);
   rail.focus(holder);
-  rail.clickRow(webTwo);
-  await wait(40);
+  rail.hoverRow(webTwo);
+  await wait(270);
   rail.select('git');
   expect(!rail.preview(), 'rail mode changes should dismiss the preview');
   rail.select('threads');
-  rail.clickRow(webTwo);
-  await wait(40);
+  rail.hoverRow(webTwo);
+  await wait(270);
   rail.collapseAnchor(webTwo);
   await wait(60);
   expect(!rail.preview(), 'collapsing a group should dismiss a preview whose anchor becomes hidden');
@@ -406,67 +452,84 @@ fs.writeFileSync(e2ePath, `
     .find((group) => group.dataset.groupKey === 'cwd:' + ${JSON.stringify(repoAppDir)});
   webGroupDetails.open = true;
   await wait(40);
-  rail.clickRow(webTwo);
-  await wait(40);
+  rail.hoverRow(webTwo);
+  await wait(270);
   rail.close(webTwo);
   await wait(40);
   expect(!rail.preview(), 'closing the previewed session should dispose and dismiss its preview');
 
   const ordinaryDouble = rail.addTerminalSession({
-    name: 'ordinary-double-click',
+    name: 'ordinary-activation',
     agent: 'codex',
     cwd: ${JSON.stringify(looseDir)},
   });
   const workingDouble = rail.addTerminalSession({
-    name: 'working-double-click',
+    name: 'working-activation',
     agent: 'claude',
     cwd: ${JSON.stringify(repoAppDir)},
   });
   const attentionDouble = rail.addTerminalSession({
-    name: 'attention-double-click',
+    name: 'attention-activation',
     agent: 'grok',
     cwd: ${JSON.stringify(repoApiDir)},
   });
   rail.focus(holder);
   rail.emit(workingDouble, 'turn-start');
   rail.emit(attentionDouble, 'turn-start');
-  rail.emit(attentionDouble, 'turn-end', 'Completed double-click fixture');
+  rail.emit(attentionDouble, 'turn-end', 'Completed activation fixture');
   const doubleClickGroups = rail.groups();
   expect(doubleClickGroups.filter((group) => group.key.startsWith('cwd:'))
     .flatMap((group) => group.rows).some((row) => row.id === ordinaryDouble),
-  'ordinary double-click fixture should render in a working-directory section');
+  'ordinary activation fixture should render in a working-directory section');
   expect(doubleClickGroups.find((group) => group.key === 'status:working')
     ?.rows.some((row) => row.id === workingDouble),
-  'working double-click fixture should render in the Working section');
+  'working activation fixture should render in the Working section');
   expect(doubleClickGroups.find((group) => group.key === 'attention:needs')
     ?.rows.some((row) => row.id === attentionDouble),
-  'attention double-click fixture should render in the Needs Attention section');
+  'attention activation fixture should render in the Needs Attention section');
 
-  expect(rail.clickRow(ordinaryDouble) === holder,
-    'one click on an inactive ordinary row should preview without changing the active session');
-  await wait(40);
+  rail.hoverRow(ordinaryDouble);
+  await wait(270);
   expect(rail.preview()?.sessionId === ordinaryDouble,
-    'one click on an inactive ordinary row should leave its preview open');
-  expect(rail.doubleClickRow(ordinaryDouble) === ordinaryDouble,
-    'double-clicking an ordinary row should activate its session');
-  await wait(80);
-  expect(!rail.preview(), 'ordinary-row double-click activation should leave no preview open');
-  expect(rail.sourceState(ordinaryDouble).focused,
-    'ordinary-row double-click activation should focus the terminal after scheduled rendering');
+    'hovering an ordinary row for 250 ms should open its preview');
+  rail.unhoverRow(ordinaryDouble);
+  rail.outsideClick();
+  rail.hoverRow(ordinaryDouble);
+  await wait(120);
+  expect(rail.clickRow(ordinaryDouble) === ordinaryDouble,
+    'one click on an inactive ordinary row should activate its session');
+  await wait(280);
+  expect(!rail.preview() && rail.sourceState(ordinaryDouble).focused,
+    'ordinary-row single-click activation should cancel pending hover and focus the terminal');
 
   rail.focus(holder);
-  expect(rail.doubleClickRow(workingDouble) === workingDouble,
-    'double-clicking a Working row should activate its session');
+  rail.hoverRow(workingDouble);
+  await wait(270);
+  expect(rail.preview()?.sessionId === workingDouble,
+    'hovering a Working row for 250 ms should open its preview');
+  expect(rail.clickRow(workingDouble) === workingDouble,
+    'one click on a Working row should activate its session');
   await wait(80);
   expect(!rail.preview() && rail.sourceState(workingDouble).focused,
-    'Working-row double-click activation should dismiss preview and focus its terminal');
+    'Working-row single-click activation should dismiss preview and focus its terminal');
 
   rail.focus(holder);
-  expect(rail.doubleClickRow(attentionDouble) === attentionDouble,
-    'double-clicking a Needs Attention row should activate its session');
+  rail.hoverRow(attentionDouble);
+  await wait(270);
+  expect(rail.preview()?.sessionId === attentionDouble,
+    'hovering a Needs Attention row for 250 ms should open its preview');
+  expect(rail.clickRow(attentionDouble) === attentionDouble,
+    'one click on a Needs Attention row should activate its session');
   await wait(80);
   expect(!rail.preview() && rail.sourceState(attentionDouble).focused,
-    'Needs Attention double-click activation should dismiss preview and focus its terminal');
+    'Needs Attention single-click activation should dismiss preview and focus its terminal');
+
+  rail.focus(holder);
+  expect(rail.doubleClickRow(ordinaryDouble) === ordinaryDouble,
+    'a redundant double-click should activate through its first ordinary-row click');
+  await wait(80);
+  expect(!rail.preview() && rail.sourceState(ordinaryDouble).focused,
+    'redundant double-click should leave the activated terminal focused with no preview');
 
   rail.focus(holder);
   rail.emit(attentionDouble, 'turn-start');
@@ -516,13 +579,13 @@ fs.writeFileSync(e2ePath, `
       rail.title(web, theme + ' ' + mode + ' active title');
       const rowAfterTitle = document.querySelector('#thread-list .rail-session-row[data-session-id="' + CSS.escape(web) + '"]');
       rowBeforePointer.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
-      rowBeforePointer.click();
       expect(rowAfterTitle === rowBeforePointer,
         theme + ' ' + mode + ' should preserve the pointer target across an animated title update');
-      await wait(40);
+      rail.hoverRow(web);
+      await wait(270);
       const geometry = rail.preview();
       expect(geometry?.sessionId === web,
-        theme + ' ' + mode + ' should complete the pointer interaction on the expected session');
+        theme + ' ' + mode + ' should open the expected hover preview after a title update');
       expect(geometry && geometry.left >= 0 && geometry.top >= 0 && geometry.right <= window.innerWidth + 1 && geometry.bottom <= window.innerHeight + 1,
         theme + ' ' + mode + ' should clamp the preview inside the viewport');
       expect(geometry.cols === geometry.sourceCols && geometry.rows === geometry.sourceRows,
@@ -534,7 +597,8 @@ fs.writeFileSync(e2ePath, `
       theme + ' ' + mode + ' should align header, terminal, and footer insets: ' + JSON.stringify(geometry.padding));
       expect(geometry.padding.terminalTop >= 9 && geometry.padding.terminalRight >= 9 && geometry.padding.terminalBottom >= 9,
         theme + ' ' + mode + ' should preserve terminal padding on every edge: ' + JSON.stringify(geometry.padding));
-      rail.previewKey('Escape');
+      rail.unhoverRow(web);
+      rail.outsideClick();
     }
   }
 
