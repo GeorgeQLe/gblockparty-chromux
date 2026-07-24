@@ -48,6 +48,7 @@ const RESTORE_ATTENTION_TYPES = new Set([
 const MAX_RESTORE_ATTENTION_RECORDS = 20;
 const MAX_RESTORE_ATTENTION_DETAIL_BYTES = 4096;
 const MAX_RESTORE_ATTENTION_ID_CHARS = 200;
+const CUSTOM_TAB_GROUP_ID_RE = /^group-[a-z0-9-]{1,64}$/;
 const PREFERENCES_FILE = path.join(CHROMUX_HOME, 'preferences.json');
 const FAVORITES_FILE = path.join(CHROMUX_HOME, 'favorites.json');
 const PROJECTS_FILE = path.join(CHROMUX_HOME, 'projects.json');
@@ -867,6 +868,13 @@ function sanitizeRestoreSession(session) {
     cwd,
     agent,
     resumeId: sanitizeResumeId(session.resumeId),
+    ...(typeof session.customTabGroupId === 'string' && CUSTOM_TAB_GROUP_ID_RE.test(session.customTabGroupId)
+      ? { customTabGroupId: session.customTabGroupId }
+      : {}),
+    ...(typeof session.wasActive === 'boolean' ? { wasActive: session.wasActive } : {}),
+    ...(typeof session.wasLastActiveInGroup === 'boolean'
+      ? { wasLastActiveInGroup: session.wasLastActiveInGroup }
+      : {}),
     alive: session.alive !== false,
     currentUrl: typeof session.currentUrl === 'string' && session.currentUrl ? session.currentUrl : null,
     browserTabs,
@@ -892,7 +900,7 @@ function writeRestoreSnapshot({ sessions, reason = 'manual', restoreId = null, s
       lastActivityAt: normalizedActivityTimestamp(session.lastActivityAt, snapshotSavedAt),
     })) : [];
   const payload = {
-    schemaVersion: 7,
+    schemaVersion: 8,
     restoreId: restoreId || `restore-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     reason,
     savedAt: snapshotSavedAt,
@@ -917,13 +925,21 @@ function readRestoreSnapshot() {
     savedAt: snapshotSavedAt,
     consumed: Boolean(payload.consumed),
     consumedAt: payload.consumedAt || null,
-    sessions: payload.sessions.map(sanitizeRestoreSession).filter(Boolean).map((session) => ({
-      ...session,
-      lastActivityAt: normalizedActivityTimestamp(
-        schemaVersion >= 7 ? session.lastActivityAt : null,
-        snapshotSavedAt,
-      ),
-    })),
+    sessions: payload.sessions.map(sanitizeRestoreSession).filter(Boolean).map((session) => {
+      const clean = {
+        ...session,
+        lastActivityAt: normalizedActivityTimestamp(
+          schemaVersion >= 7 ? session.lastActivityAt : null,
+          snapshotSavedAt,
+        ),
+      };
+      if (schemaVersion < 8) {
+        delete clean.customTabGroupId;
+        delete clean.wasActive;
+        delete clean.wasLastActiveInGroup;
+      }
+      return clean;
+    }),
   };
 }
 

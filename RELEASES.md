@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.58.0
+
+Tag: `chromux-v0.58.0`
+
+- Add opt-in two-level session navigation with custom groups first and exact normalized working-directory groups after them, preserving session-open order, last-active focus, searchable/keyboard activation, horizontal overflow, and the existing flat tab bar by default.
+- Add persistent custom-group creation, validation, rename, deletion, and context-menu moves; empty groups remain manageable in Settings, while nonempty group deletion returns sessions to automatic directory grouping.
+- Aggregate session count, highest-priority status, and attention/queue badges on group tabs, and upgrade restart snapshots to schema v8 for custom membership, exact active session, and per-group last-active restoration while retaining schema v1–v7 compatibility.
+
 ## GBlockParty Chromux v0.57.0
 
 Tag: `chromux-v0.57.0`

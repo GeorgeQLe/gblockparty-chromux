@@ -13,6 +13,8 @@ const e2eOutPath = path.join(tmpDir, 'e2e.out');
 const shared = path.join(homeDir, 'shared-project');
 const codexCwd = path.join(homeDir, 'codex-project');
 const grokCwd = path.join(homeDir, 'grok-project');
+const restoreGood = path.join(homeDir, 'restore-good');
+const restoreOther = path.join(homeDir, 'restore-other');
 const ids = {
   exactA: '11111111-1111-4111-8111-111111111111',
   exactB: '22222222-2222-4222-8222-222222222222',
@@ -23,6 +25,8 @@ const ids = {
 };
 
 fs.mkdirSync(path.join(homeDir, '.chromux'), { recursive: true });
+fs.mkdirSync(restoreGood, { recursive: true });
+fs.mkdirSync(restoreOther, { recursive: true });
 fs.writeFileSync(path.join(homeDir, '.chromux', 'restore-sessions.json'), JSON.stringify({
   schemaVersion: 2,
   restoreId: 'legacy-v2',
@@ -78,7 +82,8 @@ fs.writeFileSync(e2ePath, `
     savedAt: legacySavedAt,
     sessions: [
       { name: 'valid-activity', cwd: ${JSON.stringify(shared)}, agent: 'claude',
-        lastActivityAt: '2026-07-22T12:34:56Z' },
+        lastActivityAt: '2026-07-22T12:34:56Z',
+        customTabGroupId: 'group-must-be-ignored', wasActive: true, wasLastActiveInGroup: true },
       { name: 'bad-activity', cwd: ${JSON.stringify(shared)}, agent: 'claude', lastActivityAt: 'not-a-time' },
     ],
   });
@@ -86,6 +91,29 @@ fs.writeFileSync(e2ePath, `
     'schema v7 should normalize valid session activity timestamps');
   expect(schemaSeven.sessions[1].lastActivityAt === legacySavedAt,
     'schema v7 should replace malformed session activity timestamps with snapshot savedAt');
+  expect(!Object.prototype.hasOwnProperty.call(schemaSeven.sessions[0], 'customTabGroupId')
+    && !Object.prototype.hasOwnProperty.call(schemaSeven.sessions[0], 'wasActive')
+    && !Object.prototype.hasOwnProperty.call(schemaSeven.sessions[0], 'wasLastActiveInGroup'),
+  'schema v7 must ignore schema-v8 grouping fields');
+
+  const schemaEight = await window.chromuxTest.restorePayload({
+    schemaVersion: 8,
+    savedAt: legacySavedAt,
+    sessions: [
+      { name: 'focus-valid', cwd: ${JSON.stringify(shared)}, agent: 'claude',
+        customTabGroupId: 'group-restore-valid', wasActive: true, wasLastActiveInGroup: false },
+      { name: 'focus-invalid', cwd: ${JSON.stringify(shared)}, agent: 'claude',
+        customTabGroupId: '../bad', wasActive: 'true', wasLastActiveInGroup: 1 },
+    ],
+  });
+  expect(schemaEight.sessions[0].customTabGroupId === 'group-restore-valid'
+    && schemaEight.sessions[0].wasActive === true
+    && schemaEight.sessions[0].wasLastActiveInGroup === false,
+  'schema v8 must sanitize and preserve valid custom membership and focus booleans');
+  expect(!Object.prototype.hasOwnProperty.call(schemaEight.sessions[1], 'customTabGroupId')
+    && !Object.prototype.hasOwnProperty.call(schemaEight.sessions[1], 'wasActive')
+    && !Object.prototype.hasOwnProperty.call(schemaEight.sessions[1], 'wasLastActiveInGroup'),
+  'schema v8 must discard malformed custom membership and focus fields');
 
   const exact = await window.chromux.resolveRestoreSessions({ sessions: [
     { name: 'tab-a', cwd: ${JSON.stringify(shared)}, agent: 'claude', resumeId: ${JSON.stringify(ids.exactA)} },
@@ -137,6 +165,7 @@ fs.writeFileSync(e2ePath, `
 
   const saved = await window.chromux.saveRestoreSnapshot({ reason: 'manual', sessions: [
     { name: 'valid', cwd: ${JSON.stringify(shared)}, agent: 'claude', resumeId: ${JSON.stringify(ids.exactB)}, composerDraft: 'saved draft',
+      customTabGroupId: 'group-saved-valid', wasActive: true, wasLastActiveInGroup: true,
       resume: { id: ${JSON.stringify(ids.exactB)}, name: 'transient detect name',
         agentMessagePreview: 'transient detect excerpt' },
       agentMessagePreview: 'transient detect excerpt',
@@ -158,11 +187,14 @@ fs.writeFileSync(e2ePath, `
         { id: 'bad-time:1', type: 'delivery', detail: 'no', occurredAt: 0 },
       ] },
   ] });
-  expect(saved.schemaVersion === 7, 'new snapshot must use schema v7');
+  expect(saved.schemaVersion === 8, 'new snapshot must use schema v8');
   expect(saved.sessions[0].lastActivityAt === '2026-07-23T01:02:03.000Z'
     && typeof saved.sessions[1].lastActivityAt === 'string',
-  'schema v7 should round-trip valid activity and provide a valid fallback for malformed or absent activity');
+  'schema v8 should retain schema-v7 activity timestamps and provide a valid fallback for malformed or absent activity');
   expect(saved.sessions[0].resumeId === ${JSON.stringify(ids.exactB)}, 'valid resumeId not persisted');
+  expect(saved.sessions[0].customTabGroupId === 'group-saved-valid'
+    && saved.sessions[0].wasActive === true && saved.sessions[0].wasLastActiveInGroup === true,
+  'schema v8 group membership and focus metadata did not round-trip');
   expect(!Object.prototype.hasOwnProperty.call(saved.sessions[0], 'resume')
     && !Object.prototype.hasOwnProperty.call(saved.sessions[0], 'agentMessagePreview'),
   'transient DETECT name/excerpt metadata must not enter restore snapshots');
@@ -178,6 +210,50 @@ fs.writeFileSync(e2ePath, `
     && saved.sessions[0].attentionRecords[0].detail === 'Finished 0', 'valid attention record changed');
   expect(!Object.prototype.hasOwnProperty.call(saved.sessions[1], 'attentionRecords'),
     'malformed or oversized attention records persisted');
+
+  const tabs = window.chromuxTestTabs;
+  const grouping = tabs && tabs.grouping;
+  expect(grouping, 'missing grouping restore test API');
+  const restoreGroup = grouping.create('Restore Team');
+  grouping.setEnabled(true);
+  await window.chromuxTest.restorePayload({
+    schemaVersion: 8,
+    restoreId: 'partial-group-restore',
+    reason: 'app-close',
+    savedAt: new Date().toISOString(),
+    consumed: false,
+    sessions: [
+      { name: 'same-group-fallback', cwd: ${JSON.stringify(restoreGood)}, agent: '',
+        customTabGroupId: restoreGroup.id, wasLastActiveInGroup: true },
+      { name: 'failed-active', cwd: ${JSON.stringify(path.join(homeDir, 'missing-restore-cwd'))}, agent: '',
+        customTabGroupId: restoreGroup.id, wasActive: true },
+      { name: 'orphan-membership', cwd: ${JSON.stringify(restoreOther)}, agent: '',
+        customTabGroupId: 'group-no-longer-local' },
+    ],
+  });
+  const partial = await grouping.autoRestore(['failed-active']);
+  expect(!partial.sessions.some((session) => session.name === 'failed-active'),
+    'a failed restore must not leave a partial runtime session');
+  expect(partial.sessions.find((session) => session.id === partial.activeId).name === 'same-group-fallback',
+    'failed exact active restore must fall back within the same group');
+  expect(partial.sessions.find((session) => session.name === 'orphan-membership').customTabGroupId === null,
+    'orphaned custom membership must fall back to automatic directory grouping');
+
+  await window.chromuxTest.restorePayload({
+    schemaVersion: 8,
+    restoreId: 'exact-group-restore',
+    reason: 'app-close',
+    savedAt: new Date().toISOString(),
+    consumed: false,
+    sessions: [
+      { name: 'not-active', cwd: ${JSON.stringify(restoreOther)}, agent: '' },
+      { name: 'exact-active', cwd: ${JSON.stringify(restoreGood)}, agent: '',
+        customTabGroupId: restoreGroup.id, wasActive: true, wasLastActiveInGroup: true },
+    ],
+  });
+  const exactFocus = await grouping.autoRestore();
+  expect(exactFocus.sessions.find((session) => session.id === exactFocus.activeId).name === 'exact-active',
+    'successful schema-v8 restore must recover the exact prior active group and session');
   return JSON.stringify({ ok: true });
 })()
 `);

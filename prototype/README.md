@@ -46,6 +46,18 @@ and terminal palette, then persist locally for the next launch. New profiles sta
 Light. Run `npm run capture:themes -- /tmp/chromux-theme-shots` to generate deterministic
 screenshots of the open theme picker in all eight theme/mode combinations.
 
+### Session tab groups
+
+The tab bar remains flat by default. Enable **SETTINGS → SESSION TAB GROUPS** to show custom and
+directory groups in an upper strip and the focused group’s sessions in a lower strip. Automatic
+groups use the session’s exact normalized working directory; custom membership overrides that
+directory until **Move to group… → Automatic directory** is chosen from the session context menu.
+Custom groups can be created, renamed, or deleted in Settings. Empty custom groups remain available
+there but stay out of the upper strip. Group selection remembers its last-active session, and search
+or numeric session shortcuts reveal both destination tabs. The preference and custom definitions
+stay in the local Chromium profile; membership and focus are included in normal app-close/update
+restore snapshots.
+
 ### Developer diagnostics
 
 Interactive source launches show a read-only diagnostics strip above the shortcut status bar. It can
@@ -194,7 +206,7 @@ See [`docs/troubleshooting.md`](docs/troubleshooting.md) for the full support gu
 | --- | --- |
 | Capture payloads + screenshots | `~/.chromux/captures/<timestamp>/` |
 | Delivery log | `~/.chromux/delivery-log.jsonl` |
-| Restore snapshot | `~/.chromux/restore-sessions.json` (schema v7; includes validated provider conversation IDs, last deliberate activity, ordered browser page/explorer tabs, optional 64 KiB composer drafts, and up to 20 bounded historical Needs Attention records per session) |
+| Restore snapshot | `~/.chromux/restore-sessions.json` (schema v8; includes validated provider conversation IDs, custom tab-group membership/focus, last deliberate activity, ordered browser page/explorer tabs, optional 64 KiB composer drafts, and up to 20 bounded historical Needs Attention records per session) |
 | Prompt history | `~/.chromux/prompt-history.json` (local plaintext, mode `0600`, 100 entries/project, 5 MiB total) |
 | Saved projects | `~/.chromux/projects.json` |
 | Update cache/source/install log | `~/.chromux/update-cache.json`, `~/.chromux/update-source.json`, `~/.chromux/update-install.log` |

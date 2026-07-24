@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Add opt-in two-level session tab groups with exact-cwd automatic grouping, persistent custom management/membership/navigation, schema-v8 restore focus, aggregate status, and flat-mode compatibility; ship as v0.58.0. _(source: user-supplied implementation plan; evidence: `prototype/renderer/index.html`, `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`, `prototype/main.js`, `prototype/scripts/test-session-tab-groups-renderer.js`, `prototype/scripts/test-restore-session-identity.js`, `RELEASES.md`)_
+
 - [x] Show projected session attention details in live terminal hover/focus previews, preserve bounded terminal geometry and interaction behavior, and ship as v0.57.0. _(source: user-supplied implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`, `prototype/scripts/test-session-rail-renderer.js`, adjacent queue/diagnostics/theme regressions, `RELEASES.md`)_
 
 - [x] Simplify Needs Attention session cards to one semantic header status, retain labeled additional reasons and direct actions, wrap summaries to two lines, and ship as v0.56.2. _(source: user-supplied implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`, session-rail and affected renderer regressions, all 45 prototype test files, source and packaged smoke, `RELEASES.md`)_

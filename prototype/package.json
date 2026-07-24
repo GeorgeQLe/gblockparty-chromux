@@ -1,6 +1,6 @@
 {
   "name": "chromux",
-  "version": "0.57.0",
+  "version": "0.58.0",
   "description": "OSS desktop front-end for local and GBlockParty-managed agent/browser workspaces.",
   "main": "main.js",
   "private": false,
@@ -37,6 +37,7 @@
     "test:tab-activity-indicators-renderer": "node scripts/test-tab-activity-indicators-renderer.js",
     "test:session-rail-renderer": "node scripts/test-session-rail-renderer.js",
     "test:tab-titles-renderer": "node scripts/test-tab-titles-renderer.js",
+    "test:session-tab-groups-renderer": "node scripts/test-session-tab-groups-renderer.js",
     "test:resume-retry-renderer": "node scripts/test-resume-retry-renderer.js",
     "test:capture-records-renderer": "node scripts/test-capture-records-renderer.js",
     "test:preview-queue-renderer": "node scripts/test-preview-queue-renderer.js",

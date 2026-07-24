@@ -12,6 +12,7 @@ const TAB_ACTIVITY_STORAGE_KEY = 'chromux.tabActivityIndicators';
 const RAIL_MODE_STORAGE_KEY = 'chromux.railMode';
 const THREAD_SORT_STORAGE_KEY = 'chromux.threadSort';
 const THREAD_PREVIEW_SIZE_STORAGE_KEY = 'chromux.threadPreviewSize';
+const TAB_GROUPS_STORAGE_KEY = 'chromux.sessionTabGroups';
 const THEME_IDS = new Set(['blueprint', 'retro-os', 'streak', 'liquid-glass']);
 const THEME_MODE_IDS = new Set(['light', 'dark']);
 const THEME_LABELS = {
@@ -27,6 +28,8 @@ const RESTORE_ATTENTION_TYPES = new Set([
   'permission', 'authentication', 'input', 'rateLimited', 'toolFailed', 'delivery', 'completed',
 ]);
 const MAX_RESTORE_ATTENTION_RECORDS = 20;
+const MAX_CUSTOM_TAB_GROUPS = 100;
+const CUSTOM_TAB_GROUP_ID_RE = /^group-[a-z0-9-]{1,64}$/;
 
 function storedTheme() {
   try {
@@ -76,6 +79,43 @@ function storedThreadPreviewSize() {
   } catch { return 'comfortable'; }
 }
 
+function sanitizeCustomTabGroupName(value) {
+  const name = String(value || '').trim();
+  return name.length >= 1 && name.length <= 80 ? name : null;
+}
+
+function sanitizeCustomTabGroupId(value) {
+  const id = String(value || '');
+  return CUSTOM_TAB_GROUP_ID_RE.test(id) ? id : null;
+}
+
+function storedTabGroups() {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(TAB_GROUPS_STORAGE_KEY) || 'null');
+    if (!parsed || parsed.schemaVersion !== 1 || typeof parsed.enabled !== 'boolean' || !Array.isArray(parsed.groups)) {
+      return { enabled: false, groups: [] };
+    }
+    const names = new Set();
+    const ids = new Set();
+    const groups = [];
+    if (parsed.groups.length > MAX_CUSTOM_TAB_GROUPS) return { enabled: false, groups: [] };
+    for (const row of parsed.groups) {
+      const id = sanitizeCustomTabGroupId(row && row.id);
+      const name = sanitizeCustomTabGroupName(row && row.name);
+      const folded = name && name.toLocaleLowerCase();
+      if (!id || !name || ids.has(id) || names.has(folded)) return { enabled: false, groups: [] };
+      ids.add(id);
+      names.add(folded);
+      groups.push({ id, name });
+    }
+    return { enabled: parsed.enabled, groups };
+  } catch {
+    return { enabled: false, groups: [] };
+  }
+}
+
+const storedTabGroupState = storedTabGroups();
+
 const state = {
   sessions: new Map(), // id -> session
   activeId: null,
@@ -96,6 +136,10 @@ const state = {
     railMode: storedRailMode(),
     threadSort: storedThreadSort(),
     threadPreviewSize: storedThreadPreviewSize(),
+    tabGroupsEnabled: storedTabGroupState.enabled,
+    customTabGroups: storedTabGroupState.groups,
+    focusedTabGroupId: null,
+    lastActiveSessionByGroup: new Map(),
     gitRoots: new Map(), // exact cwd -> { value: string|null|undefined, promise }
     gitDiffs: new Map(), // repository root -> { value: summary|null|undefined, promise }
     railExpanded: new Map(),
@@ -133,6 +177,7 @@ const state = {
   testInstallUpdateResult: null,
   testUpdateInstallTrace: null,
   testCodexLaunchExecutor: null,
+  testRestoreFailureNames: null,
   updateQueue: {
     phase: 'idle',
     error: null,
@@ -358,6 +403,56 @@ function renderThemeControls() {
 function renderTabActivityControls() {
   const toggle = $('#settings-tab-activity-indicators');
   if (toggle) toggle.checked = state.ui.tabActivityIndicators;
+}
+
+function setCustomTabGroupError(message = '') {
+  const error = $('#custom-tab-group-error');
+  if (!error) return;
+  error.textContent = message;
+  error.classList.toggle('hidden', !message);
+}
+
+function renderCustomTabGroups() {
+  const toggle = $('#settings-tab-groups');
+  if (toggle) toggle.checked = state.ui.tabGroupsEnabled;
+  const host = $('#custom-tab-groups');
+  if (!host) return;
+  host.innerHTML = '';
+  for (const group of state.ui.customTabGroups) {
+    const row = document.createElement('div');
+    row.className = 'custom-tab-group-row';
+    row.dataset.groupId = group.id;
+    const name = document.createElement('span');
+    name.className = 'custom-tab-group-label';
+    name.textContent = group.name;
+    const count = document.createElement('span');
+    count.className = 'custom-tab-group-count';
+    const memberCount = orderedSessions().filter((session) => session.customTabGroupId === group.id).length;
+    count.textContent = `${memberCount} SESSION${memberCount === 1 ? '' : 'S'}`;
+    const rename = document.createElement('button');
+    rename.type = 'button';
+    rename.className = 'qi-btn';
+    rename.textContent = 'RENAME';
+    rename.onclick = () => {
+      const next = window.prompt('Rename custom group', group.name);
+      if (next === null) return;
+      const result = renameCustomTabGroup(group.id, next);
+      setCustomTabGroupError(result.error || '');
+    };
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'qi-btn';
+    remove.textContent = 'DELETE';
+    remove.onclick = () => deleteCustomTabGroup(group.id);
+    row.append(name, count, rename, remove);
+    host.appendChild(row);
+  }
+  if (!state.ui.customTabGroups.length) {
+    const empty = document.createElement('div');
+    empty.className = 'custom-tab-groups-empty';
+    empty.textContent = 'No custom groups yet.';
+    host.appendChild(empty);
+  }
 }
 
 function renderPreventSleepStatus(status = state.env && state.env.preventSleep) {
@@ -1356,6 +1451,7 @@ function newSessionShape({ id, name, cwd, agent }) {
   }[agent];
   return {
     id, name, cwd, agent, resumeId: null, lastActivityAt: Date.now(),
+    customTabGroupId: null,
     restoredAttentionRecords: [], // historical snapshot records; separate from live turn/capture state
     capabilities,
     lifecycle: { alive: true, exitCode: null, exitedAt: null, resumeLaunch: null },
@@ -1574,6 +1670,7 @@ function updateBadges() {
   $('#g-sessions').textContent = String(state.sessions.size);
   // "SENT" counts exactly what its label says: deliveries that exited 0.
   $('#g-captures').textContent = String(deliveredCaptureCount());
+  if (state.ui.tabGroupsEnabled) renderTabs();
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -3099,6 +3196,56 @@ function openGrokContextAdvisory(session, mode = 'other') {
   $('#grok-context-enable').focus();
 }
 
+function openMoveToGroupPicker(session, x, y) {
+  closeSessionContextMenu();
+  const menu = document.createElement('div');
+  menu.className = 'session-menu group-picker';
+  menu.style.left = `${x}px`;
+  menu.style.top = `${y}px`;
+  menu.setAttribute('role', 'menu');
+  const add = (label, detail, action, selected = false) => {
+    const item = document.createElement('button');
+    item.className = 'session-menu-item';
+    item.setAttribute('role', 'menuitemradio');
+    item.setAttribute('aria-checked', String(selected));
+    const text = document.createElement('span');
+    text.className = 'smi-label';
+    text.textContent = `${selected ? '✓ ' : ''}${label}`;
+    const hint = document.createElement('span');
+    hint.className = 'smi-detail';
+    hint.textContent = detail;
+    item.append(text, hint);
+    item.onclick = (event) => {
+      event.stopPropagation();
+      closeSessionContextMenu();
+      action();
+    };
+    menu.appendChild(item);
+  };
+  add('Automatic directory', normalizeSessionCwd(session.cwd) || '~',
+    () => setSessionCustomTabGroup(session, null), !validCustomTabGroup(session.customTabGroupId));
+  for (const group of state.ui.customTabGroups) {
+    add(group.name, 'Custom group', () => setSessionCustomTabGroup(session, group.id),
+      session.customTabGroupId === group.id);
+  }
+  add('Create and move…', 'New custom group', () => {
+    const name = window.prompt('New custom group name', '');
+    if (name === null) return;
+    const result = createCustomTabGroup(name);
+    if (result.group) setSessionCustomTabGroup(session, result.group.id);
+    else {
+      setCustomTabGroupError(result.error);
+      openSettings();
+    }
+  });
+  document.body.appendChild(menu);
+  state.contextMenu = menu;
+  const rect = menu.getBoundingClientRect();
+  menu.style.left = `${Math.min(x, window.innerWidth - rect.width - 8)}px`;
+  menu.style.top = `${Math.min(y, window.innerHeight - rect.height - 8)}px`;
+  requestAnimationFrame(() => menu.querySelector('button')?.focus());
+}
+
 function openSessionContextMenu(session, x, y) {
   closeSessionContextMenu();
 
@@ -3125,7 +3272,8 @@ function openSessionContextMenu(session, x, y) {
     hint.className = 'smi-detail';
     hint.textContent = detail;
     item.append(text, hint);
-    item.onclick = () => {
+    item.onclick = (event) => {
+      event.stopPropagation();
       closeSessionContextMenu();
       action();
     };
@@ -3143,6 +3291,8 @@ function openSessionContextMenu(session, x, y) {
       else duplicateSession(session, crossAgent, 'other').catch(() => {});
     }, false, crossAgent === 'grok');
   }
+  addItem('Move to group…', validCustomTabGroup(session.customTabGroupId)?.name || 'Automatic directory',
+    () => openMoveToGroupPicker(session, x, y));
   addItem('Close session', session.name, () => closeSession(session.id), true);
 
   document.body.appendChild(menu);
@@ -3778,6 +3928,223 @@ function orderedSessions() {
   return [...state.sessions.values()];
 }
 
+function persistTabGroups() {
+  try {
+    window.localStorage.setItem(TAB_GROUPS_STORAGE_KEY, JSON.stringify({
+      schemaVersion: 1,
+      enabled: Boolean(state.ui.tabGroupsEnabled),
+      groups: state.ui.customTabGroups.slice(0, MAX_CUSTOM_TAB_GROUPS)
+        .map(({ id, name }) => ({ id, name })),
+    }));
+  } catch { /* unavailable */ }
+}
+
+function normalizeSessionCwd(value) {
+  let cwd = String(value || '').trim();
+  if (!cwd) return '';
+  const driveRoot = /^[a-zA-Z]:[\\/]$/.test(cwd);
+  while (!driveRoot && cwd.length > 1 && /[\\/]$/.test(cwd)) cwd = cwd.slice(0, -1);
+  return cwd;
+}
+
+function directoryGroupId(cwd) {
+  return `directory:${normalizeSessionCwd(cwd)}`;
+}
+
+function validCustomTabGroup(id) {
+  return state.ui.customTabGroups.find((group) => group.id === id) || null;
+}
+
+function sessionTabGroupId(session) {
+  return validCustomTabGroup(session.customTabGroupId)
+    ? session.customTabGroupId
+    : directoryGroupId(session.cwd);
+}
+
+function directoryLabelParts(cwd) {
+  const normalized = normalizeSessionCwd(cwd);
+  const parts = normalized.split(/[\\/]+/).filter(Boolean);
+  return { normalized, parts, basename: parts[parts.length - 1] || normalized || '~' };
+}
+
+function directoryGroupLabels(directoryCwds) {
+  const rows = directoryCwds.map(directoryLabelParts);
+  const labels = new Map();
+  for (const row of rows) {
+    const conflicts = rows.filter((other) => other !== row && other.basename === row.basename);
+    if (!conflicts.length) {
+      labels.set(row.normalized, row.basename);
+      continue;
+    }
+    const parents = row.parts.slice(0, -1);
+    let suffix = row.normalized;
+    for (let count = 1; count <= Math.max(1, parents.length); count += 1) {
+      const candidate = parents.slice(-count).join('/');
+      if (conflicts.every((other) => other.parts.slice(0, -1).slice(-count).join('/') !== candidate)) {
+        suffix = candidate || row.normalized;
+        break;
+      }
+    }
+    labels.set(row.normalized, `${row.basename} — ${suffix}`);
+  }
+  return labels;
+}
+
+function effectiveTabGroups() {
+  const sessions = orderedSessions();
+  const members = new Map();
+  for (const session of sessions) {
+    const id = sessionTabGroupId(session);
+    if (!members.has(id)) members.set(id, []);
+    members.get(id).push(session);
+  }
+  const groups = [];
+  for (const custom of state.ui.customTabGroups) {
+    const customMembers = members.get(custom.id) || [];
+    if (customMembers.length) groups.push({ ...custom, kind: 'custom', sessions: customMembers, tooltip: custom.name });
+  }
+  const directoryIds = [];
+  for (const session of sessions) {
+    const id = sessionTabGroupId(session);
+    if (id.startsWith('directory:') && !directoryIds.includes(id)) directoryIds.push(id);
+  }
+  const directoryCwds = directoryIds.map((id) => id.slice('directory:'.length));
+  const labels = directoryGroupLabels(directoryCwds);
+  for (const [index, id] of directoryIds.entries()) {
+    const cwd = directoryCwds[index];
+    groups.push({
+      id,
+      name: labels.get(cwd) || cwd || '~',
+      kind: 'directory',
+      sessions: members.get(id) || [],
+      tooltip: cwd || '~',
+    });
+  }
+  return groups;
+}
+
+function focusedTabGroup(groups = effectiveTabGroups()) {
+  let group = groups.find((candidate) => candidate.id === state.ui.focusedTabGroupId) || null;
+  if (!group && state.activeId) {
+    group = groups.find((candidate) => candidate.sessions.some((session) => session.id === state.activeId)) || null;
+  }
+  return group || groups[0] || null;
+}
+
+function groupAttentionCount(group) {
+  const ids = new Set(group.sessions.map((session) => session.id));
+  const attention = window.chromuxAttention.projectAttentionItems({
+    sessions: orderedSessions(),
+    activeId: state.activeId,
+    captures: state.captures.values(),
+    updateQueue: state.updateQueue,
+    updateStatus: state.updateStatus,
+  }).filter((item) => ids.has(item.sessionId) && item.type !== 'queue').length;
+  return attention + group.sessions.reduce((total, session) => total + session.browser.queue.length, 0);
+}
+
+function groupStatus(group) {
+  const priority = new Map([['action', 0], ['dead', 1], ['working', 2], ['completed', 3], ['idle', 4], ['live', 5]]);
+  return group.sessions.map((session) => sessionTabIndicator(session))
+    .sort((a, b) => (priority.get(a.kind) ?? 99) - (priority.get(b.kind) ?? 99))[0]
+    || { kind: 'live', status: 'No sessions' };
+}
+
+function revealHorizontalItem(list, item, rightBoundary = null) {
+  if (!list || !item) return;
+  const itemRect = item.getBoundingClientRect();
+  const listRect = list.getBoundingClientRect();
+  const visibleRight = rightBoundary ? Math.min(listRect.right, rightBoundary.getBoundingClientRect().left - 6) : listRect.right;
+  if (itemRect.left < listRect.left) list.scrollLeft += itemRect.left - listRect.left;
+  else if (itemRect.right > visibleRight) list.scrollLeft += itemRect.right - visibleRight;
+}
+
+function selectTabGroup(id, { activate = true } = {}) {
+  const groups = effectiveTabGroups();
+  const group = groups.find((candidate) => candidate.id === id);
+  if (!group) return null;
+  state.ui.focusedTabGroupId = group.id;
+  if (activate) {
+    const remembered = state.ui.lastActiveSessionByGroup.get(group.id);
+    const target = group.sessions.find((session) => session.id === remembered) || group.sessions[0];
+    if (target) {
+      activateSession(target.id);
+      return target;
+    }
+  }
+  renderTabs();
+  requestAnimationFrame(() => {
+    revealHorizontalItem($('#group-tab-list'), $(`#group-tab-list [data-group-id="${CSS.escape(group.id)}"]`), $('#tab-actions'));
+  });
+  return group;
+}
+
+function setSessionCustomTabGroup(session, customTabGroupId) {
+  const next = validCustomTabGroup(customTabGroupId) ? customTabGroupId : null;
+  session.customTabGroupId = next;
+  const destinationId = sessionTabGroupId(session);
+  state.ui.focusedTabGroupId = destinationId;
+  state.ui.lastActiveSessionByGroup.set(destinationId, session.id);
+  persistTabGroups();
+  renderTabs();
+  if (session.id === state.activeId) activateSession(session.id, { recordActivity: false });
+}
+
+function customGroupNameError(rawName, exceptId = null) {
+  const name = sanitizeCustomTabGroupName(rawName);
+  if (!name) return 'Group names must contain 1–80 characters.';
+  if (state.ui.customTabGroups.some((group) => group.id !== exceptId
+    && group.name.toLocaleLowerCase() === name.toLocaleLowerCase())) {
+    return 'Custom group names must be unique.';
+  }
+  return null;
+}
+
+function createCustomTabGroup(rawName) {
+  const error = customGroupNameError(rawName);
+  if (error || state.ui.customTabGroups.length >= MAX_CUSTOM_TAB_GROUPS) {
+    return { group: null, error: error || `At most ${MAX_CUSTOM_TAB_GROUPS} custom groups are allowed.` };
+  }
+  const name = sanitizeCustomTabGroupName(rawName);
+  const id = `group-${globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function'
+    ? globalThis.crypto.randomUUID().toLowerCase()
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`}`;
+  const group = { id, name };
+  state.ui.customTabGroups.push(group);
+  persistTabGroups();
+  renderCustomTabGroups();
+  renderTabs();
+  return { group, error: null };
+}
+
+function renameCustomTabGroup(id, rawName) {
+  const group = validCustomTabGroup(id);
+  const error = customGroupNameError(rawName, id);
+  if (!group || error) return { group: null, error: error || 'Custom group no longer exists.' };
+  group.name = sanitizeCustomTabGroupName(rawName);
+  persistTabGroups();
+  renderCustomTabGroups();
+  renderTabs();
+  return { group, error: null };
+}
+
+function deleteCustomTabGroup(id) {
+  const group = validCustomTabGroup(id);
+  if (!group) return false;
+  const members = orderedSessions().filter((session) => session.customTabGroupId === id);
+  if (members.length && !window.confirm(`Delete “${group.name}” and return ${members.length} session${members.length === 1 ? '' : 's'} to automatic directory grouping?`)) {
+    return false;
+  }
+  for (const session of members) session.customTabGroupId = null;
+  state.ui.customTabGroups = state.ui.customTabGroups.filter((candidate) => candidate.id !== id);
+  state.ui.lastActiveSessionByGroup.delete(id);
+  persistTabGroups();
+  renderCustomTabGroups();
+  renderTabs();
+  if (state.activeId) activateSession(state.activeId, { recordActivity: false });
+  return true;
+}
+
 function sessionDisplayLabel(session) {
   const rawTitle = session.term && session.term.title;
   if (!rawTitle) return session.name;
@@ -3905,7 +4272,10 @@ function buildSessionTab(session) {
     state.ui.hoverTabSessionId = null;
     renderTabs();
   });
-  $('#tab-list').insertBefore(tab, $('#tab-actions'));
+  const tabList = $('#tab-list');
+  const actions = $('#tab-actions');
+  if (actions && actions.parentElement === tabList) tabList.insertBefore(tab, actions);
+  else tabList.appendChild(tab);
   return { tab, dot, tabLabelWrap: labelWrap, tabLabel: label, tabBadge: badge };
 }
 
@@ -3993,6 +4363,61 @@ function renderTabs() {
     if (!s.els || !s.els.tab) continue;
     s.els.tab.classList.toggle('active', s.id === state.activeId);
     updateSessionTabText(s);
+  }
+  const nav = $('#session-tabs');
+  const tabList = $('#tab-list');
+  const groupList = $('#group-tab-list');
+  const groupedSessions = $('#group-session-list');
+  const actions = $('#tab-actions');
+  const grouping = state.ui.tabGroupsEnabled && state.sessions.size > 0;
+  nav.classList.toggle('grouped', grouping);
+  groupList.classList.toggle('hidden', !grouping);
+  groupedSessions.classList.toggle('hidden', !grouping);
+  tabList.classList.toggle('hidden', grouping);
+
+  for (const session of orderedSessions()) session.els.tab.remove();
+  actions.remove();
+  if (!grouping) {
+    groupList.replaceChildren();
+    groupedSessions.replaceChildren();
+    for (const session of orderedSessions()) tabList.appendChild(session.els.tab);
+    tabList.appendChild(actions);
+  } else {
+    const groups = effectiveTabGroups();
+    const focused = focusedTabGroup(groups);
+    if (focused) state.ui.focusedTabGroupId = focused.id;
+    groupList.replaceChildren();
+    for (const group of groups) {
+      const status = groupStatus(group);
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `session-tab group-tab${focused && group.id === focused.id ? ' active' : ''}`;
+      button.dataset.groupId = group.id;
+      button.title = group.tooltip;
+      button.setAttribute('aria-label', `${group.name}. ${group.sessions.length} sessions. ${status.status}.`);
+      button.setAttribute('aria-current', focused && group.id === focused.id ? 'true' : 'false');
+      const dot = document.createElement('span');
+      dot.className = `tab-dot ${status.kind}`;
+      dot.setAttribute('aria-hidden', 'true');
+      const label = document.createElement('span');
+      label.className = 'tab-label-wrap';
+      label.textContent = group.name;
+      const count = document.createElement('span');
+      count.className = 'group-session-count';
+      count.textContent = String(group.sessions.length);
+      const badgeValue = groupAttentionCount(group);
+      const badge = document.createElement('span');
+      badge.className = `tab-badge${badgeValue ? '' : ' zero'}`;
+      badge.textContent = String(badgeValue);
+      button.append(dot, label, count, badge);
+      button.onclick = () => selectTabGroup(group.id);
+      groupList.appendChild(button);
+    }
+    groupList.appendChild(actions);
+    groupedSessions.replaceChildren();
+    if (focused) {
+      for (const session of focused.sessions) groupedSessions.appendChild(session.els.tab);
+    }
   }
   updateTabOverflowState();
   if (!$('#session-search-panel').classList.contains('hidden')) renderSessionSearch();
@@ -5400,10 +5825,12 @@ async function createSessionNow({
   name, cwd, agent, initialUrl = null, initialBrowserTabs = [], initialActiveBrowserTabId = null,
   initialQueue = [], initialAttentionRecords = [], command = undefined, resumeLaunch = null, composerDraft = '',
   initialLastActivityAt = null,
+  initialCustomTabGroupId = null,
 }) {
   state.counter += 1;
   const id = 's' + state.counter;
   const session = newSessionShape({ id, name, cwd, agent });
+  session.customTabGroupId = validCustomTabGroup(initialCustomTabGroupId) ? initialCustomTabGroupId : null;
   const restoredActivityAt = Date.parse(initialLastActivityAt || '');
   if (Number.isFinite(restoredActivityAt)) session.lastActivityAt = restoredActivityAt;
   session.composer.draft = utf8WithinLimit(composerDraft) ? String(composerDraft || '') : '';
@@ -5488,11 +5915,22 @@ async function createSessionNow({
 
   state.sessions.set(id, session);
   apply({ type: 'session-created', sessionId: id, name, cwd, agent });
-  const ptyInfo = await window.chromux.ptyCreate({
-    id, cwd,
-    command: command !== undefined ? command : agentCommand(agent),
-    cols: term.cols, rows: term.rows,
-  });
+  let ptyInfo;
+  try {
+    ptyInfo = await window.chromux.ptyCreate({
+      id, cwd,
+      command: command !== undefined ? command : agentCommand(agent),
+      cols: term.cols, rows: term.rows,
+    });
+  } catch (error) {
+    state.sessions.delete(id);
+    viewEls.view.remove();
+    tabEls.tab.remove();
+    term.dispose();
+    apply({ type: 'session-closed', sessionId: id });
+    renderTabs();
+    throw error;
+  }
   if (ptyInfo && ptyInfo.signalToken) session.turn.token = ptyInfo.signalToken;
 
   session.browser.queue = Array.isArray(initialQueue)
@@ -5517,25 +5955,24 @@ async function createSessionNow({
 
 function revealFocusedSessionTab(id) {
   const session = state.sessions.get(id);
-  const tabList = $('#tab-list');
+  const tabList = state.ui.tabGroupsEnabled ? $('#group-session-list') : $('#tab-list');
   const tabActions = $('#tab-actions');
-  if (!session?.els?.tab || !tabList || !tabActions) return;
-
-  const tabRect = session.els.tab.getBoundingClientRect();
-  const listRect = tabList.getBoundingClientRect();
-  const actionsRect = tabActions.getBoundingClientRect();
-  const listStyle = getComputedStyle(tabList);
-  const tabGap = parseFloat(listStyle.columnGap || listStyle.gap) || 0;
-  const visibleRight = Math.min(listRect.right, actionsRect.left - tabGap);
-
-  if (tabRect.left < listRect.left) {
-    tabList.scrollLeft += tabRect.left - listRect.left;
-  } else if (tabRect.right > visibleRight) {
-    tabList.scrollLeft += tabRect.right - visibleRight;
+  if (!session?.els?.tab || !tabList) return;
+  revealHorizontalItem(tabList, session.els.tab, state.ui.tabGroupsEnabled ? null : tabActions);
+  if (state.ui.tabGroupsEnabled) {
+    const groupTab = $(`#group-tab-list [data-group-id="${CSS.escape(sessionTabGroupId(session))}"]`);
+    revealHorizontalItem($('#group-tab-list'), groupTab, tabActions);
   }
 }
 
 function activateSession(id, { consumeRestoredCompletion = true, recordActivity = true } = {}) {
+  const target = state.sessions.get(id);
+  if (!target) return;
+  if (state.ui.tabGroupsEnabled) {
+    const groupId = sessionTabGroupId(target);
+    state.ui.focusedTabGroupId = groupId;
+    state.ui.lastActiveSessionByGroup.set(groupId, id);
+  }
   dismissThreadPreview();
   if (!state.ui.diagnosticSessionId || !state.sessions.has(state.ui.diagnosticSessionId)) state.ui.diagnosticSessionId = id;
   apply({ type: 'session-focused', sessionId: id, consumeRestoredCompletion, recordActivity });
@@ -5568,10 +6005,15 @@ function closeSession(id) {
   s.els.view.remove();
   s.els.tab.remove();
   state.sessions.delete(id);
+  for (const [groupId, sessionId] of state.ui.lastActiveSessionByGroup) {
+    if (sessionId === id) state.ui.lastActiveSessionByGroup.delete(groupId);
+  }
   apply({ type: 'session-closed', sessionId: id });
   if (state.activeId === id) {
-    const next = state.sessions.keys().next();
-    state.activeId = next.done ? null : next.value;
+    const groups = effectiveTabGroups();
+    const sameGroup = groups.find((group) => group.id === state.ui.focusedTabGroupId);
+    const nextId = sameGroup?.sessions[0]?.id || groups[0]?.sessions[0]?.id || null;
+    state.activeId = nextId;
     if (state.activeId) activateSession(state.activeId);
   }
   if (state.ui.diagnosticSessionId === id) {
@@ -5776,6 +6218,9 @@ function snapshotOpenSessions() {
     cwd: session.cwd,
     agent: session.agent || '',
     resumeId: session.resumeId || null,
+    ...(validCustomTabGroup(session.customTabGroupId) ? { customTabGroupId: session.customTabGroupId } : {}),
+    wasActive: session.id === state.activeId,
+    wasLastActiveInGroup: state.ui.lastActiveSessionByGroup.get(sessionTabGroupId(session)) === session.id,
     alive: Boolean(session.lifecycle.alive),
     currentUrl: activePageTab(session)?.currentUrl || null,
     browserTabs: session.browser.tabs.map((tab) => (tab.type === 'explorer'
@@ -5804,6 +6249,11 @@ function snapshotOpenSessions() {
       cwd: options.cwd,
       agent: 'codex',
       resumeId: options.resumeLaunch?.resumeId || null,
+      ...(validCustomTabGroup(options.initialCustomTabGroupId)
+        ? { customTabGroupId: options.initialCustomTabGroupId }
+        : {}),
+      wasActive: false,
+      wasLastActiveInGroup: false,
       alive: true,
       currentUrl: options.initialUrl || null,
       browserTabs: Array.isArray(options.initialBrowserTabs) ? options.initialBrowserTabs : [],
@@ -5954,6 +6404,7 @@ function openSettings() {
   const toggle = $('#settings-developer-mode');
   if (toggle) toggle.checked = Boolean(state.env && state.env.devMode);
   renderPreventSleepStatus();
+  renderCustomTabGroups();
   $('#modal-settings').classList.remove('hidden');
   invalidate('shortcutDebug');
   checkUpdates(false).catch(() => {});
@@ -6399,6 +6850,7 @@ async function openRestoredSession(row) {
     initialQueue: resolved.queue || [],
     composerDraft: resolved.composerDraft || '',
     initialLastActivityAt: resolved.lastActivityAt || row.lastActivityAt || state.restoreSessions?.savedAt || null,
+    initialCustomTabGroupId: validCustomTabGroup(resolved.customTabGroupId) ? resolved.customTabGroupId : null,
     command,
     resumeLaunch: resumeLaunchForRow(resolved, {
       name,
@@ -6860,8 +7312,12 @@ async function autoRestoreWorkspace() {
 
   const res = await window.chromux.resolveRestoreSessions({ sessions: snapshot.sessions });
   const restored = [];
+  const successful = [];
   const restoreRow = async (row) => {
     try {
+      if (state.testRestoreFailureNames && state.testRestoreFailureNames.has(row.name)) {
+        throw new Error(`Simulated restore failure: ${row.name}`);
+      }
       const name = uniqueSessionName(row.name || (row.cwd ? row.cwd.split('/').filter(Boolean).pop() : 'restored'));
       const command = row.command || undefined;
       const session = await createSession({
@@ -6875,6 +7331,7 @@ async function autoRestoreWorkspace() {
         initialAttentionRecords: row.attentionRecords || [],
         composerDraft: row.composerDraft || '',
         initialLastActivityAt: row.lastActivityAt || snapshot.savedAt || null,
+        initialCustomTabGroupId: validCustomTabGroup(row.customTabGroupId) ? row.customTabGroupId : null,
         command,
         resumeLaunch: resumeLaunchForRow(row, {
           name,
@@ -6884,6 +7341,7 @@ async function autoRestoreWorkspace() {
         }),
       });
       restored.push({ name: row.name, cwd: row.cwd, agent: row.agent, sessionId: session.id });
+      successful.push({ row, session });
       row.opened = true;
       row.restoredAt = new Date().toISOString();
     } catch { /* keep restoring remaining sessions */ }
@@ -6894,6 +7352,33 @@ async function autoRestoreWorkspace() {
   }
   const codexRestores = rows.filter((row) => row.agent === 'codex').map((row) => restoreRow(row));
   await Promise.all(codexRestores);
+  for (const { row, session } of successful) {
+    if (row.wasLastActiveInGroup === true) {
+      state.ui.lastActiveSessionByGroup.set(sessionTabGroupId(session), session.id);
+    }
+  }
+  let restoreTarget = successful.find(({ row }) => row.wasActive === true) || null;
+  const priorActiveRow = rows.find((row) => row.wasActive === true) || null;
+  if (!restoreTarget && priorActiveRow) {
+    const priorGroupId = validCustomTabGroup(priorActiveRow.customTabGroupId)
+      ? priorActiveRow.customTabGroupId : directoryGroupId(priorActiveRow.cwd);
+    restoreTarget = successful.find(({ session }) => sessionTabGroupId(session) === priorGroupId
+      && state.ui.lastActiveSessionByGroup.get(priorGroupId) === session.id)
+      || successful.find(({ session }) => sessionTabGroupId(session) === priorGroupId)
+      || null;
+  }
+  if (!restoreTarget) {
+    const firstGroup = effectiveTabGroups()[0];
+    const remembered = firstGroup && state.ui.lastActiveSessionByGroup.get(firstGroup.id);
+    restoreTarget = successful.find(({ session }) => session.id === remembered)
+      || successful.find(({ session }) => session.id === firstGroup?.sessions[0]?.id)
+      || successful[0]
+      || null;
+  }
+  if (restoreTarget) activateSession(restoreTarget.session.id, {
+    consumeRestoredCompletion: false,
+    recordActivity: false,
+  });
   const consumed = await window.chromux.markRestoreSnapshotConsumed({
     restoreId: snapshot.restoreId,
     restoredSessions: restored,
@@ -6986,6 +7471,30 @@ $('#settings-theme-mode').addEventListener('click', (event) => {
 });
 $('#settings-tab-activity-indicators').addEventListener('change', (event) => {
   applyTabActivityIndicators(event.target.checked);
+});
+$('#settings-tab-groups').addEventListener('change', (event) => {
+  state.ui.tabGroupsEnabled = Boolean(event.target.checked);
+  if (state.ui.tabGroupsEnabled && state.activeId) {
+    const active = state.sessions.get(state.activeId);
+    state.ui.focusedTabGroupId = active ? sessionTabGroupId(active) : null;
+  }
+  persistTabGroups();
+  renderTabs();
+  if (state.activeId) requestAnimationFrame(() => revealFocusedSessionTab(state.activeId));
+});
+const addCustomTabGroupFromSettings = () => {
+  const input = $('#custom-tab-group-name');
+  const result = createCustomTabGroup(input.value);
+  setCustomTabGroupError(result.error || '');
+  if (result.group) input.value = '';
+  input.focus();
+};
+$('#custom-tab-group-add').addEventListener('click', addCustomTabGroupFromSettings);
+$('#custom-tab-group-name').addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    addCustomTabGroupFromSettings();
+  }
 });
 $('#settings-thread-preview-size').addEventListener('change', (event) => {
   applyThreadPreviewSize(event.target.value);
@@ -7486,13 +7995,17 @@ if (window.chromuxTest) {
   const addRenderableTestSession = ({
     name = 'tab-test', agent = 'codex', cwd = '/tmp', turnState = 'unknown', alive = true,
     realTerminal = false, cols = 64, rows = 16, composerDraft = '', lastActivityAt = null,
-    attentionRecords = [],
+    attentionRecords = [], customTabGroupId = null, queue = [],
   } = {}) => {
     state.counter += 1;
     const session = newSessionShape({ id: 's' + state.counter, name, cwd, agent });
+    session.customTabGroupId = validCustomTabGroup(customTabGroupId) ? customTabGroupId : null;
     session.turn.state = turnState;
     if (turnState !== 'unknown') session.turn.since = Date.now();
     session.lifecycle.alive = alive;
+    session.browser.queue = Array.isArray(queue)
+      ? queue.map((item) => normalizeQueueItem(item, 'RESTORE')).filter(Boolean)
+      : [];
     session.composer.draft = utf8WithinLimit(composerDraft) ? composerDraft : '';
     const viewEls = buildSessionView(session);
     const tabEls = buildSessionTab(session);
@@ -7715,6 +8228,104 @@ if (window.chromuxTest) {
         wrapWidth: wrap.clientWidth,
         labelWidth: label.scrollWidth,
       };
+    },
+    grouping: {
+      enabled: () => state.ui.tabGroupsEnabled,
+      setEnabled(enabled) {
+        state.ui.tabGroupsEnabled = Boolean(enabled);
+        if (state.ui.tabGroupsEnabled && state.activeId) {
+          state.ui.focusedTabGroupId = sessionTabGroupId(testSession(state.activeId));
+        }
+        persistTabGroups();
+        renderTabs();
+        flushRender();
+      },
+      create(name) {
+        const result = createCustomTabGroup(name);
+        flushRender();
+        return result.group ? { ...result.group } : { error: result.error };
+      },
+      rename(id, name) {
+        const result = renameCustomTabGroup(id, name);
+        flushRender();
+        return result.group ? { ...result.group } : { error: result.error };
+      },
+      delete(id, confirm = true) {
+        const original = window.confirm;
+        window.confirm = () => confirm;
+        try { return deleteCustomTabGroup(id); } finally { window.confirm = original; }
+      },
+      move(sessionId, groupId = null) {
+        setSessionCustomTabGroup(testSession(sessionId), groupId);
+        flushRender();
+      },
+      select(id) {
+        const result = selectTabGroup(id);
+        flushRender();
+        return result && result.id;
+      },
+      groups: () => effectiveTabGroups().map((group) => ({
+        id: group.id,
+        name: group.name,
+        kind: group.kind,
+        sessions: group.sessions.map((session) => session.id),
+        tooltip: group.tooltip,
+      })),
+      definitions: () => state.ui.customTabGroups.map((group) => ({ ...group })),
+      focused: () => state.ui.focusedTabGroupId,
+      active: () => state.activeId,
+      upper: () => [...document.querySelectorAll('#group-tab-list .group-tab')].map((tab) => ({
+        id: tab.dataset.groupId,
+        label: tab.querySelector('.tab-label-wrap')?.textContent || '',
+        count: tab.querySelector('.group-session-count')?.textContent || '',
+        indicator: ['dead', 'action', 'working', 'completed', 'idle', 'live']
+          .find((kind) => tab.querySelector('.tab-dot')?.classList.contains(kind)) || '',
+        badge: tab.querySelector('.tab-badge')?.textContent || '0',
+        active: tab.classList.contains('active'),
+        title: tab.title,
+      })),
+      lower: () => [...document.querySelectorAll('#group-session-list > .session-tab')]
+        .map((tab) => [...state.sessions.values()].find((session) => session.els.tab === tab)?.id || ''),
+      storageProbe(raw) {
+        const prior = window.localStorage.getItem(TAB_GROUPS_STORAGE_KEY);
+        try {
+          window.localStorage.setItem(TAB_GROUPS_STORAGE_KEY, raw);
+          return storedTabGroups();
+        } finally {
+          if (prior === null) window.localStorage.removeItem(TAB_GROUPS_STORAGE_KEY);
+          else window.localStorage.setItem(TAB_GROUPS_STORAGE_KEY, prior);
+        }
+      },
+      snapshot: () => snapshotOpenSessions().map((row) => ({ ...row })),
+      async autoRestore(failNames = []) {
+        state.testRestoreFailureNames = new Set(failNames);
+        try {
+          await autoRestoreWorkspace();
+          flushRender();
+          return {
+            activeId: state.activeId,
+            sessions: orderedSessions().map((session) => ({
+              id: session.id,
+              name: session.name,
+              cwd: session.cwd,
+              customTabGroupId: session.customTabGroupId,
+            })),
+          };
+        } finally {
+          state.testRestoreFailureNames = null;
+        }
+      },
+      shortcut(index) {
+        const result = handleShortcutActivateSessionIndex({ index });
+        flushRender();
+        return result;
+      },
+      setQueue(sessionId, urls) {
+        const session = testSession(sessionId);
+        session.browser.queue = (urls || []).map((url) => normalizeQueueItem({ url }, 'RESTORE')).filter(Boolean);
+        renderQueue(session);
+        flushRender();
+      },
     },
     flushRender,
   };

@@ -73,6 +73,7 @@
 
     <div id="workspace">
       <nav id="session-tabs" aria-label="Session tabs">
+        <div id="group-tab-list" class="hidden" aria-label="Session groups"></div>
         <div id="tab-list">
           <div id="tab-actions">
             <button id="btn-search-sessions" class="session-tab tab-action" title="Search sessions" aria-label="Search sessions" aria-expanded="false" aria-controls="session-search-panel">
@@ -81,6 +82,7 @@
             <button id="btn-new-session" class="session-tab add-tab" title="New session (⌘T)" aria-label="New session">+</button>
           </div>
         </div>
+        <div id="group-session-list" class="hidden" aria-label="Sessions in selected group"></div>
       </nav>
       <div id="restore-warning" class="restore-warning hidden"></div>
 
@@ -241,6 +243,26 @@
             <span class="settings-switch-track" aria-hidden="true"><span></span></span>
             <span>Show tab activity indicators</span>
           </label>
+        </section>
+        <div class="settings-divider" aria-hidden="true"></div>
+        <section class="tab-group-settings" aria-labelledby="tab-groups-heading">
+          <div class="settings-preferences">
+            <div>
+              <div id="tab-groups-heading" class="microlabel">SESSION TAB GROUPS</div>
+              <div class="settings-section-copy">Show directory and custom groups above a second row of session tabs.</div>
+            </div>
+            <label class="settings-switch">
+              <input id="settings-tab-groups" type="checkbox">
+              <span class="settings-switch-track" aria-hidden="true"><span></span></span>
+              <span>Group session tabs</span>
+            </label>
+          </div>
+          <div id="custom-tab-groups" class="custom-tab-groups" aria-label="Custom session groups"></div>
+          <div class="custom-tab-group-create">
+            <input id="custom-tab-group-name" type="text" maxlength="80" placeholder="New custom group" aria-label="New custom group name">
+            <button id="custom-tab-group-add" class="btn" type="button">ADD GROUP</button>
+          </div>
+          <div id="custom-tab-group-error" class="settings-preference-status fail hidden" role="status"></div>
         </section>
         <div class="settings-divider" aria-hidden="true"></div>
         <section class="settings-preferences" aria-labelledby="prevent-sleep-heading">
