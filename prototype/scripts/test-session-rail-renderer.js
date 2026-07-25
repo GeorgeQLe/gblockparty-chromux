@@ -83,19 +83,39 @@ fs.writeFileSync(e2ePath, `
   rail.setActivity(activityProbe, 5000);
   rail.ptyOutput(activityProbe, 'streaming output\\r\\n');
   expect(rail.activityAt(activityProbe) === 5000, 'streaming PTY output must not change recent activity');
+  const ordinaryOrderBeforeFocus = rail.groups()
+    .filter((group) => group.key.startsWith('cwd:'))
+    .map((group) => [group.key, group.rows.map((row) => row.id)]);
   await wait(5);
   rail.focus(activityProbe);
-  expect(rail.activityAt(activityProbe) > 5000, 'focusing a session should update recent activity');
+  const ordinaryOrderAfterFocus = rail.groups()
+    .filter((group) => group.key.startsWith('cwd:'))
+    .map((group) => [group.key, group.rows.map((row) => row.id)]);
+  expect(rail.activityAt(activityProbe) === 5000,
+    'ordinary session navigation must not change recent activity');
+  expect(JSON.stringify(ordinaryOrderAfterFocus) === JSON.stringify(ordinaryOrderBeforeFocus),
+    'ordinary session navigation must not move Recent rows or directory groups');
   rail.focus(holder);
   rail.setActivity(activityProbe, 6000);
+  rail.setActivity(holder, 7000);
+  expect(rail.groups().find((group) => group.title === ${JSON.stringify(looseDir)})
+    ?.rows[0]?.id === holder,
+  'activity fixture should begin with the holder first in its Recent directory group');
   await wait(5);
   rail.submit(activityProbe, 'terminal prompt\\r');
   const terminalSubmittedAt = rail.activityAt(activityProbe);
-  expect(terminalSubmittedAt > 6000, 'submitted terminal input should update recent activity');
+  expect(terminalSubmittedAt > 7000, 'submitted terminal input should update recent activity');
+  expect(rail.groups().find((group) => group.title === ${JSON.stringify(looseDir)})
+    ?.rows[0]?.id === activityProbe,
+  'submitted terminal input should reorder its Recent directory group');
   rail.setActivity(activityProbe, 7000);
+  rail.setActivity(holder, 8000);
   await wait(5);
   expect(await rail.submitComposer(activityProbe, 'composer prompt'), 'composer fixture should submit');
-  expect(rail.activityAt(activityProbe) > 7000, 'submitted composer input should update recent activity');
+  expect(rail.activityAt(activityProbe) > 8000, 'submitted composer input should update recent activity');
+  expect(rail.groups().find((group) => group.title === ${JSON.stringify(looseDir)})
+    ?.rows[0]?.id === activityProbe,
+  'submitted composer input should reorder its Recent directory group');
   rail.emit(activityProbe, 'turn-start');
   rail.setActivity(activityProbe, 8000);
   await wait(5);
@@ -475,6 +495,24 @@ fs.writeFileSync(e2ePath, `
   'pending Codex sessions should spin in their directory row without joining the Working section');
   expect(workingGroup.rows.map((row) => row.id).join(',') === [webTwo, worker].join(','),
     'Recent should order Working rows newest first');
+  const workingActivityBeforeFocus = rail.activityAt(worker);
+  const workingOrderBeforeFocus = workingGroup.rows.map((row) => row.id);
+  rail.focus(worker);
+  workingGroup = rail.groups().find((group) => group.key === 'status:working');
+  expect(rail.activityAt(worker) === workingActivityBeforeFocus,
+    'Working session navigation must not change recent activity');
+  expect(JSON.stringify(workingGroup.rows.map((row) => row.id)) === JSON.stringify(workingOrderBeforeFocus),
+    'Working session navigation must not move Recent rows');
+  rail.focus(holder);
+  const pendingActivityBeforeTransition = rail.activityAt(pendingWorker);
+  await wait(5);
+  rail.emit(pendingWorker, 'turn-start');
+  workingGroup = rail.groups().find((group) => group.key === 'status:working');
+  expect(rail.activityAt(pendingWorker) > pendingActivityBeforeTransition,
+    'a genuine turn-state transition should update recent activity');
+  expect(workingGroup.rows[0]?.id === pendingWorker,
+    'a genuine turn-state transition should reorder Recent Working rows');
+  rail.close(pendingWorker);
 
   const focusedAction = rail.addTerminalSession({
     name: 'focused-action-required',
@@ -753,6 +791,25 @@ fs.writeFileSync(e2ePath, `
   await wait(80);
   expect(!rail.preview() && rail.sourceState(ordinaryDouble).focused,
     'redundant double-click should leave the activated terminal focused with no preview');
+
+  const attentionUnder = rail.addTerminalSession({
+    name: 'attention-under-second-click',
+    agent: 'claude',
+    cwd: ${JSON.stringify(repoApiDir)},
+  });
+  rail.focus(holder);
+  rail.emit(attentionDouble, 'turn-start');
+  rail.emit(attentionDouble, 'turn-end', 'Completed first click fixture');
+  rail.emit(attentionUnder, 'turn-start');
+  rail.emit(attentionUnder, 'turn-end', 'Completed exposed-row fixture');
+  const attentionActivityBeforeActivation = rail.activityAt(attentionDouble);
+  const postRenderClick = rail.doubleClickRowsAcrossRender(attentionDouble, attentionUnder);
+  expect(postRenderClick.firstLeftAttention && postRenderClick.secondStayedAttention,
+    'opening a completed row should rebuild Threads with that session outside Needs Attention');
+  expect(rail.activityAt(attentionDouble) === attentionActivityBeforeActivation,
+    'Needs Attention navigation must not change recent activity');
+  expect(postRenderClick.activeId === attentionDouble,
+    'a detail-2 click dispatched after the Threads rebuild must not activate the newly exposed row');
 
   rail.focus(holder);
   rail.emit(attentionDouble, 'turn-start');

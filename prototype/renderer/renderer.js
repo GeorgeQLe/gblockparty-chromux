@@ -1433,7 +1433,6 @@ function apply(event) {
       break;
     case 'session-focused':
       state.activeId = event.sessionId;
-      if (session && event.recordActivity !== false) session.lastActivityAt = Date.now();
       if (session && event.consumeRestoredCompletion !== false) {
         session.restoredAttentionRecords = session.restoredAttentionRecords
           .filter((record) => record.type !== 'completed');
@@ -4696,7 +4695,7 @@ function setSessionCustomTabGroup(session, customTabGroupId) {
   state.ui.lastActiveSessionByGroup.set(destinationId, session.id);
   persistTabGroups();
   renderTabs();
-  if (session.id === state.activeId) activateSession(session.id, { recordActivity: false });
+  if (session.id === state.activeId) activateSession(session.id);
 }
 
 function customGroupNameError(rawName, exceptId = null) {
@@ -4750,7 +4749,7 @@ function deleteCustomTabGroup(id) {
   persistTabGroups();
   renderCustomTabGroups();
   renderTabs();
-  if (state.activeId) activateSession(state.activeId, { recordActivity: false });
+  if (state.activeId) activateSession(state.activeId);
   return true;
 }
 
@@ -5518,7 +5517,8 @@ function appendThreadSessionRow(host, session, { attention = null } = {}) {
     cancelThreadPreviewOpen(session.id);
     if (open) dismissThreadPreview();
   });
-  row.onclick = () => {
+  row.onclick = (event) => {
+    if (event.detail > 1) return;
     cancelThreadPreviewOpen();
     if (session.id === state.activeId) {
       dismissThreadPreview();
@@ -6603,7 +6603,6 @@ async function createSessionNow({
   if (activate) {
     activateSession(id, {
       consumeRestoredCompletion: false,
-      recordActivity: !Number.isFinite(restoredActivityAt),
     });
   } else {
     session.els.view.classList.add('offstage');
@@ -6631,7 +6630,7 @@ function revealFocusedSessionTab(id) {
   }
 }
 
-function activateSession(id, { consumeRestoredCompletion = true, recordActivity = true } = {}) {
+function activateSession(id, { consumeRestoredCompletion = true } = {}) {
   const target = state.sessions.get(id);
   if (!target) return;
   if (state.ui.tabGroupsEnabled) {
@@ -6641,7 +6640,7 @@ function activateSession(id, { consumeRestoredCompletion = true, recordActivity 
   }
   dismissThreadPreview();
   if (!state.ui.diagnosticSessionId || !state.sessions.has(state.ui.diagnosticSessionId)) state.ui.diagnosticSessionId = id;
-  apply({ type: 'session-focused', sessionId: id, consumeRestoredCompletion, recordActivity });
+  apply({ type: 'session-focused', sessionId: id, consumeRestoredCompletion });
   for (const s of state.sessions.values()) {
     const active = s.id === id;
     s.els.view.classList.toggle('offstage', !active);
@@ -8196,7 +8195,6 @@ async function autoRestoreWorkspace() {
   }
   if (restoreTarget) activateSession(restoreTarget.session.id, {
     consumeRestoredCompletion: false,
-    recordActivity: false,
   });
   const consumed = await window.chromux.markRestoreSnapshotConsumed({
     restoreId: snapshot.restoreId,
@@ -9380,6 +9378,31 @@ if (window.chromuxTest) {
       row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
       flushRender();
       return state.activeId;
+    },
+    doubleClickRowsAcrossRender(firstId, secondId) {
+      const first = document.querySelector(
+        `#thread-list .rail-session-row[data-session-id="${CSS.escape(firstId)}"]`,
+      );
+      if (!first) throw new Error(`Missing first rail row: ${firstId}`);
+      first.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+      flushRender();
+      const firstLeftAttention = !document.querySelector(
+        `.attention-thread[data-session-id="${CSS.escape(firstId)}"]`,
+      );
+      const second = document.querySelector(
+        `#thread-list .rail-session-row[data-session-id="${CSS.escape(secondId)}"]`,
+      );
+      if (!second) throw new Error(`Missing exposed rail row: ${secondId}`);
+      second.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 2 }));
+      second.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
+      flushRender();
+      return {
+        activeId: state.activeId,
+        firstLeftAttention,
+        secondStayedAttention: Boolean(document.querySelector(
+          `.attention-thread[data-session-id="${CSS.escape(secondId)}"]`,
+        )),
+      };
     },
     doubleClickAttentionAction(id, kind, label) {
       const card = document.querySelector(`.attention-thread[data-session-id="${CSS.escape(id)}"]`);

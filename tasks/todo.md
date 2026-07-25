@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Keep Recent Threads ordering stable during navigation, retain meaningful-work recency, block post-render double-click activation of newly exposed rows, and ship as v0.61.2. _(source: user-supplied implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-session-rail-renderer.js`, focused and complete prototype matrix, source and packaged smoke, `prototype/README.md`, `RELEASES.md`)_
+
 - [x] Add configurable paired-workspace, all-layout cycle, and full-Chromux browser expansion behavior with session-local exact restoration, full-renderer geometry, Settings persistence, and v0.61.0 release coverage. _(source: user-supplied implementation plan; evidence: `prototype/renderer/index.html`, `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`, `prototype/scripts/test-browser-collapse-renderer.js`, complete prototype matrix, source and packaged smoke, `RELEASES.md`)_
 
 - [x] Keep the browser queue open while an approved preview loads, close it only after that selected tab succeeds, preserve failure recovery, and ship as v0.60.4. _(source: user-supplied implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-preview-queue-renderer.js`, browser-tabs regression, `RELEASES.md`)_

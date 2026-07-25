@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.61.2
+
+Tag: `chromux-v0.61.2`
+
+- Keep Recent Threads rows and working-directory groups stable while navigating ordinary, Working, and Needs Attention sessions.
+- Advance recency only for meaningful work such as session creation, submitted prompts, turn-state changes, and explicit attention actions.
+- Ignore follow-up mouse clicks from a double-click after Threads rebuilds, preventing a newly exposed row from activating while preserving single-click and keyboard activation.
+
 ## GBlockParty Chromux v0.61.1
 
 Tag: `chromux-v0.61.1`

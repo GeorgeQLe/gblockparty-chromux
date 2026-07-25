@@ -77,7 +77,8 @@ actions together, and returns to its directory group as soon as the last reason 
 **Chromux Update** status appears in a pinned system row above Needs Attention. Opening or dismissing a
 completion consumes it to a quiet Idle state, while completions already visible in the active session become
 Idle immediately. The thread-list filter defaults to **Recent**, ordering Working sessions and working-directory
-groups by deliberate activity (focus, submitted input, or turn-state changes); toggling it to **A–Z**
+groups by meaningful work (creation, submitted prompts, turn-state changes, or explicit attention actions)
+without moving rows or groups during session navigation; toggling it to **A–Z**
 alphabetizes group and session display labels instead. The icon-only control sits below the Threads header,
 and its validated choice stays in renderer local storage, does not affect Needs Attention urgency, and is
 hidden in Git Changes. Streaming terminal output does not reorder rows. Click an
