@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.60.4
+
+Tag: `chromux-v0.60.4`
+
+- Keep the browser review queue visible after `OPEN` while the selected page is still loading, and close it only after that page loads successfully.
+- Leave the queue open after main-frame failures so restored offline loopback rows, rechecks, and server-launch recovery remain accessible.
+- Track only the latest queue selection across browser tabs, accept successful redirects, and clear transient navigation state when its tab or session closes.
+
 ## GBlockParty Chromux v0.60.3
 
 Tag: `chromux-v0.60.3`

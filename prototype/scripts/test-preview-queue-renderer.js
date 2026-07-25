@@ -82,6 +82,71 @@ fs.writeFileSync(e2ePath, `
   expect(JSON.stringify(q.queueUrls(realId)) === JSON.stringify(['http://localhost:3000']),
     'queue OPEN should dequeue only the opened URL');
 
+  const pendingId = await q.addSession({ name: 'pending-queue-navigation', agent: 'codex' });
+  q.feed(pendingId, 'Local: http://localhost:49151/pending-success\\r\\n');
+  q.showQueue(pendingId);
+  q.openQueued(pendingId, 'http://localhost:49151/pending-success');
+  expect(q.queueCount(pendingId) === 0, 'queue OPEN should dequeue the pending success URL immediately');
+  expect(q.queuePanelHidden(pendingId) === false, 'queue should remain visible while the selected page loads');
+  const pendingSuccess = q.pendingQueueNavigation();
+  expect(pendingSuccess && pendingSuccess.sessionId === pendingId
+    && pendingSuccess.tabId === q.activeBrowserTabId(pendingId)
+    && pendingSuccess.url === 'http://localhost:49151/pending-success',
+  'queue OPEN should track the selected tab and URL until completion: ' + JSON.stringify(pendingSuccess));
+
+  const unrelatedId = await q.addSession({ name: 'unrelated-queue-navigation', agent: 'codex' });
+  q.finishLoad(unrelatedId, 'http://localhost:49151/unrelated-success');
+  expect(q.queuePanelHidden(pendingId) === false,
+    'a successful load in an unrelated tab should not close the pending queue');
+  expect(q.pendingQueueNavigation()?.sessionId === pendingId,
+    'an unrelated successful load should not clear pending queue navigation');
+
+  q.redirectLoad(pendingId, 'http://localhost:49151/redirected-success');
+  q.finishLoad(pendingId, 'http://localhost:49151/redirected-success');
+  expect(q.queuePanelHidden(pendingId) === true,
+    'successful completion, including a redirect, should close the pending queue');
+  expect(q.pendingQueueNavigation() === null, 'successful completion should clear pending queue navigation');
+
+  const latestId = await q.addSession({ name: 'latest-queue-navigation', agent: 'codex' });
+  q.feed(latestId, 'Local: http://localhost:49151/first-selection\\r\\n');
+  q.feed(latestId, 'Local: http://localhost:49151/latest-selection\\r\\n');
+  q.showQueue(latestId);
+  q.openQueued(latestId, 'http://localhost:49151/first-selection');
+  q.openQueued(latestId, 'http://localhost:49151/latest-selection');
+  expect(q.pendingQueueNavigation()?.url === 'http://localhost:49151/latest-selection',
+    'the latest queue selection should replace earlier pending navigation');
+  q.failLoad(latestId, 'http://localhost:49151/first-selection', -3, true);
+  q.finishLoad(latestId, 'http://localhost:49151/first-selection');
+  expect(q.queuePanelHidden(latestId) === false && q.pendingQueueNavigation()?.url === 'http://localhost:49151/latest-selection',
+    'stale events from an earlier same-tab selection should not close or clear the queue');
+  q.finishLoad(latestId, 'http://localhost:49151/latest-selection');
+  expect(q.queuePanelHidden(latestId) === true && q.pendingQueueNavigation() === null,
+    'only the latest same-tab queue selection should control automatic closure');
+
+  const pendingFailureId = await q.addSession({ name: 'pending-queue-failure', agent: 'codex' });
+  q.feed(pendingFailureId, 'Local: http://localhost:49149/pending-failure\\r\\n');
+  q.showQueue(pendingFailureId);
+  q.openQueued(pendingFailureId, 'http://localhost:49149/pending-failure');
+  q.failLoad(pendingFailureId, 'http://localhost:49149/pending-failure');
+  expect(q.queuePanelHidden(pendingFailureId) === false,
+    'main-frame failure should leave the pending queue visible');
+  expect(JSON.stringify(q.queueUrls(pendingFailureId)) === JSON.stringify(['http://localhost:49149/pending-failure']),
+    'main-frame loopback failure should restore the offline queue row');
+  expect(q.queueRows(pendingFailureId)[0]?.status === 'SERVER OFFLINE',
+    'restored loopback failure should remain actionable as offline');
+  expect(q.pendingQueueNavigation() === null, 'main-frame failure should clear pending queue navigation');
+
+  const pendingCloseId = await q.addSession({ name: 'pending-queue-close', agent: 'codex' });
+  q.feed(pendingCloseId, 'Local: http://localhost:49151/pending-close\\r\\n');
+  q.showQueue(pendingCloseId);
+  q.openQueued(pendingCloseId, 'http://localhost:49151/pending-close');
+  const closedPendingTabId = q.activeBrowserTabId(pendingCloseId);
+  q.closeBrowserTab(pendingCloseId, closedPendingTabId);
+  expect(q.pendingQueueNavigation() === null, 'closing the pending browser tab should clear transient navigation state');
+  q.finishLoad(pendingCloseId, 'http://localhost:49151/pending-close');
+  expect(q.queuePanelHidden(pendingCloseId) === false,
+    'a stale completion after closing the pending tab should not close the queue');
+
   const id = await q.addSession({ name: 'typed-preview-session', agent: 'codex' });
   q.feed(id, 'http://localhost:49151/uat-ahttp://localhost:49151/uat-b\\r\\n');
   expect(q.currentUrl(id) === null, 'malformed concatenated token should not open empty pane');

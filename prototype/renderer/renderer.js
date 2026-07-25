@@ -163,6 +163,7 @@ const state = {
   restoreWarningRows: [],
   restoreInferredRows: [],
   restoreWarningDismissed: false,
+  pendingQueueNavigation: null, // runtime-only { sessionId, tabId, url }
   resumeRetryWarning: null,
   codexUpdate: {
     phase: 'checking',
@@ -1948,7 +1949,8 @@ function renderQueue(session) {
     open.textContent = 'OPEN';
     open.onclick = () => {
       apply({ type: 'preview-opened', sessionId: session.id, url: item.url });
-      openOrFocusBrowserTab(session, item.url, '', { retryExisting: true });
+      const tab = openOrFocusBrowserTab(session, item.url, '', { retryExisting: true });
+      beginPendingQueueNavigation(session, tab, item.url);
       renderQueue(session);
     };
     const pin = document.createElement('button');
@@ -2530,6 +2532,53 @@ function createPageBrowserTab(session, url = null, title = '', { activate = true
   return tab;
 }
 
+function beginPendingQueueNavigation(session, tab, url) {
+  const normalized = normalizedBrowserUrl(url);
+  state.pendingQueueNavigation = session && tab && tab.type === 'page' && normalized
+    ? { sessionId: session.id, tabId: tab.id, url: normalized }
+    : null;
+}
+
+function pendingQueueNavigationMatches(session, tab) {
+  const pending = state.pendingQueueNavigation;
+  return Boolean(pending && session && tab
+    && pending.sessionId === session.id
+    && pending.tabId === tab.id);
+}
+
+function redirectPendingQueueNavigation(session, tab, url) {
+  if (!pendingQueueNavigationMatches(session, tab)) return false;
+  const normalized = normalizedBrowserUrl(url);
+  if (!normalized) return false;
+  state.pendingQueueNavigation.url = normalized;
+  return true;
+}
+
+function completePendingQueueNavigation(session, tab, loadedUrl) {
+  if (!pendingQueueNavigationMatches(session, tab)) return false;
+  const normalized = normalizedBrowserUrl(loadedUrl);
+  if (!normalized || normalized !== state.pendingQueueNavigation.url) return false;
+  state.pendingQueueNavigation = null;
+  session.els.queuePanel.classList.add('hidden');
+  return true;
+}
+
+function failPendingQueueNavigation(session, tab, failedUrl) {
+  if (!pendingQueueNavigationMatches(session, tab)) return false;
+  const pending = state.pendingQueueNavigation;
+  const normalizedFailure = normalizedBrowserUrl(failedUrl);
+  if (normalizedFailure && normalizedFailure !== pending.url) return false;
+  state.pendingQueueNavigation = null;
+  return true;
+}
+
+function clearPendingQueueNavigationForTab(session, tabId) {
+  const pending = state.pendingQueueNavigation;
+  if (!pending || !session || pending.sessionId !== session.id || pending.tabId !== tabId) return false;
+  state.pendingQueueNavigation = null;
+  return true;
+}
+
 function ensurePageWebview(session, tab) {
   if (!tab || tab.type !== 'page' || !tab.currentUrl || tab.webview) return;
   const wv = document.createElement('webview');
@@ -2564,11 +2613,16 @@ function ensurePageWebview(session, tab) {
   wv.addEventListener('did-start-navigation', (e) => {
     if (e.isMainFrame !== false) tab.failedUrl = null;
   });
+  wv.addEventListener('did-redirect-navigation', (e) => {
+    if (e.isMainFrame !== false) redirectPendingQueueNavigation(session, tab, e.url);
+  });
   wv.addEventListener('did-navigate', (e) => navigated(e.url));
   wv.addEventListener('did-navigate-in-page', (e) => { if (e.isMainFrame) navigated(e.url); });
   wv.addEventListener('did-fail-load', (e) => {
-    if (e.errorCode === -3 || e.isMainFrame === false) return;
+    if (e.isMainFrame === false) return;
     const failedUrl = normalizedBrowserUrl(e.validatedURL || tab.currentUrl);
+    failPendingQueueNavigation(session, tab, failedUrl);
+    if (e.errorCode === -3) return;
     if (failedUrl) {
       tab.failedUrl = failedUrl;
       queueLoopbackFailure(session, failedUrl);
@@ -2577,6 +2631,7 @@ function ensurePageWebview(session, tab) {
   wv.addEventListener('did-finish-load', () => {
     const loadedUrl = normalizedBrowserUrl(tab.currentUrl);
     if (loadedUrl && loadedUrl !== tab.failedUrl) removeSuccessfulQueuedPreview(session, loadedUrl);
+    if (loadedUrl && loadedUrl !== tab.failedUrl) completePendingQueueNavigation(session, tab, loadedUrl);
   });
   wv.addEventListener('page-title-updated', (e) => {
     tab.title = String(e.title || tab.currentUrl || 'Page').slice(0, 200);
@@ -2641,6 +2696,7 @@ function openOrFocusBrowserTab(session, url, title = '', { retryExisting = false
 function closeBrowserTab(session, tabId) {
   const index = session.browser.tabs.findIndex((tab) => tab.id === tabId);
   if (index < 0) return;
+  clearPendingQueueNavigationForTab(session, tabId);
   const [tab] = session.browser.tabs.splice(index, 1);
   if (tab.type === 'page' && tab.webview) tab.webview.remove();
   if (session.browser.activeTabId === tabId) {
@@ -6520,6 +6576,7 @@ function activateSession(id, { consumeRestoredCompletion = true, recordActivity 
 function closeSession(id) {
   const s = state.sessions.get(id);
   if (!s) return;
+  if (state.pendingQueueNavigation?.sessionId === id) state.pendingQueueNavigation = null;
   if (state.ui.threadPreview?.sessionId === id) dismissThreadPreview();
   if (s._threadCueTimer) clearTimeout(s._threadCueTimer);
   resetSynchronizedOutput(s);
@@ -9708,6 +9765,17 @@ if (window.chromuxTest) {
     })),
     queueCount: (id) => testSession(id).browser.queue.length,
     currentUrl: (id) => testSession(id).browser.currentUrl,
+    activeBrowserTabId: (id) => testSession(id).browser.activeTabId,
+    pendingQueueNavigation: () => state.pendingQueueNavigation ? { ...state.pendingQueueNavigation } : null,
+    queuePanelHidden: (id) => testSession(id).els.queuePanel.classList.contains('hidden'),
+    showQueue(id) {
+      testSession(id).els.queuePanel.classList.remove('hidden');
+      flushRender();
+    },
+    closeBrowserTab(id, tabId) {
+      closeBrowserTab(testSession(id), tabId);
+      flushRender();
+    },
     focus(id) {
       activateSession(id);
       flushRender();
@@ -9770,11 +9838,23 @@ if (window.chromuxTest) {
       return launchServerScript(session, session.browser.serverLauncher);
     },
     failLoad(id, url, errorCode = -102, isMainFrame = true) {
-      if (errorCode !== -3 && isMainFrame) queueLoopbackFailure(testSession(id), url);
+      const session = testSession(id);
+      const tab = activePageTab(session);
+      if (isMainFrame && tab) failPendingQueueNavigation(session, tab, url);
+      if (errorCode !== -3 && isMainFrame) queueLoopbackFailure(session, url);
       flushRender();
     },
     finishLoad(id, url) {
-      removeSuccessfulQueuedPreview(testSession(id), url);
+      const session = testSession(id);
+      removeSuccessfulQueuedPreview(session, url);
+      const tab = activePageTab(session);
+      if (tab) completePendingQueueNavigation(session, tab, url);
+      flushRender();
+    },
+    redirectLoad(id, url) {
+      const session = testSession(id);
+      const tab = activePageTab(session);
+      if (tab) redirectPendingQueueNavigation(session, tab, url);
       flushRender();
     },
     activeId: () => state.activeId,

@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Keep the browser queue open while an approved preview loads, close it only after that selected tab succeeds, preserve failure recovery, and ship as v0.60.4. _(source: user-supplied implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-preview-queue-renderer.js`, browser-tabs regression, `RELEASES.md`)_
+
 - [x] Make Codex update-preflight discovery and subprocess execution share the augmented PATH so Node-based launchers work after Finder startup; ship as v0.60.3. _(source: user-supplied implementation plan; evidence: `prototype/codex-update-service.js`, `prototype/scripts/test-codex-update-service.js`, source and packaged smoke, `RELEASES.md`)_
 
 - [x] Prevent correlated OSC 10/11/12 color-reply residue from entering the Codex prompt composer, preserve streaming input and ordinary prompt behavior, and ship as v0.60.2. _(source: user-supplied implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-composer-renderer.js`, complete renderer matrix, source and packaged smoke, `RELEASES.md`)_
