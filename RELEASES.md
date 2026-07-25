@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.61.3
+
+Tag: `chromux-v0.61.3`
+
+- Remove the printable `]` and `\` framing left around correlated Codex OSC 10/11/12 color replies, including wrapped, adjacent, repeated, and partially stripped forms.
+- Keep artifact-only prompts empty, prefer clean session-local input over contaminated rendered content, and preserve legitimate mixed prompt text byte-for-byte.
+- Continue forwarding raw terminal input unchanged while retaining bounded session-local correlation and exact-match cleanup.
+
 ## GBlockParty Chromux v0.61.2
 
 Tag: `chromux-v0.61.2`

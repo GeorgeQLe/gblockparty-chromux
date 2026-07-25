@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Remove printable framing around correlated Codex OSC 10/11/12 color-reply residue in Compose, preserve prompt text and raw PTY delivery, and ship as v0.61.3. _(source: user-supplied implementation plan, advanced from occupied v0.61.2; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-composer-renderer.js`, focused and complete prototype matrix, source and packaged smoke, `RELEASES.md`)_
+
 - [x] Keep Recent Threads ordering stable during navigation, retain meaningful-work recency, block post-render double-click activation of newly exposed rows, and ship as v0.61.2. _(source: user-supplied implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-session-rail-renderer.js`, focused and complete prototype matrix, source and packaged smoke, `prototype/README.md`, `RELEASES.md`)_
 
 - [x] Add configurable paired-workspace, all-layout cycle, and full-Chromux browser expansion behavior with session-local exact restoration, full-renderer geometry, Settings persistence, and v0.61.0 release coverage. _(source: user-supplied implementation plan; evidence: `prototype/renderer/index.html`, `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`, `prototype/scripts/test-browser-collapse-renderer.js`, complete prototype matrix, source and packaged smoke, `RELEASES.md`)_

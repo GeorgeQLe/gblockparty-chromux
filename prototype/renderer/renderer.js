@@ -906,10 +906,16 @@ function removeCorrelatedOscColorReplyResidue(termState, value) {
   const signatures = Array.isArray(termState && termState.oscColorReplySignatures)
     ? [...termState.oscColorReplySignatures].sort((left, right) => right.length - left.length)
     : [];
-  for (const signature of signatures) {
-    if (!signature || !text.includes(signature)) continue;
+  const variants = [...new Set(signatures.flatMap((signature) => signature ? [
+    `]${signature}\\`,
+    `]${signature}`,
+    `${signature}\\`,
+    signature,
+  ] : []))].sort((left, right) => right.length - left.length);
+  for (const variant of variants) {
+    if (!text.includes(variant)) continue;
     matched = true;
-    text = text.split(signature).join('');
+    text = text.split(variant).join('');
   }
   return { text, matched };
 }

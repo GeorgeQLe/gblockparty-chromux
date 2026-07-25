@@ -98,37 +98,67 @@ fs.writeFileSync(e2ePath, `
   'Compose must transfer only the ordinary text surrounding OSC traffic');
   c.close(mixedOsc); c.focus(first); await tick();
 
-  const contaminatedShadow = c.addSession({ name: 'contaminated-shadow', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16, cols: 80 });
-  const reportedColorReply = '\\x1b]10;rgb:1d1d/2020/2727\\x1b\\\\';
-  const reportedResidue = '10;rgb:1d1d/2020/2727';
+  const renderedSig10 = '10;rgb:e7e7/eded/f7f7';
+  const renderedSig11 = '11;rgb:1111/1818/2727';
+  const renderedSig12 = '12;rgb:7777/8888/9999';
+  const renderedReplySt = '\\x1b]' + renderedSig10 + '\\x1b\\\\';
+  const renderedReplyBel = '\\x1b]' + renderedSig11 + '\\x07';
+  const renderedReplyC1 = '\\x9d' + renderedSig12 + '\\x9c';
+  const renderedReplyBytes = renderedReplySt + renderedReplyBel + renderedReplyC1;
+  const actualRenderedPair = ']' + renderedSig10 + '\\\\]' + renderedSig11 + '\\\\';
+  const wrappedActualResidue = actualRenderedPair.repeat(8);
+
+  const artifactOnly = c.addSession({ name: 'artifact-only', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16, cols: 26 });
+  c.nativeInput(artifactOnly, renderedReplyBytes);
+  expect(c.ptyInputs(artifactOnly).join('') === renderedReplyBytes,
+    'raw OSC color replies must reach the PTY byte-for-byte unchanged');
+  c.clearPtyInputs(artifactOnly);
+  await c.renderPromptFixture(artifactOnly, '? for shortcuts\\r\\n› ' + wrappedActualResidue);
+  c.open(artifactOnly); await tick();
+  expect(c.draft(artifactOnly) === '' && !c.state(artifactOnly).conflictOpen
+    && c.ptyInputs(artifactOnly).length === 0,
+  'wrapped printable OSC framing must open an empty composer without clearing or transmitting input');
+
+  const artifactDraft = c.addSession({
+    name: 'artifact-draft', agent: 'codex', cwd: ${JSON.stringify(projectDir)},
+    composerDraft: 'existing draft', rows: 16, cols: 26,
+  });
+  c.nativeInput(artifactDraft, renderedReplyBytes); c.clearPtyInputs(artifactDraft);
+  await c.renderPromptFixture(artifactDraft, '? for shortcuts\\r\\n› ' + wrappedActualResidue);
+  c.open(artifactDraft); await tick();
+  expect(c.draft(artifactDraft) === 'existing draft' && !c.state(artifactDraft).conflictOpen
+    && c.ptyInputs(artifactDraft).length === 0,
+  'artifact-only terminal content must not conflict with an existing composer draft');
+
+  const contaminatedShadow = c.addSession({ name: 'contaminated-shadow', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16, cols: 26 });
   c.nativeInput(contaminatedShadow, 'keep this prompt');
-  c.nativeInput(contaminatedShadow, reportedColorReply);
+  c.nativeInput(contaminatedShadow, renderedReplyBytes);
   c.clearPtyInputs(contaminatedShadow);
-  await c.renderPromptFixture(contaminatedShadow, '? for shortcuts\\r\\n› ' + reportedResidue + reportedResidue);
+  await c.renderPromptFixture(contaminatedShadow, '? for shortcuts\\r\\n› ' + wrappedActualResidue);
   c.open(contaminatedShadow); await tick();
   expect(c.draft(contaminatedShadow) === 'keep this prompt'
     && c.ptyInputs(contaminatedShadow).join('') === '\\x15\\x0b',
-  'a clean shadow must win over a rendered prompt contaminated by repeated correlated color replies');
+  'a clean shadow must win over a rendered prompt contaminated by printable OSC framing');
 
-  const artifactOnly = c.addSession({ name: 'artifact-only', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16, cols: 80 });
-  c.nativeInput(artifactOnly, reportedColorReply); c.clearPtyInputs(artifactOnly);
-  await c.renderPromptFixture(artifactOnly, '? for shortcuts\\r\\n› ' + reportedResidue);
-  c.open(artifactOnly); await tick();
-  expect(c.draft(artifactOnly) === '' && c.ptyInputs(artifactOnly).length === 0,
-    'an artifact-only rendered prompt must be treated as empty without clearing or transferring it');
-
-  const mixedRenderedResidue = c.addSession({ name: 'mixed-rendered-residue', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16, cols: 100 });
-  c.nativeInput(mixedRenderedResidue, reportedColorReply); c.clearPtyInputs(mixedRenderedResidue);
-  await c.renderPromptFixture(mixedRenderedResidue, '? for shortcuts\\r\\n› write tests ' + reportedResidue + ' please');
+  const mixedRenderedResidue = c.addSession({ name: 'mixed-rendered-residue', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16, cols: 36 });
+  c.nativeInput(mixedRenderedResidue, renderedReplyBytes); c.clearPtyInputs(mixedRenderedResidue);
+  const everyRenderedVariant = ']' + renderedSig10 + '\\\\'
+    + ']' + renderedSig10 + '\\\\'
+    + ']' + renderedSig11
+    + renderedSig10 + '\\\\'
+    + renderedSig12
+    + renderedSig11;
+  await c.renderPromptFixture(mixedRenderedResidue, '? for shortcuts\\r\\n› before<' + everyRenderedVariant + '>after');
   c.open(mixedRenderedResidue); await tick();
-  expect(c.draft(mixedRenderedResidue) === 'write tests  please'
+  expect(c.draft(mixedRenderedResidue) === 'before<>after'
     && c.ptyInputs(mixedRenderedResidue).join('') === '\\x15\\x0b',
-  'correlated color-reply residue must be removed without discarding legitimate rendered prompt text');
+  'adjacent and repeated ST, BEL, C1, partially stripped, and fully stripped residue must be removed exactly');
 
   const oscLookalike = c.addSession({ name: 'osc-lookalike', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16, cols: 80 });
-  await c.renderPromptFixture(oscLookalike, '? for shortcuts\\r\\n› inspect 10;rgb:1d1d/2020/2727 literally');
+  const uncorrelatedText = 'inspect ]' + renderedSig10 + '\\\\ literally';
+  await c.renderPromptFixture(oscLookalike, '? for shortcuts\\r\\n› ' + uncorrelatedText);
   c.open(oscLookalike); await tick();
-  expect(c.draft(oscLookalike) === 'inspect 10;rgb:1d1d/2020/2727 literally',
+  expect(c.draft(oscLookalike) === uncorrelatedText,
     'OSC-looking user text must remain when no matching terminal reply was observed in that session');
   c.close(oscLookalike); c.focus(first); await tick();
 
