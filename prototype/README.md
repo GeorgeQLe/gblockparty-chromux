@@ -219,6 +219,14 @@ See [`docs/troubleshooting.md`](docs/troubleshooting.md) for the full support gu
 | Update cache/source/install log | `~/.chromux/update-cache.json`, `~/.chromux/update-source.json`, `~/.chromux/update-install.log` |
 | Hook settings and notify scripts | `~/.chromux/hooks-claude.json`, `~/.chromux/codex-notify.sh`, `~/.chromux/hooks-grok.json`, `~/.chromux/grok-hook.sh`, and `~/.grok/hooks/chromux-turn-signals.json` |
 | Resource broker | `~/.chromux/resource-broker.sock`, `~/.chromux/resource-broker.lock`, `~/.chromux/resource-broker-state.json`, and optional `~/.chromux/resource-broker.log` |
+| Browser pane profiles | Session-specific persistent Electron partitions shared by that session's page tabs |
+
+When Chromux launches, it reclaims browser partitions left by closed Chromux
+sessions and exact stale `signal-<24 lowercase hex>.json` correlation files.
+Cleanup finishes before the first window and session are created, so storage
+from a session closed during the current run is reclaimed on the next launch.
+Unrelated Electron partitions, symlinks, captures, delivery logs, restore
+snapshots, prompt history, and agent-owned directories are never included.
 
 ## Agent attention protocol
 
@@ -239,7 +247,6 @@ an attentive Threads reason. A background completion remains in Needs Attention 
 or that reason is explicitly dismissed; a completion received by the active session is already seen. Opening a session never
 dismisses permission, authentication, input, rate-limit, or tool-failure attention. Chromux does not post
 macOS Notification Center alerts.
-| Browser pane profiles | Session-specific persistent Electron partitions shared by that session's page tabs |
 
 Chromux has no account, cloud sync, Chromux-hosted capture upload, or product
 telemetry in the current prototype. Browser pages, update checks, agent CLIs,

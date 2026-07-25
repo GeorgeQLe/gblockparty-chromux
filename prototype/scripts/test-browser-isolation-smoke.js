@@ -9,9 +9,17 @@ const { spawn } = require('child_process');
 const appDir = path.resolve(__dirname, '..');
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'chromux-browser-isolation-'));
 const home = path.join(temp, 'home');
+const userData = path.join(temp, 'user-data');
+const partitions = path.join(userData, 'Partitions');
 const e2ePath = path.join(temp, 'e2e.js');
 const outputPath = path.join(temp, 'result.json');
+const packagedExecutable = process.env.CHROMUX_PACKAGED_EXECUTABLE || '';
 fs.mkdirSync(home, { recursive: true });
+fs.mkdirSync(path.join(partitions, 'chromux', 'Cache'), { recursive: true });
+fs.writeFileSync(path.join(partitions, 'chromux', 'Cache', 'stale-entry'), 'stale');
+fs.mkdirSync(path.join(partitions, 'unrelated-profile'), { recursive: true });
+fs.mkdirSync(path.join(home, '.chromux'), { recursive: true });
+fs.writeFileSync(path.join(home, '.chromux', 'signal-0123456789abcdef01234567.json'), '{}');
 
 const server = http.createServer((request, response) => {
   response.setHeader('content-type', 'text/html; charset=utf-8');
@@ -50,24 +58,39 @@ server.listen(0, '127.0.0.1', () => {
   expect(twoState.cookie.includes('chromuxTarget=two') && !twoState.cookie.includes('chromuxTarget=one'), 'second cookies crossed');
   expect(oneState.storage === 'one' && twoState.storage === 'two', 'local storage crossed');
   expect(oneState.input === 'alpha' && twoState.input === 'bravo', 'typed state crossed');
-  b.focus(first);
-  await wait(80);
-  const shotOne = await one.capturePage();
-  b.focus(second);
-  await wait(80);
-  const shotTwo = await two.capturePage();
-  expect(shotOne.toPNG().length > 100 && shotTwo.toPNG().length > 100, 'screenshots missing');
+  const screenshots = [];
+  if (${JSON.stringify(!packagedExecutable)}) {
+    b.focus(first);
+    await wait(80);
+    const shotOne = await one.capturePage();
+    b.focus(second);
+    await wait(80);
+    const shotTwo = await two.capturePage();
+    screenshots.push(shotOne.toPNG().length, shotTwo.toPNG().length);
+    expect(screenshots.every((bytes) => bytes > 100), 'screenshots missing');
+  }
   await one.loadURL(${JSON.stringify(origin + '/one-next')});
   await waitFor(async () => (await one.executeJavaScript('location.pathname')) === '/one-next', 'first navigation failed');
   expect(await two.executeJavaScript('location.pathname') === '/two', 'tab selection/navigation crossed');
-  return JSON.stringify({ ok: true, oneState, twoState, screenshots: [shotOne.toPNG().length, shotTwo.toPNG().length] });
+  return JSON.stringify({ ok: true, oneState, twoState, screenshots });
 })()
 `);
 
   const electron = path.join(appDir, 'node_modules', '.bin', 'electron');
-  const child = spawn(process.execPath, [electron, '.', '--smoke'], {
+  const executable = packagedExecutable || process.execPath;
+  const args = packagedExecutable
+    ? ['--smoke', `--user-data-dir=${userData}`]
+    : [electron, '.', '--smoke', `--user-data-dir=${userData}`];
+  const child = spawn(executable, args, {
     cwd: appDir,
-    env: { ...process.env, HOME: home, PATH: '/usr/bin:/bin', CHROMUX_E2E: e2ePath, CHROMUX_E2E_OUT: outputPath },
+    env: {
+      ...process.env,
+      HOME: home,
+      PATH: '/usr/bin:/bin',
+      CHROMUX_E2E: e2ePath,
+      CHROMUX_E2E_OUT: outputPath,
+      CHROMUX_KEEP_USER_DATA: '1',
+    },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let stdout = '';
@@ -79,9 +102,29 @@ server.listen(0, '127.0.0.1', () => {
     clearTimeout(timeout);
     server.close();
     const output = fs.existsSync(outputPath) ? fs.readFileSync(outputPath, 'utf8') : '';
+    const stalePartitionRemoved = !fs.existsSync(path.join(partitions, 'chromux'));
+    const staleSignalRemoved = !fs.existsSync(path.join(home, '.chromux', 'signal-0123456789abcdef01234567.json'));
+    const unrelatedPartitionRetained = fs.existsSync(path.join(partitions, 'unrelated-profile'));
+    const newPartitions = fs.existsSync(partitions)
+      ? fs.readdirSync(partitions).filter((name) => (
+        /^chromux-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(name)
+      ))
+      : [];
     fs.rmSync(temp, { recursive: true, force: true });
-    if (code !== 0 || signal || !output.includes('"ok":true')) {
-      console.error('BROWSER_ISOLATION_SMOKE_FAIL', { code, signal, output, stdout: stdout.trim(), stderr: stderr.trim() });
+    if (code !== 0 || signal || !output.includes('"ok":true')
+      || !stalePartitionRemoved || !staleSignalRemoved || !unrelatedPartitionRetained
+      || new Set(newPartitions).size < 2) {
+      console.error('BROWSER_ISOLATION_SMOKE_FAIL', {
+        code,
+        signal,
+        output,
+        stalePartitionRemoved,
+        staleSignalRemoved,
+        unrelatedPartitionRetained,
+        newPartitions,
+        stdout: stdout.trim(),
+        stderr: stderr.trim(),
+      });
       process.exitCode = 1;
       return;
     }

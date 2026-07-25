@@ -143,13 +143,21 @@ Chromux stores local artifacts under your home directory:
 | Hook settings and notify scripts | `~/.chromux/` |
 | Browser profiles | Session-specific Electron partitions `persist:chromux-<session ID>` |
 
-### Resource broker unavailable or stuck
-
-Open **RESOURCES** and use **REFRESH** first. The daemon normally starts on demand at `~/.chromux/resource-broker.sock`. If MCP tools are missing, run `/mcp` in Codex and follow the registration steps in [`resource-broker.md`](resource-broker.md). A queued request advances automatically when its owner releases, disconnects, or reaches TTL. Use **FORCE RELEASE** only after confirming the displayed owner is stale; it cannot stop an operation that already escaped the wrapper.
+Closed-session browser profiles and exact stale
+`signal-<24 lowercase hex>.json` files are reclaimed automatically the next
+time Chromux launches. Cleanup runs before the first window is created and is
+best-effort: an unreadable entry is reported without blocking startup or other
+eligible entries. Unrelated partitions, malformed names, ordinary partition
+files, top-level symlinks, nonmatching signal files, captures, delivery history,
+restore snapshots, prompt history, and agent-owned directories are not removed.
 
 Chromux does not currently expire capture directories. To reclaim disk space, delete old directories under `~/.chromux/captures/`. To clear delivery history, delete `~/.chromux/delivery-log.jsonl`.
 
 Do not delete a capture directory until you no longer need its `payload.yaml` or `screenshot.png` for manual retry or audit.
+
+### Resource broker unavailable or stuck
+
+Open **RESOURCES** and use **REFRESH** first. The daemon normally starts on demand at `~/.chromux/resource-broker.sock`. If MCP tools are missing, run `/mcp` in Codex and follow the registration steps in [`resource-broker.md`](resource-broker.md). A queued request advances automatically when its owner releases, disconnects, or reaches TTL. Use **FORCE RELEASE** only after confirming the displayed owner is stale; it cannot stop an operation that already escaped the wrapper.
 
 ## Manual retry reference
 

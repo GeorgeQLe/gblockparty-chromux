@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.61.4
+
+Tag: `chromux-v0.61.4`
+
+- Reclaim closed-session Chromux browser partitions and exact stale signal-correlation records on the next launch, before the first window and session are created.
+- Restrict cleanup to legacy, UUID, and renderer-fallback partition directories plus exact lowercase signal filenames, while retaining unrelated entries, ordinary partition files, top-level symlinks, nonmatching signals, captures, delivery logs, restore data, prompt history, and agent-owned storage.
+- Continue startup after individual filesystem failures with bounded diagnostics and aggregate counts, while preserving distinct persistent browser partitions for every new session.
+
 ## GBlockParty Chromux v0.61.3
 
 Tag: `chromux-v0.61.3`

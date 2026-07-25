@@ -20,6 +20,7 @@ const { BrokerClient } = require('./resource-broker/client');
 const { createPreventSleepController } = require('./prevent-sleep');
 const { MAX_DRAFT_BYTES, createPromptHistoryStore } = require('./prompt-history');
 const { previewProbe } = require('./preview-probe');
+const { cleanupOrphanedStorage } = require('./storage-cleanup');
 const {
   CHROMUX_SHORTCUT_ACTIONS,
   chromuxShortcutAction,
@@ -2143,6 +2144,10 @@ ipcMain.handle('install-update', async (_e, opts = {}) => {
 
 app.whenReady().then(() => {
   ensureDirs();
+  cleanupOrphanedStorage({
+    userDataDir: app.getPath('userData'),
+    chromuxHome: CHROMUX_HOME,
+  });
   initializePreventSleep();
   resourceClient.connect().catch((err) => console.error('resource broker unavailable:', err.message));
   installAppMenu();
