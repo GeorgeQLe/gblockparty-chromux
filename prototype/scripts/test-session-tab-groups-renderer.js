@@ -190,9 +190,36 @@ fs.writeFileSync(e2ePath, `
     .find((group) => group.sessions.includes(alpha)).id,
   'global search must reveal and activate a session across groups');
 
-  const shortcut = groups.shortcut(3);
-  expect(shortcut && shortcut.sessionId === beta && groups.focused() === customTwo.id,
-    'numeric session shortcuts must focus the destination group');
+  effective = groups.groups();
+  const shippingIndex = effective.findIndex((group) => group.id === customTwo.id);
+  const apiIndex = effective.findIndex((group) => group.sessions.includes(apiA));
+  const alphaIndex = effective.findIndex((group) => group.sessions.includes(alpha));
+
+  groups.select(apiGroup.id);
+  tabs.focus(apiB);
+  groups.select(effective[alphaIndex].id);
+  let shortcut = groups.shortcut(apiIndex);
+  expect(shortcut && shortcut.groupId === apiGroup.id && shortcut.sessionId === apiB,
+    'numeric shortcuts must select a group by visible index and restore its remembered session');
+  shortcut = groups.shortcut(apiIndex);
+  expect(shortcut && shortcut.groupId === apiGroup.id && shortcut.sessionId === apiA,
+    'repeating a numeric shortcut inside its group must cycle to the next visible session');
+  shortcut = groups.shortcut(apiIndex);
+  expect(shortcut && shortcut.sessionId === apiB,
+    'repeated numeric group cycling must wrap from the last session to the first');
+
+  shortcut = groups.shortcut(alphaIndex);
+  expect(shortcut && shortcut.sessionId === alpha && shortcut.groupId === effective[alphaIndex].id,
+    'a numeric shortcut must enter a one-session group');
+  shortcut = groups.shortcut(alphaIndex);
+  expect(shortcut && shortcut.sessionId === alpha && groups.active() === alpha,
+    'repeating a numeric shortcut for a one-session group must remain stable');
+
+  const activeBeforeEmptySlot = groups.active();
+  expect(groups.shortcut(effective.length) === null && groups.active() === activeBeforeEmptySlot,
+    'an empty numeric group slot must do nothing');
+  expect(shippingIndex === 0,
+    'custom groups must retain precedence in visible numeric shortcut order');
 
   const workspace = document.querySelector('#workspace');
   for (let index = 0; index < 8; index += 1) {
@@ -220,6 +247,9 @@ fs.writeFileSync(e2ePath, `
   expect(document.querySelector('#group-tab-list').classList.contains('hidden')
     && !document.querySelector('#tab-list').classList.contains('hidden'),
   'disabling grouping must restore the unchanged flat strip');
+  shortcut = groups.shortcut(3);
+  expect(shortcut && shortcut.groupId === null && shortcut.sessionId === beta && groups.active() === beta,
+    'flat mode numeric shortcuts must retain global session-index switching');
 
   return JSON.stringify({ ok: true });
 })()

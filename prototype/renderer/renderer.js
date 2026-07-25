@@ -1903,6 +1903,7 @@ function computeShortcutCatalog() {
   const context = shortcutFocusContext();
   const chord = shortcutDebugChord();
   const sessions = orderedSessions();
+  const tabGroups = state.ui.tabGroupsEnabled ? effectiveTabGroups() : null;
   const guardReason = guardedShortcutDisabledReason(context);
   const activeSession = context.activeSessionId ? state.sessions.get(context.activeSessionId) : null;
   const definitions = [];
@@ -1933,9 +1934,15 @@ function computeShortcutCatalog() {
     let description = '';
 
     if (shortcut.id.startsWith('session-')) {
-      const target = sessions[shortcut.index];
-      disabledReason = guardReason || (target ? null : `no session ${shortcut.index + 1}`);
-      description = target ? `activate ${target.name}` : 'session slot empty';
+      if (tabGroups) {
+        const target = tabGroups[shortcut.index];
+        disabledReason = guardReason || (target ? null : `no group ${shortcut.index + 1}`);
+        description = target ? `target/cycle ${target.name}` : 'group slot empty';
+      } else {
+        const target = sessions[shortcut.index];
+        disabledReason = guardReason || (target ? null : `no session ${shortcut.index + 1}`);
+        description = target ? `activate ${target.name}` : 'session slot empty';
+      }
     } else if (shortcut.id === 'queue-next') {
       disabledReason = guardReason || (context.queueCount > 0 ? null : 'queue empty');
       description = context.queueCount > 0 ? `${context.queueCount} queued` : 'queue empty';
@@ -7829,10 +7836,27 @@ function focusNextQueuedPreview(now = Date.now()) {
 function handleShortcutActivateSessionIndex(payload) {
   const index = Number(payload && payload.index);
   if (!Number.isInteger(index) || modalOpen() || editableFocused()) return null;
+
+  if (state.ui.tabGroupsEnabled) {
+    const groups = effectiveTabGroups();
+    const group = groups[index];
+    if (!group) return null;
+
+    const activeIndex = group.sessions.findIndex((session) => session.id === state.activeId);
+    const remembered = state.ui.lastActiveSessionByGroup.get(group.id);
+    const session = activeIndex >= 0
+      ? group.sessions[(activeIndex + 1) % group.sessions.length]
+      : group.sessions.find((candidate) => candidate.id === remembered) || group.sessions[0];
+    if (!session) return null;
+
+    activateSession(session.id);
+    return { index, groupId: group.id, sessionId: session.id };
+  }
+
   const session = orderedSessions()[index];
   if (!session) return null;
   activateSessionByIndex(index);
-  return { index, sessionId: session.id };
+  return { index, groupId: null, sessionId: session.id };
 }
 
 function handleShortcutFocusNextQueueItem(now = Date.now()) {
@@ -9189,6 +9213,14 @@ if (window.chromuxTest) {
 
   window.chromuxTestHotkeys = {
     addSession: async (opts) => addFakeSession(opts),
+    setGrouping(enabled) {
+      state.ui.tabGroupsEnabled = Boolean(enabled);
+      if (state.ui.tabGroupsEnabled && state.activeId) {
+        state.ui.focusedTabGroupId = sessionTabGroupId(testSession(state.activeId));
+      }
+      invalidate('shortcutDebug');
+      flushRender();
+    },
     focus(id) {
       activateSession(id);
       flushRender();

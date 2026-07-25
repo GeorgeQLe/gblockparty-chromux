@@ -36,9 +36,10 @@ fs.writeFileSync(e2ePath, `
 
   await new Promise((resolve) => setTimeout(resolve, 100));
 
-  const firstId = await h.addSession({ name: 'first' });
+  const firstId = await h.addSession({ name: 'first', cwd: '/work/first' });
   const secondId = await h.addSession({
     name: 'queued',
+    cwd: '/work/second',
     queue: [{ url: 'http://localhost:5173/queued', source: 'TEST', ts: 1 }],
   });
 
@@ -48,6 +49,21 @@ fs.writeFileSync(e2ePath, `
   expect(byId('queue-next').available, 'Command+J should be available when a queue item exists');
   expect(byId('browser-toggle').available, 'Command+Shift+B should be available with an active session');
   expect(byId('browser-toggle').description === 'open browser', 'shut browser target should be open');
+  expect(byId('session-1').description === 'activate first',
+    'flat mode must describe numeric shortcuts as session activation');
+  expect(byId('session-3').description === 'session slot empty',
+    'flat mode must describe unavailable numeric shortcuts as empty session slots');
+
+  h.setGrouping(true);
+  expect(byId('session-1').description === 'target/cycle first',
+    'grouped mode must describe the first digit as targeting and cycling the first visible group');
+  expect(byId('session-2').description === 'target/cycle second',
+    'grouped mode must describe the second digit as targeting and cycling the second visible group');
+  expect(byId('session-3').description === 'group slot empty',
+    'grouped mode must describe unavailable digits as empty group slots');
+  expect(byId('session-3').disabledReason === 'no group 3',
+    'grouped mode must diagnose unavailable digits as missing groups');
+  h.setGrouping(false);
 
   h.setCollapsed(firstId, false);
   expect(byId('browser-toggle').description === 'shut browser', 'open browser target should be shut');

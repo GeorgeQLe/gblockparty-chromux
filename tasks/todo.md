@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Make Command-digit shortcuts select visible primary groups, restore remembered sessions, cycle within the selected group, preserve flat-mode indexing, and ship as v0.58.6. _(source: user-supplied implementation plan; evidence: `prototype/renderer/renderer.js`, shortcut/hotkey/grouped-tab/webview renderer regressions, `RELEASES.md`)_
+
 - [x] Preserve grouped-tab Working spinner and pointer-target continuity across title, hover, badge, and status updates; restore reliable lower session-tab activation; ship as v0.58.4. _(source: user-reported regression; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-session-tab-groups-renderer.js`, all 46 prototype test files, source and packaged smoke, package metadata inspection, `RELEASES.md`)_
 
 - [x] Make GitHub update checks resilient to REST API rate limits with a validated public latest-release redirect fallback, retry transient failures without caching them, and ship as v0.58.3. _(source: user-supplied implementation plan; evidence: `prototype/update-checker.js`, `prototype/scripts/test-github-update-check.js`, `prototype/scripts/test-update-queue-renderer.js`, all 46 prototype test files, source and packaged smoke, `prototype/docs/privacy-and-local-data.md`, `RELEASES.md`)_

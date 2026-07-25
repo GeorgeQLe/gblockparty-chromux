@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.58.6
+
+Tag: `chromux-v0.58.6`
+
+- Make `⌘1` through `⌘9` target the visible primary group-tab order while grouped mode is enabled, restoring each destination group’s remembered session on entry.
+- Cycle through a selected group’s visible lower session tabs on repeated presses, including wraparound and stable one-session groups; leave empty group slots inactive.
+- Preserve global session-index switching in flat mode and update Developer Mode shortcut diagnostics to distinguish group targets from session targets.
+
 ## GBlockParty Chromux v0.58.5
 
 Tag: `chromux-v0.58.5`
