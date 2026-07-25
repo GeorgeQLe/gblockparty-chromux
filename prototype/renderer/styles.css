@@ -1152,14 +1152,26 @@ body.dragging webview { pointer-events: none; }
   gap: 9px;
 }
 .browser-rail > .browser-rail-toggle {
-  flex: 1 1 auto;
+  flex: 1 1 50%;
   height: auto;
 }
+.browser-fullscreen-toggle { border-top: 1px solid var(--line-hi); }
 .browser-rail-label {
   writing-mode: vertical-rl;
   text-orientation: mixed;
 }
 .panel-open-icon { width: 16px; height: 16px; flex: none; }
+.browser-fullscreen-icon { width: 17px; height: 17px; flex: none; }
+
+.session-view.browser-fullscreen .term-pane,
+.session-view.browser-fullscreen > .divider {
+  display: none;
+}
+.session-view.browser-fullscreen .web-pane {
+  grid-column: 3;
+  min-width: 0;
+  border-left: 0;
+}
 
 .browser-toolbar {
   flex: 1 1 auto;

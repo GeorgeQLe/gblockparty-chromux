@@ -1583,6 +1583,8 @@ function createBrowserState() {
     queue: [],
     serverLauncher: null,
     collapsed: true,
+    fullscreen: false,
+    fullscreenReturnCollapsed: null,
     expandedGridTemplate: 'minmax(320px, 46%) 6px minmax(360px, 1fr)',
   };
   const activePage = () => browser.tabs.find((tab) => tab.id === browser.activeTabId && tab.type === 'page') || null;
@@ -2845,14 +2847,35 @@ function renderBrowserRailToggle(button, collapsed) {
   button.replaceChildren(icon, label);
 }
 
+function renderBrowserFullscreenToggle(button, fullscreen) {
+  const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  icon.classList.add('browser-fullscreen-icon');
+  icon.setAttribute('viewBox', '0 0 16 16');
+  icon.setAttribute('fill', 'none');
+  icon.setAttribute('stroke', 'currentColor');
+  icon.setAttribute('stroke-width', '1.5');
+  icon.setAttribute('stroke-linecap', 'round');
+  icon.setAttribute('stroke-linejoin', 'round');
+  icon.setAttribute('aria-hidden', 'true');
+  icon.setAttribute('focusable', 'false');
+  icon.innerHTML = fullscreen
+    ? '<path d="M6 2v4H2M10 2v4h4M6 14v-4H2M10 14v-4h4"></path>'
+    : '<path d="M6 2H2v4M10 2h4v4M6 14H2v-4M10 14h4v-4"></path>';
+  button.replaceChildren(icon);
+}
+
 function applyBrowserLayout(session) {
   if (!session.els) return;
   const collapsed = Boolean(session.browser.collapsed);
+  const fullscreen = Boolean(session.browser.fullscreen);
   session.els.view.classList.toggle('browser-collapsed', collapsed);
+  session.els.view.classList.toggle('browser-fullscreen', fullscreen);
   session.els.webPane.classList.toggle('collapsed', collapsed);
-  session.els.divider.classList.toggle('disabled', collapsed);
-  session.els.divider.setAttribute('aria-disabled', collapsed ? 'true' : 'false');
-  if (collapsed) {
+  session.els.divider.classList.toggle('disabled', collapsed || fullscreen);
+  session.els.divider.setAttribute('aria-disabled', collapsed || fullscreen ? 'true' : 'false');
+  if (fullscreen) {
+    session.els.view.style.gridTemplateColumns = '0px 0px minmax(0, 1fr)';
+  } else if (collapsed) {
     session.els.view.style.gridTemplateColumns = 'minmax(320px, 1fr) 6px 40px';
   } else {
     session.els.view.style.gridTemplateColumns = session.browser.expandedGridTemplate;
@@ -2862,16 +2885,54 @@ function applyBrowserLayout(session) {
     ? 'Open paired browser (⌘⇧B)'
     : 'Shut paired browser (⌘⇧B)';
   session.els.collapseBtn.setAttribute('aria-label', session.els.collapseBtn.title);
+  renderBrowserFullscreenToggle(session.els.fullscreenBtn, fullscreen);
+  session.els.fullscreenBtn.title = fullscreen ? 'Exit full screen' : 'Full screen';
+  session.els.fullscreenBtn.setAttribute('aria-label', session.els.fullscreenBtn.title);
+  session.els.fullscreenBtn.setAttribute('aria-pressed', String(fullscreen));
   refitTerminal(session);
 }
 
 function setBrowserCollapsed(session, collapsed) {
   const next = Boolean(collapsed);
+  if (session.browser.fullscreen && next) {
+    session.browser.fullscreen = false;
+    session.browser.fullscreenReturnCollapsed = null;
+    session.browser.collapsed = true;
+    session.els.queuePanel.classList.add('hidden');
+    if (session.els.favoritesPanel) session.els.favoritesPanel.classList.add('hidden');
+    applyBrowserLayout(session);
+    invalidate('shortcutDebug');
+    return;
+  }
   if (session.browser.collapsed === next) return;
   if (next) session.browser.expandedGridTemplate = session.els.view.style.gridTemplateColumns || session.browser.expandedGridTemplate;
   session.browser.collapsed = next;
   if (next) session.els.queuePanel.classList.add('hidden');
   if (next && session.els.favoritesPanel) session.els.favoritesPanel.classList.add('hidden');
+  applyBrowserLayout(session);
+  invalidate('shortcutDebug');
+}
+
+function setBrowserFullscreen(session, fullscreen) {
+  const next = Boolean(fullscreen);
+  if (session.browser.fullscreen === next) return;
+  if (next) {
+    session.browser.fullscreenReturnCollapsed = Boolean(session.browser.collapsed);
+    if (!session.browser.collapsed) {
+      session.browser.expandedGridTemplate = session.els.view.style.gridTemplateColumns
+        || session.browser.expandedGridTemplate;
+    }
+    session.browser.collapsed = false;
+    session.browser.fullscreen = true;
+  } else {
+    session.browser.fullscreen = false;
+    session.browser.collapsed = Boolean(session.browser.fullscreenReturnCollapsed);
+    session.browser.fullscreenReturnCollapsed = null;
+    if (session.browser.collapsed) {
+      session.els.queuePanel.classList.add('hidden');
+      if (session.els.favoritesPanel) session.els.favoritesPanel.classList.add('hidden');
+    }
+  }
   applyBrowserLayout(session);
   invalidate('shortcutDebug');
 }
@@ -3733,6 +3794,12 @@ function buildSessionView(session) {
   collapseBtn.title = 'Open paired browser (⌘⇧B)';
   collapseBtn.setAttribute('aria-label', 'Open paired browser (⌘⇧B)');
   renderBrowserRailToggle(collapseBtn, true);
+  const fullscreenBtn = document.createElement('button');
+  fullscreenBtn.className = 'head-btn browser-rail-toggle browser-fullscreen-toggle';
+  fullscreenBtn.title = 'Full screen';
+  fullscreenBtn.setAttribute('aria-label', 'Full screen');
+  fullscreenBtn.setAttribute('aria-pressed', 'false');
+  renderBrowserFullscreenToggle(fullscreenBtn, false);
   const urlBar = document.createElement('input');
   urlBar.className = 'url-bar'; urlBar.type = 'text'; urlBar.spellcheck = false;
   urlBar.setAttribute('autocomplete', 'off');
@@ -3811,7 +3878,7 @@ function buildSessionView(session) {
 
   const browserRail = document.createElement('div');
   browserRail.className = 'browser-rail';
-  browserRail.appendChild(collapseBtn);
+  browserRail.append(collapseBtn, fullscreenBtn);
   browserContent.append(webHead, browserTabs, queuePanel, favoritesPanel, webHost);
   webPane.append(browserContent, browserRail);
   view.append(termPane, divider, webPane);
@@ -3855,13 +3922,14 @@ function buildSessionView(session) {
   composer.addEventListener('keydown', (event) => handleComposerKeydown(session, event));
   historySearch.addEventListener('input', () => { session.composer.query = historySearch.value; renderComposerHistory(session); });
   clearHistoryBtn.onclick = () => clearComposerHistory(session);
-  collapseBtn.onclick = () => setBrowserCollapsed(session, !session.browser.collapsed);
+  collapseBtn.onclick = () => setBrowserCollapsed(session, session.browser.fullscreen || !session.browser.collapsed);
+  fullscreenBtn.onclick = () => setBrowserFullscreen(session, !session.browser.fullscreen);
   pickBtn.onclick = () => (session.browser.picking ? null : startPick(session));
   captureBtn.onclick = () => openCaptureModal(session, { selector: null, outerHTML: null, pageTitle: null, pageUrl: activePageTab(session)?.currentUrl || null });
 
   // divider drag
   divider.addEventListener('mousedown', (e) => {
-    if (session.browser.collapsed) return;
+    if (session.browser.collapsed || session.browser.fullscreen) return;
     e.preventDefault();
     document.body.classList.add('dragging');
     const onMove = (ev) => {
@@ -3887,7 +3955,7 @@ function buildSessionView(session) {
     historyDrawer, historySearch, historyList, clearHistoryBtn,
     back, reload, searchHtmlBtn, urlBar, urlSuggestions, favoriteBtn, favoritesBtn, favoritesBadge, favoritesPanel, favoritesList, queueBtn, queueBadge, queuePanel, queueList,
     consoleChip, captureChip, pickBtn, captureBtn, webHost, placeholder, refreshFlash,
-    explorerHost, browserTabs, divider, webPane, browserContent, browserRail, browserToolbar, collapseBtn,
+    explorerHost, browserTabs, divider, webPane, browserContent, browserRail, browserToolbar, collapseBtn, fullscreenBtn,
   };
 }
 
@@ -4997,7 +5065,11 @@ function attentionAction(item) {
     const session = state.sessions.get(item.sessionId);
     if (!session) return;
     activateSession(session.id);
-    if (item.type === 'queue') session.els.queuePanel.classList.remove('hidden');
+    if (item.type === 'queue') {
+      setBrowserCollapsed(session, false);
+      session.els.favoritesPanel.classList.add('hidden');
+      session.els.queuePanel.classList.remove('hidden');
+    }
   };
 }
 
@@ -8194,7 +8266,7 @@ function handleShortcutToggleBrowser() {
   if (modalOpen() || editableFocused()) return null;
   const session = state.sessions.get(state.activeId);
   if (!session) return null;
-  setBrowserCollapsed(session, !session.browser.collapsed);
+  setBrowserCollapsed(session, session.browser.fullscreen || !session.browser.collapsed);
   return { sessionId: session.id, collapsed: session.browser.collapsed };
 }
 
@@ -9108,6 +9180,10 @@ if (window.chromuxTest) {
       };
     },
     activeId: () => state.activeId,
+    queueCount: (id) => testSession(id).browser.queue.length,
+    queueUrls: (id) => testSession(id).browser.queue.map((item) => item.url),
+    queuePanelHidden: (id) => testSession(id).els.queuePanel.classList.contains('hidden'),
+    browserCollapsed: (id) => testSession(id).browser.collapsed,
     turnState: (id) => ({ ...testSession(id).turn }),
     attentionKinds: () => [...document.querySelectorAll('#thread-list .attention-system-row, #thread-list .attention-reason')]
       .map((el) => el.dataset.attentionKind || ''),
@@ -9585,6 +9661,7 @@ if (window.chromuxTest) {
     },
     activeId: () => state.activeId,
     queueCount: (id) => testSession(id).browser.queue.length,
+    queueUrls: (id) => testSession(id).browser.queue.map((item) => item.url),
     queuePanelHidden: (id) => testSession(id).els.queuePanel.classList.contains('hidden'),
     browserCollapsed: (id) => testSession(id).browser.collapsed,
     focusedOpenUrl: () => document.activeElement?.dataset?.queueOpenUrl || null,
@@ -9841,6 +9918,15 @@ if (window.chromuxTest) {
       setBrowserCollapsed(testSession(id), false);
       flushRender();
     },
+    fullscreen(id) {
+      const session = testSession(id);
+      setBrowserFullscreen(session, !session.browser.fullscreen);
+      flushRender();
+    },
+    collapseControl(id) {
+      testSession(id).els.collapseBtn.click();
+      flushRender();
+    },
     shortcutToggle() {
       const result = handleShortcutToggleBrowser();
       flushRender();
@@ -9868,8 +9954,10 @@ if (window.chromuxTest) {
       const toolbarRect = toolbar.getBoundingClientRect();
       const captureRect = session.els.captureBtn.getBoundingClientRect();
       const webPaneRect = session.els.webPane.getBoundingClientRect();
+      const viewRect = session.els.view.getBoundingClientRect();
       const railRect = session.els.browserRail.getBoundingClientRect();
       const toggleRect = session.els.collapseBtn.getBoundingClientRect();
+      const fullscreenRect = session.els.fullscreenBtn.getBoundingClientRect();
       const toggleContentRects = [...session.els.collapseBtn.children]
         .map((child) => child.getBoundingClientRect())
         .filter((rect) => rect.width > 0 && rect.height > 0);
@@ -9880,12 +9968,21 @@ if (window.chromuxTest) {
         ? Math.max(...toggleContentRects.map((rect) => rect.bottom))
         : toggleRect.bottom;
       const openIcon = session.els.collapseBtn.querySelector('.panel-open-icon');
+      const fullscreenIcon = session.els.fullscreenBtn.querySelector('.browser-fullscreen-icon');
       return {
         active: state.activeId === id,
         collapsed: session.browser.collapsed,
+        fullscreen: session.browser.fullscreen,
         grid: session.els.view.style.gridTemplateColumns,
         webCollapsed: session.els.webPane.classList.contains('collapsed'),
         webHostHidden: getComputedStyle(session.els.webHost).display === 'none',
+        terminalHidden: getComputedStyle(session.els.termPane).display === 'none',
+        terminalVisible: getComputedStyle(session.els.termPane).display !== 'none',
+        dividerHidden: getComputedStyle(session.els.divider).display === 'none',
+        webFillsWorkspace: Math.abs(webPaneRect.top - viewRect.top) <= 1
+          && Math.abs(webPaneRect.bottom - viewRect.bottom) <= 1
+          && Math.abs(webPaneRect.left - viewRect.left) <= 1
+          && Math.abs(webPaneRect.right - viewRect.right) <= 1,
         dividerDisabled: session.els.divider.classList.contains('disabled'),
         collapseText: session.els.collapseBtn.textContent,
         collapseTitle: session.els.collapseBtn.title,
@@ -9893,6 +9990,11 @@ if (window.chromuxTest) {
         railWidth: Math.round(railRect.width),
         railBounds: { top: railRect.top, bottom: railRect.bottom, height: railRect.height },
         toggleBounds: { top: toggleRect.top, bottom: toggleRect.bottom, height: toggleRect.height },
+        fullscreenBounds: { top: fullscreenRect.top, bottom: fullscreenRect.bottom, height: fullscreenRect.height },
+        railControlsEqual: Math.abs(toggleRect.height - fullscreenRect.height) <= 1,
+        collapseInTopHalf: Math.abs(toggleRect.top - railRect.top) <= 1
+          && Math.abs(toggleRect.bottom - fullscreenRect.top) <= 1,
+        fullscreenInBottomHalf: Math.abs(fullscreenRect.bottom - railRect.bottom) <= 1,
         toggleSpansRail: Math.abs(toggleRect.top - railRect.top) <= 1
           && Math.abs(toggleRect.bottom - railRect.bottom) <= 1,
         toggleContentCenterDelta: Math.abs(
@@ -9904,6 +10006,10 @@ if (window.chromuxTest) {
         toggleInToolbar: toolbar.contains(session.els.collapseBtn),
         openIconPresent: Boolean(openIcon),
         openIconAriaHidden: Boolean(openIcon && openIcon.getAttribute('aria-hidden') === 'true'),
+        fullscreenTitle: session.els.fullscreenBtn.title,
+        fullscreenAriaLabel: session.els.fullscreenBtn.getAttribute('aria-label'),
+        fullscreenIconPresent: Boolean(fullscreenIcon),
+        fullscreenIconAriaHidden: Boolean(fullscreenIcon && fullscreenIcon.getAttribute('aria-hidden') === 'true'),
         currentUrl: session.browser.currentUrl,
         urlBar: session.els.urlBar.value,
         queueCount: session.browser.queue.length,
@@ -10395,6 +10501,7 @@ function fakeSessionEls() {
   const divider = document.createElement('div');
   const browserToolbar = document.createElement('div');
   const collapseBtn = document.createElement('button');
+  const fullscreenBtn = document.createElement('button');
   const termLabel = document.createElement('span');
   const placeholder = document.createElement('div');
   webHost.appendChild(placeholder);
@@ -10418,6 +10525,7 @@ function fakeSessionEls() {
     divider,
     browserToolbar,
     collapseBtn,
+    fullscreenBtn,
     urlBar: document.createElement('input'),
     captureChip: document.createElement('span'),
   };

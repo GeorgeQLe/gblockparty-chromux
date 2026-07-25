@@ -41,9 +41,12 @@ fs.writeFileSync(e2ePath, `
   expect(first.collapseAriaLabel === first.collapseTitle, 'shut browser rail should expose its open action accessibly');
   expect(first.grid.includes('40px'), 'new session should start on the 40px browser rail, got ' + first.grid);
   expect(first.railWidth === 40, 'browser rail should remain exactly 40px wide, got ' + first.railWidth);
-  expect(first.toggleSpansRail, 'BROWSER toggle should span the full rail: ' + JSON.stringify(first));
-  expect(first.toggleContentCenterDelta <= 1,
-    'BROWSER toggle content should be vertically centered in the rail: ' + JSON.stringify(first));
+  expect(first.railControlsEqual && first.collapseInTopHalf && first.fullscreenInBottomHalf,
+    'browser rail controls should split its height equally: ' + JSON.stringify(first));
+  expect(first.fullscreenTitle === 'Full screen' && first.fullscreenAriaLabel === 'Full screen',
+    'expansion control should expose its native tooltip and accessible name');
+  expect(first.fullscreenIconPresent && first.fullscreenIconAriaHidden,
+    'expansion control should use a decorative expansion icon');
   expect(first.railAtFarRight, "browser rail should be the pane's far-right child");
   expect(first.railAfterContent, 'browser content and rail should be siblings with the rail last');
   expect(!first.toggleInToolbar, 'browser toggle should not live in the scrolling toolbar');
@@ -75,6 +78,7 @@ fs.writeFileSync(e2ePath, `
   expect(first.collapseTitle === 'Open paired browser (⌘⇧B)', 'browser button should have open title');
   expect(first.collapseAriaLabel === first.collapseTitle, 'browser button should retain its accessible open name');
   expect(first.openIconPresent && first.openIconAriaHidden, 'collapsed rail should retain its decorative panel-open icon');
+  expect(first.railControlsEqual, 'collapsed rail should retain equal top/bottom control geometry');
   expect(first.currentUrl === 'http://localhost:5173/current', 'collapse must preserve current URL');
   expect(first.urlBar === 'http://localhost:5173/current', 'collapse must preserve URL bar');
   expect(first.queueCount === 1, 'collapse must preserve queue state');
@@ -99,9 +103,7 @@ fs.writeFileSync(e2ePath, `
   expect(first.collapseTitle === 'Shut paired browser (⌘⇧B)', 'open browser title should say shut');
   expect(first.collapseAriaLabel === first.collapseTitle, 'open browser rail should expose its shut action accessibly');
   expect(first.railWidth === 40 && first.railAtFarRight, 'open browser rail should stay 40px at the far-right edge');
-  expect(first.toggleSpansRail, 'COLLAPSE toggle should span the full rail: ' + JSON.stringify(first));
-  expect(first.toggleContentCenterDelta <= 1,
-    'COLLAPSE toggle content should be vertically centered in the rail: ' + JSON.stringify(first));
+  expect(first.railControlsEqual, 'open browser rail should retain equal top/bottom control geometry');
   expect(!first.openIconPresent, 'open-state COLLAPSE rail should not show the panel-open icon');
   expect(first.currentUrl === 'http://localhost:5173/current', 'restore must preserve current URL');
   expect(first.queueCount === 1, 'restore must preserve queue state');
@@ -122,20 +124,94 @@ fs.writeFileSync(e2ePath, `
   expect(first.currentUrl === 'http://localhost:5173/current', 'shortcut open must preserve current URL');
   expect(first.queueCount === 1, 'shortcut open must preserve queue state');
 
+  // Fullscreen entered from split restores the exact split width and state.
+  b.narrow(firstId, 285);
+  const splitGrid = b.state(firstId).grid;
+  b.fullscreen(firstId);
+  await tick();
+  first = b.state(firstId);
+  expect(first.fullscreen && !first.collapsed, 'fullscreen should open the browser without marking it collapsed');
+  expect(first.terminalHidden && first.dividerHidden && first.webFillsWorkspace,
+    'fullscreen should hide terminal/divider and give the browser the complete workspace: ' + JSON.stringify(first));
+  expect(first.fullscreenTitle === 'Exit full screen' && first.fullscreenAriaLabel === 'Exit full screen',
+    'active expansion control should expose Exit full screen');
+  expect(first.currentUrl === 'http://localhost:5173/current' && first.queueCount === 1,
+    'fullscreen should preserve URL and queue state');
+  expect(first.fitCount > 0, 'fullscreen transitions should refit the terminal');
+  b.fullscreen(firstId);
+  await tick();
+  first = b.state(firstId);
+  expect(!first.fullscreen && !first.collapsed && first.grid === splitGrid,
+    'exiting fullscreen from split should restore its exact divider width');
+
+  // Fullscreen entered from collapsed restores collapsed, unless collapse is used while active.
+  b.collapse(firstId);
+  const collapsedGrid = b.state(firstId).grid;
+  b.fullscreen(firstId);
+  await tick();
+  first = b.state(firstId);
+  expect(first.fullscreen && !first.collapsed && first.webFillsWorkspace,
+    'fullscreen should temporarily open a previously collapsed browser');
+  b.fullscreen(firstId);
+  await tick();
+  first = b.state(firstId);
+  expect(!first.fullscreen && first.collapsed && first.grid === collapsedGrid,
+    'fullscreen exit should restore the prior collapsed state exactly');
+  b.fullscreen(firstId);
+  b.collapseControl(firstId);
+  await tick();
+  first = b.state(firstId);
+  expect(!first.fullscreen && first.collapsed && first.terminalVisible,
+    'collapse control while fullscreen should return directly to collapsed terminal view');
+
+  // Command+Shift+B has the same shut-browser behavior while fullscreen.
+  b.restore(firstId);
+  b.fullscreen(firstId);
+  const fullscreenShortcut = b.shortcutToggle();
+  await tick();
+  first = b.state(firstId);
+  expect(fullscreenShortcut?.collapsed === true && !first.fullscreen && first.collapsed,
+    'Command+Shift+B while fullscreen should shut the browser and restore the terminal');
+
+  // Fullscreen is per-session and does not disturb tabs, webviews, or narrow toolbar state.
+  b.restore(firstId);
+  const preservedTabId = b.openNew(firstId, 'https://example.invalid/preserved-tab');
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  b.setTabConsole(firstId, preservedTabId, 5);
+  const preservedWebview = b.webview(firstId);
+  b.narrow(firstId, 285);
+  b.fullscreen(firstId);
+  b.focus(secondId);
+  second = b.state(secondId);
+  expect(!second.fullscreen && second.collapsed, 'fullscreen state should remain isolated per session');
+  b.focus(firstId);
+  first = b.state(firstId);
+  expect(first.fullscreen && b.tabs(firstId).some((tab) => tab.id === preservedTabId && tab.active),
+    'session switching should preserve fullscreen and active browser tabs');
+  expect(b.webview(firstId) === preservedWebview,
+    'fullscreen transitions should preserve the mounted browser webview');
+  expect(b.consoleText(firstId).includes('5 logs'),
+    'fullscreen transitions should preserve active-tab console state');
+  b.fullscreen(firstId);
+  await tick();
+  first = b.state(firstId);
+  expect(first.toolbarOverflow && first.grid.includes('285px'),
+    'fullscreen exit should preserve narrow toolbar and split width');
+
   // Explicit open restores a shut browser without clearing URL/queue.
   b.collapse(firstId);
-  b.open(firstId, 'http://localhost:5173/approved');
+  b.open(firstId, 'https://example.invalid/approved');
   await tick();
   first = b.state(firstId);
   expect(!first.collapsed, 'opening a URL should restore a shut browser');
-  expect(first.currentUrl === 'http://localhost:5173/approved', 'open should navigate the paired pane');
+  expect(first.currentUrl === 'https://example.invalid/approved', 'open should navigate the paired pane');
 
   // A normal terminal link click opens in the paired pane without a modifier.
-  const prevented = b.clickTerminalLink(linkId, 'http://localhost:5173/from-terminal-link');
+  const prevented = b.clickTerminalLink(linkId, 'https://example.invalid/from-terminal-link');
   const linkBrowser = b.state(linkId);
   expect(prevented, 'terminal link activation should consume the click');
   expect(!linkBrowser.collapsed, 'terminal link click should restore the paired browser');
-  expect(linkBrowser.currentUrl === 'http://localhost:5173/from-terminal-link',
+  expect(linkBrowser.currentUrl === 'https://example.invalid/from-terminal-link',
     'terminal link click should navigate the paired browser');
   expect(first.queueCount === 1, 'open must preserve queue state');
 

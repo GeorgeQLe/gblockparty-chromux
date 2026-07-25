@@ -407,8 +407,14 @@ fs.writeFileSync(e2ePath, `
   rail.hoverRow(web);
   await wait(270);
   expect(rail.preview()?.sessionId === web, 'ordinary row should still open a preview before inline action test');
+  const queuedUrlBeforeOpen = 'http://localhost:49151/api-preview';
+  expect(rail.browserCollapsed(api) && rail.queuePanelHidden(api) && rail.queueCount(api) === 1,
+    'queue attention fixture should begin collapsed, hidden, and unconsumed');
   rail.clickAttentionAction(api, 'QUEUE 1', 'OPEN');
-  expect(!rail.preview() && rail.activeId() === api, 'inline attention actions should act directly without opening a thread preview');
+  expect(!rail.preview() && rail.activeId() === api && !rail.browserCollapsed(api)
+    && !rail.queuePanelHidden(api) && rail.queueCount(api) === 1
+    && rail.queueUrls(api).join(',') === queuedUrlBeforeOpen,
+  'queue OPEN should activate its session, restore the browser, reveal the queue, and leave its URL unconsumed');
   rail.focus(holder);
   rail.focus(api);
   rail.focus(holder);

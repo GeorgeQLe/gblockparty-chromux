@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Reveal collapsed paired browsers from Needs Attention queue `OPEN`, add per-session browser fullscreen with exact collapsed/split restoration and rail-only controls, preserve browser state across transitions, and ship as v0.60.0. _(source: user-supplied implementation plan; evidence: `prototype/renderer/renderer.js`, browser-collapse/session-rail/shortcuts/browser-tabs/theme regressions, source and packaged smoke, `RELEASES.md`)_
+
 - [x] Restore immediate Codex submission spinners while retaining pending turn safety, provider-confirmed Working membership, `/clear` stale-completion safeguards, and disabled-indicator behavior; ship as v0.59.1. _(source: user-supplied implementation plan; evidence: `prototype/renderer/attention.js`, tab-activity/session-rail/diagnostics/turn-signal/update-queue regressions, complete prototype matrix, source and packaged smoke, `RELEASES.md`)_
 
 - [x] Annotate loopback preview queues with live server status, launch validated project scripts in non-focused shell tabs, preserve explicit browser-open approval, recover failed loopback tabs, and ship as v0.59.0. _(source: user-supplied implementation plan; evidence: `prototype/preview-probe.js`, main/preload IPC, renderer queue/launcher/browser lifecycle, focused and complete 47-file prototype matrix, source and packaged smoke, `RELEASES.md`)_

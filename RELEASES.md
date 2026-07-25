@@ -1,5 +1,14 @@
 # Release Notes
 
+## GBlockParty Chromux v0.60.0
+
+Tag: `chromux-v0.60.0`
+
+- Add per-session paired-browser fullscreen within the Chromux workspace, with a rail-only expansion control and exact restoration of the prior collapsed or split layout.
+- Keep browser tabs, URLs, webviews, review queues, favorites, captures, console state, narrow toolbars, and divider width intact across collapsed, split, and fullscreen transitions.
+- Make Needs Attention queue `OPEN` activate its session, restore a shut browser, and reveal the review queue without navigating to or consuming the queued preview.
+- Preserve the existing collapse control and Command-Shift-B behavior, including shutting the browser directly from fullscreen into the terminal-focused collapsed layout.
+
 ## GBlockParty Chromux v0.59.1
 
 Tag: `chromux-v0.59.1`
