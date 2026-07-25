@@ -148,12 +148,53 @@ fs.writeFileSync(e2ePath, `
   expect(!c.state(acceptedSkill).conflictOpen && c.ptyInputs(acceptedSkill).length === 0,
     'an immediately reopened composer must not recover the stale pre-clear rendered row');
 
+  const tabCompletedSkill = c.addSession({ name: 'tab-completed-skill', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16, cols: 42 });
+  c.nativeInput(tabCompletedSkill, '$inve'); c.nativeInput(tabCompletedSkill, '\\t'); c.clearPtyInputs(tabCompletedSkill);
+  await c.renderPromptFixture(tabCompletedSkill, '› $investigate ');
+  c.open(tabCompletedSkill); await tick();
+  expect(c.draft(tabCompletedSkill) === '$investigate ' && c.pendingInput(tabCompletedSkill) === ''
+    && c.ptyInputs(tabCompletedSkill).join('') === '\\x15\\x0b',
+  'Tab-confirmed Codex skill completion should transfer without shortcut chrome and clear the live line once');
+  c.close(tabCompletedSkill); c.clearPtyInputs(tabCompletedSkill); c.open(tabCompletedSkill); await tick();
+  expect(!c.state(tabCompletedSkill).conflictOpen && c.ptyInputs(tabCompletedSkill).length === 0,
+    'an immediately reopened composer must not recover a transferred chrome-free completion');
+
+  const wrappedTabSkill = c.addSession({ name: 'wrapped-tab-skill', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16, cols: 18 });
+  c.nativeInput(wrappedTabSkill, '$inve'); c.nativeInput(wrappedTabSkill, '\\t'); c.clearPtyInputs(wrappedTabSkill);
+  await c.renderPromptFixture(wrappedTabSkill, '› $investigate explain this narrow completion');
+  c.open(wrappedTabSkill); await tick();
+  expect(c.draft(wrappedTabSkill) === '$investigate explain this narrow completion'
+    && c.ptyInputs(wrappedTabSkill).join('') === '\\x15\\x0b',
+  'Tab-confirmed completion should preserve following text across narrow visual wraps');
+
+  const noTabCompletion = c.addSession({ name: 'no-tab-completion', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16 });
+  c.nativeInput(noTabCompletion, '$inve'); c.clearPtyInputs(noTabCompletion);
+  await c.renderPromptFixture(noTabCompletion, '› $investigate ');
+  c.open(noTabCompletion); await tick();
+  expect(c.draft(noTabCompletion) === '$inve' && c.ptyInputs(noTabCompletion).length === 0,
+    'chrome-free rendered completion must remain ambiguous without a preceding Tab intent');
+
+  const incompatibleCompletion = c.addSession({ name: 'incompatible-completion', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16 });
+  c.nativeInput(incompatibleCompletion, '$inve'); c.nativeInput(incompatibleCompletion, '\\t'); c.clearPtyInputs(incompatibleCompletion);
+  await c.renderPromptFixture(incompatibleCompletion, '› $skill-creator ');
+  c.open(incompatibleCompletion); await tick();
+  expect(c.draft(incompatibleCompletion) === '$inve' && c.ptyInputs(incompatibleCompletion).length === 0,
+    'Tab intent must not authorize a rendered token that is not a strict extension of the shadow prefix');
+
+  const invalidatedCompletion = c.addSession({ name: 'invalidated-completion', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16 });
+  c.nativeInput(invalidatedCompletion, '$inve'); c.nativeInput(invalidatedCompletion, '\\t');
+  c.nativeInput(invalidatedCompletion, 'x'); c.clearPtyInputs(invalidatedCompletion);
+  await c.renderPromptFixture(invalidatedCompletion, '› $investigate ');
+  c.open(invalidatedCompletion); await tick();
+  expect(c.draft(invalidatedCompletion) === '$invex' && c.ptyInputs(invalidatedCompletion).length === 0,
+    'input after Tab must invalidate completion intent and preserve the edited shadow');
+
   const recalledPrompt = c.addSession({ name: 'recalled-prompt', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16, cols: 42 });
   c.nativeInput(recalledPrompt, '\\x1b[A'); c.clearPtyInputs(recalledPrompt);
   await c.renderPromptFixture(recalledPrompt, '? for shortcuts\\r\\n› recalled history value 😀');
   c.open(recalledPrompt); await tick();
   expect(c.draft(recalledPrompt) === 'recalled history value 😀',
-    'Compose should use Codex-rendered history recall instead of literal navigation input');
+    'Compose should use Codex-rendered history recall instead of literal navigation input: ' + JSON.stringify(c.draft(recalledPrompt)));
 
   const wrappedPrompt = c.addSession({ name: 'wrapped-prompt', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16, cols: 20 });
   c.nativeInput(wrappedPrompt, 'shadow'); c.clearPtyInputs(wrappedPrompt);

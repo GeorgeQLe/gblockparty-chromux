@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Transfer Tab-completed Codex `$skill` mentions into Compose when shortcut chrome is hidden, retain conservative ambiguous-prompt fallback, and ship as v0.58.7. _(source: user-supplied implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-composer-renderer.js`, focused renderer regressions, source and packaged smoke, `RELEASES.md`)_
+
 - [x] Make Command-digit shortcuts select visible primary groups, restore remembered sessions, cycle within the selected group, preserve flat-mode indexing, and ship as v0.58.6. _(source: user-supplied implementation plan; evidence: `prototype/renderer/renderer.js`, shortcut/hotkey/grouped-tab/webview renderer regressions, `RELEASES.md`)_
 
 - [x] Preserve grouped-tab Working spinner and pointer-target continuity across title, hover, badge, and status updates; restore reliable lower session-tab activation; ship as v0.58.4. _(source: user-reported regression; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-session-tab-groups-renderer.js`, all 46 prototype test files, source and packaged smoke, package metadata inspection, `RELEASES.md`)_

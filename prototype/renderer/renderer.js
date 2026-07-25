@@ -896,25 +896,55 @@ function updatePendingTerminalInput(termState, data) {
   }
 }
 
+function recordCodexCompletionIntent(session) {
+  const termState = session && session.term;
+  if (!termState || session.agent !== 'codex') return false;
+  const cursor = Math.min(termState.typedInputBuf.length, Math.max(0, Number(termState.typedInputCursor) || 0));
+  const prefix = termState.typedInputBuf.slice(0, cursor);
+  const token = prefix.match(/\$[A-Za-z0-9:_-]*$/u);
+  if (!token || token[0].length < 2) {
+    termState.codexCompletionIntent = null;
+    return false;
+  }
+  termState.codexCompletionIntent = {
+    shadowPrefix: prefix,
+    tokenPrefix: token[0],
+  };
+  return true;
+}
+
+function isCodexCompletionCandidate(intent, value) {
+  if (!intent || typeof intent.shadowPrefix !== 'string'
+    || typeof intent.tokenPrefix !== 'string' || typeof value !== 'string') return false;
+  const beforeToken = intent.shadowPrefix.slice(0, -intent.tokenPrefix.length);
+  if (!value.startsWith(beforeToken)) return false;
+  const completed = value.slice(beforeToken.length).match(/^\$[A-Za-z0-9:_-]+(?=\s|$)/u);
+  return Boolean(completed
+    && completed[0].length > intent.tokenPrefix.length
+    && completed[0].startsWith(intent.tokenPrefix));
+}
+
 const CODEX_PROMPT_GLYPH_RE = /^\s*[›❯](?:\s|$)/u;
 const CODEX_PROMPT_PLACEHOLDER_RE = /^(?:ask codex(?: anything)?|type (?:a )?(?:message|prompt)|write a prompt)[.…]*$/iu;
 const CODEX_PROMPT_CHROME_RE = /(?:\?\s+for shortcuts|\bcontext left\b|^\s*choose an option:)/iu;
 const CODEX_FRAME_EDGE_RE = /^\s*[╭╰┌└┏┗╔╚].*[╮╯┐┘┓┛╗╝]\s*$/u;
 const CODEX_FRAME_VERTICAL_RE = /^\s*[│┃║]\s?(.*?)(?:\s?[│┃║])?\s*$/u;
 
-function terminalBufferRow(buffer, index) {
+function terminalBufferRow(buffer, index, endColumn = null) {
   const line = buffer && typeof buffer.getLine === 'function' ? buffer.getLine(index) : null;
   if (!line || typeof line.translateToString !== 'function') return null;
   return {
     text: line.translateToString(true),
+    cursorText: Number.isFinite(endColumn) ? line.translateToString(false, 0, endColumn) : null,
     wrapped: Boolean(line.isWrapped),
   };
 }
 
-function codexPromptRowContent(text) {
+function codexPromptRowContent(text, { trimEnd = true } = {}) {
   const raw = String(text || '');
   const framed = raw.match(CODEX_FRAME_VERTICAL_RE);
-  return framed ? framed[1].replace(/\s+$/u, '') : raw.replace(/\s+$/u, '');
+  if (framed) return framed[1].replace(/\s+$/u, '');
+  return trimEnd ? raw.replace(/\s+$/u, '') : raw;
 }
 
 function readCodexRenderedPrompt(session) {
@@ -957,22 +987,21 @@ function readCodexRenderedPrompt(session) {
     if (CODEX_FRAME_EDGE_RE.test(row.text)) framed = true;
     if (CODEX_PROMPT_CHROME_RE.test(codexPromptRowContent(row.text))) hasChrome = true;
   }
-  if (!framed && !hasChrome) {
-    return { status: 'ambiguous', text: '' };
-  }
-
   let value = '';
   for (let index = promptStart; index <= promptEnd; index += 1) {
-    const row = terminalBufferRow(buffer, index);
+    const endsAtCursor = index === cursorRow && Number.isFinite(buffer.cursorX);
+    const row = terminalBufferRow(buffer, index, endsAtCursor ? buffer.cursorX : null);
     if (!row) return { status: 'ambiguous', text: '' };
-    let content = codexPromptRowContent(row.text);
+    const rowText = endsAtCursor ? row.cursorText : row.text;
+    let content = codexPromptRowContent(rowText, { trimEnd: !endsAtCursor });
     if (index === promptStart) content = content.replace(CODEX_PROMPT_GLYPH_RE, '');
     else if (!row.wrapped) content = content.replace(/^ {2}/u, '');
     value += index > promptStart && !row.wrapped ? `\n${content}` : content;
   }
   if (CODEX_PROMPT_PLACEHOLDER_RE.test(value.trim())) value = '';
-  if (session.term.promptSnapshotInvalidated && value) return { status: 'ambiguous', text: '' };
+  if (session.term.promptSnapshotInvalidated && value) return { status: 'ambiguous', text: value };
   if (!utf8WithinLimit(value)) return { status: 'overflow', text: '' };
+  if (!framed && !hasChrome) return { status: 'ambiguous', text: value };
   return { status: 'resolved', text: value };
 }
 
@@ -985,11 +1014,20 @@ function resolveCurrentTerminalPrompt(session) {
     return { text: shadow, source: 'shadow', confidence: 'fallback', canClear: Boolean(shadow) };
   }
   const rendered = readCodexRenderedPrompt(session);
-  if (rendered.status === 'resolved') {
+  const completionProven = rendered.status === 'ambiguous'
+    && isCodexCompletionCandidate(session.term.codexCompletionIntent, rendered.text);
+  if (rendered.status === 'resolved' || completionProven) {
     session.term.typedInputBuf = rendered.text;
     session.term.typedInputCursor = rendered.text.length;
-    return { text: rendered.text, source: 'codex-rendered', confidence: 'high', canClear: Boolean(rendered.text) };
+    session.term.codexCompletionIntent = null;
+    return {
+      text: rendered.text,
+      source: completionProven ? 'codex-rendered-completion' : 'codex-rendered',
+      confidence: 'high',
+      canClear: Boolean(rendered.text),
+    };
   }
+  session.term.codexCompletionIntent = null;
   return {
     text: shadow,
     source: rendered.status === 'ambiguous' || rendered.status === 'overflow'
@@ -1003,6 +1041,8 @@ function trackTypedPreviewSuppressions(session, data) {
   if (!session || !data) return '';
   const t = session.term;
   const raw = String(data);
+  if (raw === '\t') recordCodexCompletionIntent(session);
+  else t.codexCompletionIntent = null;
   if (/[\r\n]/.test(raw)) t.promptSnapshotInvalidated = true;
   else if (raw !== '\x15\x0b') t.promptSnapshotInvalidated = false;
   const submitted = /[\r\n]/.test(raw) ? submittedInputText(lineBufferAfterInput(t.typedInputBuf, raw.split(/[\r\n]/, 1)[0])) : '';
@@ -1282,6 +1322,7 @@ function apply(event) {
       if (session) {
         tabStateChanged = session.lifecycle.alive;
         session.lifecycle.alive = false;
+        session.term.codexCompletionIntent = null;
         session.lifecycle.exitCode = Number.isFinite(event.exitCode) ? event.exitCode : null;
         session.lifecycle.exitedAt = Date.now();
       }
@@ -1491,6 +1532,7 @@ function newSessionShape({ id, name, cwd, agent }) {
       title: '',
       typedInputBuf: '',
       typedInputCursor: 0,
+      codexCompletionIntent: null,
       oscInputActive: false,
       oscInputEscapePending: false,
       promptSnapshotInvalidated: false,

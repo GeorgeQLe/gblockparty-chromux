@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.58.7
+
+Tag: `chromux-v0.58.7`
+
+- Transfer a Codex `$skill` completion into Compose after Tab even when the active rendered prompt omits shortcut, context, and frame chrome.
+- Require a session-scoped Tab intent and a strict extension of the same `$` token before trusting an otherwise ambiguous prompt, preserving conservative fallback behavior for unrelated terminal output.
+- Invalidate completion intent after further input or session termination, preserve following and narrow-wrapped prompt text, and keep Unicode and 64 KiB draft bounds intact.
+
 ## GBlockParty Chromux v0.58.6
 
 Tag: `chromux-v0.58.6`
