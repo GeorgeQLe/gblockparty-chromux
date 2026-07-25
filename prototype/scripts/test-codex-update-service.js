@@ -1,6 +1,9 @@
 'use strict';
 
 const assert = require('assert');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const {
   GITHUB_LATEST_URL,
   HOMEBREW_CASK_URL,
@@ -14,15 +17,19 @@ function fixture({
   latest = '1.2.4',
   now = 1_800_000_000_000,
   npmReady = true,
+  envPath = '/augmented/codex/path',
 } = {}) {
   let installed = current;
   let clock = now;
   const calls = [];
+  const runPaths = [];
   const service = createCodexUpdateService({
+    envPath,
     now: () => clock,
     resolveExecutable: () => executable,
     run: async (_file, args, options = {}) => {
       calls.push(['run', ...args]);
+      runPaths.push(options.env && options.env.PATH);
       if (args[0] === '--version') return { stdout: `codex-cli ${installed}\n`, stderr: '' };
       if (args[0] === 'update') {
         if (options.onOutput) options.onOutput('installing fixture\n');
@@ -39,10 +46,48 @@ function fixture({
       throw new Error(`Unexpected URL: ${url}`);
     },
   });
-  return { service, calls, advance: (ms) => { clock += ms; }, setInstalled: (value) => { installed = value; } };
+  return {
+    service,
+    calls,
+    runPaths,
+    envPath,
+    advance: (ms) => { clock += ms; },
+    setInstalled: (value) => { installed = value; },
+  };
 }
 
 (async () => {
+  const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'chromux-codex-update-'));
+  const fixtureExecutable = path.join(fixtureDir, 'codex');
+  fs.writeFileSync(fixtureExecutable, '#!/usr/bin/env node\nprocess.stdout.write("codex-cli 1.2.3\\n");\n', { mode: 0o755 });
+  const originalPath = process.env.PATH;
+  try {
+    process.env.PATH = '/usr/bin:/bin';
+    const augmentedPath = [
+      fixtureDir,
+      path.dirname(process.execPath),
+      '/usr/bin',
+      '/bin',
+    ].join(path.delimiter);
+    const realChild = createCodexUpdateService({
+      envPath: augmentedPath,
+      request: async (url) => {
+        assert.equal(url, GITHUB_LATEST_URL);
+        return {
+          tag_name: 'rust-v1.2.3',
+          html_url: 'https://github.com/openai/codex/releases/tag/rust-v1.2.3',
+        };
+      },
+    });
+    const realChildStatus = await realChild.check();
+    assert.equal(realChildStatus.error, null, 'Node-based Codex launchers should execute with the augmented service PATH');
+    assert.equal(realChildStatus.currentVersion, '1.2.3');
+  } finally {
+    if (originalPath === undefined) delete process.env.PATH;
+    else process.env.PATH = originalPath;
+    fs.rmSync(fixtureDir, { recursive: true, force: true });
+  }
+
   const brew = fixture();
   const first = await brew.service.check();
   assert.equal(first.installKind, 'homebrew');
@@ -101,6 +146,11 @@ function fixture({
   assert.equal(installed.ok, true);
   assert.equal(installed.currentVersion, '1.2.4');
   assert.ok(progress.includes('installing') && progress.includes('complete'));
+  assert.deepEqual(
+    install.runPaths,
+    [install.envPath, install.envPath, install.envPath],
+    'initial version detection, update execution, and verification must share the augmented PATH',
+  );
 
   const verification = fixture();
   const originalCheck = await verification.service.check();

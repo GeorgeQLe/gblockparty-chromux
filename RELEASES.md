@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.60.3
+
+Tag: `chromux-v0.60.3`
+
+- Run every Codex update-preflight subprocess with the same augmented PATH used to discover the Codex executable.
+- Restore boot-time version detection for Node-based Codex launchers when Chromux starts from Finder with a minimal inherited PATH.
+- Preserve direct executable execution, bounded output, timeouts, install-source detection, update behavior, and post-update verification.
+
 ## GBlockParty Chromux v0.60.2
 
 Tag: `chromux-v0.60.2`

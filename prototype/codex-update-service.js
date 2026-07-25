@@ -114,13 +114,14 @@ function requestJson(url, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
   });
 }
 
-function runFile(file, args, { timeoutMs = DEFAULT_TIMEOUT_MS, onOutput = null } = {}) {
+function runFile(file, args, { timeoutMs = DEFAULT_TIMEOUT_MS, onOutput = null, env = process.env } = {}) {
   return new Promise((resolve, reject) => {
     const child = execFile(file, args, {
       timeout: timeoutMs,
       maxBuffer: MAX_OUTPUT_BYTES,
       encoding: 'utf8',
       windowsHide: true,
+      env,
     }, (error, stdout, stderr) => {
       if (error) {
         error.stdout = boundedText(stdout, MAX_OUTPUT_BYTES);
@@ -148,9 +149,10 @@ function createCodexUpdateService({
   timeoutMs = DEFAULT_TIMEOUT_MS,
 } = {}) {
   let cache = null;
+  const childEnv = { ...process.env, PATH: envPath };
 
   async function installedVersion(executable) {
-    const result = await run(executable, ['--version'], { timeoutMs });
+    const result = await run(executable, ['--version'], { timeoutMs, env: childEnv });
     const version = parseVersion(result.stdout || result.stderr);
     if (!version) throw new Error('Could not read the installed Codex version');
     return version;
@@ -230,7 +232,11 @@ function createCodexUpdateService({
       if (typeof onProgress === 'function') onProgress({ phase: 'installing', output: text });
     };
     try {
-      await run(executable, ['update'], { timeoutMs: 5 * 60 * 1000, onOutput: emit });
+      await run(executable, ['update'], {
+        timeoutMs: 5 * 60 * 1000,
+        onOutput: emit,
+        env: childEnv,
+      });
       cache = null;
       const afterExecutable = resolveExecutable();
       if (!afterExecutable) throw new Error('Codex disappeared after the update');

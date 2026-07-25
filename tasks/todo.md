@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Make Codex update-preflight discovery and subprocess execution share the augmented PATH so Node-based launchers work after Finder startup; ship as v0.60.3. _(source: user-supplied implementation plan; evidence: `prototype/codex-update-service.js`, `prototype/scripts/test-codex-update-service.js`, source and packaged smoke, `RELEASES.md`)_
+
 - [x] Prevent correlated OSC 10/11/12 color-reply residue from entering the Codex prompt composer, preserve streaming input and ordinary prompt behavior, and ship as v0.60.2. _(source: user-supplied implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-composer-renderer.js`, complete renderer matrix, source and packaged smoke, `RELEASES.md`)_
 
 - [x] Buffer Codex DEC synchronized-output frames across PTY chunk boundaries, preserve ordinary terminal behavior, bound malformed frames, and ship as v0.60.1. _(source: user-supplied implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-synchronized-output-renderer.js`, complete prototype matrix, source and packaged smoke, `RELEASES.md`)_
