@@ -22,6 +22,13 @@ fs.writeFileSync(e2ePath, `
 
   await new Promise((resolve) => setTimeout(resolve, 100));
 
+  expect(b.preference() === 'chromux', 'missing preference should default to full Chromux');
+  expect(b.preferenceStorageProbe(null).value === 'chromux', 'missing stored preference should resolve to chromux');
+  expect(b.preferenceStorageProbe('invalid').value === 'chromux', 'invalid stored preference should resolve to chromux');
+  expect(b.preferenceStorageProbe('workspace').value === 'workspace', 'workspace preference should be accepted');
+  expect(b.preferenceStorageProbe('cycle').value === 'cycle', 'cycle preference should be accepted');
+  expect(b.preferenceStorageProbe('chromux').value === 'chromux', 'chromux preference should be accepted');
+
   const firstId = b.addSession({
     name: 'first-browser',
     url: 'http://localhost:5173/current',
@@ -43,8 +50,10 @@ fs.writeFileSync(e2ePath, `
   expect(first.railWidth === 40, 'browser rail should remain exactly 40px wide, got ' + first.railWidth);
   expect(first.railControlsEqual && first.collapseInTopHalf && first.fullscreenInBottomHalf,
     'browser rail controls should split its height equally: ' + JSON.stringify(first));
-  expect(first.fullscreenTitle === 'Full screen' && first.fullscreenAriaLabel === 'Full screen',
-    'expansion control should expose its native tooltip and accessible name');
+  expect(first.fullscreenTitle === 'Fill Chromux with browser'
+    && first.fullscreenAriaLabel === first.fullscreenTitle,
+  'expansion control should describe the default full-Chromux action');
+  expect(first.fullscreenPressed === 'false', 'inactive expansion control should expose aria-pressed=false');
   expect(first.fullscreenIconPresent && first.fullscreenIconAriaHidden,
     'expansion control should use a decorative expansion icon');
   expect(first.railAtFarRight, "browser rail should be the pane's far-right child");
@@ -124,47 +133,53 @@ fs.writeFileSync(e2ePath, `
   expect(first.currentUrl === 'http://localhost:5173/current', 'shortcut open must preserve current URL');
   expect(first.queueCount === 1, 'shortcut open must preserve queue state');
 
-  // Fullscreen entered from split restores the exact split width and state.
+  // The default preference toggles full-renderer browser mode and restores
+  // the exact prior paired layout.
   b.narrow(firstId, 285);
   const splitGrid = b.state(firstId).grid;
   b.fullscreen(firstId);
   await tick();
   first = b.state(firstId);
-  expect(first.fullscreen && !first.collapsed, 'fullscreen should open the browser without marking it collapsed');
-  expect(first.terminalHidden && first.dividerHidden && first.webFillsWorkspace,
-    'fullscreen should hide terminal/divider and give the browser the complete workspace: ' + JSON.stringify(first));
-  expect(first.fullscreenTitle === 'Exit full screen' && first.fullscreenAriaLabel === 'Exit full screen',
-    'active expansion control should expose Exit full screen');
+  expect(first.layoutMode === 'browserChromux' && first.fullscreen && !first.collapsed,
+    'default expansion should enter browser-Chromux mode');
+  expect(first.terminalHidden && first.dividerHidden && first.webFillsRenderer && first.chromuxChromeCovered,
+    'browser-Chromux should cover the renderer viewport and Chromux chrome: ' + JSON.stringify(first));
+  expect(first.browserRailUsable, 'browser-Chromux should retain a usable browser rail');
+  expect(first.fullscreenPressed === 'true', 'active browser-Chromux should expose aria-pressed=true');
+  expect(first.fullscreenTitle === 'Restore paired layout' && first.fullscreenAriaLabel === first.fullscreenTitle,
+    'active expansion control should describe its exact return layout');
   expect(first.currentUrl === 'http://localhost:5173/current' && first.queueCount === 1,
     'fullscreen should preserve URL and queue state');
   expect(first.fitCount > 0, 'fullscreen transitions should refit the terminal');
   b.fullscreen(firstId);
   await tick();
   first = b.state(firstId);
-  expect(!first.fullscreen && !first.collapsed && first.grid === splitGrid,
-    'exiting fullscreen from split should restore its exact divider width');
+  expect(first.layoutMode === 'paired' && !first.fullscreen && !first.collapsed && first.grid === splitGrid,
+    'exiting browser-Chromux from split should restore its exact divider width');
 
-  // Fullscreen entered from collapsed restores collapsed, unless collapse is used while active.
+  // The default preference also restores an exact terminal-focused return.
   b.collapse(firstId);
   const collapsedGrid = b.state(firstId).grid;
   b.fullscreen(firstId);
   await tick();
   first = b.state(firstId);
-  expect(first.fullscreen && !first.collapsed && first.webFillsWorkspace,
-    'fullscreen should temporarily open a previously collapsed browser');
+  expect(first.layoutMode === 'browserChromux' && first.webFillsRenderer,
+    'browser-Chromux should temporarily open a terminal-focused browser');
+  expect(first.fullscreenTitle === 'Restore terminal layout',
+    'browser-Chromux should describe the terminal return layout');
   b.fullscreen(firstId);
   await tick();
   first = b.state(firstId);
-  expect(!first.fullscreen && first.collapsed && first.grid === collapsedGrid,
-    'fullscreen exit should restore the prior collapsed state exactly');
+  expect(first.layoutMode === 'terminal' && first.collapsed && first.grid === collapsedGrid,
+    'browser-Chromux exit should restore the prior terminal state exactly');
   b.fullscreen(firstId);
   b.collapseControl(firstId);
   await tick();
   first = b.state(firstId);
-  expect(!first.fullscreen && first.collapsed && first.terminalVisible,
+  expect(first.layoutMode === 'terminal' && !first.fullscreen && first.collapsed && first.terminalVisible,
     'collapse control while fullscreen should return directly to collapsed terminal view');
 
-  // Command+Shift+B has the same shut-browser behavior while fullscreen.
+  // Command+Shift+B exits either expansion mode to terminal-focused layout.
   b.restore(firstId);
   b.fullscreen(firstId);
   const fullscreenShortcut = b.shortcutToggle();
@@ -173,7 +188,61 @@ fs.writeFileSync(e2ePath, `
   expect(fullscreenShortcut?.collapsed === true && !first.fullscreen && first.collapsed,
     'Command+Shift+B while fullscreen should shut the browser and restore the terminal');
 
+  // Workspace-only behavior preserves the exact paired/terminal return state.
+  b.setPreference('workspace');
+  expect(b.preference() === 'workspace' && b.preferenceStored() === 'workspace'
+    && b.preferenceSelectValue() === 'workspace',
+  'Settings should select and persist workspace behavior');
+  b.restore(firstId);
+  b.narrow(firstId, 285);
+  b.fullscreen(firstId);
+  await tick();
+  first = b.state(firstId);
+  expect(first.layoutMode === 'browserWorkspace' && first.webFillsWorkspace && !first.webFillsRenderer,
+    'workspace behavior should fill only the paired workspace');
+  expect(first.fullscreenTitle === 'Restore paired layout' && first.fullscreenPressed === 'true',
+    'workspace expansion should expose its active state');
+  b.fullscreen(firstId);
+  expect(b.state(firstId).layoutMode === 'paired' && b.state(firstId).grid.includes('285px'),
+    'workspace expansion should restore the exact paired split');
+  b.collapse(firstId);
+  b.fullscreen(firstId);
+  expect(b.state(firstId).layoutMode === 'browserWorkspace', 'workspace behavior should expand from terminal');
+  b.fullscreen(firstId);
+  expect(b.state(firstId).layoutMode === 'terminal', 'workspace behavior should restore terminal');
+
+  // Cycle behavior follows paired → terminal → browser-Chromux → paired.
+  b.setPreference('cycle');
+  b.restore(firstId);
+  b.narrow(firstId, 285);
+  b.fullscreen(firstId);
+  expect(b.state(firstId).layoutMode === 'terminal', 'cycle should move paired to terminal first');
+  expect(b.state(firstId).fullscreenTitle === 'Fill Chromux with browser',
+    'cycle terminal action should describe browser-Chromux');
+  b.fullscreen(firstId);
+  expect(b.state(firstId).layoutMode === 'browserChromux', 'cycle should move terminal to browser-Chromux');
+  expect(b.state(firstId).fullscreenTitle === 'Restore paired layout',
+    'cycle browser-Chromux action should describe paired mode');
+  b.fullscreen(firstId);
+  first = b.state(firstId);
+  expect(first.layoutMode === 'paired' && first.grid.includes('285px'),
+    'cycle should move browser-Chromux to paired and retain divider width');
+
+  // Preference changes exit an active expansion to its recorded return layout.
+  b.collapse(firstId);
+  b.fullscreen(firstId);
+  expect(b.state(firstId).layoutMode === 'browserChromux', 'cycle should expand terminal to browser-Chromux');
+  b.setPreference('chromux');
+  expect(b.state(firstId).layoutMode === 'terminal',
+    'changing behavior should restore the recorded terminal return before applying');
+  b.restore(firstId);
+  b.fullscreen(firstId);
+  b.setPreference('workspace');
+  expect(b.state(firstId).layoutMode === 'paired',
+    'changing behavior should restore the recorded paired return before applying');
+
   // Fullscreen is per-session and does not disturb tabs, webviews, or narrow toolbar state.
+  b.setPreference('chromux');
   b.restore(firstId);
   const preservedTabId = b.openNew(firstId, 'https://example.invalid/preserved-tab');
   await new Promise((resolve) => setTimeout(resolve, 100));
@@ -181,12 +250,15 @@ fs.writeFileSync(e2ePath, `
   const preservedWebview = b.webview(firstId);
   b.narrow(firstId, 285);
   b.fullscreen(firstId);
-  b.focus(secondId);
+  expect(b.shortcutFocus(secondId)?.sessionId === secondId,
+    'keyboard session shortcut should activate the second session');
   second = b.state(secondId);
-  expect(!second.fullscreen && second.collapsed, 'fullscreen state should remain isolated per session');
-  b.focus(firstId);
+  expect(second.layoutMode === 'terminal' && !second.fullscreen && second.collapsed,
+    'layout mode should remain isolated per session');
+  expect(b.shortcutFocus(firstId)?.sessionId === firstId,
+    'keyboard session shortcut should return to the first session');
   first = b.state(firstId);
-  expect(first.fullscreen && b.tabs(firstId).some((tab) => tab.id === preservedTabId && tab.active),
+  expect(first.layoutMode === 'browserChromux' && b.tabs(firstId).some((tab) => tab.id === preservedTabId && tab.active),
     'session switching should preserve fullscreen and active browser tabs');
   expect(b.webview(firstId) === preservedWebview,
     'fullscreen transitions should preserve the mounted browser webview');

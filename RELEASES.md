@@ -1,5 +1,14 @@
 # Release Notes
 
+## GBlockParty Chromux v0.61.0
+
+Tag: `chromux-v0.61.0`
+
+- Add a persisted Browser fullscreen behavior setting for paired-workspace expansion, a three-layout cycle, or full-Chromux browser toggling; full Chromux is the default.
+- Replace browser fullscreen flags with session-local paired, terminal, browser-workspace, and browser-Chromux modes that preserve the exact return layout and last divider width.
+- Let the active browser cover the complete Chromux renderer while retaining its toolbar, tabs, and rail, without entering native macOS fullscreen or remounting live webviews.
+- Keep Command-Shift-B dedicated to opening or shutting the paired browser, including a direct return to terminal-focused layout from either browser expansion mode.
+
 ## GBlockParty Chromux v0.60.4
 
 Tag: `chromux-v0.60.4`

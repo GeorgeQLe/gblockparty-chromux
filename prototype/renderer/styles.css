@@ -1163,14 +1163,30 @@ body.dragging webview { pointer-events: none; }
 .panel-open-icon { width: 16px; height: 16px; flex: none; }
 .browser-fullscreen-icon { width: 17px; height: 17px; flex: none; }
 
-.session-view.browser-fullscreen .term-pane,
-.session-view.browser-fullscreen > .divider {
+.session-view.browser-workspace .term-pane,
+.session-view.browser-workspace > .divider,
+.session-view.browser-chromux .term-pane,
+.session-view.browser-chromux > .divider {
   display: none;
 }
-.session-view.browser-fullscreen .web-pane {
+.session-view.browser-workspace .web-pane {
   grid-column: 3;
   min-width: 0;
   border-left: 0;
+}
+.session-view.browser-chromux .web-pane {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  border: 0;
+}
+body.browser-chromux-active #workspace {
+  overflow: visible !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 .browser-toolbar {

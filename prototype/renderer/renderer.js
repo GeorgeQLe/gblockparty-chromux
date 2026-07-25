@@ -13,6 +13,7 @@ const RAIL_MODE_STORAGE_KEY = 'chromux.railMode';
 const THREAD_SORT_STORAGE_KEY = 'chromux.threadSort';
 const THREAD_PREVIEW_SIZE_STORAGE_KEY = 'chromux.threadPreviewSize';
 const TAB_GROUPS_STORAGE_KEY = 'chromux.sessionTabGroups';
+const BROWSER_FULLSCREEN_BEHAVIOR_STORAGE_KEY = 'chromux.browserFullscreenBehavior';
 const THEME_IDS = new Set(['blueprint', 'retro-os', 'streak', 'liquid-glass']);
 const THEME_MODE_IDS = new Set(['light', 'dark']);
 const THEME_LABELS = {
@@ -24,6 +25,8 @@ const THEME_LABELS = {
 const RAIL_MODES = new Set(['threads', 'git']);
 const THREAD_SORT_MODES = new Set(['recent', 'az']);
 const THREAD_PREVIEW_SIZES = new Set(['compact', 'comfortable', 'large']);
+const BROWSER_FULLSCREEN_BEHAVIORS = new Set(['workspace', 'cycle', 'chromux']);
+const BROWSER_LAYOUT_MODES = new Set(['paired', 'terminal', 'browserWorkspace', 'browserChromux']);
 const RESTORE_ATTENTION_TYPES = new Set([
   'permission', 'authentication', 'input', 'rateLimited', 'toolFailed', 'delivery', 'completed',
 ]);
@@ -77,6 +80,13 @@ function storedThreadPreviewSize() {
     const value = window.localStorage.getItem(THREAD_PREVIEW_SIZE_STORAGE_KEY);
     return THREAD_PREVIEW_SIZES.has(value) ? value : 'comfortable';
   } catch { return 'comfortable'; }
+}
+
+function storedBrowserFullscreenBehavior() {
+  try {
+    const value = window.localStorage.getItem(BROWSER_FULLSCREEN_BEHAVIOR_STORAGE_KEY);
+    return BROWSER_FULLSCREEN_BEHAVIORS.has(value) ? value : 'chromux';
+  } catch { return 'chromux'; }
 }
 
 function sanitizeCustomTabGroupName(value) {
@@ -136,6 +146,7 @@ const state = {
     railMode: storedRailMode(),
     threadSort: storedThreadSort(),
     threadPreviewSize: storedThreadPreviewSize(),
+    browserFullscreenBehavior: storedBrowserFullscreenBehavior(),
     tabGroupsEnabled: storedTabGroupState.enabled,
     customTabGroups: storedTabGroupState.groups,
     focusedTabGroupId: null,
@@ -575,6 +586,7 @@ function applyThreadPreviewSize(size, { persist = true } = {}) {
 applyTheme(state.ui.theme, { persist: false });
 applyTabActivityIndicators(state.ui.tabActivityIndicators, { persist: false });
 applyThreadPreviewSize(state.ui.threadPreviewSize, { persist: false });
+applyBrowserFullscreenBehavior(state.ui.browserFullscreenBehavior, { persist: false });
 
 // ───────────────────────────────────────────────────────────────────────────
 // Preview detection — scan complete terminal lines for localhost URLs and
@@ -1665,9 +1677,8 @@ function createBrowserState() {
       : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     queue: [],
     serverLauncher: null,
-    collapsed: true,
-    fullscreen: false,
-    fullscreenReturnCollapsed: null,
+    layoutMode: 'terminal',
+    expansionReturnLayout: null,
     expandedGridTemplate: 'minmax(320px, 46%) 6px minmax(360px, 1fr)',
   };
   const activePage = () => browser.tabs.find((tab) => tab.id === browser.activeTabId && tab.type === 'page') || null;
@@ -2244,7 +2255,7 @@ function shortcutFocusContext() {
     activeSessionName: activeSession ? activeSession.name : null,
     sessionCount: state.sessions.size,
     queueCount,
-    browserCollapsed: activeSession ? Boolean(activeSession.browser.collapsed) : null,
+    browserCollapsed: activeSession ? activeSession.browser.layoutMode === 'terminal' : null,
   };
 }
 
@@ -2333,7 +2344,7 @@ function computeShortcutCatalog() {
     } else if (shortcut.id === 'browser-toggle') {
       disabledReason = guardReason || (activeSession ? null : 'no active session');
       description = activeSession
-        ? (activeSession.browser.collapsed ? 'open browser' : 'shut browser')
+        ? (activeSession.browser.layoutMode === 'terminal' ? 'open browser' : 'shut browser')
         : 'no active session';
     } else if (shortcut.id === 'composer-open') {
       disabledReason = guardReason || (activeSession ? null : 'no active session');
@@ -2665,7 +2676,7 @@ function openInPane(session, url) {
   const normalized = normalizedBrowserUrl(url);
   if (!normalized) return null;
   const b = session.browser;
-  if (b.collapsed) setBrowserCollapsed(session, false);
+  if (b.layoutMode === 'terminal') setBrowserCollapsed(session, false);
   let tab = activePageTab(session);
   if (!tab) tab = createPageBrowserTab(session, normalized, normalized, { activate: true });
   else {
@@ -2683,7 +2694,7 @@ function openInPane(session, url) {
 function openOrFocusBrowserTab(session, url, title = '', { retryExisting = false } = {}) {
   const normalized = normalizedBrowserUrl(url);
   if (!normalized) return null;
-  if (session.browser.collapsed) setBrowserCollapsed(session, false);
+  if (session.browser.layoutMode === 'terminal') setBrowserCollapsed(session, false);
   const existing = pageTabForUrl(session, normalized);
   if (existing) {
     activateBrowserTab(session, existing.id);
@@ -2740,7 +2751,7 @@ function renderBrowserTabs(session) {
   add.textContent = '+';
   add.title = 'New browser tab';
   add.onclick = () => {
-    if (session.browser.collapsed) setBrowserCollapsed(session, false);
+    if (session.browser.layoutMode === 'terminal') setBrowserCollapsed(session, false);
     const tab = createPageBrowserTab(session, null, 'New tab', { activate: true });
     session.els.placeholder.classList.remove('hidden');
     session.els.urlBar.focus();
@@ -2759,7 +2770,7 @@ function htmlExplorerTab(session) {
 }
 
 function openHtmlExplorer(session, { query = '', path: explorerPath = '' } = {}) {
-  if (session.browser.collapsed) setBrowserCollapsed(session, false);
+  if (session.browser.layoutMode === 'terminal') setBrowserCollapsed(session, false);
   let tab = htmlExplorerTab(session);
   if (!tab) {
     tab = {
@@ -2985,7 +2996,44 @@ function renderBrowserRailToggle(button, collapsed) {
   button.replaceChildren(icon, label);
 }
 
-function renderBrowserFullscreenToggle(button, fullscreen) {
+function isBrowserExpansionLayout(mode) {
+  return mode === 'browserWorkspace' || mode === 'browserChromux';
+}
+
+function browserLayoutReturnMode(session) {
+  const mode = session.browser.expansionReturnLayout;
+  return mode === 'paired' || mode === 'terminal' ? mode : 'terminal';
+}
+
+function browserLayoutAction(session) {
+  const mode = session.browser.layoutMode;
+  const behavior = state.ui.browserFullscreenBehavior;
+  if (isBrowserExpansionLayout(mode)) {
+    if (behavior === 'cycle' && mode === 'browserChromux') return { mode: 'paired', title: 'Restore paired layout' };
+    const returnMode = browserLayoutReturnMode(session);
+    return {
+      mode: returnMode,
+      title: returnMode === 'paired' ? 'Restore paired layout' : 'Restore terminal layout',
+    };
+  }
+  if (behavior === 'cycle' && mode === 'paired') {
+    return { mode: 'terminal', title: 'Show full terminal' };
+  }
+  if (behavior === 'workspace') {
+    return { mode: 'browserWorkspace', title: 'Fill paired browser area' };
+  }
+  return { mode: 'browserChromux', title: 'Fill Chromux with browser' };
+}
+
+function syncBrowserChromuxActiveClass() {
+  const activeSession = state.sessions.get(state.activeId);
+  document.body.classList.toggle(
+    'browser-chromux-active',
+    activeSession?.browser.layoutMode === 'browserChromux'
+  );
+}
+
+function renderBrowserFullscreenToggle(button, currentMode, nextMode) {
   const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   icon.classList.add('browser-fullscreen-icon');
   icon.setAttribute('viewBox', '0 0 16 16');
@@ -2996,22 +3044,30 @@ function renderBrowserFullscreenToggle(button, fullscreen) {
   icon.setAttribute('stroke-linejoin', 'round');
   icon.setAttribute('aria-hidden', 'true');
   icon.setAttribute('focusable', 'false');
-  icon.innerHTML = fullscreen
-    ? '<path d="M6 2v4H2M10 2v4h4M6 14v-4H2M10 14v-4h4"></path>'
-    : '<path d="M6 2H2v4M10 2h4v4M6 14H2v-4M10 14h4v-4"></path>';
+  if (nextMode === 'terminal') {
+    icon.innerHTML = '<path d="M2 4h4V2M14 4h-4V2M2 12h4v2M14 12h-4v2"></path><path d="M5 8h6"></path>';
+  } else if (isBrowserExpansionLayout(currentMode)) {
+    icon.innerHTML = '<path d="M6 2v4H2M10 2v4h4M6 14v-4H2M10 14v-4h4"></path>';
+  } else {
+    icon.innerHTML = '<path d="M6 2H2v4M10 2h4v4M6 14H2v-4M10 14h4v-4"></path>';
+  }
   button.replaceChildren(icon);
 }
 
 function applyBrowserLayout(session) {
   if (!session.els) return;
-  const collapsed = Boolean(session.browser.collapsed);
-  const fullscreen = Boolean(session.browser.fullscreen);
+  const mode = BROWSER_LAYOUT_MODES.has(session.browser.layoutMode)
+    ? session.browser.layoutMode
+    : 'terminal';
+  const collapsed = mode === 'terminal';
+  const expanded = isBrowserExpansionLayout(mode);
   session.els.view.classList.toggle('browser-collapsed', collapsed);
-  session.els.view.classList.toggle('browser-fullscreen', fullscreen);
+  session.els.view.classList.toggle('browser-workspace', mode === 'browserWorkspace');
+  session.els.view.classList.toggle('browser-chromux', mode === 'browserChromux');
   session.els.webPane.classList.toggle('collapsed', collapsed);
-  session.els.divider.classList.toggle('disabled', collapsed || fullscreen);
-  session.els.divider.setAttribute('aria-disabled', collapsed || fullscreen ? 'true' : 'false');
-  if (fullscreen) {
+  session.els.divider.classList.toggle('disabled', collapsed || expanded);
+  session.els.divider.setAttribute('aria-disabled', collapsed || expanded ? 'true' : 'false');
+  if (expanded) {
     session.els.view.style.gridTemplateColumns = '0px 0px minmax(0, 1fr)';
   } else if (collapsed) {
     session.els.view.style.gridTemplateColumns = 'minmax(320px, 1fr) 6px 40px';
@@ -3023,56 +3079,69 @@ function applyBrowserLayout(session) {
     ? 'Open paired browser (⌘⇧B)'
     : 'Shut paired browser (⌘⇧B)';
   session.els.collapseBtn.setAttribute('aria-label', session.els.collapseBtn.title);
-  renderBrowserFullscreenToggle(session.els.fullscreenBtn, fullscreen);
-  session.els.fullscreenBtn.title = fullscreen ? 'Exit full screen' : 'Full screen';
+  const action = browserLayoutAction(session);
+  renderBrowserFullscreenToggle(session.els.fullscreenBtn, mode, action.mode);
+  session.els.fullscreenBtn.title = action.title;
   session.els.fullscreenBtn.setAttribute('aria-label', session.els.fullscreenBtn.title);
-  session.els.fullscreenBtn.setAttribute('aria-pressed', String(fullscreen));
+  session.els.fullscreenBtn.setAttribute('aria-pressed', String(expanded));
+  session.els.fullscreenBtn.dataset.nextLayout = action.mode;
+  syncBrowserChromuxActiveClass();
   refitTerminal(session);
+}
+
+function setBrowserLayoutMode(session, mode, { recordReturn = false } = {}) {
+  const next = BROWSER_LAYOUT_MODES.has(mode) ? mode : 'terminal';
+  const current = session.browser.layoutMode;
+  if (current === next) return false;
+  if (current === 'paired' && next !== 'paired') {
+    session.browser.expandedGridTemplate = session.els.view.style.gridTemplateColumns
+      || session.browser.expandedGridTemplate;
+  }
+  if (recordReturn && (current === 'paired' || current === 'terminal') && isBrowserExpansionLayout(next)) {
+    session.browser.expansionReturnLayout = current;
+  } else if (!isBrowserExpansionLayout(next)) {
+    session.browser.expansionReturnLayout = null;
+  }
+  session.browser.layoutMode = next;
+  if (next === 'terminal') {
+    session.els.queuePanel.classList.add('hidden');
+    if (session.els.favoritesPanel) session.els.favoritesPanel.classList.add('hidden');
+  }
+  applyBrowserLayout(session);
+  invalidate('shortcutDebug');
+  return true;
 }
 
 function setBrowserCollapsed(session, collapsed) {
   const next = Boolean(collapsed);
-  if (session.browser.fullscreen && next) {
-    session.browser.fullscreen = false;
-    session.browser.fullscreenReturnCollapsed = null;
-    session.browser.collapsed = true;
-    session.els.queuePanel.classList.add('hidden');
-    if (session.els.favoritesPanel) session.els.favoritesPanel.classList.add('hidden');
-    applyBrowserLayout(session);
-    invalidate('shortcutDebug');
-    return;
-  }
-  if (session.browser.collapsed === next) return;
-  if (next) session.browser.expandedGridTemplate = session.els.view.style.gridTemplateColumns || session.browser.expandedGridTemplate;
-  session.browser.collapsed = next;
-  if (next) session.els.queuePanel.classList.add('hidden');
-  if (next && session.els.favoritesPanel) session.els.favoritesPanel.classList.add('hidden');
-  applyBrowserLayout(session);
-  invalidate('shortcutDebug');
+  if (next) return setBrowserLayoutMode(session, 'terminal');
+  if (session.browser.layoutMode === 'terminal') return setBrowserLayoutMode(session, 'paired');
+  return false;
 }
 
-function setBrowserFullscreen(session, fullscreen) {
-  const next = Boolean(fullscreen);
-  if (session.browser.fullscreen === next) return;
-  if (next) {
-    session.browser.fullscreenReturnCollapsed = Boolean(session.browser.collapsed);
-    if (!session.browser.collapsed) {
-      session.browser.expandedGridTemplate = session.els.view.style.gridTemplateColumns
-        || session.browser.expandedGridTemplate;
-    }
-    session.browser.collapsed = false;
-    session.browser.fullscreen = true;
-  } else {
-    session.browser.fullscreen = false;
-    session.browser.collapsed = Boolean(session.browser.fullscreenReturnCollapsed);
-    session.browser.fullscreenReturnCollapsed = null;
-    if (session.browser.collapsed) {
-      session.els.queuePanel.classList.add('hidden');
-      if (session.els.favoritesPanel) session.els.favoritesPanel.classList.add('hidden');
-    }
+function advanceBrowserLayout(session) {
+  const action = browserLayoutAction(session);
+  const recordReturn = isBrowserExpansionLayout(action.mode)
+    && (session.browser.layoutMode === 'paired' || session.browser.layoutMode === 'terminal');
+  return setBrowserLayoutMode(session, action.mode, { recordReturn });
+}
+
+function exitBrowserExpansion(session) {
+  if (!isBrowserExpansionLayout(session.browser.layoutMode)) return false;
+  return setBrowserLayoutMode(session, browserLayoutReturnMode(session));
+}
+
+function applyBrowserFullscreenBehavior(behavior, { persist = true } = {}) {
+  const next = BROWSER_FULLSCREEN_BEHAVIORS.has(behavior) ? behavior : 'chromux';
+  for (const session of state.sessions.values()) exitBrowserExpansion(session);
+  state.ui.browserFullscreenBehavior = next;
+  if (persist) {
+    try { window.localStorage.setItem(BROWSER_FULLSCREEN_BEHAVIOR_STORAGE_KEY, next); } catch { /* unavailable */ }
   }
-  applyBrowserLayout(session);
-  invalidate('shortcutDebug');
+  const select = $('#settings-browser-fullscreen-behavior');
+  if (select) select.value = next;
+  for (const session of state.sessions.values()) applyBrowserLayout(session);
+  return next;
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -3934,10 +4003,10 @@ function buildSessionView(session) {
   renderBrowserRailToggle(collapseBtn, true);
   const fullscreenBtn = document.createElement('button');
   fullscreenBtn.className = 'head-btn browser-rail-toggle browser-fullscreen-toggle';
-  fullscreenBtn.title = 'Full screen';
-  fullscreenBtn.setAttribute('aria-label', 'Full screen');
+  fullscreenBtn.title = 'Fill Chromux with browser';
+  fullscreenBtn.setAttribute('aria-label', 'Fill Chromux with browser');
   fullscreenBtn.setAttribute('aria-pressed', 'false');
-  renderBrowserFullscreenToggle(fullscreenBtn, false);
+  renderBrowserFullscreenToggle(fullscreenBtn, 'terminal', 'browserChromux');
   const urlBar = document.createElement('input');
   urlBar.className = 'url-bar'; urlBar.type = 'text'; urlBar.spellcheck = false;
   urlBar.setAttribute('autocomplete', 'off');
@@ -4060,14 +4129,14 @@ function buildSessionView(session) {
   composer.addEventListener('keydown', (event) => handleComposerKeydown(session, event));
   historySearch.addEventListener('input', () => { session.composer.query = historySearch.value; renderComposerHistory(session); });
   clearHistoryBtn.onclick = () => clearComposerHistory(session);
-  collapseBtn.onclick = () => setBrowserCollapsed(session, session.browser.fullscreen || !session.browser.collapsed);
-  fullscreenBtn.onclick = () => setBrowserFullscreen(session, !session.browser.fullscreen);
+  collapseBtn.onclick = () => setBrowserCollapsed(session, session.browser.layoutMode !== 'terminal');
+  fullscreenBtn.onclick = () => advanceBrowserLayout(session);
   pickBtn.onclick = () => (session.browser.picking ? null : startPick(session));
   captureBtn.onclick = () => openCaptureModal(session, { selector: null, outerHTML: null, pageTitle: null, pageUrl: activePageTab(session)?.currentUrl || null });
 
   // divider drag
   divider.addEventListener('mousedown', (e) => {
-    if (session.browser.collapsed || session.browser.fullscreen) return;
+    if (session.browser.layoutMode !== 'paired') return;
     e.preventDefault();
     document.body.classList.add('dragging');
     const onMove = (ev) => {
@@ -6567,6 +6636,7 @@ function activateSession(id, { consumeRestoredCompletion = true, recordActivity 
       });
     }
   }
+  syncBrowserChromuxActiveClass();
   $('#empty-state').classList.toggle('hidden', state.sessions.size > 0);
   renderTabs();
   revealFocusedSessionTab(id);
@@ -6583,6 +6653,7 @@ function closeSession(id) {
   window.chromux.ptyKill(id);
   if (s.term.scrollToBottom) s.term.scrollToBottom.dispose();
   s.term.term.dispose();
+  if (s.els.webPane.parentElement !== s.els.view) s.els.webPane.remove();
   s.els.view.remove();
   s.els.tab.remove();
   state.sessions.delete(id);
@@ -6597,6 +6668,7 @@ function closeSession(id) {
     state.activeId = nextId;
     if (state.activeId) activateSession(state.activeId);
   }
+  syncBrowserChromuxActiveClass();
   if (state.ui.diagnosticSessionId === id) {
     state.ui.diagnosticSessionId = state.sessions.has(state.activeId)
       ? state.activeId : (state.sessions.keys().next().value || null);
@@ -8228,6 +8300,9 @@ $('#custom-tab-group-name').addEventListener('keydown', (event) => {
 $('#settings-thread-preview-size').addEventListener('change', (event) => {
   applyThreadPreviewSize(event.target.value);
 });
+$('#settings-browser-fullscreen-behavior').addEventListener('change', (event) => {
+  applyBrowserFullscreenBehavior(event.target.value);
+});
 $('#settings-prevent-sleep').addEventListener('change', (event) => {
   changePreventSleep(event.target.checked);
 });
@@ -8527,8 +8602,8 @@ function handleShortcutToggleBrowser() {
   if (modalOpen() || editableFocused()) return null;
   const session = state.sessions.get(state.activeId);
   if (!session) return null;
-  setBrowserCollapsed(session, session.browser.fullscreen || !session.browser.collapsed);
-  return { sessionId: session.id, collapsed: session.browser.collapsed };
+  setBrowserCollapsed(session, session.browser.layoutMode !== 'terminal');
+  return { sessionId: session.id, collapsed: session.browser.layoutMode === 'terminal' };
 }
 
 function handleShortcutOpenNewSession() {
@@ -9444,7 +9519,7 @@ if (window.chromuxTest) {
     queueCount: (id) => testSession(id).browser.queue.length,
     queueUrls: (id) => testSession(id).browser.queue.map((item) => item.url),
     queuePanelHidden: (id) => testSession(id).els.queuePanel.classList.contains('hidden'),
-    browserCollapsed: (id) => testSession(id).browser.collapsed,
+    browserCollapsed: (id) => testSession(id).browser.layoutMode === 'terminal',
     turnState: (id) => ({ ...testSession(id).turn }),
     attentionKinds: () => [...document.querySelectorAll('#thread-list .attention-system-row, #thread-list .attention-reason')]
       .map((el) => el.dataset.attentionKind || ''),
@@ -9983,7 +10058,7 @@ if (window.chromuxTest) {
     queueCount: (id) => testSession(id).browser.queue.length,
     queueUrls: (id) => testSession(id).browser.queue.map((item) => item.url),
     queuePanelHidden: (id) => testSession(id).els.queuePanel.classList.contains('hidden'),
-    browserCollapsed: (id) => testSession(id).browser.collapsed,
+    browserCollapsed: (id) => testSession(id).browser.layoutMode === 'terminal',
     focusedOpenUrl: () => document.activeElement?.dataset?.queueOpenUrl || null,
     clickFocused() {
       if (!document.activeElement) throw new Error('Nothing focused');
@@ -10032,7 +10107,7 @@ if (window.chromuxTest) {
       flushRender();
     },
     setCollapsed(id, collapsed) {
-      testSession(id).browser.collapsed = Boolean(collapsed);
+      testSession(id).browser.layoutMode = collapsed ? 'terminal' : 'paired';
       invalidate('shortcutDebug');
       flushRender();
     },
@@ -10240,7 +10315,7 @@ if (window.chromuxTest) {
     },
     fullscreen(id) {
       const session = testSession(id);
-      setBrowserFullscreen(session, !session.browser.fullscreen);
+      advanceBrowserLayout(session);
       flushRender();
     },
     collapseControl(id) {
@@ -10256,6 +10331,12 @@ if (window.chromuxTest) {
       activateSession(id);
       flushRender();
     },
+    shortcutFocus(id) {
+      const index = orderedSessions().findIndex((session) => session.id === id);
+      const result = handleShortcutActivateSessionIndex({ index });
+      flushRender();
+      return result;
+    },
     narrow(id, browserPx = 240) {
       const session = testSession(id);
       session.browser.expandedGridTemplate = `minmax(320px, 1fr) 6px ${browserPx}px`;
@@ -10266,6 +10347,31 @@ if (window.chromuxTest) {
       const session = testSession(id);
       session.els.browserToolbar.scrollLeft = session.els.browserToolbar.scrollWidth;
       flushRender();
+    },
+    preference: () => state.ui.browserFullscreenBehavior,
+    preferenceStored: () => window.localStorage.getItem(BROWSER_FULLSCREEN_BEHAVIOR_STORAGE_KEY),
+    preferenceSelectValue: () => $('#settings-browser-fullscreen-behavior')?.value || '',
+    preferenceStorageProbe(raw) {
+      const prior = window.localStorage.getItem(BROWSER_FULLSCREEN_BEHAVIOR_STORAGE_KEY);
+      try {
+        if (raw === null) window.localStorage.removeItem(BROWSER_FULLSCREEN_BEHAVIOR_STORAGE_KEY);
+        else window.localStorage.setItem(BROWSER_FULLSCREEN_BEHAVIOR_STORAGE_KEY, raw);
+        return {
+          value: storedBrowserFullscreenBehavior(),
+          stored: window.localStorage.getItem(BROWSER_FULLSCREEN_BEHAVIOR_STORAGE_KEY),
+        };
+      } finally {
+        if (prior === null) window.localStorage.removeItem(BROWSER_FULLSCREEN_BEHAVIOR_STORAGE_KEY);
+        else window.localStorage.setItem(BROWSER_FULLSCREEN_BEHAVIOR_STORAGE_KEY, prior);
+      }
+    },
+    setPreference(behavior) {
+      const select = $('#settings-browser-fullscreen-behavior');
+      if (!select) throw new Error('Missing browser fullscreen behavior setting');
+      select.value = behavior;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      flushRender();
+      return state.ui.browserFullscreenBehavior;
     },
     state(id) {
       const session = testSession(id);
@@ -10289,10 +10395,25 @@ if (window.chromuxTest) {
         : toggleRect.bottom;
       const openIcon = session.els.collapseBtn.querySelector('.panel-open-icon');
       const fullscreenIcon = session.els.fullscreenBtn.querySelector('.browser-fullscreen-icon');
+      const fillsRenderer = Math.abs(webPaneRect.top) <= 1
+        && Math.abs(webPaneRect.left) <= 1
+        && Math.abs(webPaneRect.bottom - window.innerHeight) <= 1
+        && Math.abs(webPaneRect.right - window.innerWidth) <= 1;
+      const coveredByBrowser = (element) => {
+        const rect = element?.getBoundingClientRect();
+        if (!rect || rect.width <= 0 || rect.height <= 0) return false;
+        const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+        return Boolean(hit && session.els.webPane.contains(hit));
+      };
+      const railHit = document.elementFromPoint(
+        fullscreenRect.left + fullscreenRect.width / 2,
+        fullscreenRect.top + fullscreenRect.height / 2
+      );
       return {
         active: state.activeId === id,
-        collapsed: session.browser.collapsed,
-        fullscreen: session.browser.fullscreen,
+        layoutMode: session.browser.layoutMode,
+        collapsed: session.browser.layoutMode === 'terminal',
+        fullscreen: isBrowserExpansionLayout(session.browser.layoutMode),
         grid: session.els.view.style.gridTemplateColumns,
         webCollapsed: session.els.webPane.classList.contains('collapsed'),
         webHostHidden: getComputedStyle(session.els.webHost).display === 'none',
@@ -10303,6 +10424,15 @@ if (window.chromuxTest) {
           && Math.abs(webPaneRect.bottom - viewRect.bottom) <= 1
           && Math.abs(webPaneRect.left - viewRect.left) <= 1
           && Math.abs(webPaneRect.right - viewRect.right) <= 1,
+        webFillsRenderer: fillsRenderer,
+        chromuxChromeCovered: fillsRenderer && [
+          $('#titlebar'), $('#rail'), $('#session-tabs'), $('#statusbar'),
+        ].every(coveredByBrowser),
+        browserRailUsable: Boolean(
+          railHit
+          && session.els.browserRail.contains(railHit)
+          && getComputedStyle(session.els.browserRail).pointerEvents !== 'none'
+        ),
         dividerDisabled: session.els.divider.classList.contains('disabled'),
         collapseText: session.els.collapseBtn.textContent,
         collapseTitle: session.els.collapseBtn.title,
@@ -10328,6 +10458,8 @@ if (window.chromuxTest) {
         openIconAriaHidden: Boolean(openIcon && openIcon.getAttribute('aria-hidden') === 'true'),
         fullscreenTitle: session.els.fullscreenBtn.title,
         fullscreenAriaLabel: session.els.fullscreenBtn.getAttribute('aria-label'),
+        fullscreenPressed: session.els.fullscreenBtn.getAttribute('aria-pressed'),
+        fullscreenNextLayout: session.els.fullscreenBtn.dataset.nextLayout || '',
         fullscreenIconPresent: Boolean(fullscreenIcon),
         fullscreenIconAriaHidden: Boolean(fullscreenIcon && fullscreenIcon.getAttribute('aria-hidden') === 'true'),
         currentUrl: session.browser.currentUrl,
@@ -10399,7 +10531,13 @@ if (window.chromuxTest) {
     startEnabled: () => !$('#ns-start-project').disabled,
     sessionState: () => {
       const session = state.sessions.get(state.activeId);
-      return session ? { name: session.name, cwd: session.cwd, queue: session.browser.queue.slice(), currentUrl: session.browser.currentUrl, collapsed: session.browser.collapsed } : null;
+      return session ? {
+        name: session.name,
+        cwd: session.cwd,
+        queue: session.browser.queue.slice(),
+        currentUrl: session.browser.currentUrl,
+        collapsed: session.browser.layoutMode === 'terminal',
+      } : null;
     },
   };
 

@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Add configurable paired-workspace, all-layout cycle, and full-Chromux browser expansion behavior with session-local exact restoration, full-renderer geometry, Settings persistence, and v0.61.0 release coverage. _(source: user-supplied implementation plan; evidence: `prototype/renderer/index.html`, `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`, `prototype/scripts/test-browser-collapse-renderer.js`, complete prototype matrix, source and packaged smoke, `RELEASES.md`)_
+
 - [x] Keep the browser queue open while an approved preview loads, close it only after that selected tab succeeds, preserve failure recovery, and ship as v0.60.4. _(source: user-supplied implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-preview-queue-renderer.js`, browser-tabs regression, `RELEASES.md`)_
 
 - [x] Make Codex update-preflight discovery and subprocess execution share the augmented PATH so Node-based launchers work after Finder startup; ship as v0.60.3. _(source: user-supplied implementation plan; evidence: `prototype/codex-update-service.js`, `prototype/scripts/test-codex-update-service.js`, source and packaged smoke, `RELEASES.md`)_
