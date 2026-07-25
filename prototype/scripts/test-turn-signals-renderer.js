@@ -129,7 +129,7 @@ fs.writeFileSync(e2ePath, `
   expect(bSignals.length === 1, 'split OSC must produce exactly one turn-signal event');
   expect(sig.written(b) === 'approval? tail', 'clean text around split OSC survives, got ' + JSON.stringify(sig.written(b)));
 
-  // 3 — Codex completion notify and submitted-line inference.
+  // 3 — Codex completion notify and provider-evidenced activity.
   const codexDone = sig.addFakeSession({ name: 'codex-done', agent: 'codex' });
   sig.feedPtyChunk(codexDone, osc('turn-end', codexDone));
   expect(sig.turnState(codexDone).state === 'completed', 'Codex notify turn-end should complete the turn');
@@ -157,9 +157,31 @@ fs.writeFileSync(e2ePath, `
   const codexSubmit = sig.addTerminalSession({ name: 'codex-submit', agent: 'codex' });
   sig.focus(holder);
   sig.typeInput(codexSubmit, 'implement this\\r');
-  expect(sig.turnState(codexSubmit).state === 'working', 'Codex submitted line from unknown should infer working');
+  expect(sig.turnState(codexSubmit).state === 'pending',
+    'Codex submitted input should await provider activity instead of inferring working');
   expect(sig.turnState(codexSubmit).generation === 1, 'ordinary Codex submission should advance the turn generation');
+  expect(sig.turnState(codexSubmit).completionBlocked === true,
+    'pending Codex input should reject completion until activity is observed');
   expect(itemsFor('COMPLETED', 'codex-submit').length === 0, 'Codex submitted line should not create completed attention');
+  sig.feedPtyChunk(codexSubmit, titleOsc('\\u2839 Implementing this'));
+  expect(sig.turnState(codexSubmit).state === 'working'
+    && sig.turnState(codexSubmit).activityObserved === true
+    && sig.turnState(codexSubmit).completionBlocked === false,
+  'a Braille-prefixed Codex title should confirm working activity');
+  sig.feedPtyChunk(codexSubmit, titleOsc('codex-submit'));
+  expect(sig.turnState(codexSubmit).state === 'completed',
+    'a stable Codex title after observed activity should complete a background turn');
+  sig.focus(codexSubmit);
+  expect(sig.turnState(codexSubmit).state === 'idle',
+    'viewing a title-completed Codex turn should consume it to idle');
+  sig.focus(holder);
+  sig.typeInput(codexSubmit, 'fallback request\\r');
+  expect(sig.turnState(codexSubmit).state === 'pending',
+    'each later Codex submission should return to pending');
+  sig.feedPtyChunk(codexSubmit, 'Running compatibility fallback...\\r\\n');
+  await wait(30); sig.flushRender();
+  expect(sig.turnState(codexSubmit).state === 'working',
+    'meaningful Codex terminal output should confirm working when title frames are unavailable');
   sig.feedPtyChunk(codexSubmit, 'Choose an option:\\r\\n1. Wait until the rate limit resets\\r\\n› ');
   await wait(30); sig.flushRender();
   expect(sig.turnState(codexSubmit).state === 'completed',
@@ -174,7 +196,7 @@ fs.writeFileSync(e2ePath, `
     'seen fallback-completed Codex row stays hidden after blur');
   expect(sig.turnState(codexSubmit).state === 'idle', 'viewed fallback completion should become idle');
   sig.typeInput(codexSubmit, 'next task\\r');
-  expect(sig.turnState(codexSubmit).state === 'working', 'new Codex input after fallback completion returns to working');
+  expect(sig.turnState(codexSubmit).state === 'pending', 'new Codex input after fallback completion returns to pending');
   expect(itemsFor('COMPLETED', 'codex-submit').length === 0,
     'new Codex input clears fallback completed attention');
 
@@ -182,12 +204,23 @@ fs.writeFileSync(e2ePath, `
   sig.focus(holder);
   const clearGeneration = sig.turnState(codexClear).generation;
   sig.typeInput(codexClear, '   /clear   \\r');
-  expect(sig.turnState(codexClear).state === 'idle',
-    'exact whitespace-trimmed /clear should keep an idle Codex session idle');
+  expect(sig.turnState(codexClear).state === 'pending',
+    'direct /clear should use the same pending state as every Codex submission');
   expect(sig.turnState(codexClear).generation === clearGeneration + 1,
-    '/clear must advance the generation to invalidate pending render callbacks');
+    'command submissions must advance the generation to invalidate pending render callbacks');
   expect(sig.turnState(codexClear).completionBlocked === true,
-    '/clear must block stale completion signals until the next ordinary prompt');
+    'command submissions must block completion until activity is observed');
+  sig.feedPtyChunk(codexClear, '/clear\\r\\n');
+  await wait(30); sig.flushRender();
+  expect(sig.turnState(codexClear).state === 'pending',
+    'a rendered slash-command echo alone must not count as busy activity');
+  sig.feedPtyChunk(codexClear, '? for shortcuts\\r\\n› ');
+  await wait(30); sig.flushRender();
+  expect(sig.turnState(codexClear).state === 'idle',
+    'composer redraw without intervening activity should resolve direct /clear to idle');
+  sig.emitSignal(codexClear, 'turn-end', 'late completion after command');
+  expect(sig.turnState(codexClear).state === 'idle',
+    'late completion after a command-only submission must remain rejected');
   sig.typeInput(codexClear, 'unsubmitted draft');
   expect(sig.turnState(codexClear).state === 'idle',
     'typing after /clear without submission should remain idle');
@@ -204,9 +237,13 @@ fs.writeFileSync(e2ePath, `
   composer.nativeInput(renderedClearIdle, '\\t');
   await composer.renderPromptFixture(renderedClearIdle, '? for shortcuts\\r\\n› /clear');
   composer.nativeInput(renderedClearIdle, '\\r');
-  expect(sig.turnState(renderedClearIdle).state === 'idle'
-    && sig.turnState(renderedClearIdle).completionBlocked === true,
-  'Tab-autocompleted /clear should stay idle after the expanded command renders');
+  expect(sig.turnState(renderedClearIdle).state === 'pending',
+    'Tab-autocompleted /clear should enter generic pending before provider redraw');
+  await composer.renderPromptFixture(renderedClearIdle, '');
+  sig.feedPtyChunk(renderedClearIdle, '? for shortcuts\\r\\n› ');
+  await wait(30); sig.flushRender();
+  expect(sig.turnState(renderedClearIdle).state === 'idle',
+    'Tab-autocompleted /clear should resolve idle from the composer redraw');
 
   const racedClearIdle = composer.addSession({
     name: 'codex-raced-clear-idle', agent: 'codex', turnState: 'idle', rows: 16, cols: 48,
@@ -217,16 +254,20 @@ fs.writeFileSync(e2ePath, `
   ]);
   composer.nativeInput(racedClearIdle, '\\t');
   composer.nativeInput(racedClearIdle, '\\r');
+  expect(sig.turnState(racedClearIdle).state === 'pending',
+    'autocomplete Enter races should remain generic pending');
+  await composer.renderPromptFixture(racedClearIdle, '');
+  sig.feedPtyChunk(racedClearIdle, '? for shortcuts\\r\\n› ');
+  await wait(30); sig.flushRender();
   expect(sig.turnState(racedClearIdle).state === 'idle'
     && sig.turnState(racedClearIdle).completionBlocked === true,
-  'Tab-autocompleted /clear must stay idle when Enter beats the PTY redraw');
+  'autocomplete Enter races should resolve idle from provider redraw evidence');
   sig.emitSignal(racedClearIdle, 'turn-end', 'stale completion after raced clear');
   expect(sig.turnState(racedClearIdle).state === 'idle',
     'the raced /clear path must retain the stale-completion barrier');
   composer.nativeInput(racedClearIdle, 'next raced request\\r');
-  expect(sig.turnState(racedClearIdle).state === 'working'
-    && sig.turnState(racedClearIdle).completionBlocked === false,
-  'the next ordinary prompt after a raced /clear must return to working');
+  expect(sig.turnState(racedClearIdle).state === 'pending',
+    'the next ordinary prompt after a raced /clear must return to pending');
 
   const ambiguousClearPrefix = composer.addSession({
     name: 'codex-ambiguous-clear-prefix', agent: 'codex', turnState: 'idle', rows: 16, cols: 48,
@@ -238,9 +279,8 @@ fs.writeFileSync(e2ePath, `
   ]);
   composer.nativeInput(ambiguousClearPrefix, '\\t');
   composer.nativeInput(ambiguousClearPrefix, '\\r');
-  expect(sig.turnState(ambiguousClearPrefix).state === 'working'
-    && sig.turnState(ambiguousClearPrefix).completionBlocked === false,
-  'an ambiguous /cl autocomplete menu must retain ordinary submission behavior');
+  expect(sig.turnState(ambiguousClearPrefix).state === 'pending',
+    'ambiguous autocomplete submissions should use the same generic pending behavior');
 
   const unrelatedSlashPrefix = composer.addSession({
     name: 'codex-unrelated-slash-prefix', agent: 'codex', turnState: 'idle', rows: 16, cols: 48,
@@ -251,8 +291,8 @@ fs.writeFileSync(e2ePath, `
   ]);
   composer.nativeInput(unrelatedSlashPrefix, '\\t');
   composer.nativeInput(unrelatedSlashPrefix, '\\r');
-  expect(sig.turnState(unrelatedSlashPrefix).state === 'working',
-    'unrelated slash autocomplete prefixes must retain ordinary submission behavior');
+  expect(sig.turnState(unrelatedSlashPrefix).state === 'pending',
+    'unrelated slash autocomplete submissions should use generic pending behavior');
 
   const renderedClearArguments = composer.addSession({
     name: 'codex-rendered-clear-arguments', agent: 'codex', turnState: 'idle', rows: 16, cols: 48,
@@ -263,8 +303,8 @@ fs.writeFileSync(e2ePath, `
   ]);
   composer.nativeInput(renderedClearArguments, '\\t');
   composer.nativeInput(renderedClearArguments, '\\r');
-  expect(sig.turnState(renderedClearArguments).state === 'working',
-    'rendered /clear with arguments must retain ordinary submission behavior');
+  expect(sig.turnState(renderedClearArguments).state === 'pending',
+    'rendered command arguments should use generic pending behavior');
 
   const editedClearAutocomplete = composer.addSession({
     name: 'codex-edited-clear-autocomplete', agent: 'codex', turnState: 'idle', rows: 16, cols: 48,
@@ -276,8 +316,8 @@ fs.writeFileSync(e2ePath, `
   composer.nativeInput(editedClearAutocomplete, '\\t');
   composer.nativeInput(editedClearAutocomplete, '\\x7f');
   composer.nativeInput(editedClearAutocomplete, '\\r');
-  expect(sig.turnState(editedClearAutocomplete).state === 'working',
-    'editing after /clear autocomplete must invalidate the transient intent');
+  expect(sig.turnState(editedClearAutocomplete).state === 'pending',
+    'edited autocomplete submissions should use generic pending behavior');
 
   const claudeClearAutocomplete = composer.addSession({
     name: 'claude-clear-autocomplete', agent: 'claude', turnState: 'idle', rows: 16, cols: 48,
@@ -298,9 +338,8 @@ fs.writeFileSync(e2ePath, `
   await composer.renderPromptFixture(composerClear, '? for shortcuts\\r\\n› ');
   composer.setDraft(composerClear, '/clear');
   await composer.submit(composerClear);
-  expect(sig.turnState(composerClear).state === 'idle'
-    && sig.turnState(composerClear).completionBlocked === true,
-  'an empty rendered prompt should fall back to the composer shadow for exact /clear');
+  expect(sig.turnState(composerClear).state === 'pending',
+    'composer-submitted commands should enter generic pending');
 
   const clearDuringTurn = sig.addTerminalSession({ name: 'codex-clear-during-turn', agent: 'codex' });
   sig.focus(holder);
@@ -309,25 +348,28 @@ fs.writeFileSync(e2ePath, `
   sig.feedPtyChunk(clearDuringTurn, 'busy output\\r\\n');
   sig.typeInput(clearDuringTurn, '/clear\\r');
   const clearedTurn = sig.turnState(clearDuringTurn);
-  expect(clearedTurn.state === 'idle'
+  expect(clearedTurn.state === 'pending'
     && clearedTurn.generation === activeGeneration + 1
     && clearedTurn.completionBlocked === true,
-  '/clear must end existing work, advance its generation, and arm completion suppression');
+  'a command during work must replace it with pending, advance generation, and arm completion suppression');
   expect(clearedTurn.detail === null && clearedTurn.protocol === null && clearedTurn.source === null
     && clearedTurn.confidence === null && clearedTurn.turnId === null && clearedTurn.eventId === null
-    && clearedTurn.stopped === false && clearedTurn.sawBusyRender === false,
-  '/clear must remove stale turn metadata');
+    && clearedTurn.stopped === false && clearedTurn.activityObserved === false,
+  'a new pending submission must remove stale turn metadata and activity evidence');
   sig.feedPtyChunk(clearDuringTurn, '? for shortcuts\\r\\n› ');
   await wait(30); sig.flushRender();
   expect(sig.turnState(clearDuringTurn).state === 'idle',
-    'a delayed rendered-composer callback must not resurrect a cleared turn');
+    'a composer redraw without new activity must resolve a command submission idle');
   sig.emitSignal(clearDuringTurn, 'turn-end', 'stale native completion');
   expect(sig.turnState(clearDuringTurn).state === 'idle',
     'a delayed native completion must not resurrect a cleared turn');
   sig.typeInput(clearDuringTurn, 'next ordinary request\\r');
-  expect(sig.turnState(clearDuringTurn).state === 'working'
-    && sig.turnState(clearDuringTurn).completionBlocked === false,
-  'the next ordinary prompt must clear suppression and start working');
+  expect(sig.turnState(clearDuringTurn).state === 'pending'
+    && sig.turnState(clearDuringTurn).completionBlocked === true,
+  'the next ordinary prompt must await fresh activity');
+  sig.feedPtyChunk(clearDuringTurn, titleOsc('\\u2839 Next ordinary request'));
+  expect(sig.turnState(clearDuringTurn).state === 'working',
+    'fresh title activity should start the next ordinary request');
   sig.emitSignal(clearDuringTurn, 'turn-end', 'new turn complete');
   expect(sig.turnState(clearDuringTurn).state === 'completed',
     'the ordinary prompt after /clear must accept its own completion');
@@ -345,10 +387,11 @@ fs.writeFileSync(e2ePath, `
   await composer.renderPromptFixture(renderedClearDuringTurn, '? for shortcuts\\r\\n› /clear');
   composer.nativeInput(renderedClearDuringTurn, '\\r');
   const renderedClearedTurn = sig.turnState(renderedClearDuringTurn);
-  expect(renderedClearedTurn.state === 'idle'
+  expect(renderedClearedTurn.state === 'pending'
     && renderedClearedTurn.generation === renderedActiveGeneration + 1
     && renderedClearedTurn.completionBlocked === true,
-  'rendered /clear should override a history-edited shadow and end existing Codex work');
+  'rendered command submission should replace existing work with pending');
+  await composer.renderPromptFixture(renderedClearDuringTurn, '');
   sig.feedPtyChunk(renderedClearDuringTurn, '? for shortcuts\\r\\n› ');
   await wait(30); sig.flushRender();
   expect(sig.turnState(renderedClearDuringTurn).state === 'idle',
@@ -357,17 +400,20 @@ fs.writeFileSync(e2ePath, `
   expect(sig.turnState(renderedClearDuringTurn).state === 'idle',
     'native completion captured before rendered /clear must stay rejected');
   composer.nativeInput(renderedClearDuringTurn, 'next rendered request\\r');
-  expect(sig.turnState(renderedClearDuringTurn).state === 'working'
-    && sig.turnState(renderedClearDuringTurn).completionBlocked === false,
-  'the next ordinary rendered-session prompt must re-arm the normal lifecycle');
+  expect(sig.turnState(renderedClearDuringTurn).state === 'pending',
+    'the next ordinary rendered-session prompt must await provider evidence');
+  sig.feedPtyChunk(renderedClearDuringTurn, titleOsc('\\u2839 Next rendered request'));
+  expect(sig.turnState(renderedClearDuringTurn).state === 'working',
+    'the next rendered-session prompt should start after title activity: '
+      + JSON.stringify(sig.turnState(renderedClearDuringTurn)));
   sig.emitSignal(renderedClearDuringTurn, 'turn-end', 'rendered follow-up complete');
   expect(sig.turnState(renderedClearDuringTurn).state === 'completed',
     'rendered-session completion after re-arming must be accepted');
 
   const clearVariants = sig.addFakeSession({ name: 'codex-clear-variants', agent: 'codex', turnState: 'idle' });
   sig.typeInput(clearVariants, '/clear foo\\r');
-  expect(sig.turnState(clearVariants).state === 'working',
-    '/clear with arguments must retain ordinary Codex submission behavior');
+  expect(sig.turnState(clearVariants).state === 'pending',
+    '/clear with arguments should use ordinary pending Codex submission behavior');
   const claudeClear = sig.addFakeSession({ name: 'claude-clear', agent: 'claude', turnState: 'idle' });
   sig.typeInput(claudeClear, '/clear\\r');
   expect(sig.turnState(claudeClear).state === 'working',
@@ -377,6 +423,7 @@ fs.writeFileSync(e2ePath, `
   sig.focus(holder);
   sig.setSignalToken(codexV2Recovery, 'codex-secret');
   sig.typeInput(codexV2Recovery, 'first turn\\r');
+  sig.feedPtyChunk(codexV2Recovery, titleOsc('\\u2839 codex-v2-recovery'));
   const codexBase = { v: 2, sessionId: codexV2Recovery, token: 'codex-secret', agent: 'codex',
     reason: null, message: 'First turn complete', turnId: 'codex-turn-1', eventId: 'codex-event-1',
     sequence: 7, timestamp: Date.now() + 10, source: 'codex:agent-turn-complete',
@@ -385,13 +432,14 @@ fs.writeFileSync(e2ePath, `
   expect(sig.turnState(codexV2Recovery).state === 'completed', 'Codex v2 should complete the first turn');
   expect(sig.turnState(codexV2Recovery).hasV2 === true, 'first turn should record v2 authority');
   sig.typeInput(codexV2Recovery, 'second turn\\r');
-  expect(sig.turnState(codexV2Recovery).state === 'working', 'second submitted turn should start working');
+  expect(sig.turnState(codexV2Recovery).state === 'pending', 'second submitted turn should start pending');
   expect(sig.turnState(codexV2Recovery).hasV2 === false,
     'new turn must clear prior-turn v2 authority without clearing session history');
   expect(sig.turnState(codexV2Recovery).sequence === 7,
     'new turn must retain the accepted session event sequence');
   expect(sig.turnState(codexV2Recovery).eventIds.includes('codex-event-1'),
     'new turn must retain session event deduplication history');
+  sig.feedPtyChunk(codexV2Recovery, titleOsc('\\u2839 codex-v2-recovery'));
   sig.feedPtyChunk(codexV2Recovery, '\\x1b[?25l\\x1b[2K\\r\\x1b[38;5;245m? for shortcuts\\r\\n');
   expect(sig.turnState(codexV2Recovery).state === 'working',
     'partial ANSI-rich idle redraw must not complete early');
@@ -427,8 +475,8 @@ fs.writeFileSync(e2ePath, `
   sig.typeInput(falseGlyph, 'keep running\\r');
   sig.feedPtyChunk(falseGlyph, '\\r\\n\\u203a ');
   await wait(30); sig.flushRender();
-  expect(sig.turnState(falseGlyph).state === 'working',
-    'ordinary output ending in a prompt glyph without Codex chrome must not complete');
+  expect(sig.turnState(falseGlyph).state === 'pending',
+    'a prompt glyph without Codex chrome or meaningful activity must remain pending');
 
   const staleComposer = sig.addTerminalSession({ name: 'codex-stale-composer', agent: 'codex' });
   sig.focus(holder);
@@ -437,13 +485,14 @@ fs.writeFileSync(e2ePath, `
   sig.feedPtyChunk(staleComposer, '? for shortcuts\\r\\n\\u203a ');
   sig.typeInput(staleComposer, 'second request\\r');
   await wait(30); sig.flushRender();
-  expect(sig.turnState(staleComposer).state === 'working'
+  expect(sig.turnState(staleComposer).state === 'pending'
     && sig.turnState(staleComposer).generation === staleGeneration + 1,
-    'a prior turn composer callback must not complete newly submitted input');
+    'a prior turn composer callback must not resolve newly submitted input');
 
-  const activeCodex = sig.addFakeSession({ name: 'codex-active', agent: 'codex' });
+  const activeCodex = sig.addTerminalSession({ name: 'codex-active', agent: 'codex' });
   sig.typeInput(activeCodex, 'keep working\\r');
   sig.feedPtyChunk(activeCodex, '\\x1b[32mRunning tests and editing files...\\x1b[0m\\r\\n');
+  await wait(30); sig.flushRender();
   expect(sig.turnState(activeCodex).state === 'working',
     'active Codex output without an idle composer must continue working');
 
@@ -485,7 +534,7 @@ fs.writeFileSync(e2ePath, `
   expect(sig.turnState(a).state === 'working', 'submitted user input after completed → working');
   expect(itemsFor('COMPLETED', 'claude-a').length === 0, 'COMPLETED item gone after typing');
   sig.typeInput(codexDone, 'resume from idle\\r');
-  expect(sig.turnState(codexDone).state === 'working', 'submitted user input after idle → working');
+  expect(sig.turnState(codexDone).state === 'pending', 'submitted Codex input after idle → pending');
   sig.feedPtyChunk(a, 'done! all set.\\r\\n');
   expect(sig.turnState(a).state === 'working', 'stale phrases must not resurrect completion');
   expect(itemsFor('COMPLETED', 'claude-a').length === 0, 'no resurrection in the queue either');

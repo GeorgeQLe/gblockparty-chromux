@@ -35,7 +35,7 @@ fs.writeFileSync(e2ePath, `
   expect(tabs.activityPreferenceStored() === null, 'default should not eagerly write local storage');
   expect(tabs.activityToggleState() === true, 'settings switch should reflect enabled default');
 
-  const active = tabs.addSession({ name: 'active-agent', agent: 'codex' });
+  const active = tabs.addSession({ name: 'active-agent', agent: 'codex', realTerminal: true });
   const background = tabs.addSession({ name: 'background-agent', agent: 'claude' });
   tabs.focus(active);
   expect(tabs.state(active).indicator === 'live', 'unknown active turn should retain live dot');
@@ -43,24 +43,44 @@ fs.writeFileSync(e2ePath, `
 
   tabs.typeInput(active, 'build this\\r');
   tabs.emitSignal(background, 'turn-start');
-  expect(tabs.state(active).indicator === 'working', 'inferred active working state should show spinner');
+  expect(tabs.state(active).indicator === 'pending'
+    && tabs.state(active).ariaLabel.includes('Awaiting agent activity'),
+  'pending Codex input should not show a spinner and should expose its awaiting status');
+  tabs.feed(active, '\\x1b]0;\\u2839 active-agent\\x07');
+  expect(tabs.state(active).indicator === 'working', 'animated Codex title should show the spinner');
   expect(tabs.state(background).indicator === 'working', 'signaled background working state should show spinner');
   expect(tabs.state(active).ariaLabel.includes('Agent working'), 'working status should be accessible on the tab');
 
   tabs.typeInput(active, '/clear\\r');
-  expect(tabs.state(active).indicator === 'idle'
-    && tabs.state(active).ariaLabel.includes('Agent idle'),
-  'focused Codex /clear should immediately replace the spinner with idle across tab projections');
+  expect(tabs.state(active).indicator === 'pending'
+    && tabs.state(active).ariaLabel.includes('Awaiting agent activity'),
+  'focused Codex commands should await provider evidence without a spinner');
+  tabs.feed(active, '? for shortcuts\\r\\n› ');
+  await wait(30); tabs.flushRender();
+  expect(tabs.state(active).indicator === 'idle',
+    'a focused composer redraw without activity should resolve pending to idle');
   tabs.typeInput(active, 'build this again\\r');
+  expect(tabs.state(active).indicator === 'pending',
+    'ordinary input after a command-only turn should return to pending');
+  tabs.feed(active, '\\x1b]0;\\u2839 active-agent\\x07');
   expect(tabs.state(active).indicator === 'working',
-    'ordinary input after focused /clear should restore the spinner');
+    'ordinary input should show the spinner after title activity');
 
-  const backgroundCodex = tabs.addSession({ name: 'background-codex-clear', agent: 'codex' });
+  const backgroundCodex = tabs.addSession({
+    name: 'background-codex-clear', agent: 'codex', realTerminal: true,
+  });
   tabs.focus(active);
   tabs.typeInput(backgroundCodex, 'background work\\r');
+  expect(tabs.state(backgroundCodex).indicator === 'pending',
+    'background Codex fixture should begin pending');
+  tabs.feed(backgroundCodex, '\\x1b]0;\\u2839 background-codex-clear\\x07');
   expect(tabs.state(backgroundCodex).indicator === 'working',
-    'background Codex fixture should begin working');
+    'background Codex fixture should begin working after title activity');
   tabs.typeInput(backgroundCodex, '  /clear  \\r');
+  expect(tabs.state(backgroundCodex).indicator === 'pending',
+    'background command submission should drop the spinner while pending');
+  tabs.feed(backgroundCodex, '? for shortcuts\\r\\n› ');
+  await wait(30); tabs.flushRender();
   const clearedRow = document.querySelector('#thread-list .rail-session-row[data-session-id="'
     + CSS.escape(backgroundCodex) + '"]');
   expect(tabs.state(backgroundCodex).indicator === 'idle'

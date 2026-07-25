@@ -855,8 +855,6 @@ const CODEX_PROMPT_PLACEHOLDER_RE = /^(?:ask codex(?: anything)?|type (?:a )?(?:
 const CODEX_PROMPT_CHROME_RE = /(?:\?\s+for shortcuts|\bcontext left\b|^\s*choose an option:)/iu;
 const CODEX_FRAME_EDGE_RE = /^\s*[╭╰┌└┏┗╔╚].*[╮╯┐┘┓┛╗╝]\s*$/u;
 const CODEX_FRAME_VERTICAL_RE = /^\s*[│┃║]\s?(.*?)(?:\s?[│┃║])?\s*$/u;
-const CODEX_SLASH_COMMAND_PREFIX_RE = /^\/[a-z][a-z0-9-]*$/u;
-const CODEX_SLASH_COMMAND_MENU_ROW_RE = /^\s*(\/[a-z][a-z0-9-]*)(?:\s+|$)/u;
 
 function terminalBufferRow(buffer, index) {
   const line = buffer && typeof buffer.getLine === 'function' ? buffer.getLine(index) : null;
@@ -953,67 +951,6 @@ function resolveCurrentTerminalPrompt(session) {
     confidence: rendered.status === 'unsupported' ? 'fallback' : 'low',
     canClear: Boolean(shadow) && rendered.status === 'unsupported',
   };
-}
-
-function resolveCodexClearAutocompleteSubmission(session, renderedText) {
-  const prefix = String(renderedText || '').trim();
-  if (prefix === '/clear'
-    || !CODEX_SLASH_COMMAND_PREFIX_RE.test(prefix)
-    || !'/clear'.startsWith(prefix)) return undefined;
-  const term = session && session.term && session.term.term;
-  const buffer = term && term.buffer && term.buffer.active;
-  if (!buffer || !Number.isFinite(buffer.baseY) || !Number.isFinite(buffer.cursorY)) return undefined;
-
-  const cursorRow = buffer.baseY + buffer.cursorY;
-  const scanEnd = Math.min(buffer.length - 1, cursorRow + 16);
-  const matchingCandidates = new Set();
-  for (let index = cursorRow + 1; index <= scanEnd; index += 1) {
-    const row = terminalBufferRow(buffer, index);
-    if (!row || row.wrapped) continue;
-    const match = codexPromptRowContent(row.text).match(CODEX_SLASH_COMMAND_MENU_ROW_RE);
-    if (match && match[1].startsWith(prefix)) matchingCandidates.add(match[1]);
-  }
-  return matchingCandidates.size === 1 && matchingCandidates.has('/clear') ? '/clear' : undefined;
-}
-
-function captureCodexRenderedSubmission(session, data) {
-  if (!session || session.agent !== 'codex') return undefined;
-  const raw = String(data || '');
-  const t = session.term;
-  if (raw === '\t') {
-    const rendered = readCodexRenderedPrompt(session);
-    const command = rendered.status === 'resolved'
-      ? resolveCodexClearAutocompleteSubmission(session, rendered.text)
-      : undefined;
-    t.clearAutocompleteIntent = command
-      ? { command, prefix: rendered.text.trim() }
-      : null;
-    t.clearAutocompleteInferenceBlocked = false;
-    return undefined;
-  }
-  const submitIndex = raw.search(/[\r\n]/);
-  if (submitIndex < 0) {
-    if (t.clearAutocompleteIntent) {
-      t.clearAutocompleteIntent = null;
-      t.clearAutocompleteInferenceBlocked = true;
-    }
-    return undefined;
-  }
-  // A standalone Enter lets xterm's rendered editor reflect every preceding
-  // autocomplete/history edit. Combined paste-and-submit payloads have not
-  // rendered their prefix yet, so their keystroke shadow remains canonical.
-  const intent = t.clearAutocompleteIntent;
-  const inferenceBlocked = t.clearAutocompleteInferenceBlocked;
-  t.clearAutocompleteIntent = null;
-  t.clearAutocompleteInferenceBlocked = false;
-  if (raw.slice(0, submitIndex)) return undefined;
-  const rendered = readCodexRenderedPrompt(session);
-  if (rendered.status !== 'resolved' || !rendered.text.trim()) return undefined;
-  const renderedText = rendered.text.trim();
-  if (renderedText === '/clear') return rendered.text;
-  if (intent && intent.command === '/clear' && renderedText === intent.prefix) return '/clear';
-  return (!inferenceBlocked && resolveCodexClearAutocompleteSubmission(session, rendered.text))
-    || rendered.text;
 }
 
 function trackTypedPreviewSuppressions(session, data) {
@@ -1247,7 +1184,7 @@ const EVENT_RING_MAX = 500;
 
 function recordEvent(event) {
   // Keystroke payloads and bulky blobs stay out of the diagnostic ring.
-  const { data, patch, submittedLine, ...rest } = event;
+  const { data, patch, ...rest } = event;
   state.events.push({ ...rest, ts: Date.now() });
   if (state.events.length > EVENT_RING_MAX) {
     state.events.splice(0, state.events.length - EVENT_RING_MAX);
@@ -1278,7 +1215,7 @@ function apply(event) {
       break;
     case 'user-input':
       // Only state-changing input is worth ring space — raw typing is noise.
-      const shadowSubmittedLine = session ? trackTypedPreviewSuppressions(session, event.data) : '';
+      if (session) trackTypedPreviewSuppressions(session, event.data);
       if (!session) return;
       const submitted = /[\r\n]/.test(String(event.data || ''));
       if (submitted) session.lastActivityAt = Date.now();
@@ -1286,7 +1223,6 @@ function apply(event) {
         session,
         event.data,
         Date.now(),
-        typeof event.submittedLine === 'string' ? event.submittedLine : shadowSubmittedLine,
       );
       if (!inputTurnChanged) {
         if (submitted) invalidate('attention');
@@ -1483,7 +1419,7 @@ function newSessionShape({ id, name, cwd, agent }) {
     capabilities,
     lifecycle: { alive: true, exitCode: null, exitedAt: null, resumeLaunch: null },
     turn: {
-      state: 'unknown', // 'unknown' | 'working' | 'idle' | 'needsInput' | 'completed'
+      state: 'unknown', // 'unknown' | 'pending' | 'working' | 'idle' | 'needsInput' | 'completed'
       instrumented: false, // true once a deterministic signal has arrived
       detail: null,
       since: 0,
@@ -1492,7 +1428,7 @@ function newSessionShape({ id, name, cwd, agent }) {
       token: null, protocol: null, authoritative: false, hasV2: false, inputAt: 0, reason: null,
       source: null, confidence: null, turnId: null, eventId: null,
       eventIds: [], sequence: -1, stopped: false, authoritativeAt: 0,
-      generation: 0, sawBusyRender: false, completionBlocked: false,
+      generation: 0, activityObserved: false, completionBlocked: false,
     },
     browser: createBrowserState(),
     term: {
@@ -1510,8 +1446,6 @@ function newSessionShape({ id, name, cwd, agent }) {
       typedInputBuf: '',
       typedInputCursor: 0,
       promptSnapshotInvalidated: false,
-      clearAutocompleteIntent: null,
-      clearAutocompleteInferenceBlocked: false,
       previewSuppress: [],
     },
     composer: {
@@ -4073,7 +4007,8 @@ function groupAttentionCount(group) {
 }
 
 function groupStatus(group) {
-  const priority = new Map([['action', 0], ['dead', 1], ['working', 2], ['completed', 3], ['idle', 4], ['live', 5]]);
+  const priority = new Map([['action', 0], ['dead', 1], ['working', 2], ['pending', 3],
+    ['completed', 4], ['idle', 5], ['live', 6]]);
   return group.sessions.map((session) => sessionTabIndicator(session))
     .sort((a, b) => (priority.get(a.kind) ?? 99) - (priority.get(b.kind) ?? 99))[0]
     || { kind: 'live', status: 'No sessions' };
@@ -4483,7 +4418,7 @@ function diagnosticGroup(label, cells) {
 
 function actualTabIndicator(session) {
   if (!session.els || !session.els.dot) return 'missing';
-  return ['dead', 'action', 'working', 'completed', 'idle', 'live']
+  return ['dead', 'action', 'working', 'pending', 'completed', 'idle', 'live']
     .find((kind) => session.els.dot.classList.contains(kind)) || 'unknown';
 }
 
@@ -5569,8 +5504,7 @@ function handleTerminalInput(session, data) {
   }
   const outgoing = rewrite ? rewrite.data : data;
   if (rewrite) adoptSessionAgent(session, rewrite.agent, 'rewrite', { command: rewrite.command });
-  const submittedLine = captureCodexRenderedSubmission(session, outgoing);
-  apply({ type: 'user-input', sessionId: session.id, data: outgoing, submittedLine });
+  apply({ type: 'user-input', sessionId: session.id, data: outgoing });
   writePtyInput(session, outgoing);
   return rewrite;
 }
@@ -6552,12 +6486,23 @@ function applyTerminalTitleUpdates(session, data) {
   const res = window.chromuxSignals.extractTerminalTitles(session.term.titleBuf, data);
   session.term.titleBuf = res.buf;
   if (res.titles.length === 0) return;
+  let lifecycleStateChanged = false;
+  for (const title of res.titles) {
+    const previousState = session.turn.state;
+    const applied = window.chromuxAttention.applyCodexTitleEvidence(
+      session, title.title, Date.now(), session.id === state.activeId,
+    );
+    lifecycleStateChanged = (applied && session.turn.state !== previousState) || lifecycleStateChanged;
+  }
   const latest = res.titles[res.titles.length - 1].title;
-  if (!latest || latest === session.term.title) return;
-  session.term.title = latest;
-  syncThreadSessionPresentation(session);
-  reorderMountedThreadRows();
-  invalidate('tabs', ...(state.env && state.env.devMode ? ['diagnostics'] : []));
+  if (latest && latest !== session.term.title) {
+    session.term.title = latest;
+    syncThreadSessionPresentation(session);
+    reorderMountedThreadRows();
+  }
+  if (lifecycleStateChanged) session.lastActivityAt = Date.now();
+  invalidate('tabs', ...(lifecycleStateChanged ? ['attention', 'update', 'badges'] : []),
+    ...(state.env && state.env.devMode ? ['diagnostics'] : []));
 }
 
 function renderedTerminalCursorContext(term) {
@@ -6572,10 +6517,12 @@ function renderedTerminalCursorContext(term) {
   return { cursorLine, nearbyLines };
 }
 
-function recoverCodexCompletionFromRenderedTerminal(session, expectedGeneration) {
+function recoverCodexCompletionFromRenderedTerminal(session, expectedGeneration, output = '') {
   if (!session || session.turn.generation !== expectedGeneration) return false;
   const rendered = renderedTerminalCursorContext(session && session.term && session.term.term);
-  if (!rendered || !window.chromuxAttention.applyCodexRenderedCompletionFallback(session, rendered, Date.now())) return false;
+  if (!rendered || !window.chromuxAttention.applyCodexRenderedCompletionFallback(
+    session, { ...rendered, output }, Date.now(),
+  )) return false;
   session.lastActivityAt = Date.now();
   if (session.id === state.activeId) {
     session.turn.attentionSeenAt = Math.max(session.turn.attentionSeenAt || 0, session.turn.since || 0);
@@ -6585,8 +6532,19 @@ function recoverCodexCompletionFromRenderedTerminal(session, expectedGeneration)
     type: 'turn-recovered', sessionId: session.id, turnState: session.turn.state,
     source: 'codex:terminal-idle', confidence: 'low',
   });
-  invalidate('update', 'attention', 'badges', 'tabs');
+  invalidate('update', 'attention', 'badges', 'tabs',
+    ...(state.env && state.env.devMode ? ['diagnostics'] : []));
   return true;
+}
+
+function hasVisibleTerminalPayload(data) {
+  return String(data || '')
+    .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\|$)/g, '')
+    .replace(/\x1b[PX^_][\s\S]*?(?:\x1b\\|$)/g, '')
+    .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '')
+    .replace(/\x1b[@-_]/g, '')
+    .replace(/[\x00-\x20\x7f]/g, '')
+    .length > 0;
 }
 
 // pty event routing — Chromux OSC signals are extracted (chunk-boundary safe)
@@ -6635,7 +6593,10 @@ function handlePtyData(id, data) {
   }
   if (res.clean) {
     const recoveryGeneration = s.turn.generation;
-    s.term.term.write(res.clean, () => recoverCodexCompletionFromRenderedTerminal(s, recoveryGeneration));
+    const shouldRecover = hasVisibleTerminalPayload(res.clean);
+    s.term.term.write(res.clean, () => {
+      if (shouldRecover) recoverCodexCompletionFromRenderedTerminal(s, recoveryGeneration, res.clean);
+    });
     feedDetector(s, res.clean);
   }
   if (s.agent === '' && s.lifecycle.alive) scanPtyAgentDescendants(false).catch(() => {});
@@ -8249,7 +8210,8 @@ if (window.chromuxTest) {
         marquee: tab.classList.contains('marquee'),
         paused: tab.classList.contains('paused'),
         hoverScroll: tab.classList.contains('hover-scroll'),
-        indicator: ['dead', 'action', 'working', 'completed', 'idle', 'live'].find((kind) => session.els.dot.classList.contains(kind)) || 'unknown',
+        indicator: ['dead', 'action', 'working', 'pending', 'completed', 'idle', 'live']
+          .find((kind) => session.els.dot.classList.contains(kind)) || 'unknown',
         indicatorCount: tab.querySelectorAll('.tab-dot').length,
         label: label.textContent,
         title: tab.title,
@@ -8307,7 +8269,7 @@ if (window.chromuxTest) {
         id: tab.dataset.groupId,
         label: tab.querySelector('.tab-label-wrap')?.textContent || '',
         count: tab.querySelector('.group-session-count')?.textContent || '',
-        indicator: ['dead', 'action', 'working', 'completed', 'idle', 'live']
+        indicator: ['dead', 'action', 'working', 'pending', 'completed', 'idle', 'live']
           .find((kind) => tab.querySelector('.tab-dot')?.classList.contains(kind)) || '',
         badge: tab.querySelector('.tab-badge')?.textContent || '0',
         active: tab.classList.contains('active'),
@@ -9879,6 +9841,7 @@ if (window.chromuxTest) {
     addSession: addRenderableTestSession,
     focus(id) { activateSession(id); flushRender(); },
     typeInput(id, data = 'x') { apply({ type: 'user-input', sessionId: id, data }); flushRender(); },
+    ptyOutput(id, data) { handlePtyData(id, data); flushRender(); },
     select(id) {
       const selector = $('#diagnostic-session');
       selector.value = id;

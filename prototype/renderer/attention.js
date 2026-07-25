@@ -65,7 +65,7 @@
   function applyTurnSignal(turn, signal, detail, now, envelope = null) {
     const next = TURN_SIGNAL_STATES[signal];
     if (!turn || !next) return false;
-    if (next === 'completed' && turn.completionBlocked) return false;
+    if (next === 'completed' && (turn.completionBlocked || turn.state === 'pending')) return false;
     if (envelope) {
       if (!V2_EVENTS.has(signal)) return false;
       if (turn.inputAt && envelope.timestamp <= turn.inputAt) return false;
@@ -94,6 +94,10 @@
       turn.confidence = 'low';
     }
     turn.state = next;
+    if (next === 'working') {
+      turn.activityObserved = true;
+      turn.completionBlocked = false;
+    }
     turn.instrumented = true;
     turn.detail = (envelope && envelope.message) || detail || null;
     turn.since = next === 'completed'
@@ -103,49 +107,28 @@
     return true;
   }
 
-  function applyUserInputTurnTransition(session, input, now, submittedLine = '') {
+  function applyUserInputTurnTransition(session, input, now) {
     const turn = session && session.turn;
     if (!turn) return false;
     const submitted = /[\r\n]/.test(input || '');
     if (!submitted) return false;
-    if (session.agent === 'codex' && String(submittedLine || '').trim() === '/clear') {
-      turn.state = 'idle';
+    if (session.agent === 'codex') {
+      turn.state = 'pending';
       turn.detail = null;
       turn.since = now;
       turn.acknowledged = false;
       turn.generation = (Number(turn.generation) || 0) + 1;
-      turn.sawBusyRender = false;
+      turn.activityObserved = false;
       turn.completionBlocked = true;
       resetTurnProtocol(turn, now);
       return true;
     }
-    if (session.agent === 'codex') turn.completionBlocked = false;
     if (['idle', 'needsInput', 'permission', 'authentication', 'rateLimited', 'toolFailed', 'completed'].includes(turn.state)) {
       turn.state = 'working';
       turn.detail = null;
       turn.since = now;
       turn.acknowledged = false;
       turn.generation = (Number(turn.generation) || 0) + 1;
-      turn.sawBusyRender = false;
-      resetTurnProtocol(turn, now);
-      return true;
-    }
-    if (session.agent === 'codex' && turn.state === 'unknown') {
-      turn.state = 'working';
-      turn.detail = null;
-      turn.since = now;
-      turn.acknowledged = false;
-      turn.generation = (Number(turn.generation) || 0) + 1;
-      turn.sawBusyRender = false;
-      resetTurnProtocol(turn, now);
-      return true;
-    }
-    if (session.agent === 'codex' && turn.state === 'working') {
-      turn.detail = null;
-      turn.since = now;
-      turn.acknowledged = false;
-      turn.generation = (Number(turn.generation) || 0) + 1;
-      turn.sawBusyRender = false;
       resetTurnProtocol(turn, now);
       return true;
     }
@@ -161,21 +144,92 @@
     return true;
   }
 
+  function applyCodexTitleEvidence(session, title, now, focused = false) {
+    const turn = session && session.turn;
+    if (!turn || session.agent !== 'codex') return false;
+    const value = String(title || '');
+    const animated = /^[\u2800-\u28ff](?:\s+|$)/u.test(value);
+    if (animated) {
+      if (!['pending', 'working'].includes(turn.state)) return false;
+      turn.state = 'working';
+      turn.detail = value.replace(/^[\u2800-\u28ff](?:\s+|$)/u, '').trim() || 'Codex working';
+      turn.since = now;
+      turn.acknowledged = false;
+      turn.activityObserved = true;
+      turn.completionBlocked = false;
+      turn.protocol = 'output';
+      turn.source = 'codex:title-active';
+      turn.confidence = 'high';
+      return true;
+    }
+    if (turn.state !== 'working' || !turn.activityObserved) return false;
+    turn.state = focused ? 'idle' : 'completed';
+    turn.detail = focused ? null : (value.trim() || 'Codex turn finished');
+    turn.since = focused ? now : Math.max(now, (Number(turn.attentionSeenAt) || 0) + 1);
+    turn.acknowledged = false;
+    turn.protocol = 'output';
+    turn.source = 'codex:title-idle';
+    turn.confidence = 'high';
+    return true;
+  }
+
   function applyCodexRenderedCompletionFallback(session, rendered, now) {
     const turn = session && session.turn;
-    if (!turn || session.agent !== 'codex' || turn.state !== 'working' || turn.completionBlocked) return false;
+    if (!turn || session.agent !== 'codex' || !['pending', 'working'].includes(turn.state)) return false;
     const cursorLine = normalizeTerminalOutput(rendered && rendered.cursorLine).trimEnd();
     const nearbyLines = Array.isArray(rendered && rendered.nearbyLines)
       ? rendered.nearbyLines.map((line) => normalizeTerminalOutput(line)) : [];
+    const currentOutput = normalizeTerminalOutput(rendered && rendered.output);
     const composerAtCursor = /^\s*[›❯]\s*$/.test(cursorLine);
     const codexChrome = nearbyLines.some((line) => /(?:\?\s+for shortcuts|\bcontext left\b|^\s*Choose an option:)/i.test(line));
     const rateLimitChooser = nearbyLines.some((line) => /^\s*Choose an option:/i.test(line))
       && nearbyLines.some((line) => /Wait until the rate limit resets/i.test(line));
+    const meaningfulOutput = currentOutput.split('\n').some((line) => {
+      const value = String(line || '').trim();
+      return /[\p{L}\p{N}]/u.test(value)
+        && !/^[›❯](?:\s+.*)?$/u.test(value)
+        && !/^\/[a-z][a-z0-9-]*(?:\s+.*)?$/iu.test(value)
+        && !/(?:\?\s+for shortcuts|\bcontext left\b)/i.test(value);
+    });
     if (!composerAtCursor || !codexChrome) {
-      turn.sawBusyRender = true;
-      return false;
+      if (turn.state !== 'pending' || !meaningfulOutput) return false;
+      turn.state = 'working';
+      turn.detail = 'Codex activity observed';
+      turn.since = now;
+      turn.acknowledged = false;
+      turn.activityObserved = true;
+      turn.completionBlocked = false;
+      turn.protocol = 'output';
+      turn.source = 'codex:terminal-active';
+      turn.confidence = 'low';
+      return true;
     }
-    if (!rateLimitChooser && !turn.sawBusyRender) return false;
+    if (turn.state === 'pending' && !rateLimitChooser) {
+      if (meaningfulOutput) {
+        turn.state = 'working';
+        turn.detail = 'Codex activity observed';
+        turn.since = now;
+        turn.acknowledged = false;
+        turn.activityObserved = true;
+        turn.completionBlocked = false;
+        turn.protocol = 'output';
+        turn.source = 'codex:terminal-active';
+        turn.confidence = 'low';
+        return true;
+      }
+      turn.state = 'idle';
+      turn.detail = null;
+      turn.since = now;
+      turn.acknowledged = false;
+      turn.protocol = 'output';
+      turn.source = 'codex:terminal-idle';
+      turn.confidence = 'low';
+      turn.completionBlocked = true;
+      return true;
+    }
+    if (!turn.activityObserved && !rateLimitChooser) return false;
+    turn.activityObserved = true;
+    turn.completionBlocked = false;
     turn.state = 'completed';
     turn.detail = 'Codex turn finished';
     turn.since = Math.max(now, (Number(turn.attentionSeenAt) || 0) + 1);
@@ -204,7 +258,8 @@
     if (turnState === 'idle') return { safe: true, reason: 'idle' };
     return {
       safe: false,
-      reason: turnState === 'working' ? 'agent turn in progress' : 'live work state unknown',
+      reason: turnState === 'working' ? 'agent turn in progress'
+        : turnState === 'pending' ? 'awaiting agent activity' : 'live work state unknown',
     };
   }
 
@@ -397,6 +452,9 @@
     if (activityIndicators && turnState === 'working') {
       return { kind: 'working', icon: '', label: 'Working', status: 'Agent working' };
     }
+    if (turnState === 'pending') {
+      return { kind: 'pending', icon: '', label: 'Awaiting agent activity', status: 'Awaiting agent activity' };
+    }
     if (activityIndicators && turnState === 'completed') {
       return { kind: 'completed', icon: '✓', label: 'Completed', status: 'Turn completed' };
     }
@@ -439,6 +497,7 @@
     applyTurnSignal,
     applyUserInputTurnTransition,
     consumeCompletedTurn,
+    applyCodexTitleEvidence,
     applyCodexRenderedCompletionFallback,
     projectSessionStatus,
     projectAttentionItems,

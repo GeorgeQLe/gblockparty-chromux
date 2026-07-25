@@ -96,6 +96,7 @@ fs.writeFileSync(e2ePath, `
   await wait(5);
   expect(await rail.submitComposer(activityProbe, 'composer prompt'), 'composer fixture should submit');
   expect(rail.activityAt(activityProbe) > 7000, 'submitted composer input should update recent activity');
+  rail.emit(activityProbe, 'turn-start');
   rail.setActivity(activityProbe, 8000);
   await wait(5);
   rail.emit(activityProbe, 'turn-end');
@@ -237,6 +238,8 @@ fs.writeFileSync(e2ePath, `
   expect(!rail.preview() && rail.rowState(web).focused, 'Escape should dismiss preview and restore focus to its row');
   expect(rail.rowState(web).ariaExpanded === 'false', 'dismissal should reset expanded ARIA state');
   rail.focusThreadSortControl();
+  expect(rail.threadSortControl().focused,
+    'thread sort control should receive focus before keyboard preview reopening');
   rail.focusRow(web);
   expect(rail.preview()?.sessionId === web && rail.rowState(web).focused,
     'keyboard focus should open the inactive row preview immediately without moving focus: '
@@ -576,16 +579,39 @@ fs.writeFileSync(e2ePath, `
   });
   rail.focus(holder);
   rail.submit(clearRailCodex, 'clearable Codex work\\r');
+  expect(!rail.groups().find((group) => group.key === 'status:working')
+    ?.rows.some((row) => row.id === clearRailCodex),
+  'pending Codex work should not enter the Working section before activity');
+  rail.title(clearRailCodex, '\u2839 clear-rail-codex');
   expect(rail.groups().find((group) => group.key === 'status:working')
     ?.rows.some((row) => row.id === clearRailCodex),
-  'submitted Codex work should enter the Working section');
+  'title-confirmed Codex work should enter the Working section');
+  const codexWorkingRow = document.querySelector(
+    '#thread-list .working-thread-group .rail-session-row[data-session-id="'
+      + CSS.escape(clearRailCodex) + '"]',
+  );
+  const codexWorkingSpinner = codexWorkingRow?.querySelector('.rail-status');
+  rail.title(clearRailCodex, '\u2838 clear-rail-codex');
+  rail.title(clearRailCodex, '\u283c clear-rail-codex');
+  const codexWorkingRowAfterFrames = document.querySelector(
+    '#thread-list .working-thread-group .rail-session-row[data-session-id="'
+      + CSS.escape(clearRailCodex) + '"]',
+  );
+  expect(codexWorkingRowAfterFrames === codexWorkingRow
+    && codexWorkingRowAfterFrames?.querySelector('.rail-status') === codexWorkingSpinner,
+  'Codex animated title evidence should preserve its mounted Working row and spinner');
   rail.submit(clearRailCodex, '  /clear  \\r');
+  expect(!rail.groups().find((group) => group.key === 'status:working')
+    ?.rows.some((row) => row.id === clearRailCodex),
+  'pending command submission should immediately leave the Working section');
+  rail.ptyOutput(clearRailCodex, '? for shortcuts\\r\\n› ');
+  await wait(30); rail.flushRender();
   const clearedCodexRow = rail.groups().flatMap((group) => group.rows)
     .find((row) => row.id === clearRailCodex);
   expect(!rail.groups().find((group) => group.key === 'status:working')
     ?.rows.some((row) => row.id === clearRailCodex)
     && clearedCodexRow?.status === 'Idle',
-  'exact Codex /clear should immediately leave Working and return to its cwd group as Idle');
+  'a command-only composer redraw should return Codex to its cwd group as Idle');
   rail.close(clearRailCodex);
   rail.focus(holder);
   rail.hoverRow(webTwo);

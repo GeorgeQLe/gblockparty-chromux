@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.58.2
+
+Tag: `chromux-v0.58.2`
+
+- Put each submitted Codex turn into an update-blocking **Awaiting agent activity** state without showing a Working spinner or placing it in the Working section.
+- Start Working only from a Braille-prefixed Codex title or meaningful terminal output, and finish from the stable title or an idle composer redraw; focused finishes become Idle while background finishes retain one completion notice.
+- Remove all `/clear` parsing, autocomplete intent, and rendered-command session state while preserving generation invalidation, stale-completion rejection, title/spinner continuity, and unchanged Claude/Grok lifecycle behavior.
+
 ## GBlockParty Chromux v0.58.1
 
 Tag: `chromux-v0.58.1`

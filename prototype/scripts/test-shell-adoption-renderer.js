@@ -47,7 +47,8 @@ fs.writeFileSync(e2ePath, `
   );
   expect(adopt.agent(typed) === 'codex', 'typed codex should adopt session identity');
   expect(adopt.header(typed).includes('CODEX'), 'terminal header should update to CODEX');
-  expect(adopt.turnState(typed).state === 'working', 'typed codex submit should mark Codex working');
+  expect(adopt.turnState(typed).state === 'pending',
+    'typed Codex launch should await provider activity without showing working');
   expect(adopt.snapshot().find((row) => row.name === 'typed-codex').agent === 'codex',
     'snapshot should persist adopted codex agent');
 

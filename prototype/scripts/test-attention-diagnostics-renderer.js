@@ -35,15 +35,28 @@ fs.writeFileSync(e2ePath, `
   ]);
   composer.nativeInput(first, '\\r');
   d.flushRender();
+  expect(d.groupText().includes('TURNpending')
+    && d.groupText().includes('TABpending')
+    && d.groupText().includes('UPDATE SAFENO · awaiting agent activity'),
+  'pending Codex input should project no spinner while remaining unsafe for updates');
+  expect(d.mismatches() === 0,
+    'pending tracked, tab, Threads, and update projections should agree');
+  await composer.renderPromptFixture(first, '');
+  d.ptyOutput(first, '? for shortcuts\\r\\n› ');
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  await settle();
   expect(d.groupText().includes('TURNidle')
     && d.groupText().includes('TABidle')
     && d.groupText().includes('UPDATE SAFEYES · idle'),
-  'autocomplete-dispatched Codex /clear should project idle through tracked/expected diagnostics and update safety');
-  expect(d.mismatches() === 0, 'autocomplete-cleared idle projections should agree with mounted Threads and tab state');
+  'command-only composer redraw should project idle through diagnostics and update safety: ' + d.groupText());
+  expect(d.mismatches() === 0, 'provider-resolved idle projections should agree with mounted Threads and tab state');
   composer.nativeInput(first, 'new diagnostic turn\\r');
   d.flushRender();
+  expect(d.groupText().includes('TURNpending') && d.groupText().includes('TABpending'),
+    'the next ordinary prompt should return tracked and tab state to pending');
+  d.ptyOutput(first, '\\x1b]0;\\u2839 codex-working\\x07');
   expect(d.groupText().includes('TURNworking') && d.groupText().includes('TABworking'),
-    'the next ordinary prompt after autocomplete-dispatched /clear should return tracked and tab state to working');
+    'animated title evidence should return tracked and tab state to working');
   d.emit(first, 'turn-end');
   expect(d.groupText().includes('COMPLETED'), 'background completion should agree with attention projection');
   expect(d.mismatches() === 0, 'projected completion should agree with rendered queue and tab');

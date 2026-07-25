@@ -235,9 +235,9 @@ fs.writeFileSync(e2ePath, `
   expect(q.attentionKinds()[0] === 'UPDATE READY', 're-queued ready update should return to attention');
 
   q.markUserInput(liveId);
-  expect(q.turnState(liveId).state === 'working', 'typing after idle should start a working turn');
-  expect(q.phase() === 'waiting', 'typing after idle should block updates again');
-  expect(q.blockers().join(',') === 'live-unknown', 'typed idle session should return to live-unknown blocker');
+  expect(q.turnState(liveId).state === 'pending', 'Codex input after idle should await activity');
+  expect(q.phase() === 'waiting', 'pending Codex input should block updates');
+  expect(q.blockers().join(',') === 'live-unknown', 'pending session should return to live-unknown blocker');
   q.setSession(liveId, { turnState: 'completed' });
   expect(q.phase() === 'ready', 'completed turn should make queued update ready again');
 
@@ -253,11 +253,14 @@ fs.writeFileSync(e2ePath, `
   expect(q.phase() === 'waiting', 'focusing a blocker leaves phase waiting');
   expect(q.blockers().join(',') === 'live-unknown', 'blocker unchanged by focus');
   sig.typeInput(liveId, '/clear\\r');
-  expect(q.turnState(liveId).state === 'idle', 'Codex /clear should immediately make the working session idle');
+  expect(q.turnState(liveId).state === 'pending', 'Codex command submission should await provider evidence');
+  expect(q.phase() === 'waiting' && q.blockers().length === 1,
+    'pending command submission must remain update-unsafe');
+  q.setSession(liveId, { turnState: 'idle' });
   expect(q.phase() === 'ready' && q.blockers().length === 0,
-    'Codex /clear should immediately remove the working update blocker');
+    'provider-resolved idle should remove the update blocker');
   sig.typeInput(liveId, 'new update-safe turn\\r');
-  expect(q.phase() === 'waiting', 'ordinary input after /clear should block updates again');
+  expect(q.phase() === 'waiting', 'ordinary pending input should block updates again');
   q.setSession(liveId, { turnState: 'completed' });
   expect(q.phase() === 'ready', 'ready again after completion');
 
