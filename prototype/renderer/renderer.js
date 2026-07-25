@@ -594,6 +594,21 @@ const QUEUE_REASON_BY_SOURCE = {
   POPUP: 'opened by page popup',
   RESTORE: 'restored from previous session',
 };
+const PREVIEW_PROBE_RETRY_DELAYS_MS = [0, 250, 750, 1500];
+const SERVER_READY_POLL_MS = 500;
+const SERVER_READY_DEADLINE_MS = 15000;
+
+function isProbeableLoopbackUrl(rawUrl) {
+  try {
+    const parsed = new URL(rawUrl);
+    return ['http:', 'https:'].includes(parsed.protocol)
+      && !parsed.username
+      && !parsed.password
+      && ['localhost', '127.0.0.1', '::1'].includes(parsed.hostname.toLowerCase().replace(/^\[|\]$/g, ''));
+  } catch {
+    return false;
+  }
+}
 
 function stripTerminalControlsForPreview(raw) {
   return String(raw || '')
@@ -728,6 +743,8 @@ function normalizeQueueItem(item, fallbackSource = 'RESTORE') {
     reason: hasReason ? item.reason.trim() : queueReasonForSource(source),
     detectedText: typeof item.detectedText === 'string' && item.detectedText ? item.detectedText : null,
     ts: Number.isFinite(item.ts) ? item.ts : Date.now(),
+    liveness: isProbeableLoopbackUrl(item.url) ? 'checking' : null,
+    probeGeneration: 0,
   };
 }
 
@@ -1564,6 +1581,7 @@ function createBrowserState() {
       ? globalThis.crypto.randomUUID()
       : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     queue: [],
+    serverLauncher: null,
     collapsed: true,
     expandedGridTemplate: 'minmax(320px, 46%) 6px minmax(360px, 1fr)',
   };
@@ -1606,6 +1624,7 @@ function createPageTabState(id, url, title = '') {
     consoleTotal: 0,
     picking: false,
     guestEditableFocused: false,
+    failedUrl: null,
   };
 }
 
@@ -1637,6 +1656,7 @@ function routePreview(session, url, source, detail = {}) {
     detectedText: detail.detectedText,
   });
   renderQueue(session);
+  probeQueuedPreview(session, url);
 }
 
 function flashRefresh(session) {
@@ -1644,6 +1664,161 @@ function flashRefresh(session) {
   el.classList.add('show');
   clearTimeout(session._flashT);
   session._flashT = setTimeout(() => el.classList.remove('show'), 1400);
+}
+
+function queuedPreview(session, url) {
+  return session.browser.queue.find((item) => item.url === url) || null;
+}
+
+function waitForPreviewProbeDelay(delay) {
+  return delay > 0 ? new Promise((resolve) => setTimeout(resolve, delay)) : Promise.resolve();
+}
+
+async function probeQueuedPreview(session, url, { retry = true } = {}) {
+  const item = queuedPreview(session, url);
+  if (!item || !isProbeableLoopbackUrl(url)) return 'unsupported';
+  item.probeGeneration = (item.probeGeneration || 0) + 1;
+  const generation = item.probeGeneration;
+  item.liveness = 'checking';
+  renderQueue(session);
+  const delays = retry ? PREVIEW_PROBE_RETRY_DELAYS_MS : [0];
+  for (const delay of delays) {
+    await waitForPreviewProbeDelay(delay);
+    if (!state.sessions.has(session.id) || queuedPreview(session, url) !== item || item.probeGeneration !== generation) {
+      return 'cancelled';
+    }
+    let result;
+    try { result = await window.chromux.previewProbe(url); } catch { result = { status: 'offline' }; }
+    if (queuedPreview(session, url) !== item || item.probeGeneration !== generation) return 'cancelled';
+    if (result && result.status === 'ready') {
+      item.liveness = 'ready';
+      renderQueue(session);
+      return 'ready';
+    }
+    if (result && result.status === 'unsupported') {
+      item.liveness = null;
+      renderQueue(session);
+      return 'unsupported';
+    }
+  }
+  item.liveness = 'offline';
+  renderQueue(session);
+  return 'offline';
+}
+
+function queueLoopbackFailure(session, url) {
+  if (!isProbeableLoopbackUrl(url)) return;
+  let item = queuedPreview(session, url);
+  if (!item) {
+    apply({
+      type: 'preview-queued',
+      sessionId: session.id,
+      url,
+      source: 'TERM',
+      reason: 'server connection failed',
+    });
+    item = queuedPreview(session, url);
+  }
+  if (!item) return;
+  item.probeGeneration = (item.probeGeneration || 0) + 1;
+  item.liveness = 'offline';
+  renderQueue(session);
+}
+
+function removeSuccessfulQueuedPreview(session, url) {
+  if (!isProbeableLoopbackUrl(url) || !queuedPreview(session, url)) return;
+  apply({ type: 'preview-opened', sessionId: session.id, url });
+  renderQueue(session);
+}
+
+function closeServerLauncher(session) {
+  if (!session?.browser?.serverLauncher) return;
+  session.browser.serverLauncher = null;
+  renderQueue(session);
+}
+
+async function openServerLauncher(session, item) {
+  session.browser.serverLauncher = {
+    url: item.url,
+    loading: true,
+    config: null,
+    selectedScript: null,
+    error: null,
+    launching: false,
+  };
+  renderQueue(session);
+  let config;
+  try { config = await window.chromux.projectConfig(session.cwd); } catch {
+    config = { valid: false, reason: 'Project scripts could not be read.' };
+  }
+  const launcher = session.browser.serverLauncher;
+  if (!state.sessions.has(session.id) || !launcher || launcher.url !== item.url) return;
+  launcher.loading = false;
+  launcher.config = config;
+  launcher.selectedScript = config.valid ? (config.recommendedScript || null) : null;
+  renderQueue(session);
+}
+
+async function pollLaunchedServer(session, url) {
+  const deadline = Date.now() + SERVER_READY_DEADLINE_MS;
+  while (Date.now() < deadline) {
+    if (!state.sessions.has(session.id)) return 'cancelled';
+    let result;
+    try { result = await window.chromux.previewProbe(url); } catch { result = { status: 'offline' }; }
+    const item = queuedPreview(session, url);
+    if (!item) return result?.status || 'cancelled';
+    if (result?.status === 'ready') {
+      item.liveness = 'ready';
+      renderQueue(session);
+      return 'ready';
+    }
+    await waitForPreviewProbeDelay(Math.min(SERVER_READY_POLL_MS, Math.max(0, deadline - Date.now())));
+  }
+  const item = queuedPreview(session, url);
+  if (item) {
+    item.liveness = 'offline';
+    renderQueue(session);
+  }
+  return 'offline';
+}
+
+async function launchServerScript(session, launcher) {
+  if (!launcher || launcher.launching || !launcher.selectedScript) return null;
+  launcher.launching = true;
+  launcher.error = null;
+  renderQueue(session);
+  let resolved;
+  try {
+    resolved = await window.chromux.projectScriptResolve(session.cwd, launcher.selectedScript);
+  } catch {
+    resolved = { valid: false, reason: 'Project script could not be validated.' };
+  }
+  if (!resolved.valid) {
+    launcher.launching = false;
+    launcher.error = resolved.reason || 'Project script is unavailable.';
+    renderQueue(session);
+    return null;
+  }
+  try {
+    const serverSession = await createSession({
+      name: `${resolved.projectName || session.name} dev server`,
+      cwd: resolved.cwd,
+      agent: '',
+      command: resolved.command,
+      activate: false,
+    });
+    session.browser.serverLauncher = null;
+    const item = queuedPreview(session, launcher.url);
+    if (item) item.liveness = 'checking';
+    renderQueue(session);
+    pollLaunchedServer(session, launcher.url);
+    return serverSession;
+  } catch (error) {
+    launcher.launching = false;
+    launcher.error = error?.message || 'Server session could not be created.';
+    renderQueue(session);
+    return null;
+  }
 }
 
 function renderQueue(session) {
@@ -1658,7 +1833,9 @@ function renderQueue(session) {
   }
   for (const item of queue) {
     const row = document.createElement('div');
-    row.className = 'queue-item';
+    row.className = `queue-item${item.liveness ? ` ${item.liveness}` : ''}`;
+    row.setAttribute('role', 'group');
+    row.setAttribute('aria-label', `${item.reason || queueReasonForSource(item.source)}. ${item.url}${item.liveness ? `. ${item.liveness === 'ready' ? 'Server ready' : (item.liveness === 'checking' ? 'Checking server' : 'Server offline')}` : ''}`);
     const src = document.createElement('span');
     src.className = 'qi-src';
     src.textContent = item.source;
@@ -1673,13 +1850,21 @@ function renderQueue(session) {
     main.title = queueDetailText(item);
     u.title = item.url;
     main.append(reason, u);
+    if (item.liveness) {
+      const status = document.createElement('span');
+      status.className = `qi-status ${item.liveness}`;
+      status.textContent = item.liveness === 'ready'
+        ? 'READY'
+        : (item.liveness === 'checking' ? 'CHECKING…' : 'SERVER OFFLINE');
+      main.appendChild(status);
+    }
     const open = document.createElement('button');
     open.className = 'qi-btn open';
     open.dataset.queueOpenUrl = item.url;
     open.textContent = 'OPEN';
     open.onclick = () => {
       apply({ type: 'preview-opened', sessionId: session.id, url: item.url });
-      openOrFocusBrowserTab(session, item.url);
+      openOrFocusBrowserTab(session, item.url, '', { retryExisting: true });
       renderQueue(session);
     };
     const pin = document.createElement('button');
@@ -1694,7 +1879,78 @@ function renderQueue(session) {
       apply({ type: 'preview-dismissed', sessionId: session.id, url: item.url });
       renderQueue(session);
     };
-    row.append(src, main, pin, open, dismiss);
+    row.append(src, main, pin);
+    if (item.liveness === 'offline') {
+      const recheck = document.createElement('button');
+      recheck.className = 'qi-btn recheck';
+      recheck.dataset.queueRecheckUrl = item.url;
+      recheck.textContent = 'RECHECK';
+      recheck.onclick = () => probeQueuedPreview(session, item.url);
+      const start = document.createElement('button');
+      start.className = 'qi-btn start-server';
+      start.dataset.queueStartUrl = item.url;
+      start.textContent = 'START SERVER…';
+      start.setAttribute('aria-haspopup', 'dialog');
+      start.setAttribute('aria-expanded', String(session.browser.serverLauncher?.url === item.url));
+      start.onclick = (event) => {
+        event.stopPropagation();
+        if (session.browser.serverLauncher?.url === item.url) closeServerLauncher(session);
+        else openServerLauncher(session, item);
+      };
+      row.append(recheck, start);
+    }
+    row.append(open, dismiss);
+    const launcher = session.browser.serverLauncher;
+    if (launcher?.url === item.url) {
+      const popover = document.createElement('div');
+      popover.className = 'server-launcher-popover';
+      popover.setAttribute('role', 'dialog');
+      popover.setAttribute('aria-label', 'Start project server');
+      popover.onclick = (event) => event.stopPropagation();
+      const title = document.createElement('div');
+      title.className = 'server-launcher-title';
+      title.textContent = 'START PROJECT SERVER';
+      const copy = document.createElement('div');
+      copy.className = 'server-launcher-copy';
+      if (launcher.loading) copy.textContent = 'Reading validated package scripts…';
+      else if (!launcher.config?.valid) copy.textContent = launcher.config?.reason || 'No supported package scripts were found.';
+      else copy.textContent = 'Runs in a visible shell tab. Opening the preview still requires OPEN.';
+      popover.append(title, copy);
+      if (launcher.config?.valid) {
+        const select = document.createElement('select');
+        select.className = 'server-launcher-select';
+        select.setAttribute('aria-label', 'Project server script');
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'Choose a package script…';
+        select.appendChild(placeholder);
+        for (const script of launcher.config.scripts) {
+          const option = document.createElement('option');
+          option.value = script;
+          option.textContent = script === launcher.config.recommendedScript ? `${script} — recommended` : script;
+          select.appendChild(option);
+        }
+        select.value = launcher.selectedScript || '';
+        select.onchange = () => {
+          launcher.selectedScript = select.value || null;
+          launcher.error = null;
+          renderQueue(session);
+        };
+        const launch = document.createElement('button');
+        launch.className = 'qi-btn server-launcher-run';
+        launch.textContent = launcher.launching ? 'STARTING…' : 'START';
+        launch.disabled = launcher.launching || !launcher.selectedScript;
+        launch.onclick = () => launchServerScript(session, launcher);
+        popover.append(select, launch);
+      }
+      if (launcher.error) {
+        const error = document.createElement('div');
+        error.className = 'server-launcher-error';
+        error.textContent = launcher.error;
+        popover.appendChild(error);
+      }
+      row.appendChild(popover);
+    }
     host.appendChild(row);
   }
   session.els.queueBadge.textContent = String(queue.length);
@@ -2214,13 +2470,30 @@ function ensurePageWebview(session, tab) {
   });
   const navigated = (url) => {
     tab.guestEditableFocused = false;
+    tab.failedUrl = null;
     tab.currentUrl = url;
     if (!tab.title || tab.title === 'New tab') tab.title = url;
     if (activePageTab(session) === tab) updateActiveBrowserControls(session);
     renderBrowserTabs(session);
+    removeSuccessfulQueuedPreview(session, url);
   };
+  wv.addEventListener('did-start-navigation', (e) => {
+    if (e.isMainFrame !== false) tab.failedUrl = null;
+  });
   wv.addEventListener('did-navigate', (e) => navigated(e.url));
   wv.addEventListener('did-navigate-in-page', (e) => { if (e.isMainFrame) navigated(e.url); });
+  wv.addEventListener('did-fail-load', (e) => {
+    if (e.errorCode === -3 || e.isMainFrame === false) return;
+    const failedUrl = normalizedBrowserUrl(e.validatedURL || tab.currentUrl);
+    if (failedUrl) {
+      tab.failedUrl = failedUrl;
+      queueLoopbackFailure(session, failedUrl);
+    }
+  });
+  wv.addEventListener('did-finish-load', () => {
+    const loadedUrl = normalizedBrowserUrl(tab.currentUrl);
+    if (loadedUrl && loadedUrl !== tab.failedUrl) removeSuccessfulQueuedPreview(session, loadedUrl);
+  });
   wv.addEventListener('page-title-updated', (e) => {
     tab.title = String(e.title || tab.currentUrl || 'Page').slice(0, 200);
     renderBrowserTabs(session);
@@ -2268,13 +2541,14 @@ function openInPane(session, url) {
   return tab;
 }
 
-function openOrFocusBrowserTab(session, url, title = '') {
+function openOrFocusBrowserTab(session, url, title = '', { retryExisting = false } = {}) {
   const normalized = normalizedBrowserUrl(url);
   if (!normalized) return null;
   if (session.browser.collapsed) setBrowserCollapsed(session, false);
   const existing = pageTabForUrl(session, normalized);
   if (existing) {
     activateBrowserTab(session, existing.id);
+    if (retryExisting && existing.webview) existing.webview.loadURL(normalized).catch(() => {});
     return existing;
   }
   return createPageBrowserTab(session, normalized, title || normalized, { activate: true });
@@ -5911,10 +6185,12 @@ async function createSessionNow({
   initialQueue = [], initialAttentionRecords = [], command = undefined, resumeLaunch = null, composerDraft = '',
   initialLastActivityAt = null,
   initialCustomTabGroupId = null,
+  activate = true,
 }) {
   state.counter += 1;
   const id = 's' + state.counter;
   const session = newSessionShape({ id, name, cwd, agent });
+  if (state.env?.smoke) session._testCommand = command !== undefined ? command : agentCommand(agent);
   session.customTabGroupId = validCustomTabGroup(initialCustomTabGroupId) ? initialCustomTabGroupId : null;
   const restoredActivityAt = Date.parse(initialLastActivityAt || '');
   if (Number.isFinite(restoredActivityAt)) session.lastActivityAt = restoredActivityAt;
@@ -6022,12 +6298,20 @@ async function createSessionNow({
     ? initialQueue.map((item) => normalizeQueueItem(item, 'RESTORE')).filter(Boolean)
     : [];
   renderQueue(session);
+  for (const item of session.browser.queue) {
+    if (item.liveness === 'checking') probeQueuedPreview(session, item.url);
+  }
   if (session.browser.activeTabId) activateBrowserTab(session, session.browser.activeTabId);
   else if (initialUrl) openInPane(session, initialUrl);
-  activateSession(id, {
-    consumeRestoredCompletion: false,
-    recordActivity: !Number.isFinite(restoredActivityAt),
-  });
+  if (activate) {
+    activateSession(id, {
+      consumeRestoredCompletion: false,
+      recordActivity: !Number.isFinite(restoredActivityAt),
+    });
+  } else {
+    session.els.view.classList.add('offstage');
+    session.els.tab.classList.remove('active');
+  }
   session.restoredAttentionRecords = Array.isArray(initialAttentionRecords)
     ? initialAttentionRecords.filter((record) => record && RESTORE_ATTENTION_TYPES.has(record.type))
       .slice(0, MAX_RESTORE_ATTENTION_RECORDS).map((record) => ({ ...record }))
@@ -8117,6 +8401,9 @@ if (window.chromuxTest) {
     if (!state.activeId) state.activeId = session.id;
     apply({ type: 'session-created', sessionId: session.id, name, cwd, agent });
     renderQueue(session);
+    for (const item of session.browser.queue) {
+      if (item.liveness === 'checking') probeQueuedPreview(session, item.url);
+    }
     flushRender();
     return session.id;
   };
@@ -8157,6 +8444,9 @@ if (window.chromuxTest) {
     state.sessions.set(session.id, session);
     apply({ type: 'session-created', sessionId: session.id, name, cwd, agent });
     renderQueue(session);
+    for (const item of session.browser.queue) {
+      if (item.liveness === 'checking') probeQueuedPreview(session, item.url);
+    }
     activateSession(session.id);
     session.restoredAttentionRecords = Array.isArray(attentionRecords)
       ? attentionRecords.filter((record) => record && RESTORE_ATTENTION_TYPES.has(record.type))
@@ -9096,6 +9386,9 @@ if (window.chromuxTest) {
       source: el.querySelector('.qi-src')?.textContent || '',
       reason: el.querySelector('.qi-reason')?.textContent || '',
       url: el.querySelector('.qi-url')?.textContent || '',
+      status: el.querySelector('.qi-status')?.textContent || '',
+      actions: [...el.querySelectorAll('.qi-btn')].map((button) => button.textContent),
+      ariaLabel: el.getAttribute('aria-label') || '',
     })),
     queueCount: (id) => testSession(id).browser.queue.length,
     currentUrl: (id) => testSession(id).browser.currentUrl,
@@ -9116,6 +9409,67 @@ if (window.chromuxTest) {
       button.click();
       flushRender();
     },
+    async recheckQueued(id, url) {
+      return probeQueuedPreview(testSession(id), url, { retry: false });
+    },
+    setLiveness(id, url, liveness) {
+      const session = testSession(id);
+      const item = queuedPreview(session, url);
+      if (!item) throw new Error(`No queued preview for ${url}`);
+      item.probeGeneration = (item.probeGeneration || 0) + 1;
+      item.liveness = liveness;
+      renderQueue(session);
+      flushRender();
+    },
+    async openServerLauncher(id, url) {
+      const session = testSession(id);
+      const item = queuedPreview(session, url);
+      if (!item) throw new Error(`No queued preview for ${url}`);
+      await openServerLauncher(session, item);
+      flushRender();
+    },
+    launcher(id) {
+      const launcher = testSession(id).browser.serverLauncher;
+      return launcher ? {
+        url: launcher.url,
+        loading: launcher.loading,
+        valid: Boolean(launcher.config?.valid),
+        reason: launcher.config?.reason || null,
+        scripts: launcher.config?.scripts?.slice() || [],
+        recommendedScript: launcher.config?.recommendedScript || null,
+        selectedScript: launcher.selectedScript,
+        error: launcher.error,
+      } : null;
+    },
+    selectServerScript(id, script) {
+      const launcher = testSession(id).browser.serverLauncher;
+      if (!launcher || !launcher.config?.scripts?.includes(script)) return false;
+      launcher.selectedScript = script;
+      renderQueue(testSession(id));
+      flushRender();
+      return true;
+    },
+    async launchServer(id) {
+      const session = testSession(id);
+      return launchServerScript(session, session.browser.serverLauncher);
+    },
+    failLoad(id, url, errorCode = -102, isMainFrame = true) {
+      if (errorCode !== -3 && isMainFrame) queueLoopbackFailure(testSession(id), url);
+      flushRender();
+    },
+    finishLoad(id, url) {
+      removeSuccessfulQueuedPreview(testSession(id), url);
+      flushRender();
+    },
+    activeId: () => state.activeId,
+    sessions: () => orderedSessions().map((session) => ({
+      id: session.id,
+      name: session.name,
+      cwd: session.cwd,
+      command: session._testCommand || null,
+      active: session.id === state.activeId,
+      alive: session.lifecycle.alive,
+    })),
     flushRender,
   };
 
@@ -9400,6 +9754,9 @@ if (window.chromuxTest) {
       renderFavoriteToolbar(session);
       renderFavoritesPicker(session);
       renderQueue(session);
+      for (const item of session.browser.queue) {
+        if (item.liveness === 'checking') probeQueuedPreview(session, item.url);
+      }
       activateSession(session.id);
       flushRender();
       return session.id;
@@ -9605,6 +9962,7 @@ if (window.chromuxTest) {
   window.chromuxTestProjects = {
     ready: async () => { await state.favoritesReady; return state.projects; },
     config: (cwd) => window.chromux.projectConfig(cwd),
+    resolve: (cwd, script) => window.chromux.projectScriptResolve(cwd, script),
     replace: async (records) => { state.projects = await window.chromux.projectsReplace(records); renderSavedProjects(); return state.projects; },
     records: () => state.projects.map((item) => ({ ...item })),
     open: async () => { openNewSessionModal(); await refreshProjectConfig(); },
@@ -10076,7 +10434,17 @@ document.addEventListener('keydown', (e) => {
     $('#modal-detect').classList.add('hidden');
     $('#drawer-log').classList.add('hidden');
     closeSessionSearch({ restoreFocus: true });
+    for (const session of state.sessions.values()) {
+      if (session.browser.serverLauncher) closeServerLauncher(session);
+    }
     invalidate('shortcutDebug');
+  }
+});
+
+document.addEventListener('click', (event) => {
+  if (event.target.closest('.server-launcher-popover, .start-server')) return;
+  for (const session of state.sessions.values()) {
+    if (session.browser.serverLauncher) closeServerLauncher(session);
   }
 });
 

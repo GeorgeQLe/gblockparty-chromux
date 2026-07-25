@@ -33,6 +33,8 @@ contextBridge.exposeInMainWorld('chromux', {
   promptHistoryClear: (cwd) => ipcRenderer.invoke('prompt-history-clear', cwd),
   clipboardWriteText: (text) => ipcRenderer.invoke('clipboard-write-text', text),
   projectConfig: (cwd) => ipcRenderer.invoke('project-config', cwd),
+  projectScriptResolve: (cwd, script) => ipcRenderer.invoke('project-script-resolve', { cwd, script }),
+  previewProbe: (url) => ipcRenderer.invoke('preview-probe', url),
   gitRoot: (cwd) => ipcRenderer.invoke('git-root', cwd),
   gitDiffSummary: (cwd) => ipcRenderer.invoke('git-diff-summary', cwd),
   resourcesList: () => ipcRenderer.invoke('resources-list'),

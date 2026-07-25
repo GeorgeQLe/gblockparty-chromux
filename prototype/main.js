@@ -19,6 +19,7 @@ const { createDevModeRestart, resolveDevMode, restartArgs } = require('./dev-mod
 const { BrokerClient } = require('./resource-broker/client');
 const { createPreventSleepController } = require('./prevent-sleep');
 const { MAX_DRAFT_BYTES, createPromptHistoryStore } = require('./prompt-history');
+const { previewProbe } = require('./preview-probe');
 const {
   CHROMUX_SHORTCUT_ACTIONS,
   chromuxShortcutAction,
@@ -242,7 +243,29 @@ function packageProjectConfig(cwd) {
   else if (fs.existsSync(path.join(resolved, 'pnpm-lock.yaml'))) runner = 'pnpm';
   else if (fs.existsSync(path.join(resolved, 'yarn.lock'))) runner = 'yarn';
   else if (fs.existsSync(path.join(resolved, 'bun.lockb')) || fs.existsSync(path.join(resolved, 'bun.lock'))) runner = 'bun';
-  return { valid: true, cwd: resolved, source: 'package.json', runner, scripts };
+  const projectName = typeof pkg.name === 'string' && pkg.name.trim()
+    ? pkg.name.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, PROJECT_NAME_MAX)
+    : path.basename(resolved);
+  const recommendedScript = ['dev', 'start', 'serve', 'preview'].find((name) => scripts.includes(name)) || null;
+  return { valid: true, cwd: resolved, source: 'package.json', runner, scripts, projectName, recommendedScript };
+}
+
+function resolveProjectScript(cwd, script) {
+  const config = packageProjectConfig(cwd);
+  const selected = typeof script === 'string' ? script.trim() : '';
+  if (!config.valid) return config;
+  if (!selected || !config.scripts.includes(selected)) {
+    return { valid: false, reason: 'Choose a validated package script.' };
+  }
+  return {
+    valid: true,
+    cwd: config.cwd,
+    source: config.source,
+    runner: config.runner,
+    script: selected,
+    projectName: config.projectName,
+    command: `${config.runner} run ${shellQuote(selected)}`,
+  };
 }
 
 function normalizeProjectRecord(record) {
@@ -2023,6 +2046,8 @@ ipcMain.handle('clipboard-write-text', (_e, text) => {
 });
 if (SMOKE) ipcMain.handle('test-clipboard-read-text', () => clipboard.readText());
 ipcMain.handle('project-config', (_e, cwd) => packageProjectConfig(cwd));
+ipcMain.handle('project-script-resolve', (_e, { cwd, script } = {}) => resolveProjectScript(cwd, script));
+ipcMain.handle('preview-probe', (_e, url) => previewProbe(url));
 ipcMain.handle('git-root', (_e, cwd) => gitRoot(cwd));
 ipcMain.handle('git-diff-summary', (_e, cwd) => gitDiffSummary(cwd));
 

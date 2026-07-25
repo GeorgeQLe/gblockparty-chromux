@@ -64,6 +64,10 @@ Chromux never auto-opens a detected preview. Every localhost / loopback / local 
 
 Use QUEUE to open the next preview intentionally. Command-J reveals and focuses the next queued OPEN button without opening it. If a page seems stale, check whether the updated URL is waiting in QUEUE.
 
+Loopback rows briefly show **CHECKING…**, then **READY** or **SERVER OFFLINE** after a bounded TCP-only check. Chromux does not make an HTTP request during this check. Use **RECHECK** after starting a server manually. If the row is offline, **START SERVER…** reads only validated scripts from the originating session directory's `package.json`; it recommends `dev`, `start`, `serve`, then `preview`, or waits for an explicit script selection. The selected script runs in a visible, non-focused shell tab labeled `<project> dev server`. Chromux polls for up to 15 seconds, but still requires **OPEN** before browser navigation. If startup times out, inspect the server shell's logs and recheck the row.
+
+When a loopback page tab fails to connect, Chromux keeps the failed tab and returns its URL to QUEUE as **SERVER OFFLINE**. Fix or start the server, then press **OPEN** to retry that existing tab. Navigation-cancel events do not create queue rows, and a successful load removes the matching failure row.
+
 New sessions start with the paired browser shut so the terminal owns the workspace. Use the browser rail's BROWSER control (or Command-Shift-B) to open it, and COLLAPSE / Command-Shift-B again to shut it. Toggle does not clear URL, queue, or capture state.
 
 ## Favorites

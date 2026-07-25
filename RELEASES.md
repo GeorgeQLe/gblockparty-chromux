@@ -1,5 +1,14 @@
 # Release Notes
 
+## GBlockParty Chromux v0.59.0
+
+Tag: `chromux-v0.59.0`
+
+- Show `CHECKING…`, `READY`, or `SERVER OFFLINE` on queued loopback previews using bounded TCP-only IPv4/IPv6 probes that reject credentials and remote hosts.
+- Offer `RECHECK` and an anchored `START SERVER…` launcher for offline previews, resolving only validated npm, pnpm, yarn, or bun package scripts and running the chosen script in a visible non-focused shell tab.
+- Keep browser navigation approval-gated, poll launched servers for 15 seconds, and return failed main-frame loopback loads to the queue while preserving their browser tabs for an explicit `OPEN` retry.
+- Reprobe restored queue entries without persisting runtime liveness, launcher state, timers, or server-shell relationships.
+
 ## GBlockParty Chromux v0.58.7
 
 Tag: `chromux-v0.58.7`

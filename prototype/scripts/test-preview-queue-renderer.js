@@ -75,6 +75,7 @@ fs.writeFileSync(e2ePath, `
   const realItem = q.queueItems(realId)[0];
   expect(realItem.reason === 'detected in agent output',
     'queued real preview should retain terminal reason: ' + JSON.stringify(realItem));
+  expect(realItem.liveness === 'checking', 'loopback preview should be admitted immediately in checking state');
   q.openQueued(realId, 'http://localhost:5173/');
   expect(q.currentUrl(realId) === 'http://localhost:5173/',
     'queue OPEN should load the approved URL into the pane');
@@ -182,6 +183,26 @@ fs.writeFileSync(e2ePath, `
   expect(legacyItem.source === 'RESTORE', 'legacy queue item without reason should default to RESTORE source');
   expect(legacyItem.reason === 'restored from previous session',
     'legacy queue item should default to restored reason: ' + JSON.stringify(legacyItem));
+  expect(legacyItem.liveness === 'checking', 'restored loopback preview should be reprobed from checking state');
+
+  const failureId = await q.addSession({ name: 'failed-browser-session', agent: 'codex' });
+  q.failLoad(failureId, 'http://localhost:49149/failed');
+  let failureRows = q.queueRows(failureId);
+  expect(failureRows.length === 1 && failureRows[0].status === 'SERVER OFFLINE',
+    'main-frame loopback failure should create an offline queue row: ' + JSON.stringify(failureRows));
+  expect(failureRows[0].actions.includes('RECHECK') && failureRows[0].actions.includes('START SERVER…')
+    && failureRows[0].actions.includes('OPEN'),
+  'offline row should expose recheck, launcher, and approval-gated open actions');
+  q.failLoad(failureId, 'http://localhost:49149/aborted', -3, true);
+  q.failLoad(failureId, 'http://localhost:49149/subframe', -102, false);
+  expect(q.queueCount(failureId) === 1, 'aborted and subframe failures should be ignored');
+  const rechecked = await q.recheckQueued(failureId, 'http://localhost:49149/failed');
+  expect(rechecked === 'offline', 'manual recheck should report the closed port offline');
+  q.finishLoad(failureId, 'http://localhost:49149/failed');
+  expect(q.queueCount(failureId) === 0, 'successful load should remove the corresponding queue entry');
+
+  const fileRow = q.queueRows(fileId)[0];
+  expect(!fileRow || fileRow.status === '', 'file previews should remain free of server liveness state');
 
   return JSON.stringify({ ok: true, queue: q.queueUrls(queueId), current: q.currentUrl(queueId), file: q.currentUrl(fileId) });
 })()

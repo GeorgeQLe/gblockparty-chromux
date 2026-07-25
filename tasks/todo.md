@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Annotate loopback preview queues with live server status, launch validated project scripts in non-focused shell tabs, preserve explicit browser-open approval, recover failed loopback tabs, and ship as v0.59.0. _(source: user-supplied implementation plan; evidence: `prototype/preview-probe.js`, main/preload IPC, renderer queue/launcher/browser lifecycle, focused and complete 47-file prototype matrix, source and packaged smoke, `RELEASES.md`)_
+
 - [x] Transfer Tab-completed Codex `$skill` mentions into Compose when shortcut chrome is hidden, retain conservative ambiguous-prompt fallback, and ship as v0.58.7. _(source: user-supplied implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-composer-renderer.js`, focused renderer regressions, source and packaged smoke, `RELEASES.md`)_
 
 - [x] Make Command-digit shortcuts select visible primary groups, restore remembered sessions, cycle within the selected group, preserve flat-mode indexing, and ship as v0.58.6. _(source: user-supplied implementation plan; evidence: `prototype/renderer/renderer.js`, shortcut/hotkey/grouped-tab/webview renderer regressions, `RELEASES.md`)_

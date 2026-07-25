@@ -38,8 +38,17 @@ try { fs.symlinkSync(outsideDir, path.join(projectDir, 'linked-outside'), 'dir')
 fs.writeFileSync(e2ePath, `
 (async () => {
   const b = window.chromuxTestBrowser;
+  const q = window.chromuxTestPreviews;
   const expect = (condition, message) => { if (!condition) throw new Error(message); };
   const wait = (ms = 60) => new Promise((resolve) => setTimeout(resolve, ms));
+  const pollUntil = async (read, accept, timeoutMs = 5000) => {
+    const deadline = Date.now() + timeoutMs;
+    while (true) {
+      const value = read();
+      if (accept(value) || Date.now() >= deadline) return value;
+      await wait(50);
+    }
+  };
   const projectDir = ${JSON.stringify(projectDir)};
 
   const index = await window.chromux.projectHtmlIndex({ launchCwd: projectDir });
@@ -131,6 +140,24 @@ fs.writeFileSync(e2ePath, `
   const unsafeOsc = b.clickOsc8Link(linkSession, 'javascript:alert(1)');
   expect(osc.activated && osc.prevented && !unsafeOsc.activated && !unsafeOsc.prevented,
     'OSC 8 HTTP(S) links should route internally while unsafe schemes stay inactive');
+
+  const failedSession = b.addSession({ name: 'failed-loopback', cwd: projectDir });
+  b.open(failedSession, 'http://localhost:49148/unavailable');
+  let failedRows = await pollUntil(
+    () => q.queueRows(failedSession),
+    (rows) => rows.length === 1 && rows[0].status === 'SERVER OFFLINE',
+  );
+  expect(failedRows.length === 1 && failedRows[0].status === 'SERVER OFFLINE',
+    'real main-frame connection failure should return the URL to the offline queue: ' + JSON.stringify(failedRows));
+  expect(b.tabs(failedSession).filter((tab) => tab.type === 'page').length === 1,
+    'failed browser tab should remain available for retry');
+  q.openQueued(failedSession, 'http://localhost:49148/unavailable');
+  failedRows = await pollUntil(
+    () => q.queueRows(failedSession),
+    (rows) => rows.length === 1 && rows[0].status === 'SERVER OFFLINE',
+  );
+  expect(failedRows.length === 1 && b.tabs(failedSession).filter((tab) => tab.type === 'page').length === 1,
+    'OPEN should retry the existing failed tab and requeue another connection failure');
   return JSON.stringify({ ok: true, indexed: paths.length, tabs: snapshot.browserTabs.length });
 })()
 `);

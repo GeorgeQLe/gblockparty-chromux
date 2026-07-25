@@ -135,6 +135,10 @@ Open **RESOURCES** to inspect host-wide owners, FIFO queues, lease expiry, wait 
    prints `http://localhost:5173` (or any loopback URL, or an absolute `/path/to/page.html`),
    Chromux queues it in the badged **QUEUE** — nothing auto-opens. Approve with queue
    **OPEN**, click a terminal link, or type a URL in the browser bar and hit ⏎.
+   Loopback rows show **CHECKING…**, **READY**, or **SERVER OFFLINE** from a bounded TCP probe.
+   Offline rows offer **RECHECK** and **START SERVER…**. The launcher reads only the originating
+   directory's validated `package.json` scripts, starts the selected script in a visible
+   non-focused shell tab, and never substitutes for the separate **OPEN** approval.
    Opening a URL also restores a shut browser. New sessions start with the paired browser
    shut; use **BROWSER** / **COLLAPSE** or `Command+Shift+B` to open/shut it. Re-emitting
    the same already-open URL auto-refreshes the pane (throttled). Popups queue too.
@@ -150,7 +154,9 @@ In **NEW SESSION**, choose a directory with a readable `package.json`, select a 
 validated configuration. **START PROJECT** opens a shell-only Chromux session in that directory and runs
 the derived package-manager command. A detected dev-server URL enters that session's review queue and is
 never opened until you approve **OPEN**. v1 uses `package.json` scripts only; `devctl` / `apps.json` sources
-are deferred until their schema is defined.
+are deferred until their schema is defined. The offline-preview launcher uses the same validation and
+runner selection, recommends `dev`, `start`, `serve`, then `preview`, and never stores arbitrary command text.
+Its shell tab remains available for logs and follows the normal Chromux PTY lifecycle.
 
 3. **Capture evidence** — hit **⌖ PICK ELEMENT**, hover to highlight, click the broken thing
    (Esc cancels). Or **⚡ CAPTURE** for a page-level capture. Review the YAML payload, add a
