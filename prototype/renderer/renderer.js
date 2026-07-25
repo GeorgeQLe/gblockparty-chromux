@@ -5971,6 +5971,18 @@ function scaleThreadPreviewTerminal() {
     preview.terminalHost.clientHeight / Math.max(1, unscaledHeight));
   preview.scale = scale;
   preview.terminalHost.style.transform = `scale(${scale})`;
+  scheduleThreadPreviewPaint(preview);
+}
+
+function scheduleThreadPreviewPaint(preview = state.ui.threadPreview) {
+  if (!preview || state.ui.threadPreview !== preview || preview.paintFrame) return;
+  preview.paintFrame = requestAnimationFrame(() => {
+    preview.paintFrame = null;
+    if (state.ui.threadPreview !== preview) return;
+    preview.paintedRows.clear();
+    preview.paintCount += 1;
+    preview.terminal.refresh(0, Math.max(0, preview.terminal.rows - 1));
+  });
 }
 
 function refreshThreadPreview() {
@@ -6031,7 +6043,9 @@ function dismissThreadPreview({ cancelPendingOpen = true } = {}) {
   state.ui.threadPreview = null;
   cancelThreadPreviewClose(preview);
   if (preview.refreshFrame) cancelAnimationFrame(preview.refreshFrame);
+  if (preview.paintFrame) cancelAnimationFrame(preview.paintFrame);
   preview.writeDisposable?.dispose();
+  preview.renderDisposable?.dispose();
   preview.resizeObserver?.disconnect();
   window.removeEventListener('resize', preview.reposition);
   $('#thread-list')?.removeEventListener('scroll', preview.reposition);
@@ -6101,12 +6115,16 @@ function openThreadPreview(session, anchor, { anchorHovered = false } = {}) {
   terminal.open(terminalHost);
   const preview = {
     sessionId: session.id, anchor, popover, terminal, terminalViewport, terminalHost,
-    refreshFrame: null, refreshCount: 0, scale: 1, writeDisposable: null, resizeObserver: null, closeTimer: null,
+    refreshFrame: null, paintFrame: null, refreshCount: 0, paintCount: 0, paintedRows: new Set(), scale: 1,
+    writeDisposable: null, renderDisposable: null, resizeObserver: null, closeTimer: null,
     anchorHovered, popoverHovered: false,
     reposition: () => positionThreadPreview(), outsidePointer: null,
   };
   state.ui.threadPreview = preview;
   preview.writeDisposable = session.term.term.onWriteParsed(refreshThreadPreview);
+  preview.renderDisposable = terminal.onRender(({ start, end }) => {
+    for (let row = start; row <= end; row += 1) preview.paintedRows.add(row);
+  });
   preview.resizeObserver = new ResizeObserver(() => { positionThreadPreview(); scaleThreadPreviewTerminal(); });
   preview.resizeObserver.observe(anchor);
   preview.resizeObserver.observe(popover);
@@ -9429,6 +9447,8 @@ if (window.chromuxTest) {
         sourceCols: source.cols, sourceRows: source.rows,
         bufferLength: buffer.length,
         refreshCount: preview.refreshCount,
+        paintCount: preview.paintCount,
+        paintedRows: preview.paintedRows.size,
         coloredCells,
         surfaceBackgrounds,
         attention: {

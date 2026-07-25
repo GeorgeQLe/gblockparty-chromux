@@ -32,7 +32,7 @@ fs.writeFileSync(e2ePath, `
   await wait(100);
 
   const holder = rail.addTerminalSession({ name: 'holder', agent: '', cwd: ${JSON.stringify(looseDir)} });
-  const web = rail.addTerminalSession({ name: 'web-agent', agent: 'codex', cwd: ${JSON.stringify(repoAppDir)}, cols: 72, rows: 18 });
+  const web = rail.addTerminalSession({ name: 'web-agent', agent: 'codex', cwd: ${JSON.stringify(repoAppDir)}, cols: 220, rows: 60 });
   const api = rail.addTerminalSession({ name: 'api-agent', agent: 'claude', cwd: ${JSON.stringify(repoApiDir)} });
   const webTwo = rail.addTerminalSession({ name: 'web-review', agent: 'grok', cwd: ${JSON.stringify(repoAppDir)}, cols: 54, rows: 14 });
   rail.focus(holder);
@@ -167,7 +167,7 @@ fs.writeFileSync(e2ePath, `
   await wait(170);
   expect(!rail.preview(), 'leaving an inactive row before 250 ms should cancel its pending preview');
   rail.hoverRow(web);
-  await wait(270);
+  await wait(350);
   let preview = rail.preview();
   expect(preview && preview.sessionId === web && rail.activeId() === holder,
     '250 ms hover should open one anchored preview without changing the active session');
@@ -190,6 +190,10 @@ fs.writeFileSync(e2ePath, `
   expect(preview.bufferLength <= 300 + preview.rows, 'serialized mirror should bound recent scrollback to 300 rows');
   expect(preview.cols === preview.sourceCols && preview.rows === preview.sourceRows,
     'preview should retain source terminal columns and rows while visually scaling');
+  expect(preview.paintCount >= 1 && preview.paintedRows === preview.rows,
+    'scaled preview should visibly repaint every xterm row: ' + JSON.stringify({
+      paintCount: preview.paintCount, paintedRows: preview.paintedRows, rows: preview.rows,
+    }));
   const sourceAfterPreview = rail.sourceState(web);
   expect(sourceAfterPreview.viewportY === sourceBefore.viewportY && sourceAfterPreview.baseY === sourceBefore.baseY,
     'opening and serializing a preview must not move the source terminal viewport');
@@ -226,12 +230,27 @@ fs.writeFileSync(e2ePath, `
     && synchronizedPreviewRow.ariaLabel.includes('Live preview title')
     && synchronizedPreviewRow.status === 'Completed',
   'title updates should synchronize Threads text, tooltip, ARIA label, and status metadata');
-  await rail.write(web, '\\x1b[?1049h\\x1b[HALTERNATE PREVIEW');
-  await wait(80);
-  expect(rail.preview()?.text.includes('ALTERNATE PREVIEW'), 'live mirror should reproduce alternate-screen content');
-  await rail.write(web, '\\x1b[?1049l');
-  await wait(80);
-  expect(rail.preview()?.text.includes('LIVE UPDATE'), 'leaving alternate screen should restore the mirrored normal buffer');
+  const syncBegin = '\\x1b[?2026h';
+  const syncEnd = '\\x1b[?2026l';
+  rail.ptyOutput(web, syncBegin
+    + '\\x1b[?1049h\\x1b[2J\\x1b[H'
+    + '\\x1b[36m╭─ Codex ─────────────────────────────────────────────────────────────────────────────────────────────────────────────╮\\x1b[0m\\r\\n'
+    + '│ production-width synchronized alternate-screen preview                                                              │\\r\\n'
+    + '\\x1b[32m› CODEX ALTERNATE PREVIEW\\x1b[0m'
+    + syncEnd);
+  await wait(120);
+  preview = rail.preview();
+  expect(preview?.text.includes('CODEX ALTERNATE PREVIEW'),
+    'live mirror should reproduce Codex alternate-screen content from a synchronized redraw');
+  expect(preview?.paintedRows === preview?.rows,
+    'Codex alternate-screen preview should visibly repaint every scaled xterm row');
+  rail.ptyOutput(web, syncBegin + '\\x1b[?1049l\\r\\n\\x1b[33muser@host web %\\x1b[0m ' + syncEnd);
+  await wait(120);
+  preview = rail.preview();
+  expect(preview?.text.includes('LIVE UPDATE') && preview.text.includes('user@host web %'),
+    'leaving Codex alternate screen should restore the mirrored normal buffer and shell prompt');
+  expect(preview?.paintedRows === preview?.rows,
+    'post-Codex shell preview should visibly repaint every scaled xterm row');
   expect(rail.cue(web).ptyInput === '', 'preview rendering must never send PTY input');
 
   rail.rowKey(web, 'Escape');
@@ -255,13 +274,26 @@ fs.writeFileSync(e2ePath, `
   expect(!rail.preview(), 'preview should close after focus and pointer leave both surfaces for 150 ms');
   rail.setPreviewSize('compact');
   rail.focusRow(web);
-  await wait(40);
-  const compactWidth = rail.preview().width;
+  await wait(80);
+  const compactPreview = rail.preview();
+  const compactWidth = compactPreview.width;
   rail.setPreviewSize('large');
-  await wait(60);
+  await wait(80);
   expect(rail.preview().width > compactWidth + 100, 'Large accessibility size should materially increase effective terminal text space');
+  expect(rail.preview().paintCount > compactPreview.paintCount && rail.preview().paintedRows === rail.preview().rows,
+    'preview size changes should repaint every visibly scaled xterm row');
   expect(rail.previewSize().value === 'large' && rail.previewSize().stored === 'large' && rail.previewSize().control === 'large',
     'preview size should update state, Settings, and local persistence together');
+  const previewThemes = window.chromuxTestThemes;
+  const originalTheme = previewThemes.current();
+  const alternateTheme = previewThemes.ids().find((theme) => theme !== originalTheme);
+  const themedPaintCount = rail.preview().paintCount;
+  previewThemes.select(alternateTheme);
+  await wait(100);
+  expect(rail.preview().paintCount > themedPaintCount && rail.preview().paintedRows === rail.preview().rows,
+    'theme changes should serialize and visibly repaint every scaled preview row');
+  previewThemes.select(originalTheme);
+  await wait(100);
   rail.setPreviewSize('comfortable');
   await wait(40);
   expect(rail.clickRow(web) === web, 'one click on an inactive ordinary row should activate its session');

@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.61.1
+
+Tag: `chromux-v0.61.1`
+
+- Repaint every mirrored xterm row after hover-preview serialization, scrolling, CSS scaling, resizing, theme changes, and preview-size changes.
+- Preserve source geometry, viewport position, ANSI colors, alternate-screen state, and bounded scrollback while rendering active and idle Codex previews.
+- Cover production-width DEC synchronized-output redraws and the return from Codex's alternate screen to a shell prompt.
+
 ## GBlockParty Chromux v0.61.0
 
 Tag: `chromux-v0.61.0`
