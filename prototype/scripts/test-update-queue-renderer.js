@@ -12,6 +12,20 @@ const e2ePath = path.join(tmpDir, 'update-queue-e2e.js');
 const e2eOutPath = path.join(tmpDir, 'e2e.out');
 
 fs.mkdirSync(homeDir, { recursive: true });
+fs.mkdirSync(path.join(homeDir, '.chromux'), { recursive: true });
+fs.writeFileSync(path.join(homeDir, '.chromux', 'update-cache.json'), JSON.stringify({
+  currentVersion: '0.58.3',
+  checkedAt: new Date().toISOString(),
+  cached: false,
+  updateAvailable: false,
+  reason: 'current',
+  latestVersion: '0.58.3',
+  latestTag: 'chromux-v0.58.3',
+  releaseUrl: 'https://github.com/GeorgeQLe/gblockparty-chromux/releases/tag/chromux-v0.58.3',
+  releaseTitle: 'GBlockParty Chromux v0.58.3',
+  publishedAt: '2026-07-24T00:00:00Z',
+  prerelease: false,
+}, null, 2));
 
 fs.writeFileSync(e2ePath, `
 (async () => {

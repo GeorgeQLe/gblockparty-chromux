@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.58.3
+
+Tag: `chromux-v0.58.3`
+
+- Keep the GitHub Releases API as the primary update source, then recover from rate limits, server errors, timeouts, DNS failures, and other request errors through GitHub's public latest-release redirect.
+- Accept only an exact HTTPS GitHub redirect to a stable `chromux-vX.Y.Z` release in the canonical Chromux repository, while leaving custom `CHROMUX_RELEASES_URL` JSON endpoints unchanged.
+- Stop caching transient network errors for one day and ignore legacy cached failures so update checks retry automatically; retain the existing renderer and IPC status contract.
+
 ## GBlockParty Chromux v0.58.2
 
 Tag: `chromux-v0.58.2`
