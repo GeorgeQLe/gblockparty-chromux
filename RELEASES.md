@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.58.4
+
+Tag: `chromux-v0.58.4`
+
+- Preserve grouped session and aggregate group tab DOM identity across title, hover, badge, and status updates so Working spinner animations continue without restarting.
+- Update hover-only marquee state without rebuilding grouped tabs, keeping pointer targets mounted so lower session-tab clicks reliably activate their corresponding terminals.
+- Reconcile grouped tabs by stable identity, remove duplicate badge-triggered renders, and cover animation, DOM, hover, and activation continuity in the Electron renderer regression suite.
+
 ## GBlockParty Chromux v0.58.3
 
 Tag: `chromux-v0.58.3`

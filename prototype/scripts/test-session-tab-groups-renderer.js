@@ -19,6 +19,7 @@ fs.writeFileSync(e2ePath, `
   if (!groups) throw new Error('Missing session-tab-group test API');
   const expect = (value, message) => { if (!value) throw new Error(message); };
   const tick = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
+  const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   expect(groups.enabled() === false, 'grouping must be disabled by default');
   expect(document.querySelector('#group-tab-list').classList.contains('hidden'),
@@ -60,6 +61,53 @@ fs.writeFileSync(e2ePath, `
   expect(!document.querySelector('#group-session-list').classList.contains('hidden'),
     'lower session strip must always render while grouped sessions exist');
   expect(groups.lower().length >= 1, 'single-session groups must still render the lower strip');
+
+  const apiGroup = groups.groups().find((group) => group.sessions.includes(apiB));
+  groups.select(apiGroup.id);
+  tabs.emitSignal(apiB, 'turn-started');
+  await wait(30);
+  const apiGroupTab = document.querySelector(
+    '#group-tab-list > .group-tab[data-group-id="' + CSS.escape(apiGroup.id) + '"]',
+  );
+  const apiGroupSpinner = apiGroupTab.querySelector('.tab-dot.working');
+  const apiGroupAnimation = apiGroupSpinner.getAnimations()[0];
+  const apiBIndex = groups.lower().indexOf(apiB);
+  const apiBTab = document.querySelectorAll('#group-session-list > .session-tab')[apiBIndex];
+  const apiBSpinner = apiBTab.querySelector('.tab-dot.working');
+  const groupMutations = [];
+  const sessionMutations = [];
+  const groupObserver = new MutationObserver((records) => groupMutations.push(...records));
+  const sessionObserver = new MutationObserver((records) => sessionMutations.push(...records));
+  groupObserver.observe(document.querySelector('#group-tab-list'), { childList: true });
+  sessionObserver.observe(document.querySelector('#group-session-list'), { childList: true });
+
+  tabs.feed(apiB, '\\x1b]0;\\u2839 api-b\\x07');
+  tabs.hover(apiA);
+  tabs.unhover(apiA);
+  await tick();
+  expect(document.querySelector(
+    '#group-tab-list > .group-tab[data-group-id="' + CSS.escape(apiGroup.id) + '"]',
+  ) === apiGroupTab && apiGroupTab.querySelector('.tab-dot') === apiGroupSpinner,
+  'ordinary grouped-tab renders must preserve the exact group tab and working spinner');
+  expect(apiGroupSpinner.getAnimations()[0] === apiGroupAnimation
+    && (Number(apiGroupAnimation.currentTime) || 0) > 0,
+  'ordinary grouped-tab renders must preserve the working spinner animation and elapsed time');
+  expect(document.querySelectorAll('#group-session-list > .session-tab')[apiBIndex] === apiBTab
+    && apiBTab.querySelector('.tab-dot') === apiBSpinner,
+  'title updates and hover must preserve the exact lower session tab and working spinner');
+  expect(groupMutations.every((record) => record.removedNodes.length === 0)
+    && sessionMutations.every((record) => record.removedNodes.length === 0),
+  'title updates and hover must not detach mounted grouped tabs');
+
+  const apiAIndex = groups.lower().indexOf(apiA);
+  const apiATab = document.querySelectorAll('#group-session-list > .session-tab')[apiAIndex];
+  tabs.hover(apiA);
+  apiATab.click();
+  await tick();
+  expect(groups.active() === apiA,
+    'clicking a lower grouped session tab after hover must activate its corresponding terminal');
+  groupObserver.disconnect();
+  sessionObserver.disconnect();
 
   groups.move(beta, customTwo.id);
   tabs.focus(alpha);

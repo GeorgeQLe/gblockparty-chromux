@@ -1393,8 +1393,8 @@ function flushRender() {
   state.ui.dirty = new Set();
   if (dirty.has('update')) renderUpdateControls();
   if (dirty.has('attention')) renderAttentionQueue();
-  if (dirty.has('tabs')) renderTabs();
   if (dirty.has('badges')) updateBadges();
+  if (dirty.has('tabs') || (dirty.has('badges') && state.ui.tabGroupsEnabled)) renderTabs();
   if (dirty.has('captureChips')) renderCaptureChips();
   if (dirty.has('shortcutDebug')) renderShortcutDebug();
   if (dirty.has('diagnostics')) renderDeveloperDiagnostics();
@@ -1633,7 +1633,6 @@ function updateBadges() {
   $('#g-sessions').textContent = String(state.sessions.size);
   // "SENT" counts exactly what its label says: deliveries that exited 0.
   $('#g-captures').textContent = String(deliveredCaptureCount());
-  if (state.ui.tabGroupsEnabled) renderTabs();
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -4228,13 +4227,14 @@ function buildSessionTab(session) {
   };
   tab.addEventListener('mouseenter', () => {
     if (session.id === state.activeId) return;
+    if (state.ui.hoverTabSessionId === session.id) return;
     state.ui.hoverTabSessionId = session.id;
-    renderTabs();
+    updateTabOverflowState();
   });
   tab.addEventListener('mouseleave', () => {
     if (state.ui.hoverTabSessionId !== session.id) return;
     state.ui.hoverTabSessionId = null;
-    renderTabs();
+    updateTabOverflowState();
   });
   const tabList = $('#tab-list');
   const actions = $('#tab-actions');
@@ -4322,6 +4322,52 @@ function toggleSessionSearch() {
   else closeSessionSearch({ restoreFocus: true });
 }
 
+function reconcileChildren(host, desiredChildren) {
+  const desired = new Set(desiredChildren);
+  desiredChildren.forEach((child, index) => {
+    const current = host.children[index] || null;
+    if (current !== child) host.insertBefore(child, current);
+  });
+  for (const child of [...host.children]) {
+    if (!desired.has(child)) child.remove();
+  }
+}
+
+function buildGroupTab() {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'session-tab group-tab';
+  const dot = document.createElement('span');
+  dot.className = 'tab-dot live';
+  dot.setAttribute('aria-hidden', 'true');
+  const label = document.createElement('span');
+  label.className = 'tab-label-wrap';
+  const count = document.createElement('span');
+  count.className = 'group-session-count';
+  const badge = document.createElement('span');
+  badge.className = 'tab-badge zero';
+  button.append(dot, label, count, badge);
+  return button;
+}
+
+function updateGroupTab(button, group, focused) {
+  const status = groupStatus(group);
+  const active = Boolean(focused && group.id === focused.id);
+  const badgeValue = groupAttentionCount(group);
+  button.className = `session-tab group-tab${active ? ' active' : ''}`;
+  button.dataset.groupId = group.id;
+  button.title = group.tooltip;
+  button.setAttribute('aria-label', `${group.name}. ${group.sessions.length} sessions. ${status.status}.`);
+  button.setAttribute('aria-current', active ? 'true' : 'false');
+  button.querySelector('.tab-dot').className = `tab-dot ${status.kind}`;
+  button.querySelector('.tab-label-wrap').textContent = group.name;
+  button.querySelector('.group-session-count').textContent = String(group.sessions.length);
+  const badge = button.querySelector('.tab-badge');
+  badge.className = `tab-badge${badgeValue ? '' : ' zero'}`;
+  badge.textContent = String(badgeValue);
+  button.onclick = () => selectTabGroup(group.id);
+}
+
 function renderTabs() {
   for (const s of state.sessions.values()) {
     if (!s.els || !s.els.tab) continue;
@@ -4339,49 +4385,25 @@ function renderTabs() {
   groupedSessions.classList.toggle('hidden', !grouping);
   tabList.classList.toggle('hidden', grouping);
 
-  for (const session of orderedSessions()) session.els.tab.remove();
-  actions.remove();
   if (!grouping) {
-    groupList.replaceChildren();
-    groupedSessions.replaceChildren();
-    for (const session of orderedSessions()) tabList.appendChild(session.els.tab);
-    tabList.appendChild(actions);
+    reconcileChildren(tabList, [...orderedSessions().map((session) => session.els.tab), actions]);
+    reconcileChildren(groupList, []);
+    reconcileChildren(groupedSessions, []);
   } else {
     const groups = effectiveTabGroups();
     const focused = focusedTabGroup(groups);
     if (focused) state.ui.focusedTabGroupId = focused.id;
-    groupList.replaceChildren();
+    const existingGroups = new Map([...groupList.querySelectorAll(':scope > .group-tab')]
+      .map((button) => [button.dataset.groupId, button]));
+    const groupTabs = [];
     for (const group of groups) {
-      const status = groupStatus(group);
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = `session-tab group-tab${focused && group.id === focused.id ? ' active' : ''}`;
-      button.dataset.groupId = group.id;
-      button.title = group.tooltip;
-      button.setAttribute('aria-label', `${group.name}. ${group.sessions.length} sessions. ${status.status}.`);
-      button.setAttribute('aria-current', focused && group.id === focused.id ? 'true' : 'false');
-      const dot = document.createElement('span');
-      dot.className = `tab-dot ${status.kind}`;
-      dot.setAttribute('aria-hidden', 'true');
-      const label = document.createElement('span');
-      label.className = 'tab-label-wrap';
-      label.textContent = group.name;
-      const count = document.createElement('span');
-      count.className = 'group-session-count';
-      count.textContent = String(group.sessions.length);
-      const badgeValue = groupAttentionCount(group);
-      const badge = document.createElement('span');
-      badge.className = `tab-badge${badgeValue ? '' : ' zero'}`;
-      badge.textContent = String(badgeValue);
-      button.append(dot, label, count, badge);
-      button.onclick = () => selectTabGroup(group.id);
-      groupList.appendChild(button);
+      const button = existingGroups.get(group.id) || buildGroupTab();
+      updateGroupTab(button, group, focused);
+      groupTabs.push(button);
     }
-    groupList.appendChild(actions);
-    groupedSessions.replaceChildren();
-    if (focused) {
-      for (const session of focused.sessions) groupedSessions.appendChild(session.els.tab);
-    }
+    reconcileChildren(groupList, [...groupTabs, actions]);
+    reconcileChildren(groupedSessions, focused ? focused.sessions.map((session) => session.els.tab) : []);
+    reconcileChildren(tabList, []);
   }
   updateTabOverflowState();
   if (!$('#session-search-panel').classList.contains('hidden')) renderSessionSearch();
