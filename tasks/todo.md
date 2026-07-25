@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Restore visible terminal hover previews for sessions without attention by assigning every optional preview surface to a stable grid row, retain attentive and overflowing previews, and ship as v0.61.5. _(source: user-supplied implementation plan; evidence: `prototype/renderer/styles.css`, `prototype/scripts/test-session-rail-renderer.js`, every theme/mode/size matrix, screenshot smoke, `RELEASES.md`)_
+
 - [x] Reclaim orphaned Chromux browser partitions and stale signal-correlation records on the next launch, preserve unrelated and user-retained storage, continue after cleanup failures, and ship as v0.61.4. _(source: user-supplied implementation plan; evidence: `prototype/storage-cleanup.js`, `prototype/scripts/test-storage-cleanup.js`, requested regressions, source and packaged cleanup/isolation smoke, privacy/troubleshooting docs, `RELEASES.md`)_
 
 - [x] Remove printable framing around correlated Codex OSC 10/11/12 color-reply residue in Compose, preserve prompt text and raw PTY delivery, and ship as v0.61.3. _(source: user-supplied implementation plan, advanced from occupied v0.61.2; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-composer-renderer.js`, focused and complete prototype matrix, source and packaged smoke, `RELEASES.md`)_

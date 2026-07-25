@@ -29,6 +29,38 @@ fs.writeFileSync(e2ePath, `
   if (!rail) throw new Error('Missing session rail test API');
   const expect = (condition, message) => { if (!condition) throw new Error(message); };
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const expectNoAttentionPreview = (preview, context) => {
+    const popover = document.querySelector('#thread-terminal-preview');
+    const headerRect = popover?.querySelector('.thread-preview-header')?.getBoundingClientRect();
+    const attention = popover?.querySelector('.thread-preview-attention');
+    const viewportRect = popover?.querySelector('.thread-preview-viewport')?.getBoundingClientRect();
+    const screenRect = popover?.querySelector('.xterm-screen')?.getBoundingClientRect();
+    const footerRect = popover?.querySelector('.thread-preview-footer')?.getBoundingClientRect();
+    const popoverRect = popover?.getBoundingClientRect();
+    expect(preview?.attention.hidden && attention?.hidden,
+      context + ' should hide the empty attention panel');
+    expect(preview?.terminalHeight >= 120 && preview.text.includes('NO ATTENTION PREVIEW'),
+      context + ' should preserve a visible terminal with serialized content: '
+        + JSON.stringify({ terminalHeight: preview?.terminalHeight, text: preview?.text }));
+    expect(headerRect && viewportRect && screenRect && footerRect && popoverRect
+      && viewportRect.top >= headerRect.bottom - 1
+      && viewportRect.bottom <= footerRect.top + 1
+      && screenRect.top >= viewportRect.top
+      && screenRect.bottom <= viewportRect.bottom
+      && footerRect.top >= viewportRect.bottom - 1
+      && footerRect.bottom <= popoverRect.bottom + 1,
+    context + ' should keep the terminal between the header and footer: '
+      + JSON.stringify({
+        headerBottom: headerRect?.bottom,
+        viewportTop: viewportRect?.top,
+        viewportBottom: viewportRect?.bottom,
+        screenTop: screenRect?.top,
+        screenBottom: screenRect?.bottom,
+        footerTop: footerRect?.top,
+        footerBottom: footerRect?.bottom,
+        popoverBottom: popoverRect?.bottom,
+      }));
+  };
   await wait(100);
 
   const holder = rail.addTerminalSession({ name: 'holder', agent: '', cwd: ${JSON.stringify(looseDir)} });
@@ -835,6 +867,10 @@ fs.writeFileSync(e2ePath, `
   expect(repoDiff.files.some((file) => file.path === 'apps/web/new-file.js' && file.status === 'Untracked'),
     'Git should expose untracked files relative to the repository');
   expect(repoDiff.totals === '1 staged · 2 unstaged', 'Git should summarize staged and unstaged diff counts');
+  const noAttentionPreview = rail.addTerminalSession({
+    name: 'no-attention-preview', agent: 'codex', cwd: ${JSON.stringify(looseDir)}, cols: 80, rows: 24,
+  });
+  await rail.write(noAttentionPreview, '\\x1b[32mNO ATTENTION PREVIEW\\x1b[0m\\r\\nvisible terminal content');
 
   const themes = window.chromuxTestThemes;
   rail.select('threads');
@@ -888,8 +924,18 @@ fs.writeFileSync(e2ePath, `
         theme + ' ' + mode + ' should preserve terminal padding on every edge: ' + JSON.stringify(geometry.padding));
       rail.unhoverRow(web);
       rail.outsideClick();
+      for (const size of ['compact', 'comfortable', 'large']) {
+        rail.setPreviewSize(size);
+        rail.focusThreadSortControl();
+        rail.focusRow(noAttentionPreview);
+        await wait(100);
+        expectNoAttentionPreview(rail.preview(), theme + ' ' + mode + ' ' + size + ' no-attention preview');
+        rail.outsideClick();
+      }
     }
   }
+  rail.setPreviewSize('comfortable');
+  rail.close(noAttentionPreview);
 
   rail.select('git');
   expect(rail.gitDiffs().find((group) => group.title === ${JSON.stringify(canonicalRepoDir)}).count === 2,

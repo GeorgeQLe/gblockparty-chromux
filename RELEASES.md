@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.61.5
+
+Tag: `chromux-v0.61.5`
+
+- Restore visible terminal content in hover and keyboard-focus previews for sessions without attention reasons.
+- Keep the optional attention panel hidden without collapsing the terminal viewport or displacing the footer across compact, comfortable, and large previews in every theme appearance.
+- Preserve terminal serialization, scaling, repaint, attention overflow, interaction, and accessibility behavior.
+
 ## GBlockParty Chromux v0.61.4
 
 Tag: `chromux-v0.61.4`
