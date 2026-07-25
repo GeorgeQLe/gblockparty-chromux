@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.61.7
+
+Tag: `chromux-v0.61.7`
+
+- Keep the last complete terminal hover-preview frame visible while the newest serialized source snapshot resets, resizes, themes, and replays into a reusable hidden xterm layer.
+- Coalesce sustained output behind one in-flight replay, repaint every staging row before an instant opacity swap, and immediately prepare any pending newer snapshot in the now-hidden layer.
+- Preserve ANSI styling, alternate-screen redraws, bounded scrollback, source dimensions and viewport position, preview scaling, theme changes, accessibility, and cancellation on dismissal or session closure.
+
 ## GBlockParty Chromux v0.61.6
 
 Tag: `chromux-v0.61.6`

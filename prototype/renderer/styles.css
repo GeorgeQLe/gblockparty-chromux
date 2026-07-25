@@ -465,7 +465,15 @@ body[data-thread-preview-size="large"] .thread-preview-attention { max-height: 1
   border: 0;
 }
 .thread-preview-viewport { grid-row: 3; position: relative; min-height: 0; overflow: hidden; background: #ffffff; }
-.thread-preview-terminal { position: absolute; inset: 10px 12px; transform-origin: top left; pointer-events: none; }
+.thread-preview-terminal {
+  position: absolute;
+  inset: 10px 12px;
+  transform-origin: top left;
+  pointer-events: none;
+  transition: none !important;
+}
+.thread-preview-terminal-visible { z-index: 1; opacity: 1; }
+.thread-preview-terminal-hidden { z-index: 0; opacity: 0; }
 .thread-preview-terminal .xterm { height: 100%; }
 .thread-preview-terminal .xterm-viewport { overflow: hidden !important; }
 .thread-preview-footer { grid-row: 4; padding: 0 12px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--faint); background: #f1f3f6; font: 700 8px/1 var(--font-display); letter-spacing: .1em; }

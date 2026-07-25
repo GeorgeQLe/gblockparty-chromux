@@ -29,6 +29,24 @@ fs.writeFileSync(e2ePath, `
   if (!rail) throw new Error('Missing session rail test API');
   const expect = (condition, message) => { if (!condition) throw new Error(message); };
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+  const samplePreviewFrames = async (count) => {
+    const frames = [];
+    for (let index = 0; index < count; index += 1) {
+      await nextFrame();
+      frames.push(rail.preview());
+    }
+    return frames;
+  };
+  const waitFor = async (predicate, timeoutMs = 2000) => {
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < timeoutMs) {
+      const value = predicate();
+      if (value) return value;
+      await nextFrame();
+    }
+    return predicate();
+  };
   const expectNoAttentionPreview = (preview, context) => {
     const popover = document.querySelector('#thread-terminal-preview');
     const headerRect = popover?.querySelector('.thread-preview-header')?.getBoundingClientRect();
@@ -157,6 +175,97 @@ fs.writeFileSync(e2ePath, `
   rail.emit(activityProbe, 'turn-end');
   expect(rail.activityAt(activityProbe) === transitionedAt, 'a duplicate turn signal must not change recent activity');
   rail.close(activityProbe);
+
+  const atomicPreview = rail.addTerminalSession({
+    name: 'atomic-preview', agent: 'codex', cwd: ${JSON.stringify(looseDir)}, cols: 220, rows: 60,
+  });
+  rail.focus(holder);
+  const densePreviewLines = (prefix, start, count) => Array.from({ length: count }, (_, offset) => {
+    const line = String(start + offset).padStart(3, '0');
+    return '\\x1b[3' + ((offset % 6) + 1) + 'm' + prefix + ' ' + line + ' '
+      + '#'.repeat(170) + '\\x1b[0m\\r\\n';
+  }).join('');
+  await rail.write(atomicPreview, densePreviewLines('ATOMIC BASE', 0, 340) + 'ATOMIC BASE COMPLETE');
+  rail.focusRow(atomicPreview);
+  rail.hoverRow(atomicPreview);
+  let atomicState = await waitFor(() => {
+    const candidate = rail.preview();
+    return candidate?.refreshCount >= 1 && candidate;
+  });
+  expect(atomicState?.layerCount === 2 && atomicState.visibleLayerCount === 1,
+    'terminal previews should keep exactly one visible layer and one reusable staging layer: '
+      + JSON.stringify(atomicState));
+  expect(atomicState.layerStyles.map((style) => style.opacity).sort().join(',') === '0,1'
+    && atomicState.layerStyles.every((style) => style.transitionDuration === '0s'
+      && style.ariaHidden === 'true'),
+  'preview layers should swap with explicit instant opacity and remain aria-hidden: '
+    + JSON.stringify(atomicState.layerStyles));
+  expect(atomicState.text.includes('ATOMIC BASE COMPLETE')
+    && atomicState.nonEmptyLines >= 300 && atomicState.paintedRows === atomicState.rows,
+    'the seeded atomic preview should begin with one complete rendered frame: '
+      + JSON.stringify({
+        nonEmptyLines: atomicState?.nonEmptyLines,
+        paintedRows: atomicState?.paintedRows,
+        rows: atomicState?.rows,
+      }));
+  const refreshStartsBeforeBurst = atomicState.refreshStarts;
+  await rail.write(atomicPreview, densePreviewLines('ATOMIC BURST A', 340, 170));
+  const sampledFramesPromise = samplePreviewFrames(30);
+  await wait(4);
+  await rail.write(atomicPreview, densePreviewLines('ATOMIC BURST B', 510, 170));
+  await wait(4);
+  await rail.write(atomicPreview, densePreviewLines('ATOMIC LATEST', 680, 170) + 'ATOMIC NEWEST COMPLETE');
+  const sampledFrames = await sampledFramesPromise;
+  expect(sampledFrames.every((frame) => frame
+    && frame.layerCount === 2
+    && frame.visibleLayerCount === 1
+    && frame.nonEmptyLines >= 300
+    && frame.paintedRows === frame.rows),
+  'every animation-frame sample during sustained output should retain one complete visible terminal frame: '
+    + JSON.stringify(sampledFrames.map((frame) => frame && ({
+      visibleLayer: frame.visibleLayer,
+      nonEmptyLines: frame.nonEmptyLines,
+      paintedRows: frame.paintedRows,
+      rows: frame.rows,
+      refreshInFlight: frame.refreshInFlight,
+      refreshPending: frame.refreshPending,
+    }))));
+  atomicState = await waitFor(() => {
+    const candidate = rail.preview();
+    return candidate?.text.includes('ATOMIC NEWEST COMPLETE') && !candidate.refreshInFlight && candidate;
+  }, 4000);
+  expect(atomicState?.text.includes('ATOMIC NEWEST COMPLETE'),
+    'coalesced preview replay should eventually expose the newest terminal snapshot');
+  expect(atomicState.maxConcurrentRefreshes === 1
+    && atomicState.refreshStarts - refreshStartsBeforeBurst <= 3,
+  'rapid source writes should coalesce without overlapping preview replays: '
+    + JSON.stringify({
+      maxConcurrentRefreshes: atomicState?.maxConcurrentRefreshes,
+      refreshStarts: atomicState?.refreshStarts,
+      refreshStartsBeforeBurst,
+    }));
+
+  await rail.write(atomicPreview, densePreviewLines('ATOMIC DISMISS', 850, 300));
+  const replayingBeforeDismiss = await waitFor(() => rail.preview()?.refreshInFlight && rail.preview());
+  expect(replayingBeforeDismiss, 'dismissal fixture should catch a preview replay in flight');
+  rail.outsideClick();
+  expect(!rail.preview() && !document.querySelector('#thread-terminal-preview'),
+    'dismissing during replay should remove the preview immediately');
+  await samplePreviewFrames(8);
+  expect(!rail.preview() && !document.querySelector('#thread-terminal-preview'),
+    'disposed replay callbacks must not remount or swap preview content');
+  rail.focusThreadSortControl();
+  rail.focusRow(atomicPreview);
+  rail.hoverRow(atomicPreview);
+  const reopenedAtomicPreview = await waitFor(() => rail.preview()?.refreshCount >= 1 && rail.preview());
+  expect(reopenedAtomicPreview, 'session-close fixture should reopen a complete atomic preview');
+  await rail.write(atomicPreview, densePreviewLines('ATOMIC SESSION CLOSE', 1150, 300));
+  const replayingBeforeSessionClose = await waitFor(() => rail.preview()?.refreshInFlight && rail.preview());
+  expect(replayingBeforeSessionClose, 'session-close fixture should catch a preview replay in flight');
+  rail.close(atomicPreview);
+  await samplePreviewFrames(8);
+  expect(!rail.preview() && !document.querySelector('#thread-terminal-preview'),
+    'closing a previewed session during replay should invalidate every pending callback');
 
   await rail.write(web, Array.from({ length: 340 }, (_, index) => 'older line ' + index + '\\r\\n').join('')
     + '\\x1b[31mRECENT RED\\x1b[0m\\r\\ninitial output');

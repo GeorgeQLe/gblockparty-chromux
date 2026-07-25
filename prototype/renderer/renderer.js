@@ -5977,56 +5977,193 @@ function positionThreadPreview() {
   preview.popover.style.top = `${Math.max(margin, Math.min(anchorRect.top + (anchorRect.height - popoverRect.height) / 2, maxTop))}px`;
 }
 
-function scaleThreadPreviewTerminal() {
-  const preview = state.ui.threadPreview;
-  if (!preview) return;
-  const screen = preview.terminalHost.querySelector('.xterm-screen');
-  if (!screen) return;
-  const screenRect = screen.getBoundingClientRect();
-  const unscaledWidth = screenRect.width / (preview.scale || 1);
-  const unscaledHeight = screenRect.height / (preview.scale || 1);
-  const scale = Math.min(1,
-    preview.terminalHost.clientWidth / Math.max(1, unscaledWidth),
-    preview.terminalHost.clientHeight / Math.max(1, unscaledHeight));
-  preview.scale = scale;
-  preview.terminalHost.style.transform = `scale(${scale})`;
-  scheduleThreadPreviewPaint(preview);
+function threadPreviewRefreshIsCurrent(preview, lifecycleGeneration, refreshGeneration, layer = null) {
+  return Boolean(preview
+    && state.ui.threadPreview === preview
+    && preview.lifecycleGeneration === lifecycleGeneration
+    && preview.refreshGeneration === refreshGeneration
+    && (!layer || preview.stagingLayer === layer));
 }
 
-function scheduleThreadPreviewPaint(preview = state.ui.threadPreview) {
+function setThreadPreviewLayerVisible(layer, visible) {
+  if (!layer) return;
+  layer.host.classList.toggle('thread-preview-terminal-visible', visible);
+  layer.host.classList.toggle('thread-preview-terminal-hidden', !visible);
+}
+
+function scaleThreadPreviewTerminal(
+  preview = state.ui.threadPreview,
+  basisLayer = preview?.visibleLayer,
+  { repaintVisible = true } = {},
+) {
+  if (!preview || state.ui.threadPreview !== preview || !basisLayer) return;
+  const screen = basisLayer.host.querySelector('.xterm-screen');
+  if (!screen) return;
+  const screenRect = screen.getBoundingClientRect();
+  const unscaledWidth = screenRect.width / (basisLayer.scale || 1);
+  const unscaledHeight = screenRect.height / (basisLayer.scale || 1);
+  const scale = Math.min(1,
+    basisLayer.host.clientWidth / Math.max(1, unscaledWidth),
+    basisLayer.host.clientHeight / Math.max(1, unscaledHeight));
+  preview.scale = scale;
+  for (const layer of preview.layers) {
+    layer.scale = scale;
+    layer.host.style.transform = `scale(${scale})`;
+  }
+  if (repaintVisible) scheduleThreadPreviewPaint(preview, preview.visibleLayer);
+}
+
+function scheduleThreadPreviewPaint(preview = state.ui.threadPreview, layer = preview?.visibleLayer) {
   if (!preview || state.ui.threadPreview !== preview || preview.paintFrame) return;
+  const lifecycleGeneration = preview.lifecycleGeneration;
   preview.paintFrame = requestAnimationFrame(() => {
     preview.paintFrame = null;
-    if (state.ui.threadPreview !== preview) return;
-    preview.paintedRows.clear();
+    if (state.ui.threadPreview !== preview
+      || preview.lifecycleGeneration !== lifecycleGeneration
+      || preview.visibleLayer !== layer
+      || !preview.layers.includes(layer)) return;
+    layer.paintedRows.clear();
     preview.paintCount += 1;
-    preview.terminal.refresh(0, Math.max(0, preview.terminal.rows - 1));
+    layer.terminal.refresh(0, Math.max(0, layer.terminal.rows - 1));
   });
+}
+
+function continueThreadPreviewRefresh(preview) {
+  if (!preview || state.ui.threadPreview !== preview || preview.refreshInFlight) return;
+  if (!preview.refreshPending) return;
+  preview.refreshPending = false;
+  beginThreadPreviewRefresh(preview);
+}
+
+function finishThreadPreviewRefresh(preview, lifecycleGeneration, refreshGeneration, layer) {
+  if (!threadPreviewRefreshIsCurrent(
+    preview, lifecycleGeneration, refreshGeneration, layer,
+  )) return;
+  layer.awaitingPaintGeneration = null;
+  preview.refreshInFlight = false;
+  preview.activeRefreshes = Math.max(0, preview.activeRefreshes - 1);
+  continueThreadPreviewRefresh(preview);
+}
+
+function scheduleThreadPreviewSwap(preview, lifecycleGeneration, refreshGeneration, layer) {
+  if (!threadPreviewRefreshIsCurrent(
+    preview, lifecycleGeneration, refreshGeneration, layer,
+  ) || preview.swapFrame) return;
+  preview.swapFrame = requestAnimationFrame(() => {
+    preview.swapFrame = null;
+    if (!threadPreviewRefreshIsCurrent(
+      preview, lifecycleGeneration, refreshGeneration, layer,
+    ) || layer.awaitingPaintGeneration !== null
+      || layer.paintedRows.size < layer.terminal.rows) return;
+    const priorVisible = preview.visibleLayer;
+    setThreadPreviewLayerVisible(priorVisible, false);
+    setThreadPreviewLayerVisible(layer, true);
+    preview.visibleLayer = layer;
+    preview.stagingLayer = priorVisible;
+    preview.refreshCount += 1;
+    preview.refreshInFlight = false;
+    preview.activeRefreshes = Math.max(0, preview.activeRefreshes - 1);
+    continueThreadPreviewRefresh(preview);
+  });
+}
+
+function recordThreadPreviewRender(preview, layer, start, end) {
+  if (!preview || state.ui.threadPreview !== preview || !preview.layers.includes(layer)) return;
+  for (let row = start; row <= end; row += 1) layer.paintedRows.add(row);
+  const paint = layer.awaitingPaintGeneration;
+  if (!paint
+    || !threadPreviewRefreshIsCurrent(
+      preview, paint.lifecycleGeneration, paint.refreshGeneration, layer,
+    )
+    || layer.paintedRows.size < layer.terminal.rows) return;
+  layer.awaitingPaintGeneration = null;
+  scheduleThreadPreviewSwap(
+    preview, paint.lifecycleGeneration, paint.refreshGeneration, layer,
+  );
+}
+
+function paintThreadPreviewStaging(preview, lifecycleGeneration, refreshGeneration, layer) {
+  if (!threadPreviewRefreshIsCurrent(
+    preview, lifecycleGeneration, refreshGeneration, layer,
+  )) return;
+  layer.paintedRows.clear();
+  layer.awaitingPaintGeneration = { lifecycleGeneration, refreshGeneration };
+  preview.paintCount += 1;
+  try {
+    layer.terminal.refresh(0, Math.max(0, layer.terminal.rows - 1));
+  } catch {
+    finishThreadPreviewRefresh(preview, lifecycleGeneration, refreshGeneration, layer);
+  }
+}
+
+function beginThreadPreviewRefresh(preview) {
+  if (!preview || state.ui.threadPreview !== preview || preview.refreshInFlight) return;
+  const session = state.sessions.get(preview.sessionId);
+  if (!session || !session.lifecycle.alive || !session.term.term || !session.term.serializer) {
+    dismissThreadPreview();
+    return;
+  }
+  let serialized = '';
+  try {
+    serialized = session.term.serializer.serialize({ scrollback: THREAD_PREVIEW_SCROLLBACK });
+  } catch {
+    return;
+  }
+  const source = session.term.term;
+  const layer = preview.stagingLayer;
+  const lifecycleGeneration = preview.lifecycleGeneration;
+  const refreshGeneration = preview.refreshGeneration + 1;
+  preview.refreshGeneration = refreshGeneration;
+  preview.refreshInFlight = true;
+  preview.refreshPending = false;
+  preview.refreshStarts += 1;
+  preview.activeRefreshes += 1;
+  preview.maxConcurrentRefreshes = Math.max(
+    preview.maxConcurrentRefreshes, preview.activeRefreshes,
+  );
+  layer.awaitingPaintGeneration = null;
+  try {
+    layer.terminal.reset();
+    layer.terminal.resize(
+      Math.max(2, source.cols || 80),
+      Math.max(1, source.rows || 24),
+    );
+    layer.terminal.options.theme = terminalThemeFor();
+    layer.terminal.write(serialized, () => {
+      if (!threadPreviewRefreshIsCurrent(
+        preview, lifecycleGeneration, refreshGeneration, layer,
+      )) return;
+      try {
+        layer.terminal.scrollToBottom();
+        scaleThreadPreviewTerminal(preview, layer, { repaintVisible: false });
+        paintThreadPreviewStaging(
+          preview, lifecycleGeneration, refreshGeneration, layer,
+        );
+      } catch {
+        finishThreadPreviewRefresh(
+          preview, lifecycleGeneration, refreshGeneration, layer,
+        );
+      }
+    });
+  } catch {
+    finishThreadPreviewRefresh(preview, lifecycleGeneration, refreshGeneration, layer);
+  }
 }
 
 function refreshThreadPreview() {
   const preview = state.ui.threadPreview;
-  if (!preview || preview.refreshFrame) return;
+  if (!preview) return;
+  if (preview.refreshInFlight) {
+    preview.refreshPending = true;
+    return;
+  }
+  if (preview.refreshFrame) return;
+  const lifecycleGeneration = preview.lifecycleGeneration;
   preview.refreshFrame = requestAnimationFrame(() => {
     preview.refreshFrame = null;
-    const session = state.sessions.get(preview.sessionId);
-    if (!session || !session.lifecycle.alive || !session.term.term || !session.term.serializer) {
-      dismissThreadPreview();
-      return;
-    }
-    let serialized = '';
-    try { serialized = session.term.serializer.serialize({ scrollback: THREAD_PREVIEW_SCROLLBACK }); } catch { return; }
-    const source = session.term.term;
-    const mirror = preview.terminal;
-    mirror.reset();
-    mirror.resize(Math.max(2, source.cols || 80), Math.max(1, source.rows || 24));
-    mirror.options.theme = terminalThemeFor();
-    mirror.write(serialized, () => {
-      if (state.ui.threadPreview !== preview) return;
-      mirror.scrollToBottom();
-      scaleThreadPreviewTerminal();
-      preview.refreshCount += 1;
-    });
+    if (state.ui.threadPreview !== preview
+      || preview.lifecycleGeneration !== lifecycleGeneration) return;
+    beginThreadPreviewRefresh(preview);
   });
 }
 
@@ -6061,15 +6198,25 @@ function dismissThreadPreview({ cancelPendingOpen = true } = {}) {
   if (!preview) return false;
   state.ui.threadPreview = null;
   cancelThreadPreviewClose(preview);
+  preview.lifecycleGeneration += 1;
   if (preview.refreshFrame) cancelAnimationFrame(preview.refreshFrame);
   if (preview.paintFrame) cancelAnimationFrame(preview.paintFrame);
+  if (preview.swapFrame) cancelAnimationFrame(preview.swapFrame);
+  preview.refreshFrame = null;
+  preview.paintFrame = null;
+  preview.swapFrame = null;
+  preview.refreshInFlight = false;
+  preview.refreshPending = false;
   preview.writeDisposable?.dispose();
-  preview.renderDisposable?.dispose();
+  for (const layer of preview.layers) {
+    layer.awaitingPaintGeneration = null;
+    layer.renderDisposable?.dispose();
+  }
   preview.resizeObserver?.disconnect();
   window.removeEventListener('resize', preview.reposition);
   $('#thread-list')?.removeEventListener('scroll', preview.reposition);
   document.removeEventListener('pointerdown', preview.outsidePointer, true);
-  preview.terminal.dispose();
+  for (const layer of preview.layers) layer.terminal.dispose();
   preview.popover.remove();
   if (preview.anchor?.isConnected) {
     preview.anchor.setAttribute('aria-expanded', 'false');
@@ -6118,7 +6265,16 @@ function openThreadPreview(session, anchor, { anchorHovered = false } = {}) {
   const attentionRows = document.createElement('div'); attentionRows.className = 'thread-preview-attention-rows';
   attention.append(attentionHeading, attentionRows);
   const terminalViewport = document.createElement('div'); terminalViewport.className = 'thread-preview-viewport';
-  const terminalHost = document.createElement('div'); terminalHost.className = 'thread-preview-terminal'; terminalHost.setAttribute('aria-hidden', 'true'); terminalViewport.appendChild(terminalHost);
+  const terminalHosts = [0, 1].map((index) => {
+    const host = document.createElement('div');
+    host.className = `thread-preview-terminal ${index === 0
+      ? 'thread-preview-terminal-visible'
+      : 'thread-preview-terminal-hidden'}`;
+    host.dataset.previewLayer = String(index);
+    host.setAttribute('aria-hidden', 'true');
+    return host;
+  });
+  terminalViewport.append(...terminalHosts);
   const footer = document.createElement('footer'); footer.className = 'thread-preview-footer';
   footer.innerHTML = '<span>CLICK TO OPEN SESSION</span><span>ESC FROM ROW TO CLOSE</span>';
   const description = document.createElement('span');
@@ -6126,24 +6282,41 @@ function openThreadPreview(session, anchor, { anchorHovered = false } = {}) {
   description.className = 'thread-preview-description';
   popover.append(header, attention, terminalViewport, footer, description);
   document.body.appendChild(popover);
-  const terminal = new Terminal({
-    cols: Math.max(2, session.term.term.cols || 80), rows: Math.max(1, session.term.term.rows || 24),
-    fontFamily: '"SF Mono", Menlo, monospace', fontSize: 11, lineHeight: 1.15,
-    cursorBlink: false, disableStdin: true, scrollback: THREAD_PREVIEW_SCROLLBACK, theme: terminalThemeFor(),
+  const layers = terminalHosts.map((host) => {
+    const terminal = new Terminal({
+      cols: Math.max(2, session.term.term.cols || 80), rows: Math.max(1, session.term.term.rows || 24),
+      fontFamily: '"SF Mono", Menlo, monospace', fontSize: 11, lineHeight: 1.15,
+      cursorBlink: false, disableStdin: true, scrollback: THREAD_PREVIEW_SCROLLBACK, theme: terminalThemeFor(),
+    });
+    terminal.open(host);
+    return {
+      host,
+      terminal,
+      scale: 1,
+      paintedRows: new Set(),
+      awaitingPaintGeneration: null,
+      renderDisposable: null,
+    };
   });
-  terminal.open(terminalHost);
   const preview = {
-    sessionId: session.id, anchor, popover, terminal, terminalViewport, terminalHost,
-    refreshFrame: null, paintFrame: null, refreshCount: 0, paintCount: 0, paintedRows: new Set(), scale: 1,
-    writeDisposable: null, renderDisposable: null, resizeObserver: null, closeTimer: null,
+    sessionId: session.id, anchor, popover, terminalViewport, layers,
+    visibleLayer: layers[0], stagingLayer: layers[1],
+    refreshFrame: null, paintFrame: null, swapFrame: null,
+    refreshInFlight: false, refreshPending: false,
+    lifecycleGeneration: 1, refreshGeneration: 0,
+    refreshCount: 0, refreshStarts: 0, activeRefreshes: 0, maxConcurrentRefreshes: 0,
+    paintCount: 0, scale: 1,
+    writeDisposable: null, resizeObserver: null, closeTimer: null,
     anchorHovered, popoverHovered: false,
     reposition: () => positionThreadPreview(), outsidePointer: null,
   };
   state.ui.threadPreview = preview;
   preview.writeDisposable = session.term.term.onWriteParsed(refreshThreadPreview);
-  preview.renderDisposable = terminal.onRender(({ start, end }) => {
-    for (let row = start; row <= end; row += 1) preview.paintedRows.add(row);
-  });
+  for (const layer of layers) {
+    layer.renderDisposable = layer.terminal.onRender(({ start, end }) => {
+      recordThreadPreviewRender(preview, layer, start, end);
+    });
+  }
   preview.resizeObserver = new ResizeObserver(() => { positionThreadPreview(); scaleThreadPreviewTerminal(); });
   preview.resizeObserver.observe(anchor);
   preview.resizeObserver.observe(popover);
@@ -9443,7 +9616,9 @@ if (window.chromuxTest) {
     preview() {
       const preview = state.ui.threadPreview;
       if (!preview) return null;
-      const buffer = preview.terminal.buffer.active;
+      const layer = preview.visibleLayer;
+      const terminal = layer.terminal;
+      const buffer = terminal.buffer.active;
       const lines = [];
       let coloredCells = 0;
       for (let index = 0; index < buffer.length; index += 1) {
@@ -9467,13 +9642,13 @@ if (window.chromuxTest) {
         preview.popover.querySelector('.thread-preview-footer'),
       ].map((element) => getComputedStyle(element).backgroundColor);
       const headerTitleRect = preview.popover.querySelector('.thread-preview-title').getBoundingClientRect();
-      const screenRect = preview.terminalHost.querySelector('.xterm-screen').getBoundingClientRect();
+      const screenRect = layer.host.querySelector('.xterm-screen').getBoundingClientRect();
       const footerLabelRect = preview.popover.querySelector('.thread-preview-footer span').getBoundingClientRect();
       const viewportRect = preview.terminalViewport.getBoundingClientRect();
       return {
         sessionId: preview.sessionId,
         text: lines.join('\n'),
-        html: preview.terminalHost.innerHTML,
+        html: layer.host.innerHTML,
         focused: document.activeElement === preview.popover,
         role: preview.popover.getAttribute('role'),
         ariaLabel: preview.popover.getAttribute('aria-label'),
@@ -9485,12 +9660,31 @@ if (window.chromuxTest) {
         cwdTitle: preview.popover.querySelector('.thread-preview-cwd')?.title || '',
         left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom,
         width: rect.width, height: rect.height,
-        cols: preview.terminal.cols, rows: preview.terminal.rows,
+        cols: terminal.cols, rows: terminal.rows,
         sourceCols: source.cols, sourceRows: source.rows,
         bufferLength: buffer.length,
+        nonEmptyLines: lines.filter((line) => line.length > 0).length,
+        layerCount: preview.layers.length,
+        visibleLayerCount: preview.layers.filter((candidate) => (
+          candidate.host.classList.contains('thread-preview-terminal-visible')
+          && getComputedStyle(candidate.host).opacity === '1'
+        )).length,
+        visibleLayer: preview.layers.indexOf(layer),
+        layerStyles: preview.layers.map((candidate) => {
+          const style = getComputedStyle(candidate.host);
+          return {
+            opacity: style.opacity,
+            transitionDuration: style.transitionDuration,
+            ariaHidden: candidate.host.getAttribute('aria-hidden'),
+          };
+        }),
+        refreshInFlight: preview.refreshInFlight,
+        refreshPending: preview.refreshPending,
+        refreshStarts: preview.refreshStarts,
+        maxConcurrentRefreshes: preview.maxConcurrentRefreshes,
         refreshCount: preview.refreshCount,
         paintCount: preview.paintCount,
-        paintedRows: preview.paintedRows.size,
+        paintedRows: layer.paintedRows.size,
         coloredCells,
         surfaceBackgrounds,
         attention: {
