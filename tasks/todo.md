@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Buffer Codex DEC synchronized-output frames across PTY chunk boundaries, preserve ordinary terminal behavior, bound malformed frames, and ship as v0.60.1. _(source: user-supplied implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-synchronized-output-renderer.js`, complete prototype matrix, source and packaged smoke, `RELEASES.md`)_
+
 - [x] Reveal collapsed paired browsers from Needs Attention queue `OPEN`, add per-session browser fullscreen with exact collapsed/split restoration and rail-only controls, preserve browser state across transitions, and ship as v0.60.0. _(source: user-supplied implementation plan; evidence: `prototype/renderer/renderer.js`, browser-collapse/session-rail/shortcuts/browser-tabs/theme regressions, source and packaged smoke, `RELEASES.md`)_
 
 - [x] Restore immediate Codex submission spinners while retaining pending turn safety, provider-confirmed Working membership, `/clear` stale-completion safeguards, and disabled-indicator behavior; ship as v0.59.1. _(source: user-supplied implementation plan; evidence: `prototype/renderer/attention.js`, tab-activity/session-rail/diagnostics/turn-signal/update-queue regressions, complete prototype matrix, source and packaged smoke, `RELEASES.md`)_

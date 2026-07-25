@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.60.1
+
+Tag: `chromux-v0.60.1`
+
+- Render Codex terminal redraws atomically by honoring DEC synchronized-output markers even though Chromux remains on xterm.js 5.5.
+- Preserve ordinary PTY output, OSC signals, titles, preview detection, completion recovery, scrolling, themes, and input behavior around synchronized frames.
+- Release malformed frames after one second or 1 MiB, and clear pending synchronized-output state when a session closes.
+
 ## GBlockParty Chromux v0.60.0
 
 Tag: `chromux-v0.60.0`

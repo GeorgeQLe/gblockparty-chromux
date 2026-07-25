@@ -1546,6 +1546,11 @@ function newSessionShape({ id, name, cwd, agent }) {
       lineBuf: '',
       signalBuf: '',
       titleBuf: '',
+      synchronizedOutputActive: false,
+      synchronizedOutputBuffer: '',
+      synchronizedOutputPartial: '',
+      synchronizedOutputBytes: 0,
+      synchronizedOutputTimer: null,
       title: '',
       typedInputBuf: '',
       typedInputCursor: 0,
@@ -6440,6 +6445,7 @@ function closeSession(id) {
   if (!s) return;
   if (state.ui.threadPreview?.sessionId === id) dismissThreadPreview();
   if (s._threadCueTimer) clearTimeout(s._threadCueTimer);
+  resetSynchronizedOutput(s);
   window.chromux.ptyKill(id);
   if (s.term.scrollToBottom) s.term.scrollToBottom.dispose();
   s.term.term.dispose();
@@ -7025,6 +7031,131 @@ function hasVisibleTerminalPayload(data) {
     .length > 0;
 }
 
+const SYNCHRONIZED_OUTPUT_BEGIN = '\x1b[?2026h';
+const SYNCHRONIZED_OUTPUT_END = '\x1b[?2026l';
+const SYNCHRONIZED_OUTPUT_TIMEOUT_MS = 1000;
+const SYNCHRONIZED_OUTPUT_MAX_BYTES = 1024 * 1024;
+
+function resetSynchronizedOutput(session) {
+  const terminal = session && session.term;
+  if (!terminal) return;
+  if (terminal.synchronizedOutputTimer) clearTimeout(terminal.synchronizedOutputTimer);
+  terminal.synchronizedOutputActive = false;
+  terminal.synchronizedOutputBuffer = '';
+  terminal.synchronizedOutputPartial = '';
+  terminal.synchronizedOutputBytes = 0;
+  terminal.synchronizedOutputTimer = null;
+}
+
+function writePtyPayload(session, payload) {
+  if (!payload) return;
+  const recoveryGeneration = session.turn.generation;
+  const shouldRecover = hasVisibleTerminalPayload(payload);
+  if (session._ptyOutputTestTrace) session._ptyOutputTestTrace.writes.push(payload);
+  session.term.term.write(payload, () => {
+    if (!shouldRecover) return;
+    if (session._ptyOutputTestTrace) session._ptyOutputTestTrace.recoveryPayloads.push(payload);
+    recoverCodexCompletionFromRenderedTerminal(session, recoveryGeneration, payload);
+  });
+  if (session._ptyOutputTestTrace) session._ptyOutputTestTrace.detectorPayloads.push(payload);
+  feedDetector(session, payload);
+}
+
+function flushSynchronizedOutput(session) {
+  const payload = session.term.synchronizedOutputBuffer;
+  resetSynchronizedOutput(session);
+  writePtyPayload(session, payload);
+}
+
+function synchronizedOutputByteLength(payload) {
+  return new TextEncoder().encode(payload).byteLength;
+}
+
+function appendSynchronizedOutput(session, payload) {
+  if (!payload) return;
+  session.term.synchronizedOutputBuffer += payload;
+  session.term.synchronizedOutputBytes += synchronizedOutputByteLength(payload);
+  if (session.term.synchronizedOutputBytes >= SYNCHRONIZED_OUTPUT_MAX_BYTES) {
+    flushSynchronizedOutput(session);
+  }
+}
+
+function handleSynchronizedOutputTimeout(session) {
+  const terminal = session.term;
+  terminal.synchronizedOutputTimer = null;
+  const partial = terminal.synchronizedOutputPartial;
+  terminal.synchronizedOutputPartial = '';
+  if (partial) {
+    if (terminal.synchronizedOutputActive) appendSynchronizedOutput(session, partial);
+    else writePtyPayload(session, partial);
+  }
+  if (terminal.synchronizedOutputActive) flushSynchronizedOutput(session);
+}
+
+function ensureSynchronizedOutputTimer(session) {
+  if (session.term.synchronizedOutputTimer) return;
+  session.term.synchronizedOutputTimer = setTimeout(() => {
+    if (state.sessions.get(session.id) !== session) return;
+    handleSynchronizedOutputTimeout(session);
+  }, SYNCHRONIZED_OUTPUT_TIMEOUT_MS);
+}
+
+function routeSynchronizedOutputSegment(session, payload) {
+  if (!payload) return;
+  if (session.term.synchronizedOutputActive) appendSynchronizedOutput(session, payload);
+  else writePtyPayload(session, payload);
+}
+
+function routeSynchronizedPtyOutput(session, data) {
+  const terminal = session.term;
+  const input = terminal.synchronizedOutputPartial + String(data || '');
+  terminal.synchronizedOutputPartial = '';
+  let cursor = 0;
+  let segmentStart = 0;
+
+  while (cursor < input.length) {
+    const markerAt = input.indexOf('\x1b', cursor);
+    if (markerAt === -1) {
+      routeSynchronizedOutputSegment(session, input.slice(segmentStart));
+      cursor = input.length;
+      break;
+    }
+    const remaining = input.slice(markerAt);
+    if (remaining.startsWith(SYNCHRONIZED_OUTPUT_BEGIN)) {
+      routeSynchronizedOutputSegment(session, input.slice(segmentStart, markerAt));
+      if (!terminal.synchronizedOutputActive) {
+        terminal.synchronizedOutputActive = true;
+        ensureSynchronizedOutputTimer(session);
+      }
+      cursor = markerAt + SYNCHRONIZED_OUTPUT_BEGIN.length;
+      segmentStart = cursor;
+      continue;
+    }
+    if (remaining.startsWith(SYNCHRONIZED_OUTPUT_END)) {
+      routeSynchronizedOutputSegment(session, input.slice(segmentStart, markerAt));
+      if (terminal.synchronizedOutputActive) flushSynchronizedOutput(session);
+      cursor = markerAt + SYNCHRONIZED_OUTPUT_END.length;
+      segmentStart = cursor;
+      continue;
+    }
+    if (SYNCHRONIZED_OUTPUT_BEGIN.startsWith(remaining)
+      || SYNCHRONIZED_OUTPUT_END.startsWith(remaining)) {
+      routeSynchronizedOutputSegment(session, input.slice(segmentStart, markerAt));
+      terminal.synchronizedOutputPartial = remaining;
+      ensureSynchronizedOutputTimer(session);
+      cursor = input.length;
+      break;
+    }
+    cursor = markerAt + 1;
+  }
+
+  if (!terminal.synchronizedOutputActive && !terminal.synchronizedOutputPartial
+    && terminal.synchronizedOutputTimer) {
+    clearTimeout(terminal.synchronizedOutputTimer);
+    terminal.synchronizedOutputTimer = null;
+  }
+}
+
 // pty event routing — Chromux OSC signals are extracted (chunk-boundary safe)
 // before anything reaches the terminal or the preview detector. A signal whose
 // session id does not match the PTY it arrived on is dropped and recorded as
@@ -7069,14 +7200,7 @@ function handlePtyData(id, data) {
       apply({ type: 'turn-signal', sessionId: id, signal: sig.event, detail: sig.detail, envelope: env });
     }
   }
-  if (res.clean) {
-    const recoveryGeneration = s.turn.generation;
-    const shouldRecover = hasVisibleTerminalPayload(res.clean);
-    s.term.term.write(res.clean, () => {
-      if (shouldRecover) recoverCodexCompletionFromRenderedTerminal(s, recoveryGeneration, res.clean);
-    });
-    feedDetector(s, res.clean);
-  }
+  if (res.clean) routeSynchronizedPtyOutput(s, res.clean);
   if (s.agent === '' && s.lifecycle.alive) scanPtyAgentDescendants(false).catch(() => {});
 }
 
@@ -7149,6 +7273,9 @@ function showResumeRetryWarning(session, exitCode, now = Date.now()) {
 function handlePtyExit({ id, exitCode }) {
   const s = state.sessions.get(id);
   if (!s) return;
+  if (s.term.synchronizedOutputActive || s.term.synchronizedOutputPartial) {
+    handleSynchronizedOutputTimeout(s);
+  }
   apply({ type: 'session-exited', sessionId: id, exitCode });
   s.term.term.write(`\r\n\x1b[38;5;210m── session exited (${exitCode}) ──\x1b[0m\r\n`);
   renderComposer(s);
@@ -9207,6 +9334,42 @@ if (window.chromuxTest) {
       })),
     })),
     flushRender,
+  };
+
+  window.chromuxTestSynchronizedOutput = {
+    addSession({ name = 'synchronized-output', realTerminal = false } = {}) {
+      const id = addRenderableTestSession({ name, agent: 'codex', realTerminal, cols: 64, rows: 12 });
+      testSession(id)._ptyOutputTestTrace = {
+        writes: [],
+        detectorPayloads: [],
+        recoveryPayloads: [],
+      };
+      return id;
+    },
+    feed(id, chunk) {
+      handlePtyData(id, chunk);
+      flushRender();
+    },
+    trace(id) {
+      const session = testSession(id);
+      const trace = session._ptyOutputTestTrace;
+      const buffer = session.term.term.buffer?.active;
+      const screen = buffer
+        ? Array.from({ length: buffer.length }, (_, index) => buffer.getLine(index)?.translateToString(true) || '')
+          .join('\n')
+        : (session._written || []).join('');
+      return {
+        writes: trace.writes.slice(),
+        detectorPayloads: trace.detectorPayloads.slice(),
+        recoveryPayloads: trace.recoveryPayloads.slice(),
+        screen,
+        syncActive: session.term.synchronizedOutputActive,
+        syncBytes: session.term.synchronizedOutputBytes,
+      };
+    },
+    pendingTimer: (id) => Boolean(testSession(id).term.synchronizedOutputTimer),
+    hasSession: (id) => state.sessions.has(id),
+    dispose(id) { closeSession(id); },
   };
 
   window.chromuxTestUpdateQueue = {
