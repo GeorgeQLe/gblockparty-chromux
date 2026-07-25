@@ -14,6 +14,7 @@ const THREAD_SORT_STORAGE_KEY = 'chromux.threadSort';
 const THREAD_PREVIEW_SIZE_STORAGE_KEY = 'chromux.threadPreviewSize';
 const TAB_GROUPS_STORAGE_KEY = 'chromux.sessionTabGroups';
 const BROWSER_FULLSCREEN_BEHAVIOR_STORAGE_KEY = 'chromux.browserFullscreenBehavior';
+const BROWSER_CHROMUX_TOP_INSET_PROPERTY = '--browser-chromux-top-inset';
 const THEME_IDS = new Set(['blueprint', 'retro-os', 'streak', 'liquid-glass']);
 const THEME_MODE_IDS = new Set(['light', 'dark']);
 const THEME_LABELS = {
@@ -531,6 +532,15 @@ function syncWindowButtonPosition() {
   return position;
 }
 
+function syncBrowserChromuxTopInset() {
+  const app = $('#app');
+  if (!app) return null;
+  const measuredTop = Number(app.getBoundingClientRect().top);
+  const top = Number.isFinite(measuredTop) ? Math.max(0, measuredTop) : 0;
+  document.documentElement.style.setProperty(BROWSER_CHROMUX_TOP_INSET_PROPERTY, `${top}px`);
+  return top;
+}
+
 function applyTheme(theme, { persist = true } = {}) {
   const next = THEME_IDS.has(theme) ? theme : 'liquid-glass';
   state.ui.theme = next;
@@ -546,6 +556,7 @@ function applyTheme(theme, { persist = true } = {}) {
   if (state.ui.threadPreview) refreshThreadPreview();
   renderThemeControls();
   syncWindowButtonPosition();
+  syncBrowserChromuxTopInset();
   return next;
 }
 
@@ -562,6 +573,7 @@ function applyThemeMode(mode, { persist = true } = {}) {
   }
   if (state.ui.threadPreview) refreshThreadPreview();
   renderThemeControls();
+  syncBrowserChromuxTopInset();
   return next;
 }
 
@@ -3066,6 +3078,7 @@ function applyBrowserLayout(session) {
     : 'terminal';
   const collapsed = mode === 'terminal';
   const expanded = isBrowserExpansionLayout(mode);
+  if (mode === 'browserChromux') syncBrowserChromuxTopInset();
   session.els.view.classList.toggle('browser-collapsed', collapsed);
   session.els.view.classList.toggle('browser-workspace', mode === 'browserWorkspace');
   session.els.view.classList.toggle('browser-chromux', mode === 'browserChromux');
@@ -10474,9 +10487,10 @@ if (window.chromuxTest) {
           && Math.abs(webPaneRect.left - viewRect.left) <= 1
           && Math.abs(webPaneRect.right - viewRect.right) <= 1,
         webFillsRenderer: fillsRenderer,
-        chromuxChromeCovered: fillsRenderer && [
-          $('#titlebar'), $('#rail'), $('#session-tabs'), $('#statusbar'),
+        chromuxContentCovered: [
+          $('#rail'), $('#session-tabs'), $('#workspace'), $('#statusbar'),
         ].every(coveredByBrowser),
+        titlebarCovered: coveredByBrowser($('#titlebar')),
         browserRailUsable: Boolean(
           railHit
           && session.els.browserRail.contains(railHit)
@@ -11076,6 +11090,7 @@ window.addEventListener('blur', () => {
   invalidate('shortcutDebug');
 });
 window.addEventListener('resize', positionSessionSearch);
+window.addEventListener('resize', syncBrowserChromuxTopInset);
 
 setInterval(() => {
   scanPtyAgentDescendants(false).catch(() => {});

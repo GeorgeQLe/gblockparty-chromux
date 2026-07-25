@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.61.6
+
+Tag: `chromux-v0.61.6`
+
+- Keep full-Chromux browser mode below the measured application header across Blueprint, Retro-OS, Streak, and Liquid Glass layouts.
+- Continue covering the session rail, session tabs, workspace, and status bar while leaving the titlebar visible, usable, and outside browser hit testing.
+- Preserve the browser rail, paired and terminal return layouts, divider width, live webview, active browser tab, URL, queue, console state, and fullscreen preference behavior.
+
 ## GBlockParty Chromux v0.61.5
 
 Tag: `chromux-v0.61.5`

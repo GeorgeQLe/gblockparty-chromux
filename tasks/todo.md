@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Keep full-Chromux browser mode below the measured application header while covering all lower app content, retain titlebar and browser-rail interaction plus exact layout/webview restoration, and ship as v0.61.6. _(source: user-supplied implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`, `prototype/scripts/test-browser-collapse-renderer.js`, theme regression, package metadata, `RELEASES.md`)_
+
 - [x] Restore visible terminal hover previews for sessions without attention by assigning every optional preview surface to a stable grid row, retain attentive and overflowing previews, and ship as v0.61.5. _(source: user-supplied implementation plan; evidence: `prototype/renderer/styles.css`, `prototype/scripts/test-session-rail-renderer.js`, every theme/mode/size matrix, screenshot smoke, `RELEASES.md`)_
 
 - [x] Reclaim orphaned Chromux browser partitions and stale signal-correlation records on the next launch, preserve unrelated and user-retained storage, continue after cleanup failures, and ship as v0.61.4. _(source: user-supplied implementation plan; evidence: `prototype/storage-cleanup.js`, `prototype/scripts/test-storage-cleanup.js`, requested regressions, source and packaged cleanup/isolation smoke, privacy/troubleshooting docs, `RELEASES.md`)_

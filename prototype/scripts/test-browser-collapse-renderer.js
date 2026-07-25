@@ -17,8 +17,50 @@ fs.writeFileSync(e2ePath, `
 (async () => {
   const b = window.chromuxTestBrowser;
   if (!b) throw new Error('Missing browser collapse test API');
+  const themes = window.chromuxTestThemes;
+  if (!themes) throw new Error('Missing themes test API');
   const expect = (cond, msg) => { if (!cond) throw new Error(msg); };
   const tick = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
+  const isCoveredByBrowser = (browserPane, element) => {
+    const rect = element.getBoundingClientRect();
+    const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    return Boolean(hit && browserPane.contains(hit));
+  };
+  const assertFullBrowserBoundary = (theme) => {
+    const browserPane = document.querySelector('.session-view.browser-chromux .web-pane');
+    const app = document.querySelector('#app');
+    const titlebar = document.querySelector('#titlebar');
+    expect(browserPane && app && titlebar, theme + ' should expose browser, app, and titlebar geometry');
+    const browserRect = browserPane.getBoundingClientRect();
+    const appRect = app.getBoundingClientRect();
+    const titlebarRect = titlebar.getBoundingClientRect();
+    const titlebarStyle = getComputedStyle(titlebar);
+    const storedTopInset = parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue('--browser-chromux-top-inset')
+    );
+    expect(Math.abs(storedTopInset - appRect.top) <= 1,
+      theme + ' measured CSS inset should match app content top; got ' + storedTopInset + ' vs ' + appRect.top);
+    expect(Math.abs(browserRect.top - appRect.top) <= 1,
+      theme + ' browser top should match app content top; got ' + browserRect.top + ' vs ' + appRect.top);
+    expect(Math.abs(browserRect.left) <= 1
+      && Math.abs(browserRect.right - window.innerWidth) <= 1
+      && Math.abs(browserRect.bottom - window.innerHeight) <= 1,
+    theme + ' browser should retain zero left, right, and bottom offsets');
+    expect(titlebarRect.width > 0 && titlebarRect.height > 0
+      && titlebarStyle.display !== 'none' && titlebarStyle.visibility !== 'hidden',
+    theme + ' titlebar should remain visible');
+    expect(titlebarRect.bottom <= browserRect.top + 1,
+      theme + ' titlebar should remain fully above browser content; got ' + titlebarRect.bottom + ' vs ' + browserRect.top);
+    expect(!isCoveredByBrowser(browserPane, titlebar),
+      theme + ' titlebar should not hit-test as browser content');
+    for (const selector of ['#rail', '#session-tabs', '#workspace', '#statusbar']) {
+      const element = document.querySelector(selector);
+      expect(element && isCoveredByBrowser(browserPane, element),
+        theme + ' browser should cover ' + selector);
+    }
+    expect(b.state(firstId).browserRailUsable, theme + ' browser rail should remain usable');
+    return appRect.top;
+  };
 
   await new Promise((resolve) => setTimeout(resolve, 100));
 
@@ -142,9 +184,32 @@ fs.writeFileSync(e2ePath, `
   first = b.state(firstId);
   expect(first.layoutMode === 'browserChromux' && first.fullscreen && !first.collapsed,
     'default expansion should enter browser-Chromux mode');
-  expect(first.terminalHidden && first.dividerHidden && first.webFillsRenderer && first.chromuxChromeCovered,
-    'browser-Chromux should cover the renderer viewport and Chromux chrome: ' + JSON.stringify(first));
-  expect(first.browserRailUsable, 'browser-Chromux should retain a usable browser rail');
+  expect(first.terminalHidden && first.dividerHidden,
+    'browser-Chromux should hide the terminal and divider: ' + JSON.stringify(first));
+  expect(first.chromuxContentCovered && !first.titlebarCovered,
+    'browser-Chromux should cover app content without covering the titlebar: ' + JSON.stringify(first));
+  const browserBoundaryTops = new Map();
+  for (const theme of ['blueprint', 'retro-os', 'streak', 'liquid-glass']) {
+    themes.select(theme);
+    await tick();
+    browserBoundaryTops.set(theme, assertFullBrowserBoundary(theme));
+  }
+  expect(new Set(browserBoundaryTops.values()).size >= 3,
+    'theme boundary coverage should exercise differing header heights and margins: '
+      + JSON.stringify(Object.fromEntries(browserBoundaryTops)));
+  const titlebar = document.querySelector('#titlebar');
+  const priorInlineTitlebarHeight = titlebar.style.height;
+  titlebar.style.height = (titlebar.getBoundingClientRect().height + 7) + 'px';
+  window.dispatchEvent(new Event('resize'));
+  await tick();
+  const resizedTop = assertFullBrowserBoundary('liquid-glass resized');
+  expect(resizedTop > browserBoundaryTops.get('liquid-glass'),
+    'window resize should refresh the measured browser inset after header geometry changes');
+  titlebar.style.height = priorInlineTitlebarHeight;
+  window.dispatchEvent(new Event('resize'));
+  await tick();
+  expect(Math.abs(assertFullBrowserBoundary('liquid-glass restored') - browserBoundaryTops.get('liquid-glass')) <= 1,
+    'restoring header geometry should restore the measured browser inset');
   expect(first.fullscreenPressed === 'true', 'active browser-Chromux should expose aria-pressed=true');
   expect(first.fullscreenTitle === 'Restore paired layout' && first.fullscreenAriaLabel === first.fullscreenTitle,
     'active expansion control should describe its exact return layout');
@@ -163,8 +228,9 @@ fs.writeFileSync(e2ePath, `
   b.fullscreen(firstId);
   await tick();
   first = b.state(firstId);
-  expect(first.layoutMode === 'browserChromux' && first.webFillsRenderer,
+  expect(first.layoutMode === 'browserChromux',
     'browser-Chromux should temporarily open a terminal-focused browser');
+  assertFullBrowserBoundary(document.body.dataset.theme);
   expect(first.fullscreenTitle === 'Restore terminal layout',
     'browser-Chromux should describe the terminal return layout');
   b.fullscreen(firstId);
