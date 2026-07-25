@@ -453,7 +453,12 @@
       return { kind: 'working', icon: '', label: 'Working', status: 'Agent working' };
     }
     if (turnState === 'pending') {
-      return { kind: 'pending', icon: '', label: 'Awaiting agent activity', status: 'Awaiting agent activity' };
+      return {
+        kind: activityIndicators ? 'working' : 'pending',
+        icon: '',
+        label: 'Awaiting agent activity',
+        status: 'Awaiting agent activity',
+      };
     }
     if (activityIndicators && turnState === 'completed') {
       return { kind: 'completed', icon: '✓', label: 'Completed', status: 'Turn completed' };

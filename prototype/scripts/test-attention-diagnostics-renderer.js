@@ -36,9 +36,9 @@ fs.writeFileSync(e2ePath, `
   composer.nativeInput(first, '\\r');
   d.flushRender();
   expect(d.groupText().includes('TURNpending')
-    && d.groupText().includes('TABpending')
+    && d.groupText().includes('TABworking')
     && d.groupText().includes('UPDATE SAFENO · awaiting agent activity'),
-  'pending Codex input should project no spinner while remaining unsafe for updates');
+  'pending Codex input should project a spinner while remaining pending and unsafe for updates');
   expect(d.mismatches() === 0,
     'pending tracked, tab, Threads, and update projections should agree');
   await composer.renderPromptFixture(first, '');
@@ -52,8 +52,8 @@ fs.writeFileSync(e2ePath, `
   expect(d.mismatches() === 0, 'provider-resolved idle projections should agree with mounted Threads and tab state');
   composer.nativeInput(first, 'new diagnostic turn\\r');
   d.flushRender();
-  expect(d.groupText().includes('TURNpending') && d.groupText().includes('TABpending'),
-    'the next ordinary prompt should return tracked and tab state to pending');
+  expect(d.groupText().includes('TURNpending') && d.groupText().includes('TABworking'),
+    'the next ordinary prompt should retain pending turn state while projecting a tab spinner');
   d.ptyOutput(first, '\\x1b]0;\\u2839 codex-working\\x07');
   expect(d.groupText().includes('TURNworking') && d.groupText().includes('TABworking'),
     'animated title evidence should return tracked and tab state to working');

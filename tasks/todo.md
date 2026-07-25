@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Restore immediate Codex submission spinners while retaining pending turn safety, provider-confirmed Working membership, `/clear` stale-completion safeguards, and disabled-indicator behavior; ship as v0.59.1. _(source: user-supplied implementation plan; evidence: `prototype/renderer/attention.js`, tab-activity/session-rail/diagnostics/turn-signal/update-queue regressions, complete prototype matrix, source and packaged smoke, `RELEASES.md`)_
+
 - [x] Annotate loopback preview queues with live server status, launch validated project scripts in non-focused shell tabs, preserve explicit browser-open approval, recover failed loopback tabs, and ship as v0.59.0. _(source: user-supplied implementation plan; evidence: `prototype/preview-probe.js`, main/preload IPC, renderer queue/launcher/browser lifecycle, focused and complete 47-file prototype matrix, source and packaged smoke, `RELEASES.md`)_
 
 - [x] Transfer Tab-completed Codex `$skill` mentions into Compose when shortcut chrome is hidden, retain conservative ambiguous-prompt fallback, and ship as v0.58.7. _(source: user-supplied implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-composer-renderer.js`, focused renderer regressions, source and packaged smoke, `RELEASES.md`)_

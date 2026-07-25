@@ -43,42 +43,56 @@ fs.writeFileSync(e2ePath, `
 
   tabs.typeInput(active, 'build this\\r');
   tabs.emitSignal(background, 'turn-start');
-  expect(tabs.state(active).indicator === 'pending'
+  expect(tabs.state(active).indicator === 'working'
     && tabs.state(active).ariaLabel.includes('Awaiting agent activity'),
-  'pending Codex input should not show a spinner and should expose its awaiting status');
+  'pending Codex input should immediately show a spinner with awaiting semantics');
+  const pendingSpinner = document.querySelector(
+    '.session-tab[data-session-id="' + CSS.escape(active) + '"] .tab-dot',
+  );
   tabs.feed(active, '\\x1b]0;\\u2839 active-agent\\x07');
-  expect(tabs.state(active).indicator === 'working', 'animated Codex title should show the spinner');
+  expect(tabs.state(active).indicator === 'working'
+    && document.querySelector(
+      '.session-tab[data-session-id="' + CSS.escape(active) + '"] .tab-dot',
+    ) === pendingSpinner,
+  'provider-confirmed Working should preserve the pending spinner node');
   expect(tabs.state(background).indicator === 'working', 'signaled background working state should show spinner');
   expect(tabs.state(active).ariaLabel.includes('Agent working'), 'working status should be accessible on the tab');
 
   tabs.typeInput(active, '/clear\\r');
-  expect(tabs.state(active).indicator === 'pending'
+  expect(tabs.state(active).indicator === 'working'
     && tabs.state(active).ariaLabel.includes('Awaiting agent activity'),
-  'focused Codex commands should await provider evidence without a spinner');
+  'focused Codex commands should show the transient spinner while awaiting provider evidence');
   tabs.feed(active, '? for shortcuts\\r\\n› ');
   await wait(30); tabs.flushRender();
   expect(tabs.state(active).indicator === 'idle',
     'a focused composer redraw without activity should resolve pending to idle');
+  tabs.emitSignal(active, 'turn-end');
+  expect(tabs.state(active).indicator === 'idle',
+    'a delayed completion signal after /clear redraw must not revive the spinner');
   tabs.typeInput(active, 'build this again\\r');
-  expect(tabs.state(active).indicator === 'pending',
-    'ordinary input after a command-only turn should return to pending');
+  expect(tabs.state(active).indicator === 'working'
+    && tabs.state(active).ariaLabel.includes('Awaiting agent activity'),
+  'ordinary input after a command-only turn should return to a pending spinner');
   tabs.feed(active, '\\x1b]0;\\u2839 active-agent\\x07');
-  expect(tabs.state(active).indicator === 'working',
-    'ordinary input should show the spinner after title activity');
+  expect(tabs.state(active).indicator === 'working'
+    && tabs.state(active).ariaLabel.includes('Agent working'),
+  'provider evidence should confirm working without interrupting spinner continuity');
 
   const backgroundCodex = tabs.addSession({
     name: 'background-codex-clear', agent: 'codex', realTerminal: true,
   });
   tabs.focus(active);
   tabs.typeInput(backgroundCodex, 'background work\\r');
-  expect(tabs.state(backgroundCodex).indicator === 'pending',
-    'background Codex fixture should begin pending');
+  expect(tabs.state(backgroundCodex).indicator === 'working'
+    && tabs.state(backgroundCodex).ariaLabel.includes('Awaiting agent activity'),
+  'background Codex fixture should begin with a pending spinner');
   tabs.feed(backgroundCodex, '\\x1b]0;\\u2839 background-codex-clear\\x07');
   expect(tabs.state(backgroundCodex).indicator === 'working',
     'background Codex fixture should begin working after title activity');
   tabs.typeInput(backgroundCodex, '  /clear  \\r');
-  expect(tabs.state(backgroundCodex).indicator === 'pending',
-    'background command submission should drop the spinner while pending');
+  expect(tabs.state(backgroundCodex).indicator === 'working'
+    && tabs.state(backgroundCodex).ariaLabel.includes('Awaiting agent activity'),
+  'background command submission should retain a transient spinner while pending');
   tabs.feed(backgroundCodex, '? for shortcuts\\r\\n› ');
   await wait(30); tabs.flushRender();
   const clearedRow = document.querySelector('#thread-list .rail-session-row[data-session-id="'
@@ -160,12 +174,22 @@ fs.writeFileSync(e2ePath, `
   expect(tabs.state(input).indicatorCount === 1 && tabs.state(permission).indicatorCount === 1,
     'each tab should contain exactly one status element');
 
+  const disabledPending = tabs.addSession({
+    name: 'disabled-pending-codex', agent: 'codex', realTerminal: true,
+  });
+  tabs.typeInput(disabledPending, 'pending while indicators toggle\\r');
+  expect(tabs.state(disabledPending).indicator === 'working'
+    && tabs.state(disabledPending).ariaLabel.includes('Awaiting agent activity'),
+  'enabled activity indicators should project pending Codex work as a spinner');
   tabs.setActivityPreference(false);
   expect(tabs.activityPreference() === false, 'switch should disable activity indicators');
   expect(tabs.activityPreferenceStored() === 'false', 'disabled preference should persist');
   expect(tabs.activityToggleState() === false, 'settings switch should reflect disabled preference');
   expect(tabs.state(active).indicator === 'live', 'disabled setting should restore active lifecycle dot');
   expect(tabs.state(background).indicator === 'live', 'disabled setting should restore background lifecycle dot');
+  expect(tabs.state(disabledPending).indicator === 'pending'
+    && tabs.state(disabledPending).ariaLabel.includes('Awaiting agent activity'),
+  'disabled setting should preserve the existing non-spinning pending presentation');
   expect(tabs.state(input).indicator === 'action' && tabs.state(permission).indicator === 'action',
     'disabled activity preference must preserve action-required indicators');
   const inputAttentionRow = document.querySelector(
@@ -179,6 +203,9 @@ fs.writeFileSync(e2ePath, `
   expect(tabs.activityPreferenceStored() === 'true', 'enabled preference should persist');
   expect(tabs.state(active).indicator === 'idle', 're-enabled setting should restore idle state');
   expect(tabs.state(background).indicator === 'working', 're-enabled setting should restore working state');
+  expect(tabs.state(disabledPending).indicator === 'working'
+    && tabs.state(disabledPending).ariaLabel.includes('Awaiting agent activity'),
+  're-enabled setting should restore the pending spinner without confirming provider activity');
 
   tabs.exit(background, 7);
   expect(tabs.state(background).indicator === 'dead', 'exited session should override working state');

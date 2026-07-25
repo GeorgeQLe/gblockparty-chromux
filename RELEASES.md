@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.59.1
+
+Tag: `chromux-v0.59.1`
+
+- Show the existing Working spinner immediately after every Codex prompt submission while retaining the internal update-blocking **Awaiting agent activity** state.
+- Keep pending turns outside the Threads Working section until provider activity is observed, preserving Working membership as provider-confirmed evidence.
+- Preserve `/clear` composer-redraw resolution, stale-completion rejection, disabled-indicator behavior, and unchanged Claude and Grok turn handling.
+
 ## GBlockParty Chromux v0.59.0
 
 Tag: `chromux-v0.59.0`

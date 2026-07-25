@@ -418,6 +418,9 @@ fs.writeFileSync(e2ePath, `
   rail.select('threads');
   rail.emit(webTwo, 'turn-start');
   const worker = rail.addSession({ name: 'api-worker', agent: 'claude', cwd: ${JSON.stringify(looseDir)} });
+  const pendingWorker = rail.addSession({
+    name: 'pending-codex', agent: 'codex', cwd: ${JSON.stringify(looseDir)}, turnState: 'pending',
+  });
   rail.emit(worker, 'turn-start');
   rail.setActivity(webTwo, 3000);
   rail.setActivity(worker, 2000);
@@ -426,6 +429,12 @@ fs.writeFileSync(e2ePath, `
     'Threads should pin every actively working session in an expanded Working section');
   expect(workingGroup.rows.map((row) => row.id).sort().join(',') === [webTwo, worker].sort().join(','),
     'Working section membership should include all and only sessions with an agent turn in progress');
+  const pendingRow = rail.groups().filter((group) => group.key.startsWith('cwd:'))
+    .flatMap((group) => group.rows).find((row) => row.id === pendingWorker);
+  expect(pendingRow?.status === 'Awaiting agent activity'
+    && pendingRow.animationName === 'tabActivitySpin'
+    && !workingGroup.rows.some((row) => row.id === pendingWorker),
+  'pending Codex sessions should spin in their directory row without joining the Working section');
   expect(workingGroup.rows.map((row) => row.id).join(',') === [webTwo, worker].join(','),
     'Recent should order Working rows newest first');
 
