@@ -47,6 +47,43 @@ fs.writeFileSync(e2ePath, `
   expect(c.ptyInputs(first).join('') === 'native', 'native xterm input must work before opening the composer');
   c.clearPtyInputs(first);
 
+  const oscOnly = c.addSession({ name: 'osc-only', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16 });
+  const oscBel = '\\x1b]10;rgb:ffff/ffff/ffff\\x07';
+  const oscSt = '\\x1b]11;rgb:0000/0000/0000\\x1b\\\\';
+  const oscC1 = '\\x9d10;rgb:aaaa/bbbb/cccc\\x9c';
+  c.nativeInput(oscOnly, oscBel);
+  c.nativeInput(oscOnly, oscSt);
+  c.nativeInput(oscOnly, oscC1);
+  expect(c.pendingInput(oscOnly) === '',
+    'BEL, ESC-backslash, and C1 OSC replies must stay out of the pending input shadow');
+  expect(c.ptyInputs(oscOnly).join('') === oscBel + oscSt + oscC1,
+    'OSC replies must reach PTY input byte-for-byte unchanged');
+  c.open(oscOnly); await tick();
+  expect(c.draft(oscOnly) === '' && c.ptyInputs(oscOnly).join('') === oscBel + oscSt + oscC1,
+    'opening Compose after only OSC replies must produce an empty draft without clearing the PTY line');
+
+  const repeatedOsc = c.addSession({ name: 'repeated-osc', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16 });
+  const repeatedReplies = Array.from({ length: 512 }, (_, index) => index % 2 ? oscBel : oscSt);
+  for (const reply of repeatedReplies) c.nativeInput(repeatedOsc, reply);
+  expect(c.pendingInput(repeatedOsc) === '',
+    'repeated OSC color replies must not accumulate in the pending input shadow during long sessions');
+  c.open(repeatedOsc); await tick();
+  expect(c.draft(repeatedOsc) === '' && c.ptyInputs(repeatedOsc).join('') === repeatedReplies.join(''),
+    'Compose must remain empty after repeated OSC replies while every original reply reaches the PTY');
+
+  const mixedOsc = c.addSession({ name: 'mixed-osc', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16 });
+  const mixedInput = 'before ' + oscBel + 'middle ' + oscSt + oscC1 + 'after';
+  c.nativeInput(mixedOsc, mixedInput);
+  expect(c.pendingInput(mixedOsc) === 'before middle after',
+    'ordinary text surrounding multiple OSC replies must remain editable');
+  expect(c.ptyInputs(mixedOsc).join('') === mixedInput,
+    'mixed OSC traffic and user text must reach PTY input unchanged');
+  c.open(mixedOsc); await tick();
+  expect(c.draft(mixedOsc) === 'before middle after'
+    && c.ptyInputs(mixedOsc).join('') === mixedInput + '\\x15\\x0b',
+  'Compose must transfer only the ordinary text surrounding OSC traffic');
+  c.close(mixedOsc); c.focus(first); await tick();
+
   await window.chromuxTest.sendHostInput({ type: 'keyDown', keyCode: 'Enter', modifiers: ['meta', 'shift'] });
   await wait(80); await tick();
   const openRoutes = await window.chromuxTest.shortcutRouteLog();

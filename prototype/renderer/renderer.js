@@ -776,6 +776,52 @@ function nextWordIndex(text, index) {
   return cursor;
 }
 
+function sanitizeTerminalUserInput(termState, data) {
+  const raw = String(data || '');
+  let inOsc = Boolean(termState && termState.oscInputActive);
+  let escapePending = Boolean(termState && termState.oscInputEscapePending);
+  let sanitized = '';
+
+  for (let index = 0; index < raw.length; index += 1) {
+    const character = raw[index];
+    if (inOsc) {
+      if (character === '\x07' || character === '\x9c') {
+        inOsc = false;
+        escapePending = false;
+        continue;
+      }
+      if (escapePending) {
+        if (character === '\\') {
+          inOsc = false;
+          escapePending = false;
+          continue;
+        }
+        escapePending = false;
+      }
+      if (character === '\x1b') escapePending = true;
+      continue;
+    }
+    if (character === '\x9d') {
+      inOsc = true;
+      escapePending = false;
+      continue;
+    }
+    if (character === '\x1b' && raw[index + 1] === ']') {
+      inOsc = true;
+      escapePending = false;
+      index += 1;
+      continue;
+    }
+    sanitized += character;
+  }
+
+  if (termState) {
+    termState.oscInputActive = inOsc;
+    termState.oscInputEscapePending = escapePending;
+  }
+  return sanitized;
+}
+
 function insertPendingTerminalText(termState, value) {
   const before = termState.typedInputBuf.slice(0, termState.typedInputCursor);
   const after = termState.typedInputBuf.slice(termState.typedInputCursor);
@@ -1445,6 +1491,8 @@ function newSessionShape({ id, name, cwd, agent }) {
       title: '',
       typedInputBuf: '',
       typedInputCursor: 0,
+      oscInputActive: false,
+      oscInputEscapePending: false,
       promptSnapshotInvalidated: false,
       previewSuppress: [],
     },
@@ -5506,7 +5554,9 @@ function adoptSessionAgent(session, agent, source = 'unknown', detail = {}) {
 
 function handleTerminalInput(session, data) {
   if (!session) return null;
-  const rewrite = rewriteShellLaunchInput(session, data);
+  const raw = String(data || '');
+  const userInput = sanitizeTerminalUserInput(session.term, raw);
+  const rewrite = userInput === raw ? rewriteShellLaunchInput(session, raw) : null;
   if (rewrite && rewrite.agent === 'codex' && !codexLaunchIsReleased()) {
     writePtyInput(session, '\x15');
     queueCodexLaunch({
@@ -5524,9 +5574,10 @@ function handleTerminalInput(session, data) {
     }).catch(() => {});
     return { ...rewrite, held: true };
   }
-  const outgoing = rewrite ? rewrite.data : data;
+  const outgoing = rewrite ? rewrite.data : raw;
+  const trackedInput = rewrite ? outgoing : userInput;
   if (rewrite) adoptSessionAgent(session, rewrite.agent, 'rewrite', { command: rewrite.command });
-  apply({ type: 'user-input', sessionId: session.id, data: outgoing });
+  if (trackedInput) apply({ type: 'user-input', sessionId: session.id, data: trackedInput });
   writePtyInput(session, outgoing);
   return rewrite;
 }

@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.58.5
+
+Tag: `chromux-v0.58.5`
+
+- Keep xterm-generated OSC replies, including OSC 10/11 color reports, out of pending terminal input and Compose drafts.
+- Recognize BEL, `ESC \`, and C1 OSC/ST forms across repeated or adjacent replies while preserving ordinary editable text around them.
+- Continue forwarding the original terminal input bytes to the PTY unchanged, preserving terminal protocol behavior and existing input editing semantics.
+
 ## GBlockParty Chromux v0.58.4
 
 Tag: `chromux-v0.58.4`
