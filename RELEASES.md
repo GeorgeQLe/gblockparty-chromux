@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.60.2
+
+Tag: `chromux-v0.60.2`
+
+- Keep OSC color replies out of Compose even when Codex renders their printable residue into its editor and Chromux prefers that rendered prompt over the keystroke shadow.
+- Correlate cleanup only with bounded, session-local OSC 10/11/12 replies actually emitted by xterm, preferring clean typed input and preserving unrelated OSC-looking text.
+- Parse OSC input across split `ESC`/`]` introducers and split string terminators while forwarding every original byte to the PTY unchanged.
+
 ## GBlockParty Chromux v0.60.1
 
 Tag: `chromux-v0.60.1`

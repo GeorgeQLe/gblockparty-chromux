@@ -793,40 +793,86 @@ function nextWordIndex(text, index) {
   return cursor;
 }
 
+const OSC_COLOR_REPLY_SIGNATURE_LIMIT = 24;
+const OSC_COLOR_REPLY_CONTENT_LIMIT = 256;
+
+function recordOscColorReplySignature(termState, content) {
+  if (!termState || typeof content !== 'string'
+    || !/^(?:10|11|12);[^\x00-\x1f\x7f]{1,252}$/u.test(content)) return;
+  const signatures = Array.isArray(termState.oscColorReplySignatures)
+    ? termState.oscColorReplySignatures : [];
+  const existing = signatures.indexOf(content);
+  if (existing >= 0) signatures.splice(existing, 1);
+  signatures.push(content);
+  if (signatures.length > OSC_COLOR_REPLY_SIGNATURE_LIMIT) {
+    signatures.splice(0, signatures.length - OSC_COLOR_REPLY_SIGNATURE_LIMIT);
+  }
+  termState.oscColorReplySignatures = signatures;
+}
+
 function sanitizeTerminalUserInput(termState, data) {
   const raw = String(data || '');
   let inOsc = Boolean(termState && termState.oscInputActive);
   let escapePending = Boolean(termState && termState.oscInputEscapePending);
+  let introducerPending = Boolean(termState && termState.oscInputIntroducerPending);
+  let oscContent = termState && typeof termState.oscInputContent === 'string'
+    ? termState.oscInputContent : '';
   let sanitized = '';
 
   for (let index = 0; index < raw.length; index += 1) {
     const character = raw[index];
     if (inOsc) {
       if (character === '\x07' || character === '\x9c') {
+        recordOscColorReplySignature(termState, oscContent);
         inOsc = false;
         escapePending = false;
+        oscContent = '';
         continue;
       }
       if (escapePending) {
         if (character === '\\') {
+          recordOscColorReplySignature(termState, oscContent);
           inOsc = false;
           escapePending = false;
+          oscContent = '';
           continue;
         }
         escapePending = false;
       }
-      if (character === '\x1b') escapePending = true;
+      if (character === '\x1b') {
+        escapePending = true;
+        continue;
+      }
+      if (oscContent.length < OSC_COLOR_REPLY_CONTENT_LIMIT) oscContent += character;
       continue;
+    }
+    if (introducerPending) {
+      introducerPending = false;
+      if (character === ']') {
+        inOsc = true;
+        escapePending = false;
+        oscContent = '';
+        continue;
+      }
+      sanitized += '\x1b';
     }
     if (character === '\x9d') {
       inOsc = true;
       escapePending = false;
+      oscContent = '';
       continue;
     }
-    if (character === '\x1b' && raw[index + 1] === ']') {
-      inOsc = true;
-      escapePending = false;
-      index += 1;
+    if (character === '\x1b') {
+      if (raw[index + 1] === ']') {
+        inOsc = true;
+        escapePending = false;
+        oscContent = '';
+        index += 1;
+      } else if (index + 1 >= raw.length) {
+        introducerPending = true;
+      } else {
+        sanitized += character;
+      }
       continue;
     }
     sanitized += character;
@@ -835,8 +881,24 @@ function sanitizeTerminalUserInput(termState, data) {
   if (termState) {
     termState.oscInputActive = inOsc;
     termState.oscInputEscapePending = escapePending;
+    termState.oscInputIntroducerPending = introducerPending;
+    termState.oscInputContent = oscContent;
   }
   return sanitized;
+}
+
+function removeCorrelatedOscColorReplyResidue(termState, value) {
+  let text = String(value || '');
+  let matched = false;
+  const signatures = Array.isArray(termState && termState.oscColorReplySignatures)
+    ? [...termState.oscColorReplySignatures].sort((left, right) => right.length - left.length)
+    : [];
+  for (const signature of signatures) {
+    if (!signature || !text.includes(signature)) continue;
+    matched = true;
+    text = text.split(signature).join('');
+  }
+  return { text, matched };
 }
 
 function insertPendingTerminalText(termState, value) {
@@ -1031,17 +1093,29 @@ function resolveCurrentTerminalPrompt(session) {
     return { text: shadow, source: 'shadow', confidence: 'fallback', canClear: Boolean(shadow) };
   }
   const rendered = readCodexRenderedPrompt(session);
+  const correlated = removeCorrelatedOscColorReplyResidue(session.term, rendered.text);
   const completionProven = rendered.status === 'ambiguous'
-    && isCodexCompletionCandidate(session.term.codexCompletionIntent, rendered.text);
+    && isCodexCompletionCandidate(session.term.codexCompletionIntent, correlated.text);
   if (rendered.status === 'resolved' || completionProven) {
-    session.term.typedInputBuf = rendered.text;
-    session.term.typedInputCursor = rendered.text.length;
+    const resolvedText = correlated.matched && shadow ? shadow : correlated.text;
     session.term.codexCompletionIntent = null;
+    if (correlated.matched && !resolvedText) {
+      return {
+        text: '',
+        source: 'codex-rendered-osc-residue',
+        confidence: 'high',
+        canClear: false,
+      };
+    }
+    session.term.typedInputBuf = resolvedText;
+    session.term.typedInputCursor = resolvedText.length;
     return {
-      text: rendered.text,
-      source: completionProven ? 'codex-rendered-completion' : 'codex-rendered',
+      text: resolvedText,
+      source: correlated.matched && shadow
+        ? 'shadow-osc-residue'
+        : (completionProven ? 'codex-rendered-completion' : 'codex-rendered'),
       confidence: 'high',
-      canClear: Boolean(rendered.text),
+      canClear: Boolean(resolvedText),
     };
   }
   session.term.codexCompletionIntent = null;
@@ -1557,6 +1631,9 @@ function newSessionShape({ id, name, cwd, agent }) {
       codexCompletionIntent: null,
       oscInputActive: false,
       oscInputEscapePending: false,
+      oscInputIntroducerPending: false,
+      oscInputContent: '',
+      oscColorReplySignatures: [],
       promptSnapshotInvalidated: false,
       previewSuppress: [],
     },

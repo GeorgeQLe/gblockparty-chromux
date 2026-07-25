@@ -62,6 +62,20 @@ fs.writeFileSync(e2ePath, `
   expect(c.draft(oscOnly) === '' && c.ptyInputs(oscOnly).join('') === oscBel + oscSt + oscC1,
     'opening Compose after only OSC replies must produce an empty draft without clearing the PTY line');
 
+  const splitOsc = c.addSession({ name: 'split-osc', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16 });
+  for (const chunk of ['\\x1b', ']10;rgb:1111/2222/3333\\x07before', '\\x1b', ']11;rgb:4444/5555/6666\\x1b', '\\\\after']) {
+    c.nativeInput(splitOsc, chunk);
+  }
+  expect(c.pendingInput(splitOsc) === 'beforeafter',
+    'OSC introducers and ESC-backslash terminators split across callbacks must stay out of the input shadow');
+  expect(c.ptyInputs(splitOsc).join('') === '\\x1b]10;rgb:1111/2222/3333\\x07before\\x1b]11;rgb:4444/5555/6666\\x1b\\\\after',
+    'split OSC replies must still reach PTY input byte-for-byte unchanged');
+
+  const splitNonOsc = c.addSession({ name: 'split-non-osc', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16 });
+  c.nativeInput(splitNonOsc, 'abc'); c.nativeInput(splitNonOsc, '\\x1b'); c.nativeInput(splitNonOsc, '[D'); c.nativeInput(splitNonOsc, 'Z');
+  expect(c.pendingInput(splitNonOsc) === 'abZc',
+    'an ordinary CSI sequence split after ESC must retain its normal input-editing behavior');
+
   const repeatedOsc = c.addSession({ name: 'repeated-osc', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16 });
   const repeatedReplies = Array.from({ length: 512 }, (_, index) => index % 2 ? oscBel : oscSt);
   for (const reply of repeatedReplies) c.nativeInput(repeatedOsc, reply);
@@ -83,6 +97,40 @@ fs.writeFileSync(e2ePath, `
     && c.ptyInputs(mixedOsc).join('') === mixedInput + '\\x15\\x0b',
   'Compose must transfer only the ordinary text surrounding OSC traffic');
   c.close(mixedOsc); c.focus(first); await tick();
+
+  const contaminatedShadow = c.addSession({ name: 'contaminated-shadow', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16, cols: 80 });
+  const reportedColorReply = '\\x1b]10;rgb:1d1d/2020/2727\\x1b\\\\';
+  const reportedResidue = '10;rgb:1d1d/2020/2727';
+  c.nativeInput(contaminatedShadow, 'keep this prompt');
+  c.nativeInput(contaminatedShadow, reportedColorReply);
+  c.clearPtyInputs(contaminatedShadow);
+  await c.renderPromptFixture(contaminatedShadow, '? for shortcuts\\r\\n› ' + reportedResidue + reportedResidue);
+  c.open(contaminatedShadow); await tick();
+  expect(c.draft(contaminatedShadow) === 'keep this prompt'
+    && c.ptyInputs(contaminatedShadow).join('') === '\\x15\\x0b',
+  'a clean shadow must win over a rendered prompt contaminated by repeated correlated color replies');
+
+  const artifactOnly = c.addSession({ name: 'artifact-only', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16, cols: 80 });
+  c.nativeInput(artifactOnly, reportedColorReply); c.clearPtyInputs(artifactOnly);
+  await c.renderPromptFixture(artifactOnly, '? for shortcuts\\r\\n› ' + reportedResidue);
+  c.open(artifactOnly); await tick();
+  expect(c.draft(artifactOnly) === '' && c.ptyInputs(artifactOnly).length === 0,
+    'an artifact-only rendered prompt must be treated as empty without clearing or transferring it');
+
+  const mixedRenderedResidue = c.addSession({ name: 'mixed-rendered-residue', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16, cols: 100 });
+  c.nativeInput(mixedRenderedResidue, reportedColorReply); c.clearPtyInputs(mixedRenderedResidue);
+  await c.renderPromptFixture(mixedRenderedResidue, '? for shortcuts\\r\\n› write tests ' + reportedResidue + ' please');
+  c.open(mixedRenderedResidue); await tick();
+  expect(c.draft(mixedRenderedResidue) === 'write tests  please'
+    && c.ptyInputs(mixedRenderedResidue).join('') === '\\x15\\x0b',
+  'correlated color-reply residue must be removed without discarding legitimate rendered prompt text');
+
+  const oscLookalike = c.addSession({ name: 'osc-lookalike', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16, cols: 80 });
+  await c.renderPromptFixture(oscLookalike, '? for shortcuts\\r\\n› inspect 10;rgb:1d1d/2020/2727 literally');
+  c.open(oscLookalike); await tick();
+  expect(c.draft(oscLookalike) === 'inspect 10;rgb:1d1d/2020/2727 literally',
+    'OSC-looking user text must remain when no matching terminal reply was observed in that session');
+  c.close(oscLookalike); c.focus(first); await tick();
 
   await window.chromuxTest.sendHostInput({ type: 'keyDown', keyCode: 'Enter', modifiers: ['meta', 'shift'] });
   await wait(80); await tick();
