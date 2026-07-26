@@ -47,7 +47,11 @@ try {
 } catch { /* first start or malformed state */ }
 
 const broker = new ResourceBroker({ recovered });
-broker.registerResource('macos:foreground-input', { kind: 'macos', label: 'macOS foreground input', exclusive: true });
+if (process.platform === 'win32') {
+  broker.registerResource('windows:foreground-input', { kind: 'windows', label: 'Windows foreground input', exclusive: true });
+} else {
+  broker.registerResource('macos:foreground-input', { kind: 'macos', label: 'macOS foreground input', exclusive: true });
+}
 
 function persist() {
   const snapshot = broker.snapshot();
@@ -57,6 +61,7 @@ function persist() {
 }
 
 async function refreshSimulators() {
+  if (process.platform !== 'darwin') return;
   try {
     const [devices, metrics] = await Promise.all([listSimulators(), readHostMetrics()]);
     const booted = devices.filter((device) => device.state === 'Booted').length;
@@ -96,6 +101,7 @@ async function dispatch(method, params, socketClientId) {
     case 'lease.release': return broker.release(params.leaseId, clientId, Boolean(params.force));
     case 'resource.register': return broker.registerResource(params.resourceId, params.details);
     case 'capacity.set': {
+      if (process.platform !== 'darwin') throw new Error('iOS Simulator capacity is only available on macOS');
       const value = params.value === 'auto' ? 'auto' : Number(params.value);
       if (value !== 'auto' && ![1, 2, 3].includes(value)) throw new Error('capacity must be auto, 1, 2, or 3');
       capacityOverride = value;
@@ -103,6 +109,7 @@ async function dispatch(method, params, socketClientId) {
       return { value: capacityOverride };
     }
     case 'simulator.execute': {
+      if (process.platform !== 'darwin') throw new Error('iOS Simulator is only available on macOS');
       broker.assertLease(params.leaseId, clientId, [`ios-simulator:${params.udid}`]);
       return executeSimulatorAction({ ...params, capacityOverride });
     }

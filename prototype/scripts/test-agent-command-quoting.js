@@ -11,6 +11,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawn, spawnSync } = require('child_process');
+const validationShell = fs.existsSync('/bin/zsh') ? '/bin/zsh' : '/bin/bash';
 
 const appDir = path.resolve(__dirname, '..');
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'chromux-quoting-'));
@@ -126,12 +127,12 @@ function expect(cond, msg) {
 // NUL-separated — proves the command both parses and delivers exact args.
 function shellArgs(cmd) {
   const shim = [
-    'claude() { printf "%s\\0" "$@" }',
-    'codex() { printf "%s\\0" "$@" }',
-    'grok() { printf "%s\\0" "$@" }',
+    'claude() { printf "%s\\0" "$@"; }',
+    'codex() { printf "%s\\0" "$@"; }',
+    'grok() { printf "%s\\0" "$@"; }',
     '',
   ].join('\n');
-  const run = spawnSync('/bin/zsh', ['-c', shim + cmd], { encoding: 'utf8' });
+  const run = spawnSync(validationShell, ['-c', shim + cmd], { encoding: 'utf8' });
   if (run.status !== 0) return { error: (run.stderr || '').trim() || `exit ${run.status}` };
   // zsh `printf '%s\0' "$@"` with no args still emits a trailing NUL (empty
   // field). Drop empty trailing segments so bare `grok` yields [] not [''].
@@ -143,8 +144,8 @@ function shellArgs(cmd) {
 function checkCommand(label, cmd, expectedArgs) {
   expect(typeof cmd === 'string' && cmd.length > 0, `${label}: no command was built`);
   if (typeof cmd !== 'string') return;
-  const parse = spawnSync('/bin/zsh', ['-n', '-c', cmd], { encoding: 'utf8' });
-  expect(parse.status === 0, `${label}: zsh cannot parse: ${cmd} — ${(parse.stderr || '').trim()}`);
+  const parse = spawnSync(validationShell, ['-n', '-c', cmd], { encoding: 'utf8' });
+  expect(parse.status === 0, `${label}: shell cannot parse: ${cmd} — ${(parse.stderr || '').trim()}`);
   const { args, error } = shellArgs(cmd);
   expect(!error, `${label}: command failed under zsh: ${error}`);
   if (!args) return;

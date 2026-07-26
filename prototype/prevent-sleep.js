@@ -9,18 +9,20 @@ function createPreventSleepController({
   platform = process.platform,
   parentPid = process.pid,
   spawnProcess = spawn,
+  powerSaveBlocker = null,
   onStatus = () => {},
 } = {}) {
   let child = null;
   let enabled = false;
   let shuttingDown = false;
   let lastError = null;
+  let blockerId = null;
 
   function status() {
     return {
-      available: platform === 'darwin',
+      available: platform === 'darwin' || (platform === 'win32' && Boolean(powerSaveBlocker)),
       enabled,
-      running: Boolean(child),
+      running: Boolean(child) || blockerId !== null,
       pid: child && Number.isInteger(child.pid) ? child.pid : null,
       error: lastError,
     };
@@ -43,12 +45,17 @@ function createPreventSleepController({
 
   function setEnabled(nextEnabled) {
     if (typeof nextEnabled !== 'boolean') throw new TypeError('enabled must be a boolean');
-    if (nextEnabled && platform !== 'darwin') {
+    if (nextEnabled && platform !== 'darwin' && platform !== 'win32') {
       enabled = false;
       lastError = 'Prevent Sleep is only available on macOS.';
       return publish();
     }
-    if (nextEnabled === enabled && (nextEnabled === Boolean(child) || !nextEnabled)) return status();
+    if (nextEnabled && platform === 'win32' && !powerSaveBlocker) {
+      enabled = false;
+      lastError = 'Electron powerSaveBlocker is unavailable.';
+      return publish();
+    }
+    if (nextEnabled === enabled && (nextEnabled === (Boolean(child) || blockerId !== null) || !nextEnabled)) return status();
 
     enabled = nextEnabled;
     lastError = null;
@@ -56,10 +63,16 @@ function createPreventSleepController({
       const target = child;
       child = null;
       if (target) target.kill();
+      if (blockerId !== null) powerSaveBlocker.stop(blockerId);
+      blockerId = null;
       return publish();
     }
 
     try {
+      if (platform === 'win32') {
+        blockerId = powerSaveBlocker.start('prevent-display-sleep');
+        return publish();
+      }
       const args = [...CAFFEINATE_ARGS, '-w', String(parentPid)];
       const target = spawnProcess(CAFFEINATE_PATH, args, { stdio: 'ignore' });
       child = target;
@@ -79,6 +92,8 @@ function createPreventSleepController({
     const target = child;
     child = null;
     if (target) target.kill();
+    if (blockerId !== null && powerSaveBlocker) powerSaveBlocker.stop(blockerId);
+    blockerId = null;
   }
 
   return { setEnabled, shutdown, status };

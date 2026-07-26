@@ -81,6 +81,10 @@ body {
     linear-gradient(180deg, var(--bg2), var(--bg1));
 }
 
+body.host-win32 #titlebar {
+  padding-right: 148px;
+}
+
 .brand { display: flex; align-items: center; gap: 10px; }
 .brand-mark { display: inline-flex; align-items: center; color: var(--text); }
 .brand-mark svg { display: block; }
@@ -1254,6 +1258,7 @@ body.browser-chromux-active #workspace {
   white-space: nowrap;
 }
 .head-btn:hover { color: var(--text); border-color: var(--line-hi); }
+.browser-toolbar .capture-btn { padding-inline: 6px; letter-spacing: .08em; }
 .head-btn.armed { color: var(--on-amber); background: var(--amber); border-color: var(--amber); box-shadow: var(--glow-amber); }
 .head-btn.attention { color: var(--amber); border-color: var(--amber); }
 .head-btn:disabled { opacity: 0.35; cursor: default; }

@@ -80,36 +80,40 @@ function normalizeShortcutChord(input = {}) {
   };
 }
 
-function chromuxShortcutAction(input = {}) {
+function chromuxShortcutAction(input = {}, platform = process.platform) {
   const chord = normalizeShortcutChord(input);
   if (chord.type !== 'keyDown') return null;
-  if (!chord.meta || chord.alt || chord.control || !chord.key) return null;
+  const windows = platform === 'win32';
+  const primary = windows ? chord.control : chord.meta;
+  const secondary = windows ? chord.meta : chord.control;
+  if (!primary || chord.alt || secondary || !chord.key) return null;
+  const prefix = windows ? 'Ctrl' : 'Cmd';
 
   if (/^[1-9]$/.test(chord.key) && !chord.shift) {
     return {
       id: CHROMUX_SHORTCUT_ACTIONS.SESSION_INDEX,
       index: Number(chord.key) - 1,
       key: chord.key,
-      label: `Cmd+${chord.key}`,
+      label: `${prefix}+${chord.key}`,
     };
   }
   if (chord.key === 'J' && !chord.shift) {
-    return { id: CHROMUX_SHORTCUT_ACTIONS.QUEUE_FOCUS, key: 'J', label: 'Cmd+J' };
+    return { id: CHROMUX_SHORTCUT_ACTIONS.QUEUE_FOCUS, key: 'J', label: `${prefix}+J` };
   }
   if (chord.key === 'B' && chord.shift) {
-    return { id: CHROMUX_SHORTCUT_ACTIONS.BROWSER_TOGGLE, key: 'B', label: 'Cmd+Shift+B' };
+    return { id: CHROMUX_SHORTCUT_ACTIONS.BROWSER_TOGGLE, key: 'B', label: `${prefix}+Shift+B` };
   }
   if (chord.key === 'Q' && !chord.shift) {
-    return { id: CHROMUX_SHORTCUT_ACTIONS.GUARDED_QUIT, key: 'Q', label: 'Cmd+Q' };
+    return { id: CHROMUX_SHORTCUT_ACTIONS.GUARDED_QUIT, key: 'Q', label: `${prefix}+Q` };
   }
   if (chord.key === 'T' && !chord.shift) {
-    return { id: CHROMUX_SHORTCUT_ACTIONS.NEW_SESSION, key: 'T', label: 'Cmd+T' };
+    return { id: CHROMUX_SHORTCUT_ACTIONS.NEW_SESSION, key: 'T', label: `${prefix}+T` };
   }
   if (chord.key === 'D' && !chord.shift) {
-    return { id: CHROMUX_SHORTCUT_ACTIONS.DETECT, key: 'D', label: 'Cmd+D' };
+    return { id: CHROMUX_SHORTCUT_ACTIONS.DETECT, key: 'D', label: `${prefix}+D` };
   }
   if (chord.key === 'ENTER' && chord.shift) {
-    return { id: CHROMUX_SHORTCUT_ACTIONS.COMPOSER_OPEN, key: 'ENTER', label: 'Cmd+Shift+Enter' };
+    return { id: CHROMUX_SHORTCUT_ACTIONS.COMPOSER_OPEN, key: 'ENTER', label: `${prefix}+Shift+Enter` };
   }
   return null;
 }
@@ -136,8 +140,8 @@ function shortcutContextDisabledReason(context = {}) {
   return null;
 }
 
-function shouldRouteChromuxShortcut(input = {}, context = {}) {
-  if (!chromuxShortcutAction(input)) return false;
+function shouldRouteChromuxShortcut(input = {}, context = {}, platform = process.platform) {
+  if (!chromuxShortcutAction(input, platform)) return false;
   return ALLOWED_CHROMUX_SHORTCUT_FOCUS_KINDS.has(classifyShortcutFocusContext(context));
 }
 

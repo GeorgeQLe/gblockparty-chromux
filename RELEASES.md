@@ -1,5 +1,14 @@
 # Release Notes
 
+## GBlockParty Chromux v0.62.0
+
+Tag: `chromux-v0.62.0` (pending real Windows UAT)
+
+- Add native Windows 11 x64 packaging with an unsigned per-user Squirrel installer, ASAR/native-module unpacking, platform release assets, and Windows auto-updates.
+- Run Windows terminals in user-selected WSL2 distributions with readiness checks, canonical Linux workspace locations, argv-safe execution, Windows/WSL path transport, distro-stable projects, and schema-v8 restore migration.
+- Add Windows title-bar behavior, Control shortcuts, Prevent Sleep, Windows foreground-input resources, named-pipe broker transport, and distro-local hooks/MCP launchers while keeping iOS Simulator controls macOS-only.
+- Add Windows platform tests, hosted packaging CI, SmartScreen/WSL guidance, and a mandatory real-machine UAT gate. Do not tag or publish until that report passes.
+
 ## GBlockParty Chromux v0.61.9
 
 Tag: `chromux-v0.61.9`

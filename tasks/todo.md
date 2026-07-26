@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [ ] Complete real Windows 11 x64 / WSL2 UAT, build the three Squirrel assets, publish `chromux-v0.62.0`, and verify GitHub `/releases/latest`. _(implementation evidence: Windows runtime adapters, Forge/CI configuration, WSL-aware sessions/hooks/DETECT/resource transport, `docs/testing/windows-uat-0.62.0.md`; shipping remains gated on a real-machine PASS)_
+
 - [x] Keep Codex permission, plan-progression, and Plan-mode numeric chooser selections out of Prompt Composer while forwarding them to the PTY exactly once; preserve ordinary numeric prompts, numbered prose/transcripts, non-Codex terminals, redraw behavior, and ship as v0.61.9. _(source: user-supplied implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-composer-renderer.js`, focused shortcut/attention/terminal-rendering regressions, package metadata, `RELEASES.md`)_
 
 - [x] Preserve Codex Working state, tab-spinner continuity, and Threads Working membership across repeated meaningful composer redraws, then ship as v0.61.8. _(source: user-supplied implementation plan, advanced from occupied v0.61.7; evidence: `prototype/renderer/attention.js`, turn-signal/tab-activity/session-rail regressions, focused and complete prototype validation, source and packaged smoke, package metadata, `RELEASES.md`)_

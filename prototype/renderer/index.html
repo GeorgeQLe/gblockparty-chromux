@@ -279,16 +279,28 @@
           <div id="custom-tab-group-error" class="settings-preference-status fail hidden" role="status"></div>
         </section>
         <div class="settings-divider" aria-hidden="true"></div>
+        <section id="settings-wsl-runtime" class="settings-preferences hidden" aria-labelledby="wsl-runtime-heading">
+          <div>
+            <div id="wsl-runtime-heading" class="microlabel">WSL2 RUNTIME</div>
+            <div class="settings-section-copy">New sessions use this distribution. Existing projects and restore records keep their own distribution.</div>
+            <div id="settings-wsl-status" class="settings-preference-status" aria-live="polite">CHECKING</div>
+          </div>
+          <label>
+            <span class="microlabel">DEFAULT DISTRIBUTION</span>
+            <select id="settings-wsl-distro" aria-label="Default WSL2 distribution"></select>
+          </label>
+        </section>
+        <div id="settings-wsl-divider" class="settings-divider hidden" aria-hidden="true"></div>
         <section class="settings-preferences" aria-labelledby="prevent-sleep-heading">
           <div>
             <div id="prevent-sleep-heading" class="microlabel">PREVENT SLEEP</div>
-            <div class="settings-section-copy">Keep this Mac awake while Chromux is open by running <code>caffeinate -dims</code>.</div>
+            <div id="prevent-sleep-copy" class="settings-section-copy">Keep this Mac awake while Chromux is open by running <code>caffeinate -dims</code>.</div>
             <div id="settings-prevent-sleep-status" class="settings-preference-status" aria-live="polite">OFF</div>
           </div>
           <label class="settings-switch">
             <input id="settings-prevent-sleep" type="checkbox">
             <span class="settings-switch-track" aria-hidden="true"><span></span></span>
-            <span>Keep Mac awake</span>
+            <span id="prevent-sleep-label">Keep Mac awake</span>
           </label>
         </section>
         <div class="settings-divider" aria-hidden="true"></div>

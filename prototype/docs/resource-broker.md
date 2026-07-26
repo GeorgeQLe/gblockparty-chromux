@@ -1,5 +1,16 @@
 # Host resource broker
 
+Windows uses `windows:foreground-input` over a user-scoped named pipe. macOS
+retains `macos:foreground-input` and its Unix socket. iOS Simulator resources
+and capacity controls are macOS-only; browser resources, leases, FIFO queues,
+renewal, cancellation, and force release are shared.
+
+`npm run broker:install` installs the host-appropriate integration. On Windows
+it writes a launcher into the selected WSL2 distribution and registers it with
+Codex. The launcher invokes the installed Windows Electron executable with
+`ELECTRON_RUN_AS_NODE=1`, so the helper reaches the named pipe without exposing
+a network port.
+
 Chromux 0.32 coordinates exclusive host resources across Chromux windows, Codex app sessions, and Codex CLI processes. One background service owns a user-only Unix socket at `~/.chromux/resource-broker.sock`; the Electron app and the stdio MCP bridge are clients of that service. The socket is mode `0600`, requests are bounded JSON records, and no network listener is opened.
 
 The daemon starts automatically when either client first connects and outlives the Chromux window. For login startup and global Codex guidance, run:
