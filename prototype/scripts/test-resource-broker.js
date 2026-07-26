@@ -3,8 +3,9 @@
 const assert = require('assert');
 const { ResourceBroker } = require('../resource-broker/core');
 const { brokerSocketPath } = require('../resource-broker/paths');
-assert(
-  brokerSocketPath('/a'.repeat(100), null, 'darwin').startsWith('/tmp/chromux-rb-'),
+assert.match(
+  brokerSocketPath('/a'.repeat(100), null, 'darwin'),
+  /(?:^|[\\/])tmp[\\/]chromux-rb-[a-f0-9]{20}\.sock$/,
   'long Unix socket paths use a bounded fallback',
 );
 assert.match(
