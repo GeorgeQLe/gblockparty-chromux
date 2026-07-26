@@ -13,7 +13,10 @@ if (!windowOptions) throw new Error('Could not locate Chromux BrowserWindow opti
 if (!/\bacceptFirstMouse:\s*true\b/.test(windowOptions[1])) {
   throw new Error('Chromux must accept the first click while its macOS window is inactive');
 }
-if (!/\btrafficLightPosition:\s*\{\s*x:\s*14,\s*y:\s*14\s*\}/.test(windowOptions[1])) {
+if (!/\.\.\.windowOptions\(process\.platform\)/.test(windowOptions[1])
+  || !/\btrafficLightPosition:\s*\{\s*x:\s*14,\s*y:\s*14\s*\}/.test(
+    fs.readFileSync(path.resolve(__dirname, '..', 'platform', 'host.js'), 'utf8'),
+  )) {
   throw new Error('Chromux must retain its startup traffic-light fallback');
 }
 if (!/setWindowButtonPosition:\s*\(position\)\s*=>\s*ipcRenderer\.send\('set-window-button-position', position\)/.test(preloadSource)) {

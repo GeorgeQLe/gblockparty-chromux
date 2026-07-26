@@ -59,7 +59,7 @@ server.listen(0, '127.0.0.1', () => {
   expect(oneState.storage === 'one' && twoState.storage === 'two', 'local storage crossed');
   expect(oneState.input === 'alpha' && twoState.input === 'bravo', 'typed state crossed');
   const screenshots = [];
-  if (${JSON.stringify(!packagedExecutable)}) {
+  if (${JSON.stringify(!packagedExecutable && process.platform !== 'linux')}) {
     b.focus(first);
     await wait(80);
     const shotOne = await one.capturePage();

@@ -265,7 +265,8 @@ function testMissingDirectoriesAndBoundedWarnings() {
 
 function testStartupOrdering() {
   const mainSource = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
-  const readyIndex = mainSource.indexOf('app.whenReady().then(() => {');
+  const readyMatch = /app\.whenReady\(\)\.then\((?:async )?\(\) => \{/.exec(mainSource);
+  const readyIndex = readyMatch ? readyMatch.index : -1;
   const cleanupIndex = mainSource.indexOf('cleanupOrphanedStorage({', readyIndex);
   const createWindowIndex = mainSource.indexOf('createWindow();', readyIndex);
   assert(readyIndex >= 0, 'Electron ready handler should exist');

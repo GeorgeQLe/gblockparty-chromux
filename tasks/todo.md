@@ -6,7 +6,9 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
-- [x] Add guarded `Command+Shift+F` paired-browser fullscreen routing from host, terminal, and non-editable webview focus; mirror the rail expansion action across all configured layouts, preserve exact session/browser state and existing shortcuts, and ship as v0.62.0. _(source: user-supplied implementation plan; evidence: shortcut/hotkey/browser-layout/webview regressions, source and packaged smoke, package metadata, `prototype/README.md`, `RELEASES.md`)_
+- [ ] Complete real Windows 11 x64 / WSL2 UAT, build the three Squirrel assets, publish `chromux-v0.62.0`, and verify GitHub `/releases/latest`. _(implementation evidence: Windows runtime adapters, Forge/CI configuration, WSL-aware sessions/hooks/DETECT/resource transport, `docs/testing/windows-uat-0.62.0.md`; shipping remains gated on a real-machine PASS)_
+
+- [x] Add guarded `Command+Shift+F` / `Control+Shift+F` paired-browser fullscreen routing from host, terminal, and non-editable webview focus; mirror the rail expansion action across all configured layouts, preserve exact session/browser state and existing shortcuts, and stage it in the v0.62.0 release candidate. _(source: user-supplied implementation plan; evidence: shortcut/hotkey/browser-layout/webview regressions, source and packaged smoke, package metadata, `prototype/README.md`, `RELEASES.md`)_
 
 - [x] Keep Codex permission, plan-progression, and Plan-mode numeric chooser selections out of Prompt Composer while forwarding them to the PTY exactly once; preserve ordinary numeric prompts, numbered prose/transcripts, non-Codex terminals, redraw behavior, and ship as v0.61.9. _(source: user-supplied implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-composer-renderer.js`, focused shortcut/attention/terminal-rendering regressions, package metadata, `RELEASES.md`)_
 

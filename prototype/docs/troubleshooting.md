@@ -1,5 +1,26 @@
 # Chromux troubleshooting
 
+## Windows / WSL2 readiness
+
+- Settings must show the chosen distribution as **READY**.
+- `wsl.exe --list --verbose` must report version `2`; WSL1 is rejected.
+- Inside that distribution verify Bash, Git, Node 22.12+, and each
+  installed/authenticated agent CLI.
+- Records tied to a removed distribution remain unresolved and are never
+  silently redirected. Reinstall that exact distro name or recreate the record.
+- Windows drive paths map to `/mnt/<drive>/...`; Linux-home paths are exposed
+  to Electron through `\\wsl.localhost\<distro>\...`.
+- Windows normally reaches WSL dev servers over `localhost`. If it does not,
+  test the URL from PowerShell and inspect firewall or VPN policy.
+
+## Windows installation and updates
+
+The v0.62 installer is unsigned, so SmartScreen normally shows **Windows
+protected your PC**. Verify it is attached to the official GitHub Release, then
+use **More info → Run anyway** if policy allows. Windows updates require the
+matching installer, full `.nupkg`, and `RELEASES`; Chromux shows the release URL
+instead of attempting a macOS install when any asset is absent.
+
 ## Saved project cannot start
 
 Chromux enables **START PROJECT** only when the directory exists, contains a readable `package.json`, and

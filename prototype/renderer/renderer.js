@@ -486,7 +486,7 @@ function renderPreventSleepStatus(status = state.env && state.env.preventSleep) 
     label.classList.add('running');
     label.textContent = snapshot.pid ? `ACTIVE · PID ${snapshot.pid}` : 'ACTIVE';
   } else if (!snapshot.available) {
-    label.textContent = 'MACOS ONLY';
+    label.textContent = 'UNAVAILABLE';
   } else {
     label.textContent = 'OFF';
   }
@@ -1662,7 +1662,7 @@ function flushRender() {
 // lifecycle, turn, browser-pane, and terminal state live in their own domains.
 // ───────────────────────────────────────────────────────────────────────────
 
-function newSessionShape({ id, name, cwd, agent }) {
+function newSessionShape({ id, name, cwd, agent, runtime = null, distro = null }) {
   const capabilities = {
     claude: { turnStarted: 'native', inputRequired: 'native', permissionRequired: 'native', authenticationRequired: 'native', rateLimited: 'native', toolFailed: 'native', turnCompleted: 'native' },
     codex: { turnStarted: 'inferred', inputRequired: 'unavailable', permissionRequired: 'unavailable', authenticationRequired: 'unavailable', rateLimited: 'unavailable', toolFailed: 'unavailable', turnCompleted: 'native' },
@@ -1670,7 +1670,10 @@ function newSessionShape({ id, name, cwd, agent }) {
     '': { turnStarted: 'unavailable', inputRequired: 'unavailable', permissionRequired: 'unavailable', authenticationRequired: 'unavailable', rateLimited: 'unavailable', toolFailed: 'unavailable', turnCompleted: 'unavailable' },
   }[agent];
   return {
-    id, name, cwd, agent, resumeId: null, lastActivityAt: Date.now(),
+    id, name, cwd, agent,
+    runtime: runtime || (state.env && state.env.runtime ? state.env.runtime.kind : 'host'),
+    distro: distro || (state.env && state.env.runtime ? state.env.runtime.selectedDistro : null),
+    resumeId: null, lastActivityAt: Date.now(),
     customTabGroupId: null,
     restoredAttentionRecords: [], // historical snapshot records; separate from live turn/capture state
     capabilities,
@@ -2368,26 +2371,29 @@ function computeShortcutCatalog() {
   const guardReason = guardedShortcutDisabledReason(context);
   const activeSession = context.activeSessionId ? state.sessions.get(context.activeSessionId) : null;
   const definitions = [];
+  const windowsPrimary = state.env && state.env.primaryModifier === 'control';
+  const primaryLabel = windowsPrimary ? 'Ctrl+' : '⌘';
+  const primaryModifiers = windowsPrimary ? { control: true } : { meta: true };
 
   for (let i = 0; i < 9; i += 1) {
     definitions.push({
       id: `session-${i + 1}`,
-      label: `⌘${i + 1}`,
+      label: `${primaryLabel}${i + 1}`,
       key: String(i + 1),
-      modifiers: { meta: true },
+      modifiers: primaryModifiers,
       kind: 'guarded',
       index: i,
       order: i,
     });
   }
   definitions.push(
-    { id: 'queue-next', label: '⌘J', key: 'J', modifiers: { meta: true }, kind: 'guarded', order: 20 },
-    { id: 'browser-toggle', label: '⌘⇧B', key: 'B', modifiers: { meta: true, shift: true }, kind: 'guarded', order: 21 },
-    { id: 'browser-fullscreen', label: '⌘⇧F', key: 'F', modifiers: { meta: true, shift: true }, kind: 'guarded', order: 22 },
-    { id: 'composer-open', label: '⌘⇧Enter', key: 'Enter', modifiers: { meta: true, shift: true }, kind: 'guarded', order: 23 },
-    { id: 'quit', label: '⌘Q', key: 'Q', modifiers: { meta: true }, kind: 'global', order: 30 },
-    { id: 'new-session', label: '⌘T', key: 'T', modifiers: { meta: true }, kind: 'document', order: 31 },
-    { id: 'detect', label: '⌘D', key: 'D', modifiers: { meta: true }, kind: 'document', order: 32 },
+    { id: 'queue-next', label: `${primaryLabel}J`, key: 'J', modifiers: primaryModifiers, kind: 'guarded', order: 20 },
+    { id: 'browser-toggle', label: `${primaryLabel}Shift+B`, key: 'B', modifiers: { ...primaryModifiers, shift: true }, kind: 'guarded', order: 21 },
+    { id: 'browser-fullscreen', label: `${primaryLabel}Shift+F`, key: 'F', modifiers: { ...primaryModifiers, shift: true }, kind: 'guarded', order: 22 },
+    { id: 'composer-open', label: `${primaryLabel}Shift+Enter`, key: 'Enter', modifiers: { ...primaryModifiers, shift: true }, kind: 'guarded', order: 23 },
+    { id: 'quit', label: `${primaryLabel}Q`, key: 'Q', modifiers: primaryModifiers, kind: 'global', order: 30 },
+    { id: 'new-session', label: `${primaryLabel}T`, key: 'T', modifiers: primaryModifiers, kind: 'document', order: 31 },
+    { id: 'detect', label: `${primaryLabel}D`, key: 'D', modifiers: primaryModifiers, kind: 'document', order: 32 },
     { id: 'escape', label: 'Esc', key: 'Esc', modifiers: {}, kind: 'document', order: 33 },
   );
 
@@ -3126,6 +3132,10 @@ function renderBrowserFullscreenToggle(button, currentMode, nextMode) {
   button.replaceChildren(icon);
 }
 
+function browserFullscreenShortcutLabel() {
+  return state.env && state.env.primaryModifier === 'control' ? 'Ctrl+Shift+F' : '⌘⇧F';
+}
+
 function applyBrowserLayout(session) {
   if (!session.els) return;
   const mode = BROWSER_LAYOUT_MODES.has(session.browser.layoutMode)
@@ -3154,7 +3164,7 @@ function applyBrowserLayout(session) {
   session.els.collapseBtn.setAttribute('aria-label', session.els.collapseBtn.title);
   const action = browserLayoutAction(session);
   renderBrowserFullscreenToggle(session.els.fullscreenBtn, mode, action.mode);
-  session.els.fullscreenBtn.title = `${action.title} (⌘⇧F)`;
+  session.els.fullscreenBtn.title = `${action.title} (${browserFullscreenShortcutLabel()})`;
   session.els.fullscreenBtn.setAttribute('aria-label', session.els.fullscreenBtn.title);
   session.els.fullscreenBtn.setAttribute('aria-pressed', String(expanded));
   session.els.fullscreenBtn.dataset.nextLayout = action.mode;
@@ -4114,7 +4124,7 @@ function buildSessionView(session) {
   const pickBtn = document.createElement('button');
   pickBtn.className = 'head-btn'; pickBtn.textContent = '⌖ PICK ELEMENT'; pickBtn.disabled = true;
   const captureBtn = document.createElement('button');
-  captureBtn.className = 'head-btn'; captureBtn.textContent = '⚡ CAPTURE'; captureBtn.disabled = true;
+  captureBtn.className = 'head-btn capture-btn'; captureBtn.textContent = '⚡ CAPTURE'; captureBtn.disabled = true;
   captureBtn.title = 'Capture page (console + screenshot + URL) without picking an element';
 
   browserToolbar.append(back, reload, searchHtmlBtn, urlBar, favoriteBtn, consoleChip, captureChip, queueBtn, favoritesBtn, pickBtn, captureBtn);
@@ -4570,7 +4580,8 @@ function handleComposerKeydown(session, event) {
   if (event.key === 'Escape') {
     event.preventDefault(); event.stopPropagation(); closeComposer(session); return;
   }
-  if (event.key === 'Enter' && event.metaKey && event.shiftKey && !event.altKey && !event.ctrlKey) {
+  const primary = state.env && state.env.primaryModifier === 'control' ? event.ctrlKey && !event.metaKey : event.metaKey && !event.ctrlKey;
+  if (event.key === 'Enter' && primary && event.shiftKey && !event.altKey) {
     event.preventDefault(); event.stopPropagation(); submitComposer(session); return;
   }
   if (event.target === session.els.composerTextarea && event.altKey && !event.metaKey && !event.ctrlKey && !event.shiftKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
@@ -6729,11 +6740,12 @@ async function createSessionNow({
   initialQueue = [], initialAttentionRecords = [], command = undefined, resumeLaunch = null, composerDraft = '',
   initialLastActivityAt = null,
   initialCustomTabGroupId = null,
+  runtime = null, distro = null,
   activate = true,
 }) {
   state.counter += 1;
   const id = 's' + state.counter;
-  const session = newSessionShape({ id, name, cwd, agent });
+  const session = newSessionShape({ id, name, cwd, agent, runtime, distro });
   if (state.env?.smoke) session._testCommand = command !== undefined ? command : agentCommand(agent);
   session.customTabGroupId = validCustomTabGroup(initialCustomTabGroupId) ? initialCustomTabGroupId : null;
   const restoredActivityAt = Date.parse(initialLastActivityAt || '');
@@ -6823,7 +6835,7 @@ async function createSessionNow({
   let ptyInfo;
   try {
     ptyInfo = await window.chromux.ptyCreate({
-      id, cwd,
+      id, cwd, location: { runtime: session.runtime, distro: session.distro, cwd },
       command: command !== undefined ? command : agentCommand(agent),
       cols: term.cols, rows: term.rows,
     });
@@ -6837,6 +6849,10 @@ async function createSessionNow({
     throw error;
   }
   if (ptyInfo && ptyInfo.signalToken) session.turn.token = ptyInfo.signalToken;
+  if (ptyInfo && ptyInfo.location) {
+    session.runtime = ptyInfo.location.runtime;
+    session.distro = ptyInfo.location.distro;
+  }
 
   session.browser.queue = Array.isArray(initialQueue)
     ? initialQueue.map((item) => normalizeQueueItem(item, 'RESTORE')).filter(Boolean)
@@ -7132,6 +7148,8 @@ function snapshotOpenSessions() {
   const attentionBySession = snapshotAttentionRecordsBySession(sessions);
   const open = sessions.map((session) => ({
     name: session.name,
+    runtime: session.runtime,
+    distro: session.distro,
     cwd: session.cwd,
     agent: session.agent || '',
     resumeId: session.resumeId || null,
@@ -8391,6 +8409,8 @@ async function autoRestoreWorkspace() {
       const session = await createSession({
         name,
         cwd: row.cwd || (state.env ? state.env.home : '~'),
+        runtime: row.runtime || null,
+        distro: row.distro || null,
         agent: row.agent || '',
         initialUrl: row.currentUrl || null,
         initialBrowserTabs: row.browserTabs || [],
@@ -8572,6 +8592,16 @@ $('#settings-browser-fullscreen-behavior').addEventListener('change', (event) =>
 $('#settings-prevent-sleep').addEventListener('change', (event) => {
   changePreventSleep(event.target.checked);
 });
+$('#settings-wsl-distro').addEventListener('change', async (event) => {
+  const result = await window.chromux.wslSelectDistro(event.target.value);
+  state.env.runtime.selectedDistro = result.selectedDistro;
+  state.env.runtime.readiness = result.readiness;
+  const ready = result.readiness && result.readiness.ready;
+  $('#settings-wsl-status').textContent = ready
+    ? (result.readiness.warning || 'READY')
+    : (result.readiness.error || 'NOT READY');
+  $('#settings-wsl-status').classList.toggle('fail', !ready);
+});
 $('#settings-developer-mode').addEventListener('change', (event) => {
   changeDeveloperMode(event.target.checked).catch(() => {
     event.target.checked = Boolean(state.env && state.env.devMode);
@@ -8588,13 +8618,16 @@ $('#btn-update-ready').onclick = () => {
 
 $('#ns-browse').onclick = async () => {
   const dir = await window.chromux.pickDirectory();
-  if (dir) { $('#ns-cwd').value = dir; await refreshProjectConfig(); }
+  if (dir) {
+    $('#ns-cwd').value = typeof dir === 'string' ? dir : dir.cwd;
+    await refreshProjectConfig();
+  }
 };
 
-async function refreshProjectConfig() {
+async function refreshProjectConfig(location = null) {
   let cwd = $('#ns-cwd').value.trim();
   if (cwd.startsWith('~')) cwd = (state.env ? state.env.home : '') + cwd.slice(1);
-  const config = await window.chromux.projectConfig(cwd);
+  const config = await window.chromux.projectConfig(location || cwd);
   state.projectConfig = config;
   const select = $('#ns-start-script'); select.innerHTML = '';
   for (const script of config.scripts || []) {
@@ -8612,7 +8645,12 @@ function renderSavedProjects() {
   for (const project of state.projects) {
     const row = document.createElement('div'); row.className = 'saved-project-row';
     const use = document.createElement('button'); use.className = 'saved-project-use'; use.textContent = `${project.name} · ${project.startCommand}`;
-    use.onclick = async () => { $('#ns-name').value = project.name; $('#ns-cwd').value = project.cwd; await refreshProjectConfig(); $('#ns-start-script').value = project.script; };
+    use.onclick = async () => {
+      $('#ns-name').value = project.name;
+      $('#ns-cwd').value = project.cwd;
+      await refreshProjectConfig(project);
+      $('#ns-start-script').value = project.script;
+    };
     const remove = document.createElement('button'); remove.className = 'qi-btn'; remove.textContent = 'REMOVE';
     remove.onclick = async () => { state.projects = await window.chromux.projectsReplace(state.projects.filter((item) => !(item.cwd === project.cwd && item.script === project.script))); renderSavedProjects(); };
     row.append(use, remove); host.appendChild(row);
@@ -8623,7 +8661,9 @@ async function saveCurrentProject() {
   const config = state.projectConfig; const script = $('#ns-start-script').value;
   if (!config || !config.valid || !config.scripts.includes(script)) return null;
   const name = $('#ns-name').value.trim() || config.cwd.split('/').pop();
-  state.projects = await window.chromux.projectsReplace([...state.projects, { name, cwd: config.cwd, script }]);
+  state.projects = await window.chromux.projectsReplace([...state.projects, {
+    name, runtime: config.runtime, distro: config.distro, cwd: config.cwd, script,
+  }]);
   renderSavedProjects();
   return state.projects.find((item) => item.cwd === config.cwd && item.script === script) || null;
 }
@@ -8634,7 +8674,14 @@ $('#ns-start-project').onclick = async () => {
   const project = await saveCurrentProject();
   if (!project) return;
   $('#modal-new').classList.add('hidden');
-  await createSession({ name: project.name, cwd: project.cwd, agent: '', command: project.startCommand });
+  await createSession({
+    name: project.name,
+    runtime: project.runtime,
+    distro: project.distro,
+    cwd: project.cwd,
+    agent: '',
+    command: project.startCommand,
+  });
 };
 
 $('#ns-agent').addEventListener('click', (e) => {
@@ -8911,8 +8958,12 @@ function shortcutInputFromDomEvent(e) {
   };
 }
 
-function fallbackChromuxShortcutAction(input) {
-  if (!input.meta || input.alt || input.control || input.type !== 'keyDown') return null;
+function fallbackChromuxShortcutAction(input, primaryModifier = state.env && state.env.primaryModifier) {
+  const windowsPrimary = primaryModifier === 'control';
+  const primary = windowsPrimary
+    ? Boolean(input.control && !input.meta)
+    : Boolean(input.meta && !input.control);
+  if (!primary || input.alt || input.type !== 'keyDown') return null;
   const key = String(input.key || '').toUpperCase();
   if (/^[1-9]$/.test(key) && !input.shift) return { id: 'session-index', index: Number(key) - 1 };
   if (key === 'T' && !input.shift) return { id: 'new-session' };
@@ -10372,7 +10423,7 @@ if (window.chromuxTest) {
       flushRender();
       return result;
     },
-    fallbackAction: (input) => fallbackChromuxShortcutAction(input),
+    fallbackAction: (input, primaryModifier) => fallbackChromuxShortcutAction(input, primaryModifier),
     focusTerminalTextarea: focusSyntheticTerminalTextarea,
     focusHostEditable() {
       removeHotkeyTestFocusEl();
@@ -10691,8 +10742,8 @@ if (window.chromuxTest) {
     },
     scrollCaptureIntoView(id) {
       const session = testSession(id);
-      session.els.browserToolbar.scrollLeft = session.els.browserToolbar.scrollWidth;
       flushRender();
+      session.els.browserToolbar.scrollLeft = session.els.browserToolbar.scrollWidth;
     },
     preference: () => state.ui.browserFullscreenBehavior,
     preferenceStored: () => window.localStorage.getItem(BROWSER_FULLSCREEN_BEHAVIOR_STORAGE_KEY),
@@ -11402,6 +11453,33 @@ setInterval(() => {
   await state.favoritesReady;
   state.projects = await window.chromux.projectsRead().catch(() => []);
   state.env = await window.chromux.getEnv();
+  document.body.classList.toggle('host-win32', state.env.hostPlatform === 'win32');
+  if (state.env.hostPlatform === 'win32') {
+    const modifier = 'Ctrl';
+    $('#btn-detect').title = `Detect open WSL agent sessions (${modifier}+D)`;
+    $('#btn-new-session').title = `New session (${modifier}+T)`;
+    $('#settings-wsl-runtime').classList.remove('hidden');
+    $('#settings-wsl-divider').classList.remove('hidden');
+    $('#prevent-sleep-copy').textContent = 'Keep this Windows PC awake while Chromux is open.';
+    $('#prevent-sleep-label').textContent = 'Keep Windows awake';
+    const distroSelect = $('#settings-wsl-distro');
+    distroSelect.innerHTML = '';
+    for (const distro of state.env.runtime.distros || []) {
+      const option = document.createElement('option');
+      option.value = distro.name;
+      option.textContent = `${distro.name}${distro.version === 2 ? '' : ' (WSL1 unsupported)'}`;
+      option.disabled = distro.version !== 2;
+      option.selected = distro.name === state.env.runtime.selectedDistro;
+      distroSelect.appendChild(option);
+    }
+    const readiness = state.env.runtime.readiness || {};
+    $('#settings-wsl-status').textContent = readiness.ready ? (readiness.warning || 'READY') : (readiness.error || 'NOT READY');
+    $('#settings-wsl-status').classList.toggle('fail', !readiness.ready);
+  }
+  if (!state.env.capabilities || !state.env.capabilities.iosSimulator) {
+    $('#resource-simulator-capacity').parentElement.classList.add('hidden');
+    $('#resource-capacity-select').closest('.resource-capacity-control').classList.add('hidden');
+  }
   state.restoreSessions = state.env.restoreSessions || null;
   window.chromux.onUpdateStatus((status) => renderUpdateStatus(status));
   window.chromux.onCodexUpdateProgress((progress) => {

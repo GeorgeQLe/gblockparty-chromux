@@ -29,6 +29,9 @@ expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'd', meta: true }).
 expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'Enter', meta: true, shift: true }).id === 'composer-open', 'Command+Shift+Enter should open composer');
 expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'f', meta: true, shift: true }).id === 'browser-fullscreen', 'Command+Shift+F should toggle browser fullscreen');
 expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: '', code: 'KeyF', modifiers: ['command', 'shift'] }).id === 'browser-fullscreen', 'Command+Shift+F should accept Electron code/modifier input');
+expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'f', control: true, shift: true }, 'win32').id === 'browser-fullscreen', 'Control+Shift+F should toggle browser fullscreen on Windows');
+expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'f', control: true, shift: true }, 'win32').label === 'Ctrl+Shift+F', 'Windows browser fullscreen action should use a Control label');
+expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'f', meta: true, shift: true }, 'win32') === null, 'Command+Shift+F should stay unowned on Windows');
 expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'f', meta: true }) === null, 'Command+F should stay unowned');
 expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'f', meta: true, shift: true, alt: true }) === null, 'Command+Option+Shift+F should stay unowned');
 expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'f', meta: true, shift: true, control: true }) === null, 'native Control+Command+F should stay unowned');
@@ -38,6 +41,7 @@ expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'v', meta: true }) 
 expectShortcut(shouldRouteChromuxShortcut({ type: 'keyDown', key: '1', meta: true }, { focusKind: 'terminal' }), 'terminal focus should allow Chromux shortcuts');
 expectShortcut(shouldRouteChromuxShortcut({ type: 'keyDown', key: 'f', meta: true, shift: true }, { focusKind: 'terminal' }), 'terminal focus should allow Command+Shift+F');
 expectShortcut(shouldRouteChromuxShortcut({ type: 'keyDown', key: 'f', meta: true, shift: true }, { focusKind: 'appSurface' }), 'app surface focus should allow Command+Shift+F');
+expectShortcut(shouldRouteChromuxShortcut({ type: 'keyDown', key: 'f', control: true, shift: true }, { focusKind: 'terminal' }, 'win32'), 'terminal focus should allow Control+Shift+F on Windows');
 expectShortcut(!shouldRouteChromuxShortcut({ type: 'keyDown', key: '1', meta: true }, { focusKind: 'hostEditable' }), 'host editable focus should suppress Chromux shortcuts');
 expectShortcut(!shouldRouteChromuxShortcut({ type: 'keyDown', key: 'f', meta: true, shift: true }, { focusKind: 'hostEditable' }), 'host editable focus should suppress Command+Shift+F');
 expectShortcut(!shouldRouteChromuxShortcut({ type: 'keyDown', key: 'f', meta: true, shift: true }, { focusKind: 'guestEditable' }), 'guest editable focus should suppress Command+Shift+F');
@@ -64,6 +68,8 @@ fs.writeFileSync(e2ePath, `
 
   expect(q.fallbackAction({ type: 'keyDown', key: 'f', meta: true, shift: true })?.id === 'browser-fullscreen',
     'renderer fallback parser should recognize Command+Shift+F');
+  expect(q.fallbackAction({ type: 'keyDown', key: 'f', control: true, shift: true }, 'control')?.id === 'browser-fullscreen',
+    'renderer fallback parser should recognize Control+Shift+F on Windows');
   expect(q.fallbackAction({ type: 'keyDown', key: 'f', meta: true, shift: true, control: true }) === null,
     'renderer fallback parser should preserve native Control+Command+F');
 

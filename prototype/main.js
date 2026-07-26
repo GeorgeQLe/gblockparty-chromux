@@ -3,7 +3,7 @@
 // claude -p delivery adapter, and webview popup interception (review-queue routing).
 'use strict';
 
-const { app, BrowserWindow, ipcMain, dialog, shell, Menu, clipboard } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Menu, clipboard, powerSaveBlocker, autoUpdater } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -21,6 +21,8 @@ const { createPreventSleepController } = require('./prevent-sleep');
 const { MAX_DRAFT_BYTES, createPromptHistoryStore } = require('./prompt-history');
 const { previewProbe } = require('./preview-probe');
 const { cleanupOrphanedStorage } = require('./storage-cleanup');
+const { WslRuntime, linuxPathToWindows, windowsPathToLinux, workspaceLocation } = require('./platform/runtime');
+const { capabilities, windowOptions, windowsSupport } = require('./platform/host');
 const {
   CHROMUX_SHORTCUT_ACTIONS,
   chromuxShortcutAction,
@@ -30,6 +32,11 @@ const {
 } = require('./shortcut-input');
 
 const SMOKE = process.argv.includes('--smoke');
+let squirrelStartup = false;
+if (process.platform === 'win32') {
+  try { squirrelStartup = require('electron-squirrel-startup'); } catch { squirrelStartup = false; }
+}
+if (squirrelStartup) app.quit();
 const SECURITY_RESOURCES = Object.freeze({
   'wire-analysis': 'https://gist.github.com/cereblab/dc9a40bc26120f4540e4e09b75ffb547',
   'reproduction-kit': 'https://github.com/cereblab/grok-build-exfil-repro',
@@ -94,6 +101,14 @@ const ptys = new Map(); // sessionId -> IPty
 const deliveries = new Map(); // deliveryId -> ChildProcess
 let closeConfirmed = false;
 let preventSleepController = null;
+const wslRuntime = new WslRuntime();
+let runtimeState = {
+  kind: process.platform === 'win32' ? 'wsl' : 'host',
+  selectedDistro: null,
+  distros: [],
+  readiness: { ready: process.platform !== 'win32', checks: [], error: null },
+  home: process.platform === 'win32' ? '/home' : os.homedir(),
+};
 const shortcutFocusContexts = new Map(); // webContentsId -> { focusKind }
 const shortcutRouteLog = [];
 const resourceClient = new BrokerClient({ client: {
@@ -103,8 +118,20 @@ const resourceClient = new BrokerClient({ client: {
   cooperative: true,
 } });
 const promptHistory = createPromptHistoryStore({ filePath: PROMPT_HISTORY_FILE });
-const codexDetectMetadata = createCodexDetectMetadata();
-const codexUpdateService = createCodexUpdateService();
+const codexDetectMetadata = process.platform === 'win32'
+  ? createCodexDetectMetadata({
+    resolveExecutable: () => runtimeState.selectedDistro ? 'wsl.exe' : null,
+    spawnProcess: (_file, args, options) => spawn('wsl.exe', [
+      '--distribution', runtimeState.selectedDistro, '--exec', 'codex', ...args,
+    ], options),
+  })
+  : createCodexDetectMetadata();
+const codexUpdateService = process.platform === 'win32'
+  ? createCodexUpdateService({
+    resolveExecutable: () => runtimeState.selectedDistro ? 'codex' : null,
+    run: (_file, args) => wslRuntime.run(runtimeState.selectedDistro, ['codex', ...args]),
+  })
+  : createCodexUpdateService();
 
 if (SMOKE && !process.env.CHROMUX_KEEP_USER_DATA) {
   app.setPath('userData', fs.mkdtempSync(path.join(os.tmpdir(), 'chromux-smoke-user-data-')));
@@ -153,10 +180,68 @@ if (SMOKE) {
   }));
 }
 
-const hasSingleInstanceLock = app.requestSingleInstanceLock();
+const hasSingleInstanceLock = !squirrelStartup && app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
   app.quit();
   process.exit(0);
+}
+
+async function initializeRuntime() {
+  if (process.platform !== 'win32') return runtimeState;
+  const support = windowsSupport();
+  if (!support.supported) {
+    runtimeState.readiness = { ready: false, checks: [], error: support.error };
+    return runtimeState;
+  }
+  try {
+    const distros = await wslRuntime.list();
+    const persisted = readPreferences().wslDistro;
+    const selected = distros.find((distro) => distro.name === persisted && distro.version === 2)
+      || distros.find((distro) => distro.default && distro.version === 2)
+      || distros.find((distro) => distro.version === 2)
+      || null;
+    runtimeState = {
+      ...runtimeState,
+      distros,
+      selectedDistro: selected && selected.name,
+      readiness: selected
+        ? await wslRuntime.readiness(selected.name)
+        : { ready: false, checks: [], error: 'Install and initialize a WSL2 distribution before using Chromux.' },
+    };
+    if (selected) {
+      try {
+        const result = await wslRuntime.run(selected.name, ['bash', '-lc', 'printf %s \"$HOME\"']);
+        if (result.stdout.trim().startsWith('/')) runtimeState.home = result.stdout.trim();
+      } catch { /* readiness contains the actionable failure */ }
+    }
+  } catch (error) {
+    runtimeState = {
+      ...runtimeState,
+      readiness: { ready: false, checks: [], error: `WSL2 could not be enumerated: ${error.message}` },
+    };
+  }
+  return runtimeState;
+}
+
+function selectedWorkspace(input) {
+  const location = workspaceLocation(input, {
+    platform: process.platform,
+    selectedDistro: runtimeState.selectedDistro,
+  });
+  if (location.runtime === 'wsl') wslRuntime.select(location.distro);
+  return location;
+}
+
+function hostPath(input) {
+  const location = selectedWorkspace(input);
+  return location.runtime === 'wsl' ? linuxPathToWindows(location.cwd, location.distro) : location.cwd;
+}
+
+function workspaceFromWindowsPath(input, requestedDistro = null) {
+  const unc = /^\\\\wsl(?:\.localhost|\$)\\([^\\]+)(?:\\(.*))?$/i.exec(String(input || ''));
+  const distro = unc ? unc[1] : (requestedDistro || runtimeState.selectedDistro);
+  wslRuntime.select(distro);
+  return { runtime: 'wsl', distro, cwd: windowsPathToLinux(input) };
 }
 
 function ensureDirs() {
@@ -271,11 +356,22 @@ function resolveProjectScript(cwd, script) {
 
 function normalizeProjectRecord(record) {
   if (!record || typeof record !== 'object' || Array.isArray(record)) return null;
-  const config = packageProjectConfig(record.cwd);
+  let location;
+  try { location = selectedWorkspace(record.location || record); } catch { return null; }
+  const config = packageProjectConfig(location.runtime === 'wsl' ? linuxPathToWindows(location.cwd, location.distro) : location.cwd);
   const script = typeof record.script === 'string' ? record.script.trim() : '';
   if (!config.valid || !config.scripts.includes(script)) return null;
   const name = typeof record.name === 'string' ? record.name.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, PROJECT_NAME_MAX) : '';
-  return { name: name || path.basename(config.cwd), cwd: config.cwd, source: config.source, script, runner: config.runner, startCommand: `${config.runner} run ${shellQuote(script)}` };
+  return {
+    name: name || path.posix.basename(location.cwd),
+    runtime: location.runtime,
+    distro: location.distro,
+    cwd: location.cwd,
+    source: config.source,
+    script,
+    runner: config.runner,
+    startCommand: `${config.runner} run ${shellQuote(script)}`,
+  };
 }
 
 function validateProjects(records) {
@@ -316,6 +412,7 @@ function send(channel, payload) {
 function initializePreventSleep() {
   const persisted = readPreferences().preventSleep === true;
   preventSleepController = createPreventSleepController({
+    powerSaveBlocker,
     onStatus(status) {
       try { writePreference('preventSleep', status.enabled); } catch (err) { console.error('prevent sleep preference write failed:', err.message); }
       send('prevent-sleep-status', status);
@@ -451,10 +548,10 @@ ipcMain.on('set-window-button-position', (event, position) => {
 
 function handleShellShortcutInput(event, input, source = 'host', webContentsId = null) {
   emitShortcutDebugInput(input, source, webContentsId);
-  const action = chromuxShortcutAction(input || {});
+  const action = chromuxShortcutAction(input || {}, process.platform);
   const context = shortcutFocusContextForSource(source, webContentsId);
   const focusKind = classifyShortcutFocusContext(context);
-  if (!action || !shouldRouteChromuxShortcut(input || {}, context)) {
+  if (!action || !shouldRouteChromuxShortcut(input || {}, context, process.platform)) {
     recordShortcutRoute(input || {}, source, webContentsId, action, false, focusKind);
     return false;
   }
@@ -681,6 +778,75 @@ function writeClaudeHooksSettings() {
 // written successfully. When false, agents launch uninstrumented instead of
 // pointing --settings/notify at a path that was never written.
 const hookInstall = { helper: false, claude: false, codex: false, grok: false };
+let runtimeHookPaths = { claude: HOOKS_CLAUDE, codex: CODEX_NOTIFY, grok: HOOKS_GROK };
+
+function writeWslFile(distro, file, content, mode = '700') {
+  return new Promise(async (resolve, reject) => {
+    try {
+      await wslRuntime.run(distro, ['mkdir', '-p', path.posix.dirname(file)]);
+    } catch (error) {
+      reject(error);
+      return;
+    }
+    const child = spawn('wsl.exe', ['--distribution', distro, '--exec', 'tee', file], {
+      windowsHide: true,
+      stdio: ['pipe', 'ignore', 'pipe'],
+    });
+    let stderr = '';
+    child.stderr.on('data', (chunk) => { stderr += chunk; });
+    child.once('error', reject);
+    child.once('close', async (code) => {
+      if (code !== 0) {
+        reject(new Error(stderr.trim() || `Could not write ${file}`));
+        return;
+      }
+      try {
+        await wslRuntime.run(distro, ['chmod', mode, file]);
+        resolve();
+      } catch (error) { reject(error); }
+    });
+    child.stdin.end(content);
+  });
+}
+
+async function installWslHooks() {
+  const distro = runtimeState.selectedDistro;
+  if (!distro || !runtimeState.readiness.ready) return;
+  writeSignalClassifier();
+  const base = `${runtimeState.home}/.chromux`;
+  const classifier = `${base}/signal-classifier.js`;
+  const claudeSettings = `${base}/hooks-claude.json`;
+  const codexNotify = `${base}/codex-notify.sh`;
+  const grokScript = `${base}/grok-hook.sh`;
+  const grokSettings = `${base}/hooks-grok.json`;
+  const classifierRun = (agent, event, arg = '') => `node ${shellQuote(classifier)} ${agent} ${event}${arg ? ` ${arg}` : ''}`;
+  const claudeHook = (event) => [{ hooks: [{ type: 'command', command: classifierRun('claude', event) }] }];
+  const claude = JSON.stringify({ hooks: {
+    UserPromptSubmit: claudeHook('UserPromptSubmit'),
+    Notification: claudeHook('Notification'),
+    Stop: claudeHook('Stop'),
+  } }, null, 2) + '\n';
+  const codex = `#!/bin/sh\n[ -n "$CHROMUX_SESSION_ID" ] || exit 0\n${classifierRun('codex', 'agent-turn-complete', '"$1"')} >/dev/null 2>&1\n`;
+  const grok = `#!/bin/sh\n[ -n "$CHROMUX_SESSION_ID" ] || exit 0\n${classifierRun('grok', '"$1"')} >/dev/null 2>&1 || true\n`;
+  const grokHook = (event) => [{ hooks: [{ type: 'command', command: `${shellQuote(grokScript)} ${event}` }] }];
+  const grokJson = JSON.stringify({ hooks: {
+    UserPromptSubmit: grokHook('UserPromptSubmit'),
+    Notification: grokHook('Notification'),
+    Stop: grokHook('Stop'),
+  } }, null, 2) + '\n';
+  await writeWslFile(distro, classifier, fs.readFileSync(SIGNAL_CLASSIFIER), '700');
+  await writeWslFile(distro, claudeSettings, claude, '600');
+  await writeWslFile(distro, codexNotify, codex, '700');
+  await writeWslFile(distro, grokScript, grok, '700');
+  await writeWslFile(distro, grokSettings, grokJson, '600');
+  await wslRuntime.run(distro, ['mkdir', '-p', `${runtimeState.home}/.grok/hooks`]);
+  await writeWslFile(distro, `${runtimeState.home}/.grok/hooks/${GROK_HOOKS_INSTALL_NAME}`, grokJson, '600');
+  runtimeHookPaths = { claude: claudeSettings, codex: codexNotify, grok: grokSettings };
+  hookInstall.helper = true;
+  hookInstall.claude = true;
+  hookInstall.codex = true;
+  hookInstall.grok = true;
+}
 
 const RESUME_ID_RE = /^[0-9a-f][0-9a-f-]{15,127}$/i;
 
@@ -695,7 +861,7 @@ function shellQuote(value) {
 }
 
 function claudeCommand(resumeId = null) {
-  const base = hookInstall.claude ? `claude --settings ${shellQuote(HOOKS_CLAUDE)}` : 'claude';
+  const base = hookInstall.claude ? `claude --settings ${shellQuote(runtimeHookPaths.claude)}` : 'claude';
   return resumeId ? `${base} --resume ${shellQuote(resumeId)}` : base;
 }
 
@@ -740,7 +906,7 @@ function writeCodexNotifyScript() {
 function codexCommand(resumeId = null) {
   // The path sits inside a TOML string inside a shell arg — escape both
   // layers: backslash-escape for TOML, then single-quote for the shell.
-  const notifyToml = `notify=["${CODEX_NOTIFY.replace(/[\\"]/g, '\\$&')}"]`;
+  const notifyToml = `notify=["${runtimeHookPaths.codex.replace(/[\\"]/g, '\\$&')}"]`;
   const updateOverride = 'check_for_update_on_startup=false';
   const base = hookInstall.codex
     ? `codex -c ${shellQuote(notifyToml)} -c ${shellQuote(updateOverride)}`
@@ -824,7 +990,14 @@ function normalizedActivityTimestamp(value, fallback = null) {
 
 function sanitizeRestoreSession(session) {
   if (!session || typeof session !== 'object') return null;
-  const cwd = typeof session.cwd === 'string' && session.cwd ? session.cwd : os.homedir();
+  const runtime = session.runtime === 'wsl' || (process.platform === 'win32' && session.runtime !== 'host') ? 'wsl' : 'host';
+  const distro = runtime === 'wsl'
+    ? (typeof session.distro === 'string' && session.distro ? session.distro : runtimeState.selectedDistro)
+    : null;
+  let cwd = typeof session.cwd === 'string' && session.cwd ? session.cwd : (runtime === 'wsl' ? runtimeState.home : os.homedir());
+  if (runtime === 'wsl') {
+    try { cwd = windowsPathToLinux(cwd); } catch { /* retain unresolved legacy POSIX path */ }
+  }
   const agent = KNOWN_AGENTS.includes(session.agent) ? session.agent : '';
   const queue = Array.isArray(session.queue)
     ? session.queue.map((item) => ({
@@ -898,6 +1071,9 @@ function sanitizeRestoreSession(session) {
     : (browserTabs[0] ? browserTabs[0].id : null);
   return {
     name: String(session.name || path.basename(cwd) || 'session').slice(0, 80),
+    runtime,
+    distro,
+    unresolved: runtime === 'wsl' && !runtimeState.distros.some((candidate) => candidate.name === distro && candidate.version === 2),
     cwd,
     agent,
     resumeId: sanitizeResumeId(session.resumeId),
@@ -1007,7 +1183,7 @@ function resolveRestoreSessions(sessions) {
   const cleanSessions = (Array.isArray(sessions) ? sessions : [])
     .map(sanitizeRestoreSession).filter(Boolean);
   const candidateCache = new Map();
-  const codexCandidates = codexSessionIndex();
+  const codexCandidates = process.platform === 'win32' ? new Map() : codexSessionIndex();
   const used = new Set();
   const exactOwners = new Map();
   cleanSessions.forEach((session, index) => {
@@ -1029,6 +1205,18 @@ function resolveRestoreSessions(sessions) {
     return candidates;
   };
   cleanSessions.forEach((session, index) => {
+    if (session.unresolved) {
+      unresolved.push({
+        name: session.name,
+        cwd: session.cwd,
+        agent: session.agent,
+        resumeId: sanitizeResumeId(session.resumeId),
+        runtime: session.runtime,
+        distro: session.distro,
+        reason: 'missing-distro',
+      });
+      return;
+    }
     let resume = null;
     let inferredMatch = false;
     const savedId = sanitizeResumeId(session.resumeId);
@@ -1134,7 +1322,13 @@ function getUpdateStatus(opts = {}) {
     releasesUrl: process.env.CHROMUX_RELEASES_URL,
   }).then((status) => ({
     ...status,
-    managedInstall: managedUpdateSource(),
+    managedInstall: process.platform === 'darwin' ? managedUpdateSource() : {
+      available: Boolean(status.windows && status.windows.complete),
+      reason: status.windows && status.windows.complete ? 'squirrel' : 'missing-windows-assets',
+      message: status.windows && status.windows.complete
+        ? 'Windows update assets are available.'
+        : 'This release does not contain a complete Windows x64 Squirrel update set.',
+    },
   }));
 }
 
@@ -1157,8 +1351,7 @@ function createWindow() {
     title: 'Chromux',
     acceptFirstMouse: true,
     backgroundColor: '#0b0e11',
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 14, y: 14 },
+    ...windowOptions(process.platform),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -1237,17 +1430,27 @@ app.on('web-contents-created', (_event, contents) => {
 // PTY sessions
 // ---------------------------------------------------------------------------
 
-ipcMain.handle('pty-create', (_e, { id, cwd, command, cols, rows }) => {
-  const shellPath = process.env.SHELL || '/bin/zsh';
+ipcMain.handle('pty-create', (_e, { id, cwd, location, command, cols, rows }) => {
+  const workspace = selectedWorkspace(location || cwd || (process.platform === 'win32' ? runtimeState.home : os.homedir()));
   const signalToken = crypto.randomBytes(32).toString('base64url');
-  const p = pty.spawn(shellPath, ['-l'], {
+  const sessionEnv = { ...process.env, TERM: 'xterm-256color', CHROMUX: '1', CHROMUX_SESSION_ID: id,
+    CHROMUX_SIGNAL_TOKEN: signalToken, CHROMUX_STATE_DIR: workspace.runtime === 'wsl' ? `${runtimeState.home}/.chromux` : CHROMUX_HOME };
+  const spec = workspace.runtime === 'wsl'
+    ? wslRuntime.ptySpec(workspace, sessionEnv)
+    : {
+      file: process.env.SHELL || '/bin/zsh',
+      args: ['-l'],
+      cwd: fs.existsSync(workspace.cwd) ? workspace.cwd : os.homedir(),
+      env: sessionEnv,
+    };
+  const p = pty.spawn(spec.file, spec.args, {
     name: 'xterm-256color',
     cols: cols || 80,
     rows: rows || 24,
-    cwd: cwd && fs.existsSync(cwd) ? cwd : os.homedir(),
-    env: { ...process.env, TERM: 'xterm-256color', CHROMUX: '1', CHROMUX_SESSION_ID: id,
-      CHROMUX_SIGNAL_TOKEN: signalToken, CHROMUX_STATE_DIR: CHROMUX_HOME },
+    cwd: spec.cwd,
+    env: spec.env,
   });
+  p.chromuxLocation = workspace;
   ptys.set(id, p);
   resourceClient.request('resource.register', {
     resourceId: `browser:${id}`,
@@ -1265,7 +1468,7 @@ ipcMain.handle('pty-create', (_e, { id, cwd, command, cols, rows }) => {
       if (ptys.has(id)) p.write(command + '\r');
     }, 700);
   }
-  return { ok: true, signalToken };
+  return { ok: true, signalToken, location: workspace };
 });
 
 ipcMain.on('pty-input', (_e, { id, data }) => {
@@ -1301,8 +1504,9 @@ ipcMain.handle('capture-prepare', (_e, { payload, pngBase64 }) => {
     screenshotPath = path.join(dir, 'screenshot.png');
     fs.writeFileSync(screenshotPath, Buffer.from(pngBase64, 'base64'));
   }
+  const runtimeScreenshotPath = process.platform === 'win32' && screenshotPath ? windowsPathToLinux(screenshotPath) : screenshotPath;
   payload.screenshot = {
-    path: screenshotPath,
+    path: runtimeScreenshotPath,
     mode: screenshotPath ? 'visible-viewport' : 'unavailable',
   };
 
@@ -1310,7 +1514,16 @@ ipcMain.handle('capture-prepare', (_e, { payload, pngBase64 }) => {
   const yamlText = yaml.dump(payload, { lineWidth: 120, noRefs: true });
   fs.writeFileSync(payloadPath, yamlText);
 
-  return { payloadPath, screenshotPath, yamlText, dir };
+  const runtimePayloadPath = process.platform === 'win32' ? windowsPathToLinux(payloadPath) : payloadPath;
+  return {
+    payloadPath: runtimePayloadPath,
+    screenshotPath: runtimeScreenshotPath,
+    hostPayloadPath: payloadPath,
+    hostScreenshotPath: screenshotPath,
+    yamlText,
+    dir,
+    hostDir: dir,
+  };
 });
 
 // ---------------------------------------------------------------------------
@@ -1334,10 +1547,16 @@ ipcMain.handle('deliver-claude', (_e, { deliveryId, payloadPath, yamlText, cwd, 
     notes ? `User note: ${notes}` : 'No user note was attached; infer intent from the captured evidence.',
   ].join('\n');
 
-  const child = spawn(process.env.SHELL || '/bin/zsh', ['-lc', 'claude -p'], {
-    cwd: cwd && fs.existsSync(cwd) ? cwd : os.homedir(),
-    env: { ...process.env },
-  });
+  const workspace = selectedWorkspace(cwd || (process.platform === 'win32' ? runtimeState.home : os.homedir()));
+  const child = workspace.runtime === 'wsl'
+    ? spawn('wsl.exe', ['--distribution', workspace.distro, '--cd', workspace.cwd, '--exec', 'claude', '-p'], {
+      cwd: process.env.SystemRoot || 'C:\\Windows',
+      env: { ...process.env, SystemRoot: process.env.SystemRoot || 'C:\\Windows' },
+    })
+    : spawn(process.env.SHELL || '/bin/zsh', ['-lc', 'claude -p'], {
+      cwd: workspace.cwd && fs.existsSync(workspace.cwd) ? workspace.cwd : os.homedir(),
+      env: { ...process.env },
+    });
   deliveries.set(deliveryId, child);
 
   child.stdout.on('data', (d) => send('deliver-output', { deliveryId, stream: 'stdout', chunk: d.toString() }));
@@ -1405,6 +1624,15 @@ function runCmd(cmd, args, timeout = 10000) {
 }
 
 async function gitRoot(cwd) {
+  if (process.platform === 'win32') {
+    let location;
+    try { location = selectedWorkspace(cwd); } catch { return null; }
+    try {
+      const result = await wslRuntime.run(location.distro, ['git', '-C', location.cwd, 'rev-parse', '--show-toplevel']);
+      const root = result.stdout.trim();
+      return root.startsWith('/') ? root : null;
+    } catch { return null; }
+  }
   if (typeof cwd !== 'string' || cwd.length === 0 || cwd.length > GIT_CWD_MAX || !path.isAbsolute(cwd)) return null;
   let directory;
   try {
@@ -1423,6 +1651,32 @@ async function gitRoot(cwd) {
 async function gitDiffSummary(cwd) {
   const root = await gitRoot(cwd);
   if (!root) return null;
+  if (process.platform === 'win32') {
+    let location;
+    try { location = selectedWorkspace(cwd); } catch { return null; }
+    let output;
+    try {
+      output = (await wslRuntime.run(location.distro, [
+        'git', '-C', root, 'status', '--porcelain=v1', '--untracked-files=all',
+      ])).stdout;
+    } catch { return null; }
+    const files = output.split('\n').filter(Boolean).map((field) => ({
+      path: field.slice(3),
+      originalPath: null,
+      index: field[0],
+      worktree: field[1],
+    }));
+    return {
+      root,
+      files,
+      totals: {
+        files: files.length,
+        staged: files.filter((file) => ![' ', '?'].includes(file.index)).length,
+        unstaged: files.filter((file) => file.worktree !== ' ').length,
+        untracked: files.filter((file) => file.index === '?' && file.worktree === '?').length,
+      },
+    };
+  }
   const output = await new Promise((resolve) => {
     execFile('/usr/bin/git', [
       '-C', root, 'status', '--porcelain=v1', '-z', '--untracked-files=all',
@@ -1460,6 +1714,39 @@ function isWithinProject(root, candidate) {
 }
 
 async function htmlProjectContext({ sessionId, launchCwd } = {}) {
+  if (process.platform === 'win32') {
+    const ptySession = typeof sessionId === 'string' ? ptys.get(sessionId) : null;
+    let location;
+    try {
+      location = selectedWorkspace((ptySession && ptySession.chromuxLocation) || launchCwd || runtimeState.home);
+    } catch {
+      return { ok: false, error: 'Project directory is unavailable.', root: null, liveCwd: null, launchCwd: null };
+    }
+    let liveLinux = null;
+    if (ptySession) {
+      try {
+        const owned = await scanWslProcesses({ chromuxOnly: true });
+        liveLinux = owned.find((row) => row.id === sessionId && row.distro === location.distro)?.cwd || null;
+      } catch { /* use launch cwd */ }
+    }
+    const launchLinux = typeof launchCwd === 'string' && launchCwd.startsWith('/') ? launchCwd : location.cwd;
+    const baseLinux = liveLinux || launchLinux;
+    const rootLinux = await gitRoot({ runtime: 'wsl', distro: location.distro, cwd: launchLinux || baseLinux }) || launchLinux || baseLinux;
+    try {
+      const root = linuxPathToWindows(rootLinux, location.distro);
+      const liveCwd = liveLinux ? linuxPathToWindows(liveLinux, location.distro) : null;
+      const launch = launchLinux ? linuxPathToWindows(launchLinux, location.distro) : null;
+      return {
+        ok: true,
+        root,
+        liveCwd: liveCwd || launch,
+        launchCwd: launch,
+        location: { runtime: 'wsl', distro: location.distro, cwd: rootLinux },
+      };
+    } catch {
+      return { ok: false, error: 'Project directory is unavailable.', root: null, liveCwd: null, launchCwd: null };
+    }
+  }
   let liveCwd = null;
   const ptySession = typeof sessionId === 'string' ? ptys.get(sessionId) : null;
   if (ptySession && Number.isInteger(ptySession.pid)) {
@@ -1671,6 +1958,12 @@ function classifyPtyAgentDescendants(procs, roots) {
 async function lsofCwds(pids) {
   const cwds = new Map();
   if (pids.length === 0) return cwds;
+  if (process.platform !== 'darwin') {
+    for (const pid of pids) {
+      try { cwds.set(pid, fs.readlinkSync(`/proc/${pid}/cwd`)); } catch { /* exited or unavailable */ }
+    }
+    return cwds;
+  }
   const out = await runCmd('/usr/sbin/lsof', ['-a', '-p', pids.join(','), '-d', 'cwd', '-Fn']);
   let pid = null;
   for (const line of out.split('\n')) {
@@ -1822,6 +2115,47 @@ function latestGrokSession(cwd) {
   return grokSessions(cwd)[0] || null;
 }
 
+async function scanWslProcesses({ chromuxOnly = false } = {}) {
+  const rows = [];
+  for (const distro of runtimeState.distros.filter((candidate) => candidate.version === 2)) {
+    let result;
+    try {
+      result = await wslRuntime.run(distro.name, ['ps', '-eo', 'pid=,ppid=,tty=,etime=,args=']);
+    } catch { continue; }
+    const processes = result.stdout.split('\n').map((line) => {
+      const match = line.match(/^\s*(\d+)\s+(\d+)\s+(\S+)\s+(\S+)\s+(.*)$/);
+      return match ? { pid: Number(match[1]), ppid: Number(match[2]), tty: match[3], etime: match[4], command: match[5].trim() } : null;
+    }).filter(Boolean);
+    for (const processRow of processes) {
+      const agent = classifyAgentCommand(processRow.command);
+      if (!agent) continue;
+      let environ = '';
+      try {
+        environ = (await wslRuntime.run(distro.name, ['cat', `/proc/${processRow.pid}/environ`])).stdout;
+      } catch { /* process may have exited */ }
+      const owned = environ.includes('CHROMUX=1') || environ.includes('CHROMUX_SESSION_ID=');
+      if (chromuxOnly !== owned) continue;
+      let cwd = null;
+      try { cwd = (await wslRuntime.run(distro.name, ['readlink', `/proc/${processRow.pid}/cwd`])).stdout.trim() || null; } catch { /* exited */ }
+      const sessionIdMatch = /CHROMUX_SESSION_ID=([A-Za-z0-9_-]+)/.exec(environ);
+      rows.push({
+        id: sessionIdMatch ? sessionIdMatch[1] : undefined,
+        tty: `${distro.name}:${processRow.tty}`,
+        pid: processRow.pid,
+        agent,
+        command: processRow.command,
+        etime: processRow.etime,
+        cwd,
+        runtime: 'wsl',
+        distro: distro.name,
+        terminal: null,
+        resume: null,
+      });
+    }
+  }
+  return rows;
+}
+
 function readFirstLine(file, cap = 262144) {
   let fd = null;
   try {
@@ -1879,6 +2213,21 @@ function codexSessionIndex(fileCap = 400) {
 }
 
 ipcMain.handle('detect-external', async () => {
+  if (process.platform === 'win32') {
+    const rows = await scanWslProcesses();
+    for (const distro of new Set(rows.filter((row) => row.agent === 'codex' && row.cwd).map((row) => row.distro))) {
+      const scanner = createCodexDetectMetadata({
+        resolveExecutable: () => 'wsl.exe',
+        spawnProcess: (_file, args, options) => spawn('wsl.exe', [
+          '--distribution', distro, '--exec', 'codex', ...args,
+        ], options),
+      });
+      const distroRows = rows.filter((row) => row.distro === distro && row.agent === 'codex' && row.cwd);
+      const metadata = await scanner.scan(distroRows.map((row) => row.cwd));
+      for (const row of distroRows) row.resume = metadata.get(row.cwd) || null;
+    }
+    return { rows, tabTitles: false, scannedAt: new Date().toISOString() };
+  }
   const [procs, tabs] = await Promise.all([listTtyProcesses(), listTerminalTabs()]);
   const byPid = new Map(procs.map((p) => [p.pid, p]));
   const agentPids = new Set(
@@ -1940,6 +2289,9 @@ ipcMain.handle('detect-external', async () => {
 });
 
 ipcMain.handle('detect-pty-agents', async () => {
+  if (process.platform === 'win32') {
+    return { rows: await scanWslProcesses({ chromuxOnly: true }), scannedAt: new Date().toISOString() };
+  }
   const roots = [...ptys.entries()]
     .map(([id, p]) => ({ id, pid: Number(p && p.pid) }))
     .filter((row) => row.id && Number.isFinite(row.pid) && row.pid > 0);
@@ -1958,18 +2310,65 @@ ipcMain.handle('detect-pty-agents', async () => {
 // Preview-detection guard: terminal soft-wrapping can split long paths, so a
 // matched .html path is only routed if it actually exists on disk.
 ipcMain.handle('file-exists', (_e, p) => {
-  try { return fs.existsSync(p); } catch { return false; }
+  try { return fs.existsSync(hostPath(p)); } catch { return false; }
 });
 ipcMain.handle('project-html-index', (_e, opts = {}) => projectHtmlIndex(opts));
-ipcMain.handle('resolve-project-html', (_e, opts = {}) => resolveProjectHtml(opts));
+ipcMain.handle('resolve-project-html', (_e, opts = {}) => {
+  if (process.platform !== 'win32') return resolveProjectHtml(opts);
+  let reference = opts.reference;
+  try {
+    const distro = opts.distro || ptys.get(opts.sessionId)?.chromuxLocation?.distro || runtimeState.selectedDistro;
+    if (typeof reference === 'string' && reference.startsWith('~/')) {
+      reference = linuxPathToWindows(`${runtimeState.home}/${reference.slice(2)}`, distro);
+    } else if (typeof reference === 'string' && reference.startsWith('/')) {
+      reference = linuxPathToWindows(reference, distro);
+    }
+  } catch { /* resolver returns its normal invalid/missing result */ }
+  return resolveProjectHtml({ ...opts, reference });
+});
 
 ipcMain.handle('pick-directory', async () => {
   const res = await dialog.showOpenDialog(win, {
     properties: ['openDirectory', 'createDirectory'],
     defaultPath: os.homedir(),
   });
-  return res.canceled ? null : res.filePaths[0];
+  if (res.canceled) return null;
+  if (process.platform !== 'win32') return res.filePaths[0];
+  return {
+    ...workspaceFromWindowsPath(res.filePaths[0]),
+  };
 });
+
+ipcMain.handle('wsl-list-distros', async () => {
+  await initializeRuntime();
+  return { distros: runtimeState.distros, selectedDistro: runtimeState.selectedDistro };
+});
+ipcMain.handle('wsl-refresh-readiness', async () => {
+  if (process.platform !== 'win32' || !runtimeState.selectedDistro) return runtimeState.readiness;
+  runtimeState.readiness = await wslRuntime.readiness(runtimeState.selectedDistro);
+  return runtimeState.readiness;
+});
+ipcMain.handle('wsl-select-distro', async (_e, distro) => {
+  if (process.platform !== 'win32') throw new Error('WSL distribution selection is only available on Windows.');
+  wslRuntime.select(distro);
+  writePreference('wslDistro', distro);
+  runtimeState.selectedDistro = distro;
+  runtimeState.readiness = await wslRuntime.readiness(distro);
+  try {
+    const result = await wslRuntime.run(distro, ['bash', '-lc', 'printf %s \"$HOME\"']);
+    if (result.stdout.trim().startsWith('/')) runtimeState.home = result.stdout.trim();
+  } catch { /* readiness reports the runtime problem */ }
+  try { await installWslHooks(); } catch (error) {
+    runtimeState.readiness.warning = `Agent hooks are unavailable; sessions will run uninstrumented: ${error.message}`;
+  }
+  return { selectedDistro: distro, readiness: runtimeState.readiness };
+});
+ipcMain.handle('path-to-runtime', (_e, { path: input, distro } = {}) => ({
+  ...(process.platform === 'win32'
+    ? workspaceFromWindowsPath(input, distro)
+    : { runtime: 'host', distro: null, cwd: path.resolve(input) }),
+}));
+ipcMain.handle('path-to-host', (_e, location) => hostPath(location));
 
 ipcMain.handle('read-delivery-log', () => {
   try {
@@ -1987,22 +2386,32 @@ ipcMain.on('reveal-path', (_e, { p }) => {
 });
 
 ipcMain.handle('get-env', () => ({
-  home: os.homedir(),
+  home: process.platform === 'win32' ? runtimeState.home : os.homedir(),
+  hostHome: os.homedir(),
   chromuxHome: CHROMUX_HOME,
   capturesDir: CAPTURES_DIR,
   deliveryLog: DELIVERY_LOG,
   restoreSessions: readRestoreSnapshot(),
   // null when the hook install failed at startup: the renderer then launches
   // agents uninstrumented instead of pointing them at broken paths.
-  hooksSettingsPath: hookInstall.claude ? HOOKS_CLAUDE : null,
-  codexNotifyPath: hookInstall.codex ? CODEX_NOTIFY : null,
+  hooksSettingsPath: hookInstall.claude ? runtimeHookPaths.claude : null,
+  codexNotifyPath: hookInstall.codex ? runtimeHookPaths.codex : null,
   // Grok hooks install into ~/.grok/hooks (no launch flag). Expose path for
   // diagnostics/tests; launch always uses bare `grok` / `grok --resume`.
-  grokHooksPath: hookInstall.grok ? HOOKS_GROK : null,
+  grokHooksPath: hookInstall.grok ? runtimeHookPaths.grok : null,
   version: currentVersion(),
   devMode: DEV_MODE,
+  hostPlatform: process.platform,
+  primaryModifier: process.platform === 'win32' ? 'control' : 'meta',
+  runtime: {
+    kind: runtimeState.kind,
+    selectedDistro: runtimeState.selectedDistro,
+    distros: runtimeState.distros,
+    readiness: runtimeState.readiness,
+  },
+  capabilities: capabilities(process.platform),
   preventSleep: preventSleepController ? preventSleepController.status() : {
-    available: process.platform === 'darwin', enabled: false, running: false, pid: null, error: null,
+    available: capabilities(process.platform).preventSleep, enabled: false, running: false, pid: null, error: null,
   },
   resourceBroker: { cooperativeComputerUse: true, socketPath: resourceClient.socketPath },
 }));
@@ -2055,8 +2464,16 @@ ipcMain.handle('clipboard-write-text', (_e, text) => {
   return true;
 });
 if (SMOKE) ipcMain.handle('test-clipboard-read-text', () => clipboard.readText());
-ipcMain.handle('project-config', (_e, cwd) => packageProjectConfig(cwd));
-ipcMain.handle('project-script-resolve', (_e, { cwd, script } = {}) => resolveProjectScript(cwd, script));
+ipcMain.handle('project-config', (_e, cwd) => {
+  const location = selectedWorkspace(cwd);
+  const config = packageProjectConfig(location.runtime === 'wsl' ? linuxPathToWindows(location.cwd, location.distro) : location.cwd);
+  return config.valid ? { ...config, ...location, location } : config;
+});
+ipcMain.handle('project-script-resolve', (_e, { cwd, location: inputLocation, script } = {}) => {
+  const location = selectedWorkspace(inputLocation || cwd);
+  const config = resolveProjectScript(location.runtime === 'wsl' ? linuxPathToWindows(location.cwd, location.distro) : location.cwd, script);
+  return config.valid ? { ...config, ...location, location } : config;
+});
 ipcMain.handle('preview-probe', (_e, url) => previewProbe(url));
 ipcMain.handle('git-root', (_e, cwd) => gitRoot(cwd));
 ipcMain.handle('git-diff-summary', (_e, cwd) => gitDiffSummary(cwd));
@@ -2123,6 +2540,38 @@ ipcMain.handle('install-update', async (_e, opts = {}) => {
   if (!status || !status.updateAvailable) {
     return { ok: false, message: 'No newer Chromux release is available.' };
   }
+  if (process.platform === 'win32') {
+    if (!status.windows || !status.windows.complete) {
+      return {
+        ok: false,
+        reason: 'missing-windows-assets',
+        message: 'The GitHub Release is missing its Windows installer, full package, or RELEASES manifest.',
+        releaseUrl: status.releaseUrl || null,
+      };
+    }
+    try {
+      autoUpdater.setFeedURL({ url: status.windows.releasesUrl });
+      autoUpdater.once('update-downloaded', () => {
+        closeConfirmed = true;
+        for (const p of ptys.values()) p.kill();
+        autoUpdater.quitAndInstall();
+      });
+      autoUpdater.once('error', (error) => send('update-status', {
+        ...status,
+        reason: 'windows-update-error',
+        message: `Windows update failed: ${error.message}`,
+      }));
+      autoUpdater.checkForUpdates();
+      return { ok: true, command: 'Squirrel.Windows autoUpdater', releaseUrl: status.releaseUrl };
+    } catch (error) {
+      return {
+        ok: false,
+        reason: 'windows-update-error',
+        message: `Could not start the Windows update: ${error.message}`,
+        releaseUrl: status.releaseUrl || null,
+      };
+    }
+  }
   const source = managedUpdateSource();
   if (!source.available) {
     return {
@@ -2151,8 +2600,9 @@ ipcMain.handle('install-update', async (_e, opts = {}) => {
   }
 });
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   ensureDirs();
+  await initializeRuntime();
   cleanupOrphanedStorage({
     userDataDir: app.getPath('userData'),
     chromuxHome: CHROMUX_HOME,
@@ -2160,10 +2610,17 @@ app.whenReady().then(() => {
   initializePreventSleep();
   resourceClient.connect().catch((err) => console.error('resource broker unavailable:', err.message));
   installAppMenu();
-  try { writeSignalClassifier(); hookInstall.helper = true; } catch (err) { console.error('signal classifier write failed; using legacy hooks:', err.message); }
-  try { writeClaudeHooksSettings(); hookInstall.claude = true; } catch (err) { console.error('hooks settings write failed:', err.message); }
-  try { writeCodexNotifyScript(); hookInstall.codex = true; } catch (err) { console.error('codex notify script write failed:', err.message); }
-  try { writeGrokHooks(); hookInstall.grok = true; } catch (err) { console.error('grok hooks write failed:', err.message); }
+  if (process.platform !== 'win32') {
+    try { writeSignalClassifier(); hookInstall.helper = true; } catch (err) { console.error('signal classifier write failed; using legacy hooks:', err.message); }
+    try { writeClaudeHooksSettings(); hookInstall.claude = true; } catch (err) { console.error('hooks settings write failed:', err.message); }
+    try { writeCodexNotifyScript(); hookInstall.codex = true; } catch (err) { console.error('codex notify script write failed:', err.message); }
+    try { writeGrokHooks(); hookInstall.grok = true; } catch (err) { console.error('grok hooks write failed:', err.message); }
+  } else if (process.platform === 'win32') {
+    try { await installWslHooks(); } catch (err) {
+      runtimeState.readiness.warning = `Agent hooks are unavailable; sessions will run uninstrumented: ${err.message}`;
+      console.error('WSL hook install failed:', err.message);
+    }
+  }
   createWindow();
   getUpdateStatus().then((status) => send('update-status', status)).catch(() => {});
   app.on('activate', () => {

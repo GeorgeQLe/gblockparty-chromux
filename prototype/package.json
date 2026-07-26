@@ -1,6 +1,7 @@
 {
   "name": "chromux",
   "version": "0.62.0",
+  "productName": "GBlockParty Chromux",
   "description": "OSS desktop front-end for local and GBlockParty-managed agent/browser workspaces.",
   "main": "main.js",
   "private": false,
@@ -18,10 +19,13 @@
     "chromux-resource-broker": "resource-broker/daemon.js"
   },
   "scripts": {
+    "test": "node scripts/run-tests.js",
+    "test:windows-platform": "node scripts/test-windows-platform.js",
+    "test:ci:windows": "node scripts/test-windows-platform.js && node scripts/test-github-update-check.js && node scripts/test-codex-update-service.js && node scripts/test-codex-detect-metadata.js && node scripts/test-prevent-sleep.js && node scripts/test-resource-broker.js && node scripts/test-storage-cleanup.js && node scripts/test-window-config.js",
     "start": "electron .",
     "smoke": "electron . --smoke --dev-mode",
     "capture:themes": "node scripts/capture-themes.js",
-    "broker:install": "node scripts/install-resource-broker.js",
+    "broker:install": "node scripts/install-resource-broker-platform.js",
     "test:resource-broker": "node scripts/test-resource-broker.js && node scripts/test-resource-broker-integration.js && node scripts/test-resource-mcp-contract.js",
     "test:simulator-policy": "node scripts/test-simulator-policy.js",
     "test:resource-ui-renderer": "node scripts/test-resource-ui-renderer.js",
@@ -68,7 +72,10 @@
     "test:themes-renderer": "node scripts/test-themes-renderer.js",
     "test:synchronized-output-renderer": "node scripts/test-synchronized-output-renderer.js",
     "test:terminal-scroll-bottom-renderer": "node scripts/test-terminal-scroll-bottom-renderer.js",
-    "package": "electron-packager . Chromux --platform=darwin --arch=arm64 --icon=build/icon --app-bundle-id=dev.georgele.chromux --overwrite --out=dist --ignore='^/dist' --ignore='^/build/icon.iconset' --asar.unpack='**/node_modules/node-pty/**'",
+    "package": "npm run package:mac",
+    "package:mac": "electron-packager . Chromux --platform=darwin --arch=arm64 --icon=build/icon --app-bundle-id=dev.georgele.chromux --overwrite --out=dist --ignore='^/dist' --ignore='^/out' --ignore='^/build/icon.iconset' --asar.unpack='**/node_modules/node-pty/**'",
+    "icon:windows": "node scripts/build-windows-icon.js",
+    "make:win": "npm run icon:windows && electron-forge make --platform=win32 --arch=x64",
     "install-app": "npm run package && node scripts/record-install-source.js && rm -rf /Applications/Chromux.app && cp -R dist/Chromux-darwin-arm64/Chromux.app /Applications/Chromux.app",
     "rebuild": "electron-rebuild -f -w node-pty",
     "postinstall": "electron-rebuild -f -w node-pty"
@@ -77,12 +84,18 @@
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/addon-serialize": "^0.13.0",
     "@xterm/xterm": "^5.5.0",
+    "electron-squirrel-startup": "^1.0.1",
     "js-yaml": "^4.1.0",
     "node-pty": "^1.0.0"
   },
   "devDependencies": {
+    "@electron-forge/cli": "^7.8.3",
+    "@electron-forge/maker-squirrel": "^7.8.3",
+    "@electron-forge/plugin-auto-unpack-natives": "^7.8.3",
     "@electron/packager": "^20.0.2",
     "@electron/rebuild": "^4.1.0",
-    "electron": "^43.0.0"
+    "@resvg/resvg-js": "^2.6.2",
+    "electron": "^43.0.0",
+    "png-to-ico": "^2.1.8"
   }
 }

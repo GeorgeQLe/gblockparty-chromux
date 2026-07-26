@@ -1,6 +1,6 @@
 # Chromux — v1 prototype
 
-A macOS desktop **agent cockpit**: parallel Claude Code / Codex / Grok Build terminal sessions,
+A macOS and Windows 11 desktop **agent cockpit**: parallel Claude Code / Codex / Grok Build terminal sessions,
 each paired 1:1 with an embedded Chromium browser pane. Localhost dev-server previews and
 generated `file://` HTML open next to the session that produced them — no alt-tabbing — and
 one click packages browser evidence (console tail + picked element + screenshot + URL) into a
@@ -16,6 +16,12 @@ unified-sidebar layout toggle, productization.
 
 Requires: macOS, Node 22.12+, Xcode command-line tools (for the `node-pty` native build), and the
 `claude` CLI on your PATH (only needed for delivery; everything else works without it).
+
+On Windows, Chromux requires Windows 11 22H2+ x64, WSL2, and an initialized
+WSL2 distribution containing Bash, Git, Node 22.12+, and each desired agent
+CLI. Windows 10, WSL1, ARM64, native PowerShell, and Git Bash sessions are not
+supported in v0.62. Choose the default distribution in Settings. Changing it
+affects new records only; existing sessions/projects retain their distribution.
 
 ```sh
 cd prototype
@@ -35,6 +41,22 @@ with `node-pty` unpacked so its `spawn-helper` can exec) and replaces any existi
 Gatekeeper only quarantines downloaded bundles. Launch from Spotlight as "Chromux". Both the
 terminal PTY and `claude -p` delivery run through your login shell, so PATH and CLI auth work
 the same as in Terminal even when launched from Finder.
+
+### Build the Windows installer
+
+On Windows:
+
+```powershell
+npm ci
+npm run make:win
+```
+
+Forge produces `GBlockParty-Chromux-Setup-0.62.0-x64.exe`,
+`GBlockPartyChromux-0.62.0-full.nupkg`, and `RELEASES` under
+`out/make/squirrel.windows/x64`. This first per-user installer is unsigned, so
+SmartScreen normally displays **Windows protected your PC**. Select **More info
+→ Run anyway** only for an installer verified against the official GitHub
+Release. Enterprise policy can prohibit unsigned apps.
 
 Then complete the loop:
 
@@ -143,10 +165,10 @@ Open **RESOURCES** to inspect host-wide owners, FIFO queues, lease expiry, wait 
    Opening a URL also restores a shut browser. New sessions start with the paired browser
    shut; use **BROWSER** / **COLLAPSE** or `Command+Shift+B` to open/shut it. Re-emitting
    the same already-open URL auto-refreshes the pane (throttled). Use the browser rail’s
-   expansion control or `Command+Shift+F` to apply **Settings → Browser Fullscreen Behavior**
-   to the active session: full Chromux, paired workspace, or the paired → terminal →
-   full-Chromux cycle. This preserves native macOS `Control+Command+F` fullscreen. Popups
-   queue too.
+   expansion control or `Command+Shift+F` (`Control+Shift+F` on Windows) to apply
+   **Settings → Browser Fullscreen Behavior** to the active session: full Chromux, paired
+   workspace, or the paired → terminal → full-Chromux cycle. This preserves native macOS
+   `Control+Command+F` fullscreen. Popups queue too.
 
    Each terminal session owns its own horizontally scrollable browser tab strip. Terminal
    links, queue entries, favorites, and project HTML selections open a new tab or focus an

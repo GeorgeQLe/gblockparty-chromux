@@ -80,7 +80,7 @@ function fixture({
       },
     });
     const realChildStatus = await realChild.check();
-    assert.equal(realChildStatus.error, null, 'Node-based Codex launchers should execute with the augmented service PATH');
+    assert.equal(realChildStatus.error, null, `Node-based Codex launchers should execute with the augmented service PATH: ${realChildStatus.error}`);
     assert.equal(realChildStatus.currentVersion, '1.2.3');
   } finally {
     if (originalPath === undefined) delete process.env.PATH;

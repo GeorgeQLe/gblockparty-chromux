@@ -1,5 +1,18 @@
 # Chromux privacy and local data
 
+## Windows and WSL2
+
+Windows desktop preferences, restore records, broker state, and captures live
+under the Windows user’s `.chromux` directory. Agent processes run inside each
+record’s selected WSL2 distribution. Capture payloads contain WSL-readable
+paths; Explorer reveal actions use the corresponding Windows or
+`\\wsl.localhost` path.
+
+The Windows resource broker uses a user-scoped named pipe. Its WSL MCP wrapper
+starts the installed Windows Electron executable in Node mode through WSL
+interop. No TCP listener is opened. Agent configuration and authentication are
+separate in each distribution.
+
 ## Saved projects
 
 Saved project start configurations are stored in `~/.chromux/projects.json`. Each record contains a

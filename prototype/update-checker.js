@@ -34,6 +34,22 @@ function parseRelease(release) {
   const releaseUrl = typeof release.html_url === 'string' && release.html_url
     ? release.html_url
     : `https://github.com/GeorgeQLe/gblockparty-chromux/releases/tag/${tag}`;
+  const hasAssets = Array.isArray(release.assets);
+  const assetList = hasAssets ? release.assets : [];
+  const assets = Object.fromEntries(assetList
+    .filter((asset) => asset && typeof asset.name === 'string' && typeof asset.browser_download_url === 'string')
+    .map((asset) => [asset.name, asset.browser_download_url]));
+  const windowsNames = {
+    setup: `GBlockParty-Chromux-Setup-${match[1]}-x64.exe`,
+    package: `GBlockPartyChromux-${match[1]}-full.nupkg`,
+    releases: 'RELEASES',
+  };
+  const windows = {
+    setupUrl: assets[windowsNames.setup] || null,
+    packageUrl: assets[windowsNames.package] || null,
+    releasesUrl: assets[windowsNames.releases] || null,
+  };
+  windows.complete = Boolean(windows.setupUrl && windows.packageUrl && windows.releasesUrl);
   return {
     ok: true,
     tag,
@@ -42,6 +58,7 @@ function parseRelease(release) {
     title: typeof release.name === 'string' ? release.name : '',
     publishedAt: typeof release.published_at === 'string' ? release.published_at : null,
     prerelease: Boolean(release.prerelease),
+    ...(hasAssets ? { assets, windows } : {}),
   };
 }
 
@@ -258,6 +275,7 @@ async function checkForUpdates({
       releaseTitle: release.title,
       publishedAt: release.publishedAt,
       prerelease: release.prerelease,
+      ...(release.windows ? { assets: release.assets, windows: release.windows } : {}),
     };
     writeJson(cacheFile, status);
     return status;

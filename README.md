@@ -12,6 +12,13 @@ npm install
 npm start
 ```
 
+Chromux v0.62 supports macOS and Windows 11 22H2+ x64. Windows sessions run
+inside a selected WSL2 distribution; Bash, Git, Node 22.12+, and the desired
+agent CLIs must be installed there. The initial Windows installer is unsigned,
+so SmartScreen normally shows **Windows protected your PC**. Use **More info →
+Run anyway** only after verifying the installer came from the official GitHub
+Release; enterprise policy may prevent bypassing the warning.
+
 For the full prototype guide, see [`prototype/README.md`](prototype/README.md).
 
 ## Architecture
@@ -30,7 +37,7 @@ Chromux checks GitHub Releases at:
 
 `https://api.github.com/repos/GeorgeQLe/gblockparty-chromux/releases/latest`
 
-Release tags must use `chromux-vX.Y.Z`, and release titles must use `GBlockParty Chromux vX.Y.Z`. When installed through `prototype`'s `npm run install-app`, the app records its local source and can run a managed update install from that source. The GitHub Release URL remains visible as a reference for manual recovery.
+Release tags must use `chromux-vX.Y.Z`, and release titles must use `GBlockParty Chromux vX.Y.Z`. macOS source installs retain the local managed updater. Windows Squirrel installs use the matching release’s `RELEASES` manifest and full package; an incomplete Windows asset set is never routed through the macOS installer.
 
 ## License
 
