@@ -40,6 +40,39 @@ fs.writeFileSync(e2ePath, `
   const expect = (condition, message) => { if (!condition) throw new Error(message); };
   const wait = (ms = 35) => new Promise((resolve) => setTimeout(resolve, ms));
   const tick = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  const assertChooserSelectionSuppressed = async ({
+    name, fixture, redrawFixture, digit, labels, seedShadow = '',
+  }) => {
+    for (const redraw of [false, true]) {
+      const id = c.addSession({
+        name: name + (redraw ? '-redraw' : '-immediate'),
+        agent: 'codex',
+        cwd: ${JSON.stringify(projectDir)},
+        rows: 20,
+        cols: 72,
+      });
+      if (seedShadow) c.nativeInput(id, seedShadow);
+      await c.renderPromptFixture(id, fixture);
+      c.clearPtyInputs(id);
+      c.nativeInput(id, digit);
+      expect(c.ptyInputs(id).length === 1 && c.ptyInputs(id)[0] === digit,
+        name + ' selection must reach the PTY exactly once: ' + JSON.stringify(c.ptyInputs(id)));
+      expect(c.pendingInput(id) === '',
+        name + ' selection must clear the pending-input shadow: ' + JSON.stringify(c.pendingInput(id)));
+      if (redraw) await c.renderPromptFixture(id, redrawFixture || fixture);
+      c.open(id); await tick();
+      const state = c.state(id);
+      expect(c.draft(id) === '' && !state.conflictOpen,
+        name + (redraw ? ' redraw' : ' immediate open')
+          + ' must not recover a digit, option label, or conflict: '
+          + JSON.stringify({ draft: c.draft(id), state }));
+      expect(labels.every((label) => !c.draft(id).includes(label)),
+        name + ' must keep every chooser label out of Compose: ' + JSON.stringify(c.draft(id)));
+      expect(c.ptyInputs(id).length === 1 && c.ptyInputs(id)[0] === digit,
+        name + ' Compose open must not transmit a clearing control: ' + JSON.stringify(c.ptyInputs(id)));
+      c.close(id); await tick();
+    }
+  };
 
   const first = c.addSession({ name: 'codex-one', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16 });
   await tick();
@@ -326,6 +359,119 @@ fs.writeFileSync(e2ePath, `
   c.open(ambiguousPrompt); await tick();
   expect(c.draft(ambiguousPrompt) === 'safe shadow' && c.ptyInputs(ambiguousPrompt).length === 0,
     'ambiguous rendered content should fall back to the shadow without clearing the live Codex prompt');
+
+  const permissionChooser = [
+    '  Would you like to run the following command?',
+    '',
+    '› 1. Yes, proceed',
+    '  2. Yes, and don\\'t ask again for commands that start with \`npm test\`',
+    '  3. No, and tell Codex what to do differently',
+    '',
+    '  Press enter to confirm or esc to cancel',
+  ].join('\\r\\n');
+  await assertChooserSelectionSuppressed({
+    name: 'permission chooser',
+    fixture: permissionChooser,
+    redrawFixture: '• Working (0s)\\r\\n' + permissionChooser.replace('› 1.', '  1.').replace('  2.', '› 2.'),
+    digit: '2',
+    labels: ['Yes, proceed', 'don\\'t ask again', 'tell Codex what to do differently'],
+    seedShadow: 'stale permission shadow',
+  });
+
+  const planProgressChooser = [
+    '  The implementation plan is complete. What should Codex do next?',
+    '',
+    '› 1. Proceed with implementation',
+    '  2. Stay in Plan mode',
+    '',
+    '  Press enter to confirm or esc to go back',
+  ].join('\\r\\n');
+  await assertChooserSelectionSuppressed({
+    name: 'plan progression chooser',
+    fixture: planProgressChooser,
+    redrawFixture: '• Working (0s)\\r\\n' + planProgressChooser,
+    digit: '1',
+    labels: ['Proceed with implementation', 'Stay in Plan mode'],
+  });
+
+  const singleQuestionChooser = [
+    '  Deployment target',
+    '  Where should the preview be published?',
+    '',
+    '› 1. Local machine',
+    '  2. Shared staging',
+    '  3. Production',
+    '',
+    '  Press enter to submit',
+  ].join('\\r\\n');
+  await assertChooserSelectionSuppressed({
+    name: 'single-question Plan mode chooser',
+    fixture: singleQuestionChooser,
+    redrawFixture: '• Working (0s)\\r\\n' + singleQuestionChooser.replace('› 1.', '  1.').replace('  3.', '› 3.'),
+    digit: '3',
+    labels: ['Local machine', 'Shared staging', 'Production'],
+  });
+
+  const multiQuestionChooser = [
+    '  Runtime',
+    '  Which runtime should the implementation target?',
+    '  1. Node.js',
+    '› 2. Electron',
+    '',
+    '  Release channel',
+    '  Which channel should receive the build?',
+    '› 1. Stable',
+    '  2. Preview',
+    '  3. Internal',
+    '',
+    '  Press enter to submit',
+  ].join('\\r\\n');
+  await assertChooserSelectionSuppressed({
+    name: 'multi-question Plan mode chooser',
+    fixture: multiQuestionChooser,
+    redrawFixture: '• Working (0s)\\r\\n' + multiQuestionChooser.replace('› 1. Stable', '  1. Stable').replace('  2. Preview', '› 2. Preview'),
+    digit: '2',
+    labels: ['Node.js', 'Electron', 'Stable', 'Preview', 'Internal'],
+  });
+
+  const bareNumericPrompt = c.addSession({ name: 'bare-numeric-prompt', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16 });
+  c.nativeInput(bareNumericPrompt, '7'); c.clearPtyInputs(bareNumericPrompt); c.open(bareNumericPrompt); await tick();
+  expect(c.draft(bareNumericPrompt) === '7' && c.ptyInputs(bareNumericPrompt).join('') === '\\x15\\x0b',
+    'ordinary bare numeric prompt text must still transfer to Compose');
+
+  const multiDigitPrompt = c.addSession({ name: 'multi-digit-prompt', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16 });
+  c.nativeInput(multiDigitPrompt, '42'); c.clearPtyInputs(multiDigitPrompt); c.open(multiDigitPrompt); await tick();
+  expect(c.draft(multiDigitPrompt) === '42' && c.ptyInputs(multiDigitPrompt).join('') === '\\x15\\x0b',
+    'ordinary multi-digit prompt text must still transfer to Compose');
+
+  const numberedProse = c.addSession({ name: 'numbered-prose', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16 });
+  await c.renderPromptFixture(numberedProse, '? for shortcuts\\r\\n› 1. Keep the first paragraph\\r\\n  2. Keep the second paragraph');
+  c.nativeInput(numberedProse, '3');
+  expect(c.pendingInput(numberedProse) === '3',
+    'numbered prompt prose without a chooser footer must retain numeric input');
+
+  const numberedTranscript = c.addSession({ name: 'numbered-transcript', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16 });
+  await c.renderPromptFixture(numberedTranscript, [
+    '  Earlier terminal transcript:',
+    '› 1. Review hooks',
+    '  2. Trust all and continue',
+    '  Press enter to confirm or esc to go back',
+    '',
+    '? for shortcuts',
+    '› ',
+  ].join('\\r\\n'));
+  c.nativeInput(numberedTranscript, '4');
+  expect(c.pendingInput(numberedTranscript) === '4',
+    'historical chooser transcript followed by a live prompt must retain numeric input');
+
+  const numericShell = c.addSession({ name: 'numeric-shell', agent: '', cwd: ${JSON.stringify(shellDir)}, rows: 16, cols: 72 });
+  await c.renderPromptFixture(numericShell, permissionChooser);
+  c.clearPtyInputs(numericShell); c.nativeInput(numericShell, '2');
+  expect(c.pendingInput(numericShell) === '2' && c.ptyInputs(numericShell).join('') === '2',
+    'chooser-looking output in a non-Codex terminal must retain its numeric shadow and PTY input');
+  c.open(numericShell); await tick();
+  expect(c.draft(numericShell) === '2' && c.ptyInputs(numericShell).join('') === '2\\x15\\x0b',
+    'non-Codex numeric terminal transfer must remain unchanged');
 
   const transfer = c.addSession({ name: 'transfer', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16 });
   c.nativeInput(transfer, 'abc'); c.nativeInput(transfer, '\\x1b[D'); c.nativeInput(transfer, 'Z');

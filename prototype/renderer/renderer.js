@@ -1039,6 +1039,9 @@ const CODEX_PROMPT_PLACEHOLDER_RE = /^(?:ask codex(?: anything)?|type (?:a )?(?:
 const CODEX_PROMPT_CHROME_RE = /(?:\?\s+for shortcuts|\bcontext left\b|^\s*choose an option:)/iu;
 const CODEX_FRAME_EDGE_RE = /^\s*[╭╰┌└┏┗╔╚].*[╮╯┐┘┓┛╗╝]\s*$/u;
 const CODEX_FRAME_VERTICAL_RE = /^\s*[│┃║]\s?(.*?)(?:\s?[│┃║])?\s*$/u;
+const CODEX_NUMERIC_CHOOSER_SELECTED_RE = /^\s*[›❯]\s*([1-9])\.\s+\S/u;
+const CODEX_NUMERIC_CHOOSER_OPTION_RE = /^\s*(?:[›❯]\s*)?([1-9])\.\s+\S/u;
+const CODEX_NUMERIC_CHOOSER_FOOTER_RE = /\b(?:enter|return)\b.{0,80}\b(?:confirm|submit|select|continue|proceed)\b|\b(?:confirm|submit|select|continue|proceed)\b.{0,80}\b(?:enter|return)\b/iu;
 
 function terminalBufferRow(buffer, index, endColumn = null) {
   const line = buffer && typeof buffer.getLine === 'function' ? buffer.getLine(index) : null;
@@ -1055,6 +1058,45 @@ function codexPromptRowContent(text, { trimEnd = true } = {}) {
   const framed = raw.match(CODEX_FRAME_VERTICAL_RE);
   if (framed) return framed[1].replace(/\s+$/u, '');
   return trimEnd ? raw.replace(/\s+$/u, '') : raw;
+}
+
+function hasActiveCodexNumericChooser(session) {
+  if (!session || session.agent !== 'codex') return false;
+  const term = session.term && session.term.term;
+  const buffer = term && term.buffer && term.buffer.active;
+  if (!buffer || !Number.isFinite(buffer.viewportY) || !Number.isFinite(buffer.length)) return false;
+  const visibleStart = Math.max(0, buffer.viewportY);
+  const visibleRows = Number.isFinite(term.rows) ? Math.max(1, term.rows) : 1;
+  const visibleEnd = Math.min(buffer.length - 1, visibleStart + visibleRows - 1);
+  const rows = [];
+  for (let index = visibleStart; index <= visibleEnd; index += 1) {
+    const row = terminalBufferRow(buffer, index);
+    rows.push({
+      index,
+      text: row ? codexPromptRowContent(row.text).trim() : '',
+    });
+  }
+
+  const footerRows = rows.filter((row) => CODEX_NUMERIC_CHOOSER_FOOTER_RE.test(row.text));
+  for (let footerIndex = footerRows.length - 1; footerIndex >= 0; footerIndex -= 1) {
+    const footer = footerRows[footerIndex];
+    const afterFooter = rows.filter((row) => row.index > footer.index && row.text);
+    if (afterFooter.some((row) => CODEX_PROMPT_GLYPH_RE.test(row.text))) continue;
+    const chooserStart = Math.max(visibleStart, footer.index - 12);
+    const chooserRows = rows.filter((row) => row.index >= chooserStart && row.index < footer.index);
+    const selectedRows = chooserRows.map((row) => {
+      const match = row.text.match(CODEX_NUMERIC_CHOOSER_SELECTED_RE);
+      return match ? { ...row, number: match[1] } : null;
+    }).filter(Boolean);
+    const optionRows = chooserRows.map((row) => {
+      const match = row.text.match(CODEX_NUMERIC_CHOOSER_OPTION_RE);
+      return match ? { ...row, number: match[1] } : null;
+    }).filter(Boolean);
+    if (selectedRows.some((selected) => optionRows.some((option) => (
+      option.number !== selected.number && Math.abs(option.index - selected.index) <= 5
+    )))) return true;
+  }
+  return false;
 }
 
 function readCodexRenderedPrompt(session) {
@@ -1163,6 +1205,13 @@ function trackTypedPreviewSuppressions(session, data) {
   if (!session || !data) return '';
   const t = session.term;
   const raw = String(data);
+  if (/^[1-9]$/.test(raw) && hasActiveCodexNumericChooser(session)) {
+    t.codexCompletionIntent = null;
+    t.typedInputBuf = '';
+    t.typedInputCursor = 0;
+    t.promptSnapshotInvalidated = true;
+    return '';
+  }
   if (raw === '\t') recordCodexCompletionIntent(session);
   else t.codexCompletionIntent = null;
   if (/[\r\n]/.test(raw)) t.promptSnapshotInvalidated = true;

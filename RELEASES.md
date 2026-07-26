@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.61.9
+
+Tag: `chromux-v0.61.9`
+
+- Keep numeric Codex permission, plan-progression, and Plan-mode questionnaire selections out of Prompt Composer while forwarding every chosen digit to Codex exactly once.
+- Recognize only visible chooser structures with a selected numbered row, a distinct numbered option, and a nearby confirmation or submission footer; reject ordinary numeric prompts, numbered prose, historical chooser transcripts, and non-Codex terminals.
+- Invalidate stale rendered-prompt recovery after a chooser selection so immediate and working-state redraws cannot recover the digit, an option label, a conflict prompt, or a terminal-clearing control.
+
 ## GBlockParty Chromux v0.61.8
 
 Tag: `chromux-v0.61.8`
