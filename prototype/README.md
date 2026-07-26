@@ -142,7 +142,11 @@ Open **RESOURCES** to inspect host-wide owners, FIFO queues, lease expiry, wait 
    non-focused shell tab, and never substitutes for the separate **OPEN** approval.
    Opening a URL also restores a shut browser. New sessions start with the paired browser
    shut; use **BROWSER** / **COLLAPSE** or `Command+Shift+B` to open/shut it. Re-emitting
-   the same already-open URL auto-refreshes the pane (throttled). Popups queue too.
+   the same already-open URL auto-refreshes the pane (throttled). Use the browser rail’s
+   expansion control or `Command+Shift+F` to apply **Settings → Browser Fullscreen Behavior**
+   to the active session: full Chromux, paired workspace, or the paired → terminal →
+   full-Chromux cycle. This preserves native macOS `Control+Command+F` fullscreen. Popups
+   queue too.
 
    Each terminal session owns its own horizontally scrollable browser tab strip. Terminal
    links, queue entries, favorites, and project HTML selections open a new tab or focus an

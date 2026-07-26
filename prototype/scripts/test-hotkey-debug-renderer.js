@@ -36,6 +36,13 @@ fs.writeFileSync(e2ePath, `
 
   await new Promise((resolve) => setTimeout(resolve, 100));
 
+  expect(byId('browser-fullscreen').available === false,
+    'Command+Shift+F should be unavailable without an active session');
+  expect(byId('browser-fullscreen').disabledReason === 'no active session',
+    'Command+Shift+F should explain the missing active session');
+  expect(h.shortcutBrowserFullscreen() === null,
+    'Command+Shift+F should be a no-op without an active session');
+
   const firstId = await h.addSession({ name: 'first', cwd: '/work/first' });
   const secondId = await h.addSession({
     name: 'queued',
@@ -49,6 +56,9 @@ fs.writeFileSync(e2ePath, `
   expect(byId('queue-next').available, 'Command+J should be available when a queue item exists');
   expect(byId('browser-toggle').available, 'Command+Shift+B should be available with an active session');
   expect(byId('browser-toggle').description === 'open browser', 'shut browser target should be open');
+  expect(byId('browser-fullscreen').available, 'Command+Shift+F should be available with an active session');
+  expect(byId('browser-fullscreen').description === 'Fill Chromux with browser',
+    'Command+Shift+F should describe its current configured layout action');
   expect(byId('session-1').description === 'activate first',
     'flat mode must describe numeric shortcuts as session activation');
   expect(byId('session-3').description === 'session slot empty',
@@ -67,6 +77,12 @@ fs.writeFileSync(e2ePath, `
 
   h.setCollapsed(firstId, false);
   expect(byId('browser-toggle').description === 'shut browser', 'open browser target should be shut');
+  expect(h.shortcutBrowserFullscreen()?.layoutMode === 'browserChromux',
+    'Command+Shift+F should enter browser-Chromux layout from paired mode');
+  expect(byId('browser-fullscreen').description === 'Restore paired layout',
+    'active Command+Shift+F should describe its exact return layout');
+  expect(h.shortcutBrowserFullscreen()?.layoutMode === 'paired',
+    'second Command+Shift+F should restore paired layout');
   h.setCollapsed(firstId, true);
   expect(byId('browser-toggle').description === 'open browser', 'collapsed browser target should be open');
   h.setCollapsed(firstId, false);
@@ -75,6 +91,8 @@ fs.writeFileSync(e2ePath, `
   expect(byId('session-1').disabledReason === 'modal open', 'session shortcuts should explain modal suppression');
   expect(byId('queue-next').disabledReason === 'modal open', 'Command+J should explain modal suppression');
   expect(byId('browser-toggle').disabledReason === 'modal open', 'Command+Shift+B should explain modal suppression');
+  expect(byId('browser-fullscreen').disabledReason === 'modal open', 'Command+Shift+F should explain modal suppression');
+  expect(h.shortcutBrowserFullscreen() === null, 'Command+Shift+F should be suppressed while a modal is open');
   expect(byId('new-session').disabledReason === 'modal open', 'Command+T should explain modal suppression');
   expect(byId('detect').disabledReason === 'modal open', 'Command+D should explain modal suppression');
   h.closeModals();
@@ -84,6 +102,8 @@ fs.writeFileSync(e2ePath, `
   expect(byId('session-1').disabledReason === 'host editable', 'session shortcuts should explain host editable suppression');
   expect(byId('queue-next').disabledReason === 'host editable', 'Command+J should explain host editable suppression');
   expect(byId('browser-toggle').disabledReason === 'host editable', 'Command+Shift+B should explain host editable suppression');
+  expect(byId('browser-fullscreen').disabledReason === 'host editable', 'Command+Shift+F should explain host editable suppression');
+  expect(h.shortcutBrowserFullscreen() === null, 'Command+Shift+F should be suppressed by host editable focus');
   expect(byId('new-session').disabledReason === 'host editable', 'Command+T should explain host editable suppression');
   expect(byId('detect').disabledReason === 'host editable', 'Command+D should explain host editable suppression');
   h.clearFocus();
@@ -94,6 +114,7 @@ fs.writeFileSync(e2ePath, `
   expect(byId('session-1').available, 'Command+1 should be available from terminal focus');
   expect(byId('queue-next').available, 'Command+J should be available from terminal focus');
   expect(byId('browser-toggle').available, 'Command+Shift+B should be available from terminal focus');
+  expect(byId('browser-fullscreen').available, 'Command+Shift+F should be available from terminal focus');
   h.clearFocus();
 
   h.focusGuestEditable(firstId);
@@ -101,6 +122,8 @@ fs.writeFileSync(e2ePath, `
   expect(byId('session-1').disabledReason === 'guest editable', 'session shortcuts should explain guest editable suppression');
   expect(byId('queue-next').disabledReason === 'guest editable', 'Command+J should explain guest editable suppression');
   expect(byId('browser-toggle').disabledReason === 'guest editable', 'Command+Shift+B should explain guest editable suppression');
+  expect(byId('browser-fullscreen').disabledReason === 'guest editable', 'Command+Shift+F should explain guest editable suppression');
+  expect(h.shortcutBrowserFullscreen() === null, 'Command+Shift+F should be suppressed by guest editable focus');
   expect(byId('new-session').disabledReason === 'guest editable', 'Command+T should explain guest editable suppression');
   expect(byId('detect').disabledReason === 'guest editable', 'Command+D should explain guest editable suppression');
   h.clearFocus();
@@ -208,6 +231,19 @@ fs.writeFileSync(e2ePath, `
   expect(debug.latestKey === 'B', 'Command+Shift+B should set B as the latest shortcut key');
   expect(debug.modifiers.shift === true, 'Command+Shift+B should light the Shift modifier chip');
   expect(byId('browser-toggle').matchedByCurrentChord, 'Command+Shift+B should match the browser-toggle shortcut');
+
+  h.note({
+    source: 'host',
+    type: 'keyDown',
+    key: 'F',
+    modifiers: { meta: true, shift: true, alt: false, control: false },
+    ts: Date.now(),
+  });
+  debug = h.debug();
+  expect(debug.latestKey === 'F', 'Command+Shift+F should set F as the latest shortcut key');
+  expect(debug.modifiers.shift === true, 'Command+Shift+F should light the Shift modifier chip');
+  expect(byId('browser-fullscreen').matchedByCurrentChord,
+    'Command+Shift+F should match the browser-fullscreen shortcut');
 
   h.note({
     source: 'host',

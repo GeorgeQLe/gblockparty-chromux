@@ -12,6 +12,7 @@ const CHROMUX_SHORTCUT_ACTIONS = {
   SESSION_INDEX: 'session-index',
   QUEUE_FOCUS: 'queue-focus',
   BROWSER_TOGGLE: 'browser-toggle',
+  BROWSER_FULLSCREEN: 'browser-fullscreen',
   GUARDED_QUIT: 'guarded-quit',
   NEW_SESSION: 'new-session',
   DETECT: 'detect',
@@ -98,6 +99,9 @@ function chromuxShortcutAction(input = {}) {
   }
   if (chord.key === 'B' && chord.shift) {
     return { id: CHROMUX_SHORTCUT_ACTIONS.BROWSER_TOGGLE, key: 'B', label: 'Cmd+Shift+B' };
+  }
+  if (chord.key === 'F' && chord.shift) {
+    return { id: CHROMUX_SHORTCUT_ACTIONS.BROWSER_FULLSCREEN, key: 'F', label: 'Cmd+Shift+F' };
   }
   if (chord.key === 'Q' && !chord.shift) {
     return { id: CHROMUX_SHORTCUT_ACTIONS.GUARDED_QUIT, key: 'Q', label: 'Cmd+Q' };

@@ -356,7 +356,7 @@ function shortcutDebugKey(input) {
   if (lower === 'control' || code === 'ControlLeft' || code === 'ControlRight') return '⌃';
   if (!detailsActive) return null;
   if (digit) return digit;
-  if (['j', 'b', 't', 'd', 'q', 'enter'].includes(lower)) return lower === 'enter' ? 'Enter' : lower.toUpperCase();
+  if (['j', 'b', 'f', 't', 'd', 'q', 'enter'].includes(lower)) return lower === 'enter' ? 'Enter' : lower.toUpperCase();
   if (['c', 'v'].includes(lower)) return lower.toUpperCase();
   if (lower === 'escape' || code === 'Escape') return 'Esc';
   if (lower === 'arrowup' || code === 'ArrowUp') return '↑';
@@ -473,6 +473,10 @@ function handleShellShortcutInput(event, input, source = 'host', webContentsId =
     send('shortcut-toggle-browser');
     return true;
   }
+  if (action.id === CHROMUX_SHORTCUT_ACTIONS.BROWSER_FULLSCREEN) {
+    send('shortcut-browser-fullscreen');
+    return true;
+  }
   if (action.id === CHROMUX_SHORTCUT_ACTIONS.GUARDED_QUIT) {
     requestGuardedQuit('app-quit');
     return true;
@@ -524,6 +528,11 @@ function installAppMenu() {
         {
           label: 'Toggle Paired Browser',
           click: () => send('shortcut-toggle-browser'),
+        },
+        {
+          label: 'Toggle Browser Fullscreen',
+          accelerator: 'CommandOrControl+Shift+F',
+          click: () => send('shortcut-browser-fullscreen'),
         },
         {
           label: 'Open Terminal Composer',

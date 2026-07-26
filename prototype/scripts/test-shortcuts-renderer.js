@@ -27,10 +27,21 @@ expectShortcut(sessionShortcutDigit({ key: '', code: 'Numpad1' }) === null, 'sho
 expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 't', meta: true }).id === 'new-session', 'Command+T should be Chromux-owned');
 expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'd', meta: true }).id === 'detect', 'Command+D should be Chromux-owned');
 expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'Enter', meta: true, shift: true }).id === 'composer-open', 'Command+Shift+Enter should open composer');
+expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'f', meta: true, shift: true }).id === 'browser-fullscreen', 'Command+Shift+F should toggle browser fullscreen');
+expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: '', code: 'KeyF', modifiers: ['command', 'shift'] }).id === 'browser-fullscreen', 'Command+Shift+F should accept Electron code/modifier input');
+expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'f', meta: true }) === null, 'Command+F should stay unowned');
+expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'f', meta: true, shift: true, alt: true }) === null, 'Command+Option+Shift+F should stay unowned');
+expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'f', meta: true, shift: true, control: true }) === null, 'native Control+Command+F should stay unowned');
+expectShortcut(chromuxShortcutAction({ type: 'keyUp', key: 'f', meta: true, shift: true }) === null, 'Command+Shift+F keyup should stay unowned');
 expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'c', meta: true }) === null, 'Command+C should stay unowned');
 expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'v', meta: true }) === null, 'Command+V should stay unowned');
 expectShortcut(shouldRouteChromuxShortcut({ type: 'keyDown', key: '1', meta: true }, { focusKind: 'terminal' }), 'terminal focus should allow Chromux shortcuts');
+expectShortcut(shouldRouteChromuxShortcut({ type: 'keyDown', key: 'f', meta: true, shift: true }, { focusKind: 'terminal' }), 'terminal focus should allow Command+Shift+F');
+expectShortcut(shouldRouteChromuxShortcut({ type: 'keyDown', key: 'f', meta: true, shift: true }, { focusKind: 'appSurface' }), 'app surface focus should allow Command+Shift+F');
 expectShortcut(!shouldRouteChromuxShortcut({ type: 'keyDown', key: '1', meta: true }, { focusKind: 'hostEditable' }), 'host editable focus should suppress Chromux shortcuts');
+expectShortcut(!shouldRouteChromuxShortcut({ type: 'keyDown', key: 'f', meta: true, shift: true }, { focusKind: 'hostEditable' }), 'host editable focus should suppress Command+Shift+F');
+expectShortcut(!shouldRouteChromuxShortcut({ type: 'keyDown', key: 'f', meta: true, shift: true }, { focusKind: 'guestEditable' }), 'guest editable focus should suppress Command+Shift+F');
+expectShortcut(!shouldRouteChromuxShortcut({ type: 'keyDown', key: 'f', meta: true, shift: true }, { focusKind: 'modal' }), 'modal focus should suppress Command+Shift+F');
 expectShortcut(!shouldRouteChromuxShortcut({ type: 'keyDown', key: 'Enter', meta: true, shift: true }, { focusKind: 'hostEditable' }), 'composer submit should remain local to host editable focus');
 
 fs.writeFileSync(e2ePath, `
@@ -51,6 +62,11 @@ fs.writeFileSync(e2ePath, `
   });
   const thirdId = await q.addSession({ name: 'third', queue: [] });
 
+  expect(q.fallbackAction({ type: 'keyDown', key: 'f', meta: true, shift: true })?.id === 'browser-fullscreen',
+    'renderer fallback parser should recognize Command+Shift+F');
+  expect(q.fallbackAction({ type: 'keyDown', key: 'f', meta: true, shift: true, control: true }) === null,
+    'renderer fallback parser should preserve native Control+Command+F');
+
   q.focusTerminalTextarea();
   expect(q.context().focusKind === 'terminal', 'xterm helper textarea should classify as terminal focus');
   expect(q.context().hostEditable === false, 'xterm helper textarea must not count as host editable');
@@ -62,6 +78,16 @@ fs.writeFileSync(e2ePath, `
 
   q.focusTerminalTextarea();
   expect(q.browserCollapsed(thirdId) === true, 'new sessions start with the paired browser shut');
+  const terminalFullscreen = q.shortcutBrowserFullscreen();
+  expect(terminalFullscreen && terminalFullscreen.sessionId === thirdId,
+    'terminal-focused Command+Shift+F should target the active session');
+  expect(terminalFullscreen.layoutMode === 'browserChromux'
+    && q.browserLayoutMode(thirdId) === 'browserChromux',
+  'terminal-focused Command+Shift+F should enter the configured browser layout');
+  const terminalFullscreenRestore = q.shortcutBrowserFullscreen();
+  expect(terminalFullscreenRestore?.layoutMode === 'terminal'
+    && q.browserLayoutMode(thirdId) === 'terminal',
+  'second terminal-focused Command+Shift+F should restore the prior terminal layout');
   const terminalToggle = q.shortcutToggleBrowser();
   expect(terminalToggle && terminalToggle.sessionId === thirdId, 'terminal-focused Command+Shift+B should toggle browser');
   expect(q.browserCollapsed(thirdId) === false, 'terminal-focused Command+Shift+B should open a shut browser');
@@ -95,6 +121,7 @@ fs.writeFileSync(e2ePath, `
   expect(q.shortcutFocusNextQueueItem() === null, 'Command+J must be a no-op while an editable is focused');
   expect(document.activeElement === input, 'Command+J must not steal focus from an editable');
   expect(q.shortcutToggleBrowser() === null, 'Command+Shift+B must be a no-op while an editable is focused');
+  expect(q.shortcutBrowserFullscreen() === null, 'Command+Shift+F must be a no-op while an editable is focused');
   q.activateIndex(0);
   expect(q.activeId() === secondId, 'Command+1..9 must be a no-op while an editable is focused');
   input.blur();

@@ -120,6 +120,14 @@ fs.writeFileSync(e2ePath, `
   expect(b.state(firstId).collapsed === true, 'Command+Shift+B from non-editable guest focus should collapse browser');
 
   await focusGuest('#noneditable', false);
+  await sendShortcut('F', ['meta', 'shift']);
+  expect(b.state(firstId).layoutMode === 'browserChromux',
+    'Command+Shift+F from non-editable guest focus should enter browser-Chromux layout');
+  await sendShortcut('F', ['meta', 'shift']);
+  expect(b.state(firstId).layoutMode === 'paired',
+    'second Command+Shift+F from non-editable guest focus should restore paired layout');
+
+  await focusGuest('#noneditable', false);
   await sendShortcut('3', ['meta']);
   expect(b.state(thirdId).active, 'Command+3 from non-editable guest focus should activate third session');
 
@@ -133,6 +141,10 @@ fs.writeFileSync(e2ePath, `
     await sendShortcut('B', ['meta', 'shift']);
     expect(b.state(firstId).active, 'Command+Shift+B suppression should keep active session: ' + selector);
     expect(b.state(firstId).collapsed === false, 'Command+Shift+B should be suppressed while guest editable is focused: ' + selector);
+
+    await sendShortcut('F', ['meta', 'shift']);
+    expect(b.state(firstId).layoutMode === 'paired',
+      'Command+Shift+F should be suppressed while guest editable is focused: ' + selector);
 
     await sendShortcut('3', ['meta']);
     expect(b.state(firstId).active, 'Command+3 should be suppressed while guest editable is focused: ' + selector);

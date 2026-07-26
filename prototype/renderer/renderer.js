@@ -2179,7 +2179,7 @@ function normalizeShortcutDebugKey(raw, modifiers = {}) {
   if (lower === 'control' || lower === 'ctrl' || key === '⌃') return '⌃';
   if (!shortcutDebugDetailsActive(modifiers)) return null;
   if (/^[1-9]$/.test(key)) return key;
-  if (['j', 'b', 't', 'd', 'q', 'c', 'v'].includes(lower)) return lower.toUpperCase();
+  if (['j', 'b', 'f', 't', 'd', 'q', 'c', 'v'].includes(lower)) return lower.toUpperCase();
   if (lower === 'enter') return 'Enter';
   if (lower === 'escape' || lower === 'esc') return 'Esc';
   if (lower === 'arrowup') return '↑';
@@ -2383,7 +2383,8 @@ function computeShortcutCatalog() {
   definitions.push(
     { id: 'queue-next', label: '⌘J', key: 'J', modifiers: { meta: true }, kind: 'guarded', order: 20 },
     { id: 'browser-toggle', label: '⌘⇧B', key: 'B', modifiers: { meta: true, shift: true }, kind: 'guarded', order: 21 },
-    { id: 'composer-open', label: '⌘⇧Enter', key: 'Enter', modifiers: { meta: true, shift: true }, kind: 'guarded', order: 22 },
+    { id: 'browser-fullscreen', label: '⌘⇧F', key: 'F', modifiers: { meta: true, shift: true }, kind: 'guarded', order: 22 },
+    { id: 'composer-open', label: '⌘⇧Enter', key: 'Enter', modifiers: { meta: true, shift: true }, kind: 'guarded', order: 23 },
     { id: 'quit', label: '⌘Q', key: 'Q', modifiers: { meta: true }, kind: 'global', order: 30 },
     { id: 'new-session', label: '⌘T', key: 'T', modifiers: { meta: true }, kind: 'document', order: 31 },
     { id: 'detect', label: '⌘D', key: 'D', modifiers: { meta: true }, kind: 'document', order: 32 },
@@ -2411,6 +2412,11 @@ function computeShortcutCatalog() {
       disabledReason = guardReason || (activeSession ? null : 'no active session');
       description = activeSession
         ? (activeSession.browser.layoutMode === 'terminal' ? 'open browser' : 'shut browser')
+        : 'no active session';
+    } else if (shortcut.id === 'browser-fullscreen') {
+      disabledReason = guardReason || (activeSession ? null : 'no active session');
+      description = activeSession
+        ? browserLayoutAction(activeSession).title
         : 'no active session';
     } else if (shortcut.id === 'composer-open') {
       disabledReason = guardReason || (activeSession ? null : 'no active session');
@@ -3148,7 +3154,7 @@ function applyBrowserLayout(session) {
   session.els.collapseBtn.setAttribute('aria-label', session.els.collapseBtn.title);
   const action = browserLayoutAction(session);
   renderBrowserFullscreenToggle(session.els.fullscreenBtn, mode, action.mode);
-  session.els.fullscreenBtn.title = action.title;
+  session.els.fullscreenBtn.title = `${action.title} (⌘⇧F)`;
   session.els.fullscreenBtn.setAttribute('aria-label', session.els.fullscreenBtn.title);
   session.els.fullscreenBtn.setAttribute('aria-pressed', String(expanded));
   session.els.fullscreenBtn.dataset.nextLayout = action.mode;
@@ -8730,6 +8736,7 @@ window.chromux.onShortcutDebugInput(noteShortcutDebugInput);
 window.chromux.onShortcutActivateSessionIndex(handleShortcutActivateSessionIndex);
 window.chromux.onShortcutFocusNextQueueItem(handleShortcutFocusNextQueueItem);
 window.chromux.onShortcutToggleBrowser(handleShortcutToggleBrowser);
+window.chromux.onShortcutBrowserFullscreen(handleShortcutBrowserFullscreen);
 window.chromux.onShortcutOpenNewSession(handleShortcutOpenNewSession);
 window.chromux.onShortcutOpenDetectModal(handleShortcutOpenDetectModal);
 window.chromux.onShortcutOpenComposer(handleShortcutOpenComposer);
@@ -8866,6 +8873,14 @@ function handleShortcutToggleBrowser() {
   return { sessionId: session.id, collapsed: session.browser.layoutMode === 'terminal' };
 }
 
+function handleShortcutBrowserFullscreen() {
+  if (modalOpen() || editableFocused()) return null;
+  const session = state.sessions.get(state.activeId);
+  if (!session) return null;
+  advanceBrowserLayout(session);
+  return { sessionId: session.id, layoutMode: session.browser.layoutMode };
+}
+
 function handleShortcutOpenNewSession() {
   if (guardedShortcutDisabledReason(shortcutFocusContext())) return null;
   openNewSessionModal();
@@ -8896,10 +8911,7 @@ function shortcutInputFromDomEvent(e) {
   };
 }
 
-function chromuxShortcutActionFromInput(input) {
-  if (window.chromux && typeof window.chromux.shortcutAction === 'function') {
-    return window.chromux.shortcutAction(input);
-  }
+function fallbackChromuxShortcutAction(input) {
   if (!input.meta || input.alt || input.control || input.type !== 'keyDown') return null;
   const key = String(input.key || '').toUpperCase();
   if (/^[1-9]$/.test(key) && !input.shift) return { id: 'session-index', index: Number(key) - 1 };
@@ -8907,8 +8919,16 @@ function chromuxShortcutActionFromInput(input) {
   if (key === 'D' && !input.shift) return { id: 'detect' };
   if (key === 'J' && !input.shift) return { id: 'queue-focus' };
   if (key === 'B' && input.shift) return { id: 'browser-toggle' };
+  if (key === 'F' && input.shift) return { id: 'browser-fullscreen' };
   if (String(input.key || '').toLowerCase() === 'enter' && input.shift) return { id: 'composer-open' };
   return null;
+}
+
+function chromuxShortcutActionFromInput(input) {
+  if (window.chromux && typeof window.chromux.shortcutAction === 'function') {
+    return window.chromux.shortcutAction(input);
+  }
+  return fallbackChromuxShortcutAction(input);
 }
 
 function handleRendererShortcutKeydown(e) {
@@ -8921,6 +8941,7 @@ function handleRendererShortcutKeydown(e) {
   if (action.id === 'session-index') result = handleShortcutActivateSessionIndex({ index: action.index });
   else if (action.id === 'queue-focus') result = handleShortcutFocusNextQueueItem();
   else if (action.id === 'browser-toggle') result = handleShortcutToggleBrowser();
+  else if (action.id === 'browser-fullscreen') result = handleShortcutBrowserFullscreen();
   else if (action.id === 'new-session') result = handleShortcutOpenNewSession();
   else if (action.id === 'detect') result = handleShortcutOpenDetectModal();
   else if (action.id === 'composer-open') result = handleShortcutOpenComposer();
@@ -10346,6 +10367,12 @@ if (window.chromuxTest) {
       flushRender();
       return result;
     },
+    shortcutBrowserFullscreen() {
+      const result = handleShortcutBrowserFullscreen();
+      flushRender();
+      return result;
+    },
+    fallbackAction: (input) => fallbackChromuxShortcutAction(input),
     focusTerminalTextarea: focusSyntheticTerminalTextarea,
     focusHostEditable() {
       removeHotkeyTestFocusEl();
@@ -10367,6 +10394,7 @@ if (window.chromuxTest) {
     queueUrls: (id) => testSession(id).browser.queue.map((item) => item.url),
     queuePanelHidden: (id) => testSession(id).els.queuePanel.classList.contains('hidden'),
     browserCollapsed: (id) => testSession(id).browser.layoutMode === 'terminal',
+    browserLayoutMode: (id) => testSession(id).browser.layoutMode,
     focusedOpenUrl: () => document.activeElement?.dataset?.queueOpenUrl || null,
     clickFocused() {
       if (!document.activeElement) throw new Error('Nothing focused');
@@ -10484,6 +10512,11 @@ if (window.chromuxTest) {
     },
     shortcutDetect() {
       const result = handleShortcutOpenDetectModal();
+      flushRender();
+      return result;
+    },
+    shortcutBrowserFullscreen() {
+      const result = handleShortcutBrowserFullscreen();
       flushRender();
       return result;
     },
@@ -10632,6 +10665,11 @@ if (window.chromuxTest) {
     },
     shortcutToggle() {
       const result = handleShortcutToggleBrowser();
+      flushRender();
+      return result;
+    },
+    shortcutFullscreen() {
+      const result = handleShortcutBrowserFullscreen();
       flushRender();
       return result;
     },

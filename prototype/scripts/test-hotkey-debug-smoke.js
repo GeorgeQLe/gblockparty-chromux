@@ -162,6 +162,25 @@ fs.writeFileSync(e2ePath, `
   expect(byId(debug.catalog, 'browser-toggle').matchedByCurrentChord, 'Command+Shift+B should match browser toggle');
   expect(b.state(firstId).collapsed, 'host Command+Shift+B should collapse active browser');
 
+  h.focusTerminalTextarea();
+  await wait(120);
+  await sendHostShortcut('F', ['meta', 'shift']);
+  debug = h.debug();
+  expect(debug.source === 'host', 'Command+Shift+F should be received from host window');
+  expect(debug.latestKey === 'F', 'Command+Shift+F should show F as latest key');
+  expect(debug.modifiers.shift === true, 'Command+Shift+F should light the Shift modifier chip');
+  expect(byId(debug.catalog, 'browser-fullscreen').matchedByCurrentChord,
+    'Command+Shift+F should match browser fullscreen');
+  expect(b.state(firstId).layoutMode === 'browserChromux',
+    'terminal-focused host Command+Shift+F should enter browser-Chromux layout');
+  expect((await latestRouteFor('F')).action === 'browser-fullscreen',
+    'Command+Shift+F should route as browser-fullscreen');
+  expect((await latestRouteFor('F')).intercepted === true,
+    'Command+Shift+F should be intercepted by Chromux');
+  await sendHostShortcut('F', ['meta', 'shift']);
+  expect(b.state(firstId).layoutMode === 'terminal',
+    'second terminal-focused host Command+Shift+F should restore terminal layout');
+
   b.focus(secondId);
   await sendHostShortcut('1', ['meta']);
   debug = h.debug();
@@ -235,6 +254,20 @@ fs.writeFileSync(e2ePath, `
   expect(b.state(firstId).collapsed, 'webview Command+Shift+B should collapse the first session browser');
 
   await focusGuest('#noneditable', false);
+  await sendWebviewShortcut(wv, 'F', ['meta', 'shift']);
+  debug = h.debug();
+  expect(debug.source === 'webview', 'Command+Shift+F should be received from webview');
+  expect(debug.latestKey === 'F', 'webview Command+Shift+F should show F as latest key');
+  expect(debug.modifiers.shift === true, 'webview Command+Shift+F should light the Shift modifier chip');
+  expect(byId(debug.catalog, 'browser-fullscreen').matchedByCurrentChord,
+    'webview Command+Shift+F should match browser fullscreen');
+  expect(b.state(firstId).layoutMode === 'browserChromux',
+    'Command+Shift+F from non-editable guest focus should enter browser-Chromux layout');
+  await sendWebviewShortcut(wv, 'F', ['meta', 'shift']);
+  expect(b.state(firstId).layoutMode === 'paired',
+    'second webview Command+Shift+F should restore paired layout');
+
+  await focusGuest('#noneditable', false);
   await sendWebviewShortcut(wv, '1', ['meta']);
   debug = h.debug();
   expect(debug.source === 'webview', 'Command+1 should be received from webview');
@@ -250,11 +283,16 @@ fs.writeFileSync(e2ePath, `
     expect(debug.latestKey === 'J', 'editable ' + selector + ' should still report received shortcut key');
     expect(byId(debug.catalog, 'queue-next').disabledReason === 'guest editable', 'Command+J should show guest editable suppression for ' + selector);
     expect(byId(debug.catalog, 'browser-toggle').disabledReason === 'guest editable', 'Command+Shift+B should show guest editable suppression for ' + selector);
+    expect(byId(debug.catalog, 'browser-fullscreen').disabledReason === 'guest editable',
+      'Command+Shift+F should show guest editable suppression for ' + selector);
     expect(byId(debug.catalog, 'session-1').disabledReason === 'guest editable', 'Command+1 should show guest editable suppression for ' + selector);
     expect(byId(debug.catalog, 'new-session').disabledReason === 'guest editable', 'Command+T should show guest editable suppression for ' + selector);
     expect(byId(debug.catalog, 'detect').disabledReason === 'guest editable', 'Command+D should show guest editable suppression for ' + selector);
     expect(b.state(firstId).active, 'editable ' + selector + ' should suppress Command+J activation');
 
+    await sendWebviewShortcut(wv, 'F', ['meta', 'shift']);
+    expect(b.state(firstId).layoutMode === 'paired',
+      'editable ' + selector + ' should suppress Command+Shift+F layout changes');
     await sendWebviewShortcut(wv, 'T', ['meta']);
     expect(h.newModalOpen() === false, 'editable ' + selector + ' should suppress Command+T modal');
     await sendWebviewShortcut(wv, 'D', ['meta']);

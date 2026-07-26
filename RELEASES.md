@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.62.0
+
+Tag: `chromux-v0.62.0`
+
+- Add `Command+Shift+F` to run the active session browser rail’s expansion action from the host, terminal, or a non-editable embedded browser.
+- Honor the configured full-Chromux, paired-workspace, or three-layout cycle behavior while preserving the exact paired or terminal return layout, divider width, mounted webview, active tab, URL, queue, and console state.
+- Keep `Command+Shift+B` dedicated to opening or shutting the paired browser, preserve native macOS `Control+Command+F`, and suppress the new shortcut for modals, editable host or guest focus, and missing active sessions.
+
 ## GBlockParty Chromux v0.61.9
 
 Tag: `chromux-v0.61.9`

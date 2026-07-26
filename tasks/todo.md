@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Add guarded `Command+Shift+F` paired-browser fullscreen routing from host, terminal, and non-editable webview focus; mirror the rail expansion action across all configured layouts, preserve exact session/browser state and existing shortcuts, and ship as v0.62.0. _(source: user-supplied implementation plan; evidence: shortcut/hotkey/browser-layout/webview regressions, source and packaged smoke, package metadata, `prototype/README.md`, `RELEASES.md`)_
+
 - [x] Keep Codex permission, plan-progression, and Plan-mode numeric chooser selections out of Prompt Composer while forwarding them to the PTY exactly once; preserve ordinary numeric prompts, numbered prose/transcripts, non-Codex terminals, redraw behavior, and ship as v0.61.9. _(source: user-supplied implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/scripts/test-composer-renderer.js`, focused shortcut/attention/terminal-rendering regressions, package metadata, `RELEASES.md`)_
 
 - [x] Preserve Codex Working state, tab-spinner continuity, and Threads Working membership across repeated meaningful composer redraws, then ship as v0.61.8. _(source: user-supplied implementation plan, advanced from occupied v0.61.7; evidence: `prototype/renderer/attention.js`, turn-signal/tab-activity/session-rail regressions, focused and complete prototype validation, source and packaged smoke, package metadata, `RELEASES.md`)_

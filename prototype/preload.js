@@ -83,6 +83,7 @@ contextBridge.exposeInMainWorld('chromux', {
   onShortcutActivateSessionIndex: (cb) => ipcRenderer.on('shortcut-activate-session-index', (_e, m) => cb(m)),
   onShortcutFocusNextQueueItem: (cb) => ipcRenderer.on('shortcut-focus-next-queue-item', () => cb()),
   onShortcutToggleBrowser: (cb) => ipcRenderer.on('shortcut-toggle-browser', () => cb()),
+  onShortcutBrowserFullscreen: (cb) => ipcRenderer.on('shortcut-browser-fullscreen', () => cb()),
   onShortcutOpenNewSession: (cb) => ipcRenderer.on('shortcut-open-new-session', () => cb()),
   onShortcutOpenDetectModal: (cb) => ipcRenderer.on('shortcut-open-detect-modal', () => cb()),
   onShortcutOpenComposer: (cb) => ipcRenderer.on('shortcut-open-composer', () => cb()),
