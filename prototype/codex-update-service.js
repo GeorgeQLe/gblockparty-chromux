@@ -45,14 +45,25 @@ function compareVersions(left, right) {
   return a.prerelease.localeCompare(b.prerelease);
 }
 
-function resolveOnPath(name, envPath = process.env.PATH || '') {
+function resolveOnPath(name, envPath = process.env.PATH || '', {
+  platform = process.platform,
+  pathExt = process.env.PATHEXT,
+} = {}) {
+  const extensions = platform === 'win32'
+    ? String(pathExt || '.COM;.EXE;.BAT;.CMD')
+      .split(';')
+      .filter(Boolean)
+      .map((extension) => extension.toLowerCase())
+    : [''];
   for (const dir of envPath.split(path.delimiter)) {
     if (!dir) continue;
-    const candidate = path.join(dir, name);
-    try {
-      fs.accessSync(candidate, fs.constants.X_OK);
-      return candidate;
-    } catch { /* keep searching */ }
+    for (const extension of extensions) {
+      const candidate = path.join(dir, `${name}${extension}`);
+      try {
+        fs.accessSync(candidate, fs.constants.X_OK);
+        return candidate;
+      } catch { /* keep searching */ }
+    }
   }
   return null;
 }
