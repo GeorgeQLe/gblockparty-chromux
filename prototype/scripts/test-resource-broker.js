@@ -3,7 +3,16 @@
 const assert = require('assert');
 const { ResourceBroker } = require('../resource-broker/core');
 const { brokerSocketPath } = require('../resource-broker/paths');
-assert(brokerSocketPath('/a'.repeat(100)).startsWith('/tmp/chromux-rb-'), 'long Unix socket paths use a bounded fallback');
+assert.match(
+  brokerSocketPath('/a'.repeat(100), null, 'darwin'),
+  /(?:^|[\\/])tmp[\\/]chromux-rb-[a-f0-9]{20}\.sock$/,
+  'long Unix socket paths use a bounded fallback',
+);
+assert.match(
+  brokerSocketPath('C:\\Users\\Fixture\\.chromux', null, 'win32'),
+  /^\\\\\.\\pipe\\chromux-resource-broker-[a-f0-9]{20}$/,
+  'Windows uses a bounded user-scoped named pipe',
+);
 
 let now = 1000;
 const broker = new ResourceBroker({ now: () => now });

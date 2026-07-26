@@ -9,6 +9,7 @@ const {
   HOMEBREW_CASK_URL,
   NPM_PACKAGE_URL,
   createCodexUpdateService,
+  resolveOnPath,
 } = require('../codex-update-service');
 
 function fixture({
@@ -57,9 +58,25 @@ function fixture({
 }
 
 (async () => {
+  const pathFixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'chromux-codex-path-'));
+  const pathFixtureExecutable = path.join(pathFixtureDir, 'codex.exe');
+  fs.writeFileSync(pathFixtureExecutable, '', { mode: 0o755 });
+  assert.equal(
+    resolveOnPath('codex', pathFixtureDir, { platform: 'win32', pathExt: '.EXE;.CMD' }),
+    pathFixtureExecutable,
+    'Windows executable lookup should honor PATHEXT without shell interpolation',
+  );
+  fs.rmSync(pathFixtureDir, { recursive: true, force: true });
+
   const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'chromux-codex-update-'));
-  const fixtureExecutable = path.join(fixtureDir, 'codex');
-  fs.writeFileSync(fixtureExecutable, '#!/usr/bin/env node\nprocess.stdout.write("codex-cli 1.2.3\\n");\n', { mode: 0o755 });
+  const windowsFixture = process.platform === 'win32';
+  const fixtureExecutable = path.join(fixtureDir, windowsFixture ? 'codex.exe' : 'codex');
+  const fixtureVersion = process.version.replace(/^v/, '');
+  if (windowsFixture) {
+    fs.copyFileSync(process.execPath, fixtureExecutable);
+  } else {
+    fs.symlinkSync(process.execPath, fixtureExecutable);
+  }
   const originalPath = process.env.PATH;
   try {
     process.env.PATH = '/usr/bin:/bin';
@@ -74,14 +91,14 @@ function fixture({
       request: async (url) => {
         assert.equal(url, GITHUB_LATEST_URL);
         return {
-          tag_name: 'rust-v1.2.3',
-          html_url: 'https://github.com/openai/codex/releases/tag/rust-v1.2.3',
+          tag_name: `rust-v${fixtureVersion}`,
+          html_url: `https://github.com/openai/codex/releases/tag/rust-v${fixtureVersion}`,
         };
       },
     });
     const realChildStatus = await realChild.check();
     assert.equal(realChildStatus.error, null, `Node-based Codex launchers should execute with the augmented service PATH: ${realChildStatus.error}`);
-    assert.equal(realChildStatus.currentVersion, '1.2.3');
+    assert.equal(realChildStatus.currentVersion, fixtureVersion);
   } finally {
     if (originalPath === undefined) delete process.env.PATH;
     else process.env.PATH = originalPath;
