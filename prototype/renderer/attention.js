@@ -191,8 +191,7 @@
         && !/^\/[a-z][a-z0-9-]*(?:\s+.*)?$/iu.test(value)
         && !/(?:\?\s+for shortcuts|\bcontext left\b)/i.test(value);
     });
-    if (!composerAtCursor || !codexChrome) {
-      if (turn.state !== 'pending' || !meaningfulOutput) return false;
+    if (meaningfulOutput && !rateLimitChooser) {
       turn.state = 'working';
       turn.detail = 'Codex activity observed';
       turn.since = now;
@@ -204,19 +203,10 @@
       turn.confidence = 'low';
       return true;
     }
+    if (!composerAtCursor || !codexChrome) {
+      return false;
+    }
     if (turn.state === 'pending' && !rateLimitChooser) {
-      if (meaningfulOutput) {
-        turn.state = 'working';
-        turn.detail = 'Codex activity observed';
-        turn.since = now;
-        turn.acknowledged = false;
-        turn.activityObserved = true;
-        turn.completionBlocked = false;
-        turn.protocol = 'output';
-        turn.source = 'codex:terminal-active';
-        turn.confidence = 'low';
-        return true;
-      }
       turn.state = 'idle';
       turn.detail = null;
       turn.since = now;

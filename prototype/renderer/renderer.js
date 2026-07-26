@@ -7419,6 +7419,7 @@ function renderedTerminalCursorContext(term) {
 function recoverCodexCompletionFromRenderedTerminal(session, expectedGeneration, output = '') {
   if (!session || session.turn.generation !== expectedGeneration) return false;
   const rendered = renderedTerminalCursorContext(session && session.term && session.term.term);
+  const previousTurnState = session.turn.state;
   if (!rendered || !window.chromuxAttention.applyCodexRenderedCompletionFallback(
     session, { ...rendered, output }, Date.now(),
   )) return false;
@@ -7427,11 +7428,13 @@ function recoverCodexCompletionFromRenderedTerminal(session, expectedGeneration,
     session.turn.attentionSeenAt = Math.max(session.turn.attentionSeenAt || 0, session.turn.since || 0);
     window.chromuxAttention.consumeCompletedTurn(session.turn, Date.now());
   }
+  const lifecycleStateChanged = session.turn.state !== previousTurnState;
   recordEvent({
     type: 'turn-recovered', sessionId: session.id, turnState: session.turn.state,
-    source: 'codex:terminal-idle', confidence: 'low',
+    source: session.turn.source || 'codex:terminal-idle',
+    confidence: session.turn.confidence || 'low',
   });
-  invalidate('update', 'attention', 'badges', 'tabs',
+  invalidate('tabs', ...(lifecycleStateChanged ? ['update', 'attention', 'badges'] : []),
     ...(state.env && state.env.devMode ? ['diagnostics'] : []));
   return true;
 }

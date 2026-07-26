@@ -1,5 +1,13 @@
 # Release Notes
 
+## GBlockParty Chromux v0.61.8
+
+Tag: `chromux-v0.61.8`
+
+- Keep Codex turns Working across repeated composer-bearing redraws whenever the current frame also contains meaningful non-rate-limit output.
+- Preserve the mounted tab spinner and Threads Working row while live redraws continue, refreshing activity and completion eligibility on every frame.
+- Continue completing from a later composer-only idle redraw, a stopped rate-limit chooser, a stable title, or validated notifier evidence.
+
 ## GBlockParty Chromux v0.61.7
 
 Tag: `chromux-v0.61.7`

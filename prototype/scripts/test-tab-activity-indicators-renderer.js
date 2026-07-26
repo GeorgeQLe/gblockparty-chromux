@@ -101,6 +101,29 @@ fs.writeFileSync(e2ePath, `
     && clearedRow?.querySelector('.rail-status')?.getAttribute('aria-label') === 'Idle',
   'background Codex /clear should project idle through both tabs and Threads');
 
+  const liveRedrawCodex = tabs.addSession({
+    name: 'live-redraw-codex', agent: 'codex', realTerminal: true,
+  });
+  tabs.focus(active);
+  tabs.typeInput(liveRedrawCodex, 'keep the spinner mounted\\r');
+  let liveRedrawSpinner = null;
+  for (const frame of ['First live redraw...', 'Second live redraw...', 'Third live redraw...']) {
+    tabs.feed(liveRedrawCodex, '\\x1b[2J\\x1b[H' + frame + '\\r\\n? for shortcuts\\r\\n› ');
+    await wait(30); tabs.flushRender();
+    const currentSpinner = document.querySelector(
+      '.session-tab[data-session-id="' + CSS.escape(liveRedrawCodex) + '"] .tab-dot',
+    );
+    if (!liveRedrawSpinner) liveRedrawSpinner = currentSpinner;
+    expect(tabs.state(liveRedrawCodex).indicator === 'working'
+      && tabs.state(liveRedrawCodex).ariaLabel.includes('Agent working')
+      && currentSpinner === liveRedrawSpinner,
+    'meaningful composer redraws should preserve the mounted Codex tab spinner: ' + frame);
+  }
+  tabs.feed(liveRedrawCodex, '\\x1b[2J\\x1b[H? for shortcuts\\r\\n› ');
+  await wait(30); tabs.flushRender();
+  expect(tabs.state(liveRedrawCodex).indicator === 'completed',
+    'a later composer-only redraw should replace the background spinner with completion');
+
   const workingRow = document.querySelector('#thread-list .rail-session-row[data-session-id="' + CSS.escape(background) + '"]');
   const workingStatus = workingRow?.querySelector('.rail-status');
   expect(workingStatus?.getAttribute('aria-label') === 'Working',

@@ -839,6 +839,44 @@ fs.writeFileSync(e2ePath, `
     && clearedCodexRow?.status === 'Idle',
   'a command-only composer redraw should return Codex to its cwd group as Idle');
   rail.close(clearRailCodex);
+
+  const liveRedrawRailCodex = rail.addTerminalSession({
+    name: 'live-redraw-rail-codex', agent: 'codex', cwd: ${JSON.stringify(looseDir)},
+  });
+  rail.focus(holder);
+  rail.submit(liveRedrawRailCodex, 'keep Working membership stable\\r');
+  let liveRedrawWorkingRow = null;
+  let liveRedrawWorkingSpinner = null;
+  for (const frame of ['First rail redraw...', 'Second rail redraw...', 'Third rail redraw...']) {
+    rail.ptyOutput(
+      liveRedrawRailCodex,
+      '\\x1b[2J\\x1b[H' + frame + '\\r\\n? for shortcuts\\r\\n› ',
+    );
+    await wait(30); rail.flushRender();
+    const currentRow = document.querySelector(
+      '#thread-list .working-thread-group .rail-session-row[data-session-id="'
+        + CSS.escape(liveRedrawRailCodex) + '"]',
+    );
+    const currentSpinner = currentRow?.querySelector('.rail-status');
+    if (!liveRedrawWorkingRow) {
+      liveRedrawWorkingRow = currentRow;
+      liveRedrawWorkingSpinner = currentSpinner;
+    }
+    expect(rail.turnState(liveRedrawRailCodex).state === 'working'
+      && currentRow === liveRedrawWorkingRow
+      && currentSpinner === liveRedrawWorkingSpinner,
+    'meaningful composer redraws should preserve Threads Working membership and spinner: ' + frame);
+  }
+  rail.ptyOutput(liveRedrawRailCodex, '\\x1b[2J\\x1b[H? for shortcuts\\r\\n› ');
+  await wait(30); rail.flushRender();
+  expect(rail.turnState(liveRedrawRailCodex).state === 'completed'
+    && !rail.groups().find((group) => group.key === 'status:working')
+      ?.rows.some((row) => row.id === liveRedrawRailCodex)
+    && rail.groups().find((group) => group.key === 'attention:needs')
+      ?.rows.some((row) => row.id === liveRedrawRailCodex),
+  'a later composer-only redraw should move the background Codex session from Working to completed attention');
+  rail.close(liveRedrawRailCodex);
+
   rail.focus(holder);
   rail.hoverRow(webTwo);
   await wait(270);

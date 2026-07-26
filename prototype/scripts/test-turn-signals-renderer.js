@@ -182,6 +182,57 @@ fs.writeFileSync(e2ePath, `
   await wait(30); sig.flushRender();
   expect(sig.turnState(codexSubmit).state === 'working',
     'meaningful Codex terminal output should confirm working when title frames are unavailable');
+
+  const liveRedraw = sig.addTerminalSession({ name: 'codex-live-redraw', agent: 'codex' });
+  sig.focus(holder);
+  sig.typeInput(liveRedraw, 'exercise repeated redraws\\r');
+  const liveFrames = [
+    'Inspecting the first live frame...',
+    'Inspecting the second live frame...',
+    'Inspecting the third live frame...',
+  ];
+  let previousLiveSince = 0;
+  for (const frame of liveFrames) {
+    sig.feedPtyChunk(liveRedraw, '\\x1b[2J\\x1b[H' + frame + '\\r\\n? for shortcuts\\r\\n› ');
+    await wait(30); sig.flushRender();
+    const liveTurn = sig.turnState(liveRedraw);
+    expect(liveTurn.state === 'working'
+      && liveTurn.activityObserved === true
+      && liveTurn.completionBlocked === false,
+    'meaningful Codex output must keep every composer-bearing live redraw working: '
+      + JSON.stringify(liveTurn));
+    expect(previousLiveSince === 0 || liveTurn.since > previousLiveSince,
+      'each meaningful composer redraw should retain or refresh the working timestamp');
+    previousLiveSince = liveTurn.since;
+  }
+  sig.feedPtyChunk(liveRedraw, '\\x1b[2J\\x1b[H? for shortcuts\\r\\n› ');
+  await wait(30); sig.flushRender();
+  expect(sig.turnState(liveRedraw).state === 'completed',
+    'a later composer-only idle redraw should complete a background Codex turn');
+  expect(itemsFor('COMPLETED', 'codex-live-redraw').length === 1,
+    'a genuine idle redraw after repeated live frames should create completed attention');
+
+  const focusedLiveRedraw = sig.addTerminalSession({
+    name: 'codex-focused-live-redraw', agent: 'codex',
+  });
+  sig.focus(focusedLiveRedraw);
+  sig.typeInput(focusedLiveRedraw, 'exercise focused redraws\\r');
+  for (const frame of ['Focused live frame one...', 'Focused live frame two...']) {
+    sig.feedPtyChunk(
+      focusedLiveRedraw,
+      '\\x1b[2J\\x1b[H' + frame + '\\r\\n? for shortcuts\\r\\n› ',
+    );
+    await wait(30); sig.flushRender();
+    expect(sig.turnState(focusedLiveRedraw).state === 'working',
+      'meaningful focused composer redraws should remain working: ' + frame);
+  }
+  sig.feedPtyChunk(focusedLiveRedraw, '\\x1b[2J\\x1b[H? for shortcuts\\r\\n› ');
+  await wait(30); sig.flushRender();
+  expect(sig.turnState(focusedLiveRedraw).state === 'idle'
+    && itemsFor('COMPLETED', 'codex-focused-live-redraw').length === 0,
+  'a later composer-only redraw should resolve a focused Codex turn directly to idle');
+  sig.focus(holder);
+
   sig.feedPtyChunk(codexSubmit, 'Choose an option:\\r\\n1. Wait until the rate limit resets\\r\\n› ');
   await wait(30); sig.flushRender();
   expect(sig.turnState(codexSubmit).state === 'completed',

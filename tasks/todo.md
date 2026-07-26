@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Preserve Codex Working state, tab-spinner continuity, and Threads Working membership across repeated meaningful composer redraws, then ship as v0.61.8. _(source: user-supplied implementation plan, advanced from occupied v0.61.7; evidence: `prototype/renderer/attention.js`, turn-signal/tab-activity/session-rail regressions, focused and complete prototype validation, source and packaged smoke, package metadata, `RELEASES.md`)_
+
 - [x] Make live terminal previews swap complete double-buffered xterm frames atomically, coalesce sustained output, cancel stale replay callbacks, preserve serialization/viewport/theme/size behavior, and ship as v0.61.7. _(source: user-supplied implementation plan, advanced from occupied v0.61.6; evidence: `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`, `prototype/scripts/test-session-rail-renderer.js`, complete prototype test matrix, source and packaged smoke, package metadata, `RELEASES.md`)_
 
 - [x] Keep full-Chromux browser mode below the measured application header while covering all lower app content, retain titlebar and browser-rail interaction plus exact layout/webview restoration, and ship as v0.61.6. _(source: user-supplied implementation plan; evidence: `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`, `prototype/scripts/test-browser-collapse-renderer.js`, theme regression, package metadata, `RELEASES.md`)_
