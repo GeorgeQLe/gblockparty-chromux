@@ -44,8 +44,8 @@ fs.writeFileSync(e2ePath, `
   const pollUntil = async (read, accept, timeoutMs = 5000) => {
     const deadline = Date.now() + timeoutMs;
     while (true) {
-      const value = read();
-      if (accept(value) || Date.now() >= deadline) return value;
+      const value = await read();
+      if (await accept(value) || Date.now() >= deadline) return value;
       await wait(50);
     }
   };
@@ -79,10 +79,12 @@ fs.writeFileSync(e2ePath, `
   expect(!nonHtml.ok && nonHtml.status === 'invalid', 'non-HTML reference must be rejected');
   await window.chromux.ptyCreate({ id: 'html-live-cwd', cwd: projectDir, cols: 80, rows: 24 });
   window.chromux.ptyInput('html-live-cwd', 'cd docs\\r');
-  await wait(180);
-  const liveCwd = await window.chromux.resolveProjectHtml({
-    sessionId: 'html-live-cwd', launchCwd: projectDir, reference: 'live.html',
-  });
+  const liveCwd = await pollUntil(
+    () => window.chromux.resolveProjectHtml({
+      sessionId: 'html-live-cwd', launchCwd: projectDir, reference: 'live.html',
+    }),
+    (result) => result.ok && result.path === 'docs/live.html',
+  );
   window.chromux.ptyKill('html-live-cwd');
   expect(liveCwd.ok && liveCwd.path === 'docs/live.html',
     'live PTY cwd must win before ambiguous repository fallback: ' + JSON.stringify(liveCwd));
@@ -122,8 +124,11 @@ fs.writeFileSync(e2ePath, `
 
   b.explore(sessionId);
   b.submit(sessionId, homeRelative.url);
-  await wait();
-  tabs = b.tabs(sessionId);
+  tabs = await pollUntil(
+    () => b.tabs(sessionId),
+    (rows) => rows.some((tab) => tab.type === 'explorer')
+      && rows.some((tab) => tab.type === 'page' && tab.active),
+  );
   expect(tabs.some((tab) => tab.type === 'explorer') && tabs.some((tab) => tab.type === 'page' && tab.active),
     'typed web URL from explorer should create an active page tab');
 

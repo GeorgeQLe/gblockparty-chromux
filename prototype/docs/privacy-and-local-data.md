@@ -72,18 +72,35 @@ retention and sharing, and dispose of data that is no longer needed.
 
 ## Local Data Inventory
 
+### Stable Electron app profile
+
+Production Chromux launches choose the Electron app profile explicitly instead
+of deriving it from `productName`, the executable name, or other display
+metadata. The preferred profile directory is `chromux` under the platform app
+data directory: `~/Library/Application Support/chromux` on macOS,
+`$XDG_CONFIG_HOME/chromux` on Linux when `XDG_CONFIG_HOME` is set (otherwise
+`~/.config/chromux`), and `%APPDATA%\chromux` on Windows.
+
+To recover settings after the product display name changed, Chromux first reuses
+an existing `chromux` profile. If that directory does not exist but an existing
+`GBlockParty Chromux` profile does, Chromux reuses the latter so newer-only
+installations retain their data. A clean installation uses `chromux`. This
+selection is made before Electron creates a window or session and remains
+independent of future display-name changes. Explicit `--user-data-dir` launches
+and isolated smoke-test profiles are not replaced by this production policy.
+
 | Data | Trigger | Local location | Retention | Outbound behavior |
 | --- | --- | --- | --- | --- |
-| Capture payloads | User clicks `CAPTURE` or completes element picking. | `~/.chromux/captures/<timestamp>/payload.yaml` | Never auto-deleted by Chromux. | Sent only when the user chooses `SEND - claude -p`; not sent by `FILE-DROP ONLY`. |
-| Screenshots | Capture attempts to save the visible browser viewport. | `~/.chromux/captures/<timestamp>/screenshot.png` when available. | Never auto-deleted by Chromux. | Chromux includes the screenshot path in the payload. It does not separately upload image bytes, but the receiving CLI/agent may read local files according to its own capabilities and permissions. |
+| Capture payloads | User clicks `CAPTURE`, completes element picking, chooses `ATTACH CURRENT PAGE`, or refreshes a staged attachment. | `~/.chromux/captures/<timestamp>-<unique-suffix>/payload.yaml` | Never auto-deleted by Chromux. | Sent only when the user chooses `SEND - claude -p` or submits a routed Composer prompt that explicitly includes the staged reference; file-drop and New-session draft staging remain local until later submission. |
+| Screenshots | Capture attempts to save the visible browser viewport. | `~/.chromux/captures/<timestamp>-<unique-suffix>/screenshot.png` when available. | Never auto-deleted by Chromux. | Chromux includes the screenshot path in the payload. It does not separately upload image bytes, but the receiving CLI/agent may read local files according to its own capabilities and permissions. |
 | Capture console tail | Browser console messages seen by the pane after it opens. | Included inside `payload.yaml`; also held in renderer memory while the pane is open. | Persisted only as part of a saved payload. In-memory state disappears when the session closes. | Sent with `SEND - claude -p` because it is part of the YAML payload. |
 | Selected element data | User selects an element with `PICK ELEMENT`. | Included inside `payload.yaml`. | Persisted only as part of a saved payload. | Sent with `SEND - claude -p` because it is part of the YAML payload. |
 | User capture notes | User types a note in the capture modal. | Included inside `payload.yaml` and the delivery prompt. | Persisted only as part of a saved payload. | Sent with `SEND - claude -p`. |
 | Delivery log | User sends a payload or chooses file-drop. | `~/.chromux/delivery-log.jsonl` | Appended indefinitely until the user deletes it. | Not sent by Chromux. |
-| Restore snapshot | App close, managed update, or Developer Mode restart stores reopen state, including each agent tab's validated provider conversation ID, last deliberate activity time, optional custom tab-group membership, prior active/last-active-in-group state, ordered page-tab URLs/titles, active page or project-explorer path/query, an optional bounded composer draft, and up to 20 session-scoped Needs Attention records (type, detail up to 4 KiB, occurrence time, and identifier). Browser queue entries remain in their existing queue field; console buffers, captures, cookies, global favorites, custom-group definitions, and global update status are not included. | `~/.chromux/restore-sessions.json` | One schema-v8 snapshot file is overwritten by later snapshots and marked consumed after restore; it is not auto-deleted. Schemas v1-v7 remain readable; schemas v1-v6 use the snapshot save time as shared legacy activity. Restored completion history clears when its thread is opened, while other restored attention remains until dismissed. | Not sent by Chromux. Draft text is sent only if the user later submits it to the terminal. |
+| Restore snapshot | App close, managed update, or Developer Mode restart stores reopen state, including each agent tab's validated provider conversation ID, last deliberate activity time, optional custom tab-group membership, prior active/last-active-in-group state, ordered page-tab URLs/titles, active page or project-explorer path/query, an optional bounded Composer draft, staged local capture references, whether the full-browser Composer drawer was open, and up to 20 session-scoped Needs Attention records (type, detail up to 4 KiB, occurrence time, and identifier). Routing targets are runtime-only. Browser queue entries remain in their existing queue field; chat messages, console buffers, capture contents, cookies, global favorites, custom-group definitions, and global update status are not included. | `~/.chromux/restore-sessions.json` | One schema-v9 snapshot file is overwritten by later snapshots and marked consumed after restore; it is not auto-deleted. Schemas v1-v8 remain readable with empty routed-Composer state; schemas v1-v6 use the snapshot save time as shared legacy activity. The unshipped schema-v9 `chatOpen` field is read as a drawer-open fallback, while old `chatMessages` are discarded. | Not sent by Chromux. Draft text and local evidence references reach an agent only if the user later submits them to the terminal or invokes another delivery path. |
 | Prompt history | A successful composer submission. | `~/.chromux/prompt-history.json` | Atomically replaced with mode `0600`; exact prompts are deduplicated, up to 100 remain per canonical project directory, and the complete file is capped at 5 MiB by evicting globally oldest entries. Individual and per-project deletion are available in **HISTORY**. | Chromux does not sync or separately send the file. Submitted prompts still pass to the selected agent CLI or shell and follow that tool's network and retention behavior. |
 | Global favorites | User pins the current paired-browser page or a queued document/URL. | `~/.chromux/favorites.json` | Atomically replaced after each change; up to 200 entries remain until unpinned or the file is deleted. | Not synced or sent by Chromux. Opening a favorite can cause ordinary browser network traffic. |
-| Renderer preferences | User chooses a theme, Light or Dark mode, rail mode, Threads Recent/A–Z order, tab activity indicators, thread-preview size, session grouping, or custom tab-group definitions/order. | Chromium-managed local storage for the Chromux renderer. | Validated selections remain until changed or the app profile is cleared. Custom groups are bounded to 100 definitions with names of 1–80 characters. | Not synced or sent by Chromux. |
+| Renderer preferences | User chooses a theme, Light or Dark mode, rail mode, Threads Recent/A–Z order, tab activity indicators, thread-preview size, session grouping, or custom tab-group definitions/order. | Chromium-managed Local Storage inside the selected stable Electron app profile described above. | Validated selections remain until changed or the app profile is cleared. Custom groups are bounded to 100 definitions with names of 1–80 characters. | Not synced or sent by Chromux. |
 | Agent hook files | Chromux starts and writes local hook helpers. | `~/.chromux/signal-classifier.js`, `~/.chromux/signal-*.json`, `~/.chromux/hooks-claude.json`, `~/.chromux/codex-notify.sh`, `~/.chromux/hooks-grok.json`, `~/.chromux/grok-hook.sh`, and `~/.grok/hooks/chromux-turn-signals.json` | Helpers are rewritten at startup. Exact regular files named `signal-<24 lowercase hex>.json` are removed on the next launch; malformed names, directories, and symlinks are retained. | Not sent by Chromux. Hook JSON is bounded, classified locally, and emitted into the owning PTY with a per-session random authentication token. Claude/Codex paths are passed at launch; Grok discovers its global hook, which no-ops outside Chromux. |
 | Update cache | Startup or manual update check. | `~/.chromux/update-cache.json` | Rewritten after valid release results; non-manual checks reuse those results for one day. Transient request failures are not cached, and legacy cached network errors are ignored so the next check retries immediately. | GitHub receives the update-check request. If the Releases API request fails, Chromux may also request GitHub's public latest-release redirect. Capture data and project paths are not included in either request. |
 | Update source | `npm run install-app` records the local install source. | `~/.chromux/update-source.json` | Kept until deleted or overwritten by a later install. | Not sent by Chromux. |
@@ -103,6 +120,7 @@ field bounds. In v1, a payload can contain:
 - Chromux session id and name;
 - project path or target cwd;
 - page URL and title;
+- visible page text capped at 24 KiB, with truncation declared;
 - selected element selector and bounded `outer_html`;
 - last 50 browser console messages, with each message capped;
 - screenshot path and screenshot availability;
@@ -206,9 +224,9 @@ rm -f ~/.chromux/codex-notify.sh
 Do not delete a capture directory until you no longer need its `payload.yaml` or
 `screenshot.png` for manual retry, debugging, or audit.
 
-The browser profile is Chromium-managed Electron app data for the
-session-specific `persist:chromux-<session ID>` partitions. The exact macOS path
-can vary between development and packaged builds. Chromux removes only its
+The browser profile is Chromium-managed Electron app data inside the selected
+stable app profile for the session-specific `persist:chromux-<session ID>`
+partitions. Chromux removes only its
 legacy exact partition name, current UUID partition names, and strict renderer
 fallback partition names at the next launch. Cleanup does not follow top-level
 symlinks or inspect agent-owned `~/.codex`, `~/.claude`, or similar directories.
@@ -224,7 +242,7 @@ Chromux app profile directory, not shared browser or unrelated app data.
   local URLs, file paths, or user notes.
 - Chromux does not automatically delete old captures or delivery logs.
 - Favorites are not encrypted or synced and may reveal local paths, hosts, or browsing targets to anyone who can read the user's local files or backups.
-- Composer drafts and prompt history are local plaintext and may contain source code, secrets, instructions, or other sensitive text. They are not included in diagnostics or console logs, but remain visible to the local account, backups, and anyone with filesystem access.
+- Composer drafts, staged browser-context paths, and prompt history are local plaintext and may contain source code, secrets, instructions, or other sensitive text. They are not included in diagnostics or console logs, but remain visible to the local account, backups, and anyone with filesystem access.
 - Chromux does not provide a current UI for clearing the browser profile.
 - Chromux does not provide enterprise policy controls, audit export controls,
   DPA terms, data residency controls, or managed retention settings.

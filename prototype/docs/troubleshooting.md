@@ -21,6 +21,41 @@ use **More info → Run anyway** if policy allows. Windows updates require the
 matching installer, full `.nupkg`, and `RELEASES`; Chromux shows the release URL
 instead of attempting a macOS install when any asset is absent.
 
+## Settings missing after an update
+
+Chromux v0.63.1 fixes a profile-name change that could make an update appear to
+reset renderer settings such as theme, brightness, rail mode, Threads ordering
+and preview size, activity indicators, browser-fullscreen behavior, and custom
+session groups. The installer did not delete those settings. Electron began
+looking under the display-name profile `GBlockParty Chromux` instead of the
+earlier `chromux` profile.
+
+On every production launch Chromux now chooses profiles in this order:
+
+1. An existing `chromux` profile, which restores the original settings for
+   affected macOS and Linux installations.
+2. An existing `GBlockParty Chromux` profile, which preserves installations
+   that have only the renamed profile.
+3. The stable `chromux` path for a clean installation.
+
+Quit every running copy of Chromux, install or launch v0.63.1 or newer, and
+reopen it. Recovery is automatic; do not move or delete either profile first.
+When both exist, `chromux` wins deliberately because it is the original stable
+profile. The usual locations are:
+
+- macOS: `~/Library/Application Support/chromux` and
+  `~/Library/Application Support/GBlockParty Chromux`
+- Linux: `$XDG_CONFIG_HOME/chromux` and
+  `$XDG_CONFIG_HOME/GBlockParty Chromux` when `XDG_CONFIG_HOME` is set;
+  otherwise use the same directory names under `~/.config`
+- Windows: `%APPDATA%\chromux` and `%APPDATA%\GBlockParty Chromux`
+
+Preferences stored separately in `~/.chromux/preferences.json` are unaffected.
+Explicit `--user-data-dir` launches and smoke tests intentionally keep their
+chosen isolated profiles. If settings still appear missing, back up both app
+profile directories before changing either one and confirm the desired
+profile's `Local Storage` directory exists.
+
 ## Saved project cannot start
 
 Chromux enables **START PROJECT** only when the directory exists, contains a readable `package.json`, and
@@ -139,14 +174,21 @@ Every capture is written before delivery, so a failed send does not lose the pay
 
 ## Wrong-session routing
 
-The capture target defaults to the paired session, but the review modal can send to another session or one-off `claude -p`.
+The capture modal target defaults to the paired session and can send to another session or one-off
+`claude -p`. The full-browser Composer separately defaults to the paired live session every time it
+opens and does not remember a prior routing target.
 
 If evidence went to the wrong place:
 
 1. Check the target selector in the capture modal before sending.
-2. Confirm the target cwd shown in the modal.
-3. For DETECT rows, remember that RESUME opens one inferred latest saved conversation for the exact project directory. Codex rows use the newest interactive CLI thread by `recency_at`; the displayed Codex name and latest-agent excerpt describe that inferred thread but do not correlate it to a particular live process. Two live agents in the same directory therefore remain indistinguishable. If the installed Codex does not support the required app-server methods, Chromux preserves the same resume identity through its bounded `~/.codex/sessions` rollout fallback and shows the legacy terminal/directory label.
-4. For external terminal adoption, DETECT is read-only: it starts a new Chromux PTY from the detected cwd or saved session; it does not attach to the original terminal tab.
+2. In full-browser mode, verify the Composer **TARGET** immediately before sending. A successful send
+   reports `Sent to <session>` without switching away from the source browser.
+3. Confirm the target cwd shown in the modal or session tab.
+4. If routing is blocked, use **SWITCH TO TARGET** and clear its unsubmitted Composer draft or pending
+   terminal input. Exited and removed targets cannot receive new input. The source draft and attached
+   evidence remain staged after every blocked or cancelled attempt.
+5. For DETECT rows, remember that RESUME opens one inferred latest saved conversation for the exact project directory. Codex rows use the newest interactive CLI thread by `recency_at`; the displayed Codex name and latest-agent excerpt describe that inferred thread but do not correlate it to a particular live process. Two live agents in the same directory therefore remain indistinguishable. If the installed Codex does not support the required app-server methods, Chromux preserves the same resume identity through its bounded `~/.codex/sessions` rollout fallback and shows the legacy terminal/directory label.
+6. For external terminal adoption, DETECT is read-only: it starts a new Chromux PTY from the detected cwd or saved session; it does not attach to the original terminal tab.
 
 If DETECT rows are missing tab titles, grant Chromux Automation access to Terminal and iTerm2 in System Settings, Privacy & Security, Automation. The `ps` and `lsof` scan can still find processes without tab-title access.
 
@@ -158,10 +200,11 @@ Chromux stores local artifacts under your home directory:
 
 | Data | Location |
 | --- | --- |
-| Capture payloads and screenshots | `~/.chromux/captures/<timestamp>/` |
+| Capture payloads and screenshots | `~/.chromux/captures/<timestamp>-<unique-suffix>/` |
 | Delivery log | `~/.chromux/delivery-log.jsonl` |
 | Global favorites | `~/.chromux/favorites.json` |
 | Hook settings and notify scripts | `~/.chromux/` |
+| Renderer settings | `Local Storage` inside the selected stable Electron app profile |
 | Browser profiles | Session-specific Electron partitions `persist:chromux-<session ID>` |
 
 Closed-session browser profiles and exact stale
@@ -192,7 +235,7 @@ From another directory:
 
 ```sh
 cd /path/to/project
-claude -p "$(cat /Users/me/.chromux/captures/<timestamp>/payload.yaml)"
+claude -p "$(cat /Users/me/.chromux/captures/<timestamp>-<unique-suffix>/payload.yaml)"
 ```
 
 See [capture-payload.md](capture-payload.md) for the YAML schema and field limits.

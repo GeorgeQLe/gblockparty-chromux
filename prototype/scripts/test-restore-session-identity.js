@@ -114,6 +114,43 @@ fs.writeFileSync(e2ePath, `
     && !Object.prototype.hasOwnProperty.call(schemaEight.sessions[1], 'wasActive')
     && !Object.prototype.hasOwnProperty.call(schemaEight.sessions[1], 'wasLastActiveInGroup'),
   'schema v8 must discard malformed custom membership and focus fields');
+  expect(!Object.prototype.hasOwnProperty.call(schemaEight.sessions[0], 'chatMessages')
+    && !Object.prototype.hasOwnProperty.call(schemaEight.sessions[0], 'stagedBrowserContexts')
+    && schemaEight.sessions[0].browserLayoutMode === 'terminal'
+    && schemaEight.sessions[0].fullBrowserComposerOpen === false
+    && !Object.prototype.hasOwnProperty.call(schemaEight.sessions[0], 'chatOpen'),
+  'schema v8 must migrate with empty routed-Composer state');
+
+  const schemaNine = await window.chromuxTest.restorePayload({
+    schemaVersion: 9,
+    savedAt: legacySavedAt,
+    sessions: [{
+      name: 'composer-valid', cwd: ${JSON.stringify(shared)}, agent: 'codex',
+      chatMessages: [{
+        id: 'discard-me', role: 'assistant', text: 'old derived output',
+        createdAt: '2026-07-23T01:02:04.000Z', source: 'terminal',
+        status: 'streaming', truncated: false,
+      }],
+      stagedBrowserContexts: [{
+        captureId: 'capture-1',
+        payloadPath: '/tmp/capture/payload.yaml',
+        screenshotPath: '/tmp/capture/screenshot.png',
+        url: 'https://example.com/page',
+        title: 'Example',
+        capturedAt: '2026-07-23T01:02:03.000Z',
+        visibleTextTruncated: true,
+      }],
+      browserLayoutMode: 'browserChromux',
+      chatOpen: true,
+    }],
+  });
+  expect(!Object.prototype.hasOwnProperty.call(schemaNine.sessions[0], 'chatMessages')
+    && !Object.prototype.hasOwnProperty.call(schemaNine.sessions[0], 'chatOpen'),
+  'schema v9 should discard the old terminal-derived chat ledger');
+  expect(schemaNine.sessions[0].stagedBrowserContexts.length === 1
+    && schemaNine.sessions[0].browserLayoutMode === 'browserChromux'
+    && schemaNine.sessions[0].fullBrowserComposerOpen === true,
+  'schema v9 should preserve staged browser context and migrate old chatOpen to the Composer drawer');
 
   const exact = await window.chromux.resolveRestoreSessions({ sessions: [
     { name: 'tab-a', cwd: ${JSON.stringify(shared)}, agent: 'claude', resumeId: ${JSON.stringify(ids.exactA)} },
@@ -166,6 +203,15 @@ fs.writeFileSync(e2ePath, `
   const saved = await window.chromux.saveRestoreSnapshot({ reason: 'manual', sessions: [
     { name: 'valid', cwd: ${JSON.stringify(shared)}, agent: 'claude', resumeId: ${JSON.stringify(ids.exactB)}, composerDraft: 'saved draft',
       customTabGroupId: 'group-saved-valid', wasActive: true, wasLastActiveInGroup: true,
+      chatMessages: [{ id: 'discard-saved', role: 'assistant', text: 'discard',
+        createdAt: '2026-07-23T01:02:04.000Z', source: 'terminal',
+        status: 'streaming', truncated: false }],
+      stagedBrowserContexts: [{
+        captureId: 'saved-capture', payloadPath: '/tmp/saved/payload.yaml',
+        screenshotPath: '/tmp/saved/screenshot.png', url: 'https://example.com/saved',
+        title: 'Saved page', capturedAt: '2026-07-23T01:02:03.000Z', visibleTextTruncated: false,
+      }],
+      browserLayoutMode: 'browserChromux', fullBrowserComposerOpen: true,
       resume: { id: ${JSON.stringify(ids.exactB)}, name: 'transient detect name',
         agentMessagePreview: 'transient detect excerpt' },
       agentMessagePreview: 'transient detect excerpt',
@@ -187,14 +233,20 @@ fs.writeFileSync(e2ePath, `
         { id: 'bad-time:1', type: 'delivery', detail: 'no', occurredAt: 0 },
       ] },
   ] });
-  expect(saved.schemaVersion === 8, 'new snapshot must use schema v8');
+  expect(saved.schemaVersion === 9, 'new snapshot must use schema v9');
   expect(saved.sessions[0].lastActivityAt === '2026-07-23T01:02:03.000Z'
     && typeof saved.sessions[1].lastActivityAt === 'string',
-  'schema v8 should retain schema-v7 activity timestamps and provide a valid fallback for malformed or absent activity');
+  'schema v9 should retain schema-v7 activity timestamps and provide a valid fallback for malformed or absent activity');
   expect(saved.sessions[0].resumeId === ${JSON.stringify(ids.exactB)}, 'valid resumeId not persisted');
   expect(saved.sessions[0].customTabGroupId === 'group-saved-valid'
     && saved.sessions[0].wasActive === true && saved.sessions[0].wasLastActiveInGroup === true,
-  'schema v8 group membership and focus metadata did not round-trip');
+  'schema v9 group membership and focus metadata did not round-trip');
+  expect(!Object.prototype.hasOwnProperty.call(saved.sessions[0], 'chatMessages')
+    && !Object.prototype.hasOwnProperty.call(saved.sessions[0], 'chatOpen')
+    && saved.sessions[0].stagedBrowserContexts.length === 1
+    && saved.sessions[0].browserLayoutMode === 'browserChromux'
+    && saved.sessions[0].fullBrowserComposerOpen === true,
+  'schema v9 Composer context and presentation metadata did not round-trip');
   expect(!Object.prototype.hasOwnProperty.call(saved.sessions[0], 'resume')
     && !Object.prototype.hasOwnProperty.call(saved.sessions[0], 'agentMessagePreview'),
   'transient DETECT name/excerpt metadata must not enter restore snapshots');

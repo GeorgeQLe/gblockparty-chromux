@@ -84,6 +84,12 @@ fs.writeFileSync(e2ePath, `
       claudeResume: api.build('claude', 'resume-id-1234'),
       codex: api.build('codex'),
       codexResume: api.build('codex', 'resume-id-1234'),
+      codexWsl: api.buildWithEnv('codex', null, {
+        codexNotifyPath: "/home/zoë/My Project/it's \\"quoted\\"/codex-notify.sh",
+      }),
+      codexWslResume: api.buildWithEnv('codex', 'resume-id-1234', {
+        codexNotifyPath: "/home/zoë/My Project/it's \\"quoted\\"/codex-notify.sh",
+      }),
       grok: api.build('grok'),
       grokResume: api.build('grok', 'resume-id-1234'),
     },
@@ -128,7 +134,7 @@ function expect(cond, msg) {
 function shellArgs(cmd) {
   const shim = [
     'claude() { printf "%s\\0" "$@"; }',
-    'codex() { printf "%s\\0" "$@"; }',
+    'codex() { printf "TERM=%s\\0" "$TERM"; printf "%s\\0" "$@"; }',
     'grok() { printf "%s\\0" "$@"; }',
     '',
   ].join('\n');
@@ -138,17 +144,19 @@ function shellArgs(cmd) {
   // field). Drop empty trailing segments so bare `grok` yields [] not [''].
   const parts = run.stdout.split('\0');
   while (parts.length && parts[parts.length - 1] === '') parts.pop();
-  return { args: parts };
+  const term = parts[0] && parts[0].startsWith('TERM=') ? parts.shift().slice(5) : null;
+  return { args: parts, term };
 }
 
-function checkCommand(label, cmd, expectedArgs) {
+function checkCommand(label, cmd, expectedArgs, expectedTerm = null) {
   expect(typeof cmd === 'string' && cmd.length > 0, `${label}: no command was built`);
   if (typeof cmd !== 'string') return;
   const parse = spawnSync(validationShell, ['-n', '-c', cmd], { encoding: 'utf8' });
   expect(parse.status === 0, `${label}: shell cannot parse: ${cmd} — ${(parse.stderr || '').trim()}`);
-  const { args, error } = shellArgs(cmd);
+  const { args, term, error } = shellArgs(cmd);
   expect(!error, `${label}: command failed under zsh: ${error}`);
   if (!args) return;
+  expect(term === expectedTerm, `${label}: TERM mismatch; got ${JSON.stringify(term)}, expected ${JSON.stringify(expectedTerm)}`);
   expect(
     JSON.stringify(args) === JSON.stringify(expectedArgs),
     `${label}: argv mismatch\n  got:      ${JSON.stringify(args)}\n  expected: ${JSON.stringify(expectedArgs)}`,
@@ -181,7 +189,10 @@ child.on('close', (code, signal) => {
   const grokInstallPath = path.join(homeDir, '.grok', 'hooks', 'chromux-turn-signals.json');
   const grokScriptPath = path.join(homeDir, '.chromux', 'grok-hook.sh');
   const tomlArg = notifyTomlArg(notifyPath);
+  const ansiThemeArg = 'tui.theme="ansi"';
   const updateArg = 'check_for_update_on_startup=false';
+  const wslNotifyPath = "/home/zoë/My Project/it's \"quoted\"/codex-notify.sh";
+  const wslTomlArg = notifyTomlArg(wslNotifyPath);
   const tomlInner = (tomlArg.match(/^notify=\["(.*)"\]$/s) || [])[1];
   expect(
     typeof tomlInner === 'string' && tomlInner.replace(/\\(["\\])/g, '$1') === notifyPath,
@@ -198,12 +209,19 @@ child.on('close', (code, signal) => {
 
   checkCommand('renderer claude', report.renderer.claude, ['--settings', hooksPath]);
   checkCommand('renderer claude --resume', report.renderer.claudeResume, ['--settings', hooksPath, '--resume', 'resume-id-1234']);
-  checkCommand('renderer codex', report.renderer.codex, ['-c', tomlArg, '-c', updateArg]);
-  checkCommand('renderer codex resume', report.renderer.codexResume, ['-c', tomlArg, '-c', updateArg, 'resume', 'resume-id-1234']);
+  checkCommand('renderer codex', report.renderer.codex,
+    ['-c', ansiThemeArg, '-c', tomlArg, '-c', updateArg], 'xterm-color');
+  checkCommand('renderer codex resume', report.renderer.codexResume,
+    ['-c', ansiThemeArg, '-c', tomlArg, '-c', updateArg, 'resume', 'resume-id-1234'], 'xterm-color');
+  checkCommand('renderer WSL codex', report.renderer.codexWsl,
+    ['-c', ansiThemeArg, '-c', wslTomlArg, '-c', updateArg], 'xterm-color');
+  checkCommand('renderer WSL codex resume', report.renderer.codexWslResume,
+    ['-c', ansiThemeArg, '-c', wslTomlArg, '-c', updateArg, 'resume', 'resume-id-1234'], 'xterm-color');
   checkCommand('renderer grok', report.renderer.grok, []);
   checkCommand('renderer grok --resume', report.renderer.grokResume, ['--resume', 'resume-id-1234']);
   checkCommand('main claude resume', report.main.claude, ['--settings', hooksPath, '--resume', claudeResumeId]);
-  checkCommand('main codex resume', report.main.codex, ['-c', tomlArg, '-c', updateArg, 'resume', codexResumeId]);
+  checkCommand('main codex resume', report.main.codex,
+    ['-c', ansiThemeArg, '-c', tomlArg, '-c', updateArg, 'resume', codexResumeId], 'xterm-color');
   checkCommand('main grok resume', report.main.grok, ['--resume', grokResumeId]);
 
   if (failures > 0) {

@@ -200,7 +200,8 @@ fs.writeFileSync(e2ePath, `
   const openRoutes = await window.chromuxTest.shortcutRouteLog();
   expect(c.state(first).open && c.state(first).focused, 'Command+Shift+Enter should open and focus the editor: ' + JSON.stringify(openRoutes.slice(-3)));
   expect(c.draft(first) === 'native' && c.ptyInputs(first).join('') === '\\x15\\x0b',
-    'shortcut open should transfer pending terminal input and clear the live line exactly once');
+    'shortcut open should transfer pending terminal input and clear the live line exactly once: '
+      + JSON.stringify({ draft: c.draft(first), inputs: c.ptyInputs(first), state: c.state(first) }));
   c.open(first); await tick();
   expect(c.ptyInputs(first).join('') === '\\x15\\x0b', 'opening an already-open composer must not retransmit or clear again');
   c.close(first); await tick(); c.clickOpen(first); await tick();
@@ -237,7 +238,7 @@ fs.writeFileSync(e2ePath, `
 
   const snapshotRows = c.snapshot();
   const saved = await window.chromux.saveRestoreSnapshot({ reason: 'manual', sessions: snapshotRows });
-  expect(saved.schemaVersion === 8, 'composer drafts should remain readable in restore snapshot schema v8');
+  expect(saved.schemaVersion === 9, 'composer drafts should remain readable in restore snapshot schema v9');
   expect(saved.sessions.find((row) => row.name === 'codex-one').composerDraft === 'first-tab-draft',
     'first draft should round-trip through main-process snapshot validation');
   const restored = c.addSession({ name: 'restored', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, composerDraft: saved.sessions[0].composerDraft });

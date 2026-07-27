@@ -14,6 +14,27 @@ Chromux 0.42.0 adds a lightweight multiline prompt composer to every managed ter
 
 The raw xterm input remains the escape hatch for interactive programs, control sequences, alternate-screen applications, and any workflow that should not use prompt composition.
 
+## Prepared in 0.64.0
+
+- Full-Chromux browser mode exposes **COMPOSE**, docking the existing Composer beneath the full-width
+  mounted browser. The drawer supports its existing expansion behavior and closes with `Escape`.
+- A fresh target picker lists every live session plus **New session** and defaults to the paired
+  session whenever the drawer opens. Existing-session sends use the recipient’s xterm/PTY input path,
+  prompt history, activity timestamp, and attention transition without switching away from the source
+  browser. Working agents accept steering.
+- Routing blocks missing or exited sessions, pending recipient terminal input, and recipient-owned
+  Composer drafts. The source draft stays intact and live targets expose a switch-to-target action.
+  Multiline shell confirmation is based on the recipient agent type.
+- **ATTACH CURRENT PAGE** is explicit and persists normal bounded capture evidence before adding a
+  removable/refreshable chip. Only attached evidence appends bounded payload, screenshot, URL, and
+  title references. Successful existing-session sends clear attachments; failures preserve them.
+- **New session** uses canonical session creation with the source runtime, distribution, directory,
+  and current URL but a fresh browser partition. It activates the new full-browser session, moves
+  staged evidence, and leaves the prompt unsent for review. Grok keeps its explicit data-risk gate.
+- Schema v9 now stores staged browser-context references and `fullBrowserComposerOpen`, keeps the
+  routing target ephemeral, reads the unshipped schema-v9 `chatOpen` field as a compatibility fallback,
+  and discards old `chatMessages`.
+
 ## Ordered post-v1 milestones
 
 1. Define normalized `prompt`, `approval`, and `choice` interaction state, including stale-request detection and confidence handling.

@@ -22,6 +22,7 @@ fs.writeFileSync(e2ePath, `
   const expect = (cond, msg) => { if (!cond) throw new Error(msg); };
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const ctrlU = '\\x15';
+  const occurrences = (text, pattern) => (String(text).match(pattern) || []).length;
 
   for (let i = 0; i < 100 && !(commands.env() && commands.env().home); i += 1) {
     await wait(50);
@@ -32,6 +33,8 @@ fs.writeFileSync(e2ePath, `
   const claudeBase = commands.build('claude');
   const grokBase = commands.build('grok');
   expect(/codex/.test(codexBase), 'expected codex base command');
+  expect(codexBase.startsWith('TERM=xterm-color codex '), 'managed Codex should scope TERM: ' + codexBase);
+  expect(codexBase.includes('tui.theme="ansi"'), 'managed Codex should select the ANSI theme: ' + codexBase);
   expect(/claude/.test(claudeBase), 'expected claude base command');
   expect(grokBase === 'grok', 'expected bare grok base command: ' + grokBase);
 
@@ -91,10 +94,50 @@ fs.writeFileSync(e2ePath, `
     expect(rewrite && rewrite.agent === 'codex', 'existing notify should gain the update override: ' + line);
     expect(rewrite.command.includes('check_for_update_on_startup=false'), 'update override missing: ' + rewrite.command);
     expect(rewrite.command.includes('notify='), 'existing notify config should be preserved: ' + rewrite.command);
+    expect(rewrite.command.startsWith('TERM=xterm-color codex '), 'existing notify should gain scoped TERM: ' + rewrite.command);
+    expect(rewrite.command.includes('tui.theme="ansi"'), 'existing notify should gain ANSI theme: ' + rewrite.command);
+    expect(occurrences(rewrite.command, /notify=/g) === 1, 'notify config should not duplicate: ' + rewrite.command);
+    expect(occurrences(rewrite.command, /check_for_update_on_startup=false/g) === 1,
+      'update override should not duplicate: ' + rewrite.command);
+    expect(occurrences(rewrite.command, /tui\\.theme=/g) === 1, 'theme config should not duplicate: ' + rewrite.command);
+  }
+
+  const existingManaged = adopt.addShellSession({ name: 'managed-flags' });
+  const managedRewrite = adopt.type(existingManaged,
+    "codex -c 'tui.theme=\\"ansi\\"' -c 'notify=[\\"/tmp/codex-notify.sh\\"]' -c 'check_for_update_on_startup=false'\\r");
+  expect(managedRewrite && managedRewrite.agent === 'codex', 'managed flags should gain only the scoped TERM');
+  expect(managedRewrite.command.startsWith('TERM=xterm-color codex '), 'managed flags should gain scoped TERM');
+  expect(occurrences(managedRewrite.command, /tui\\.theme=/g) === 1,
+    'managed ANSI theme should not duplicate: ' + managedRewrite.command);
+  expect(occurrences(managedRewrite.command, /notify=/g) === 1,
+    'managed notify should not duplicate: ' + managedRewrite.command);
+  expect(occurrences(managedRewrite.command, /check_for_update_on_startup=false/g) === 1,
+    'managed update override should not duplicate: ' + managedRewrite.command);
+
+  const explicitThemeLines = [
+    "codex -c 'tui.theme=\\"catppuccin-mocha\\"'\\r",
+    "codex --config='tui.theme=\\"catppuccin-latte\\"' resume 123e4567-e89b-12d3-a456-426614174000\\r",
+  ];
+  for (const line of explicitThemeLines) {
+    const id = adopt.addShellSession({ name: 'theme-opt-out-' + line.length });
+    const rewrite = adopt.type(id, line);
+    expect(rewrite && rewrite.agent === 'codex', 'explicit Codex theme should still adopt: ' + line);
+    expect(!rewrite.command.startsWith('TERM=xterm-color '),
+      'explicit Codex theme should opt out of scoped TERM: ' + rewrite.command);
+    expect(!rewrite.command.includes('tui.theme="ansi"'),
+      'explicit Codex theme should opt out of the ANSI override: ' + rewrite.command);
+    expect(/catppuccin-(mocha|latte)/.test(rewrite.command),
+      'explicit Codex theme should be preserved: ' + rewrite.command);
+    expect(occurrences(rewrite.command, /tui\\.theme=/g) === 1,
+      'explicit Codex theme should not duplicate: ' + rewrite.command);
+    expect(occurrences(rewrite.command, /notify=/g) === 1,
+      'explicit theme should still gain one notify config: ' + rewrite.command);
+    expect(occurrences(rewrite.command, /check_for_update_on_startup=false/g) === 1,
+      'explicit theme should still gain one update override: ' + rewrite.command);
   }
 
   const guardLines = [
-    "codex -c 'notify=[\\"/tmp/codex-notify.sh\\"]' -c 'check_for_update_on_startup=false'\\r",
+    "codex -c 'tui.theme=\\"catppuccin-mocha\\"' -c 'notify=[\\"/tmp/codex-notify.sh\\"]' -c 'check_for_update_on_startup=false'\\r",
     'claude --settings /tmp/hooks-claude.json\\r',
     'codex | cat\\r',
     'codex > out.txt\\r',

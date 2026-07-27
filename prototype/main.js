@@ -21,6 +21,7 @@ const { createPreventSleepController } = require('./prevent-sleep');
 const { MAX_DRAFT_BYTES, createPromptHistoryStore } = require('./prompt-history');
 const { previewProbe } = require('./preview-probe');
 const { cleanupOrphanedStorage } = require('./storage-cleanup');
+const { resolveChromuxUserDataPath } = require('./user-data-path');
 const { WslRuntime, linuxPathToWindows, windowsPathToLinux, workspaceLocation } = require('./platform/runtime');
 const { capabilities, windowOptions, windowsSupport } = require('./platform/host');
 const {
@@ -37,6 +38,13 @@ if (process.platform === 'win32') {
   try { squirrelStartup = require('electron-squirrel-startup'); } catch { squirrelStartup = false; }
 }
 if (squirrelStartup) app.quit();
+const resolvedUserDataPath = resolveChromuxUserDataPath({
+  appDataDir: app.getPath('appData'),
+  argv: process.argv,
+  smoke: SMOKE,
+  keepSmokeUserData: Boolean(process.env.CHROMUX_KEEP_USER_DATA),
+});
+if (resolvedUserDataPath) app.setPath('userData', resolvedUserDataPath);
 const SECURITY_RESOURCES = Object.freeze({
   'wire-analysis': 'https://gist.github.com/cereblab/dc9a40bc26120f4540e4e09b75ffb547',
   'reproduction-kit': 'https://github.com/cereblab/grok-build-exfil-repro',
@@ -57,6 +65,9 @@ const RESTORE_ATTENTION_TYPES = new Set([
 const MAX_RESTORE_ATTENTION_RECORDS = 20;
 const MAX_RESTORE_ATTENTION_DETAIL_BYTES = 4096;
 const MAX_RESTORE_ATTENTION_ID_CHARS = 200;
+const MAX_STAGED_BROWSER_CONTEXTS = 5;
+const MAX_RESTORE_PATH_CHARS = 8192;
+const BROWSER_LAYOUT_MODES = new Set(['paired', 'terminal', 'browserWorkspace', 'browserChromux']);
 const CUSTOM_TAB_GROUP_ID_RE = /^group-[a-z0-9-]{1,64}$/;
 const PREFERENCES_FILE = path.join(CHROMUX_HOME, 'preferences.json');
 const FAVORITES_FILE = path.join(CHROMUX_HOME, 'favorites.json');
@@ -132,10 +143,6 @@ const codexUpdateService = process.platform === 'win32'
     run: (_file, args) => wslRuntime.run(runtimeState.selectedDistro, ['codex', ...args]),
   })
   : createCodexUpdateService();
-
-if (SMOKE && !process.env.CHROMUX_KEEP_USER_DATA) {
-  app.setPath('userData', fs.mkdtempSync(path.join(os.tmpdir(), 'chromux-smoke-user-data-')));
-}
 
 function readPreferences() {
   try {
@@ -865,6 +872,10 @@ function claudeCommand(resumeId = null) {
   return resumeId ? `${base} --resume ${shellQuote(resumeId)}` : base;
 }
 
+const CODEX_COMPAT_TERM = 'xterm-color';
+const CODEX_ANSI_THEME_CONFIG = 'tui.theme="ansi"';
+const CODEX_UPDATE_CONFIG = 'check_for_update_on_startup=false';
+
 // Codex turn signals — verified on codex-cli 0.142.5: `codex -c notify=[...]`
 // is accepted (invalid values are rejected at parse time), the notify child is
 // invoked with a single JSON arg of type "agent-turn-complete", and a
@@ -907,10 +918,15 @@ function codexCommand(resumeId = null) {
   // The path sits inside a TOML string inside a shell arg — escape both
   // layers: backslash-escape for TOML, then single-quote for the shell.
   const notifyToml = `notify=["${runtimeHookPaths.codex.replace(/[\\"]/g, '\\$&')}"]`;
-  const updateOverride = 'check_for_update_on_startup=false';
-  const base = hookInstall.codex
-    ? `codex -c ${shellQuote(notifyToml)} -c ${shellQuote(updateOverride)}`
-    : `codex -c ${shellQuote(updateOverride)}`;
+  const configs = [
+    CODEX_ANSI_THEME_CONFIG,
+    ...(hookInstall.codex ? [notifyToml] : []),
+    CODEX_UPDATE_CONFIG,
+  ];
+  // TERM is scoped to Codex, so the surrounding Chromux shell keeps its
+  // normal xterm-256color capability after Codex exits.
+  const base = `TERM=${CODEX_COMPAT_TERM} codex ${configs
+    .map((value) => `-c ${shellQuote(value)}`).join(' ')}`;
   return resumeId ? `${base} resume ${shellQuote(resumeId)}` : base;
 }
 
@@ -988,6 +1004,29 @@ function normalizedActivityTimestamp(value, fallback = null) {
   return Number.isFinite(fallbackParsed) ? new Date(fallbackParsed).toISOString() : null;
 }
 
+function sanitizeBrowserContextReference(context) {
+  if (!context || typeof context !== 'object') return null;
+  if (typeof context.payloadPath !== 'string' || !context.payloadPath
+    || context.payloadPath.length > MAX_RESTORE_PATH_CHARS) return null;
+  if (typeof context.url !== 'string' || context.url.length > 8192) return null;
+  try {
+    const parsed = new URL(context.url);
+    if (!['http:', 'https:', 'file:'].includes(parsed.protocol) || parsed.username || parsed.password) return null;
+  } catch { return null; }
+  const screenshotPath = typeof context.screenshotPath === 'string' && context.screenshotPath
+    && context.screenshotPath.length <= MAX_RESTORE_PATH_CHARS
+    ? context.screenshotPath : null;
+  return {
+    captureId: typeof context.captureId === 'string' ? context.captureId.slice(0, 200) : '',
+    payloadPath: context.payloadPath,
+    screenshotPath,
+    url: context.url,
+    title: typeof context.title === 'string' ? context.title.slice(0, 500) : '',
+    capturedAt: normalizedActivityTimestamp(context.capturedAt) || new Date().toISOString(),
+    visibleTextTruncated: Boolean(context.visibleTextTruncated),
+  };
+}
+
 function sanitizeRestoreSession(session) {
   if (!session || typeof session !== 'object') return null;
   const runtime = session.runtime === 'wsl' || (process.platform === 'win32' && session.runtime !== 'host') ? 'wsl' : 'host';
@@ -1016,6 +1055,13 @@ function sanitizeRestoreSession(session) {
     && Buffer.byteLength(session.composerDraft, 'utf8') <= MAX_DRAFT_BYTES
     ? session.composerDraft
     : null;
+  const stagedBrowserContexts = (Array.isArray(session.stagedBrowserContexts)
+    ? session.stagedBrowserContexts : [])
+    .map(sanitizeBrowserContextReference)
+    .filter(Boolean)
+    .slice(0, MAX_STAGED_BROWSER_CONTEXTS);
+  const browserLayoutMode = BROWSER_LAYOUT_MODES.has(session.browserLayoutMode)
+    ? session.browserLayoutMode : 'terminal';
   const attentionRecords = Array.isArray(session.attentionRecords)
     ? session.attentionRecords.slice(0, MAX_RESTORE_ATTENTION_RECORDS).map((record) => {
       if (!record || typeof record !== 'object' || !RESTORE_ATTENTION_TYPES.has(record.type)) return null;
@@ -1097,6 +1143,12 @@ function sanitizeRestoreSession(session) {
     restoredAt: typeof session.restoredAt === 'string' ? session.restoredAt : null,
     ...(attentionRecords.length > 0 ? { attentionRecords } : {}),
     ...(composerDraft ? { composerDraft } : {}),
+    ...(stagedBrowserContexts.length > 0 ? { stagedBrowserContexts } : {}),
+    browserLayoutMode,
+    fullBrowserComposerOpen: Boolean(
+      (session.fullBrowserComposerOpen || session.chatOpen)
+      && browserLayoutMode === 'browserChromux'
+    ),
   };
 }
 
@@ -1109,7 +1161,7 @@ function writeRestoreSnapshot({ sessions, reason = 'manual', restoreId = null, s
       lastActivityAt: normalizedActivityTimestamp(session.lastActivityAt, snapshotSavedAt),
     })) : [];
   const payload = {
-    schemaVersion: 8,
+    schemaVersion: 9,
     restoreId: restoreId || `restore-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     reason,
     savedAt: snapshotSavedAt,
@@ -1147,6 +1199,14 @@ function readRestoreSnapshot() {
         delete clean.wasActive;
         delete clean.wasLastActiveInGroup;
       }
+      if (schemaVersion < 9) {
+        delete clean.chatMessages;
+        delete clean.stagedBrowserContexts;
+        clean.browserLayoutMode = 'terminal';
+        clean.fullBrowserComposerOpen = false;
+      }
+      delete clean.chatMessages;
+      delete clean.chatOpen;
       return clean;
     }),
   };
@@ -1452,10 +1512,12 @@ ipcMain.handle('pty-create', (_e, { id, cwd, location, command, cols, rows }) =>
   });
   p.chromuxLocation = workspace;
   ptys.set(id, p);
-  resourceClient.request('resource.register', {
-    resourceId: `browser:${id}`,
-    details: { kind: 'browser', label: `Chromux browser ${id}`, sessionId: id, explicitTarget: true, exclusive: false },
-  }).catch(() => {});
+  if (!SMOKE) {
+    resourceClient.request('resource.register', {
+      resourceId: `browser:${id}`,
+      details: { kind: 'browser', label: `Chromux browser ${id}`, sessionId: id, explicitTarget: true, exclusive: false },
+    }).catch(() => {});
+  }
   p.onData((data) => send('pty-data', { id, data }));
   p.onExit(({ exitCode }) => {
     ptys.delete(id);
@@ -1496,8 +1558,7 @@ ipcMain.on('pty-kill', (_e, { id }) => {
 ipcMain.handle('capture-prepare', (_e, { payload, pngBase64 }) => {
   ensureDirs();
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19);
-  const dir = path.join(CAPTURES_DIR, stamp);
-  fs.mkdirSync(dir, { recursive: true });
+  const dir = fs.mkdtempSync(path.join(CAPTURES_DIR, `${stamp}-`));
 
   let screenshotPath = null;
   if (pngBase64) {
@@ -2479,7 +2540,20 @@ ipcMain.handle('git-root', (_e, cwd) => gitRoot(cwd));
 ipcMain.handle('git-diff-summary', (_e, cwd) => gitDiffSummary(cwd));
 
 ipcMain.handle('check-updates', (_e, opts = {}) => getUpdateStatus(opts));
-ipcMain.handle('codex-update-check', (_e, opts = {}) => codexUpdateService.check({ force: Boolean(opts.force) }));
+ipcMain.handle('codex-update-check', (_e, opts = {}) => {
+  if (SMOKE && process.env.CHROMUX_E2E_CODEX_UPDATE_ERROR === '1') {
+    return Promise.resolve({
+      currentVersion: null,
+      latestVersion: null,
+      updateAvailable: null,
+      installKind: null,
+      releaseUrl: 'https://github.com/openai/codex/releases/latest',
+      checkedAt: new Date().toISOString(),
+      error: 'Codex update check fixture is offline',
+    });
+  }
+  return codexUpdateService.check({ force: Boolean(opts.force) });
+});
 ipcMain.handle('codex-update-install', (event) => codexUpdateService.install({
   onProgress: (progress) => {
     if (!event.sender.isDestroyed()) event.sender.send('codex-update-progress', progress);
@@ -2608,7 +2682,9 @@ app.whenReady().then(async () => {
     chromuxHome: CHROMUX_HOME,
   });
   initializePreventSleep();
-  resourceClient.connect().catch((err) => console.error('resource broker unavailable:', err.message));
+  if (!SMOKE) {
+    resourceClient.connect().catch((err) => console.error('resource broker unavailable:', err.message));
+  }
   installAppMenu();
   if (process.platform !== 'win32') {
     try { writeSignalClassifier(); hookInstall.helper = true; } catch (err) { console.error('signal classifier write failed; using legacy hooks:', err.message); }

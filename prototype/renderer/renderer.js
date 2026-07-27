@@ -15,6 +15,7 @@ const THREAD_PREVIEW_SIZE_STORAGE_KEY = 'chromux.threadPreviewSize';
 const TAB_GROUPS_STORAGE_KEY = 'chromux.sessionTabGroups';
 const BROWSER_FULLSCREEN_BEHAVIOR_STORAGE_KEY = 'chromux.browserFullscreenBehavior';
 const BROWSER_CHROMUX_TOP_INSET_PROPERTY = '--browser-chromux-top-inset';
+const COMPOSER_NEW_SESSION_TARGET = '__new_session__';
 const THEME_IDS = new Set(['blueprint', 'retro-os', 'streak', 'liquid-glass']);
 const THEME_MODE_IDS = new Set(['light', 'dark']);
 const THEME_LABELS = {
@@ -211,10 +212,13 @@ const BOUNDS = {
   consoleTail: 50,
   consoleMsgChars: 500,
   outerHtmlChars: 8000,
+  visibleTextBytes: 24 * 1024,
   reloadThrottleMs: 3000,
   shortcutDebugStaleMs: 1500,
   resumeStartupExitMs: 15000,
   composerDraftBytes: 64 * 1024,
+  composerContextReferenceBytes: 2048,
+  stagedBrowserContexts: 5,
   restoreAttentionDetailBytes: 4096,
 };
 
@@ -524,7 +528,7 @@ function syncWindowButtonPosition() {
   if (!titlebar || typeof window.chromux?.setWindowButtonPosition !== 'function') return null;
   const rect = titlebar.getBoundingClientRect();
   const position = {
-    x: 14,
+    x: Math.round(rect.left + 14),
     y: 14 + Math.round(rect.top + (rect.height - 44) / 2),
   };
   state.ui.windowButtonPosition = position;
@@ -1496,6 +1500,7 @@ function apply(event) {
         session.term.codexCompletionIntent = null;
         session.lifecycle.exitCode = Number.isFinite(event.exitCode) ? event.exitCode : null;
         session.lifecycle.exitedAt = Date.now();
+        for (const source of state.sessions.values()) renderComposerContexts(source);
       }
       break;
     case 'session-focused':
@@ -1694,6 +1699,7 @@ function newSessionShape({ id, name, cwd, agent, runtime = null, distro = null }
     term: {
       term: null,
       fitAddon: null,
+      resizeObserver: null,
       serializer: null,
       fit: () => {},
       viewportY: null,
@@ -1731,6 +1737,15 @@ function newSessionShape({ id, name, cwd, agent, runtime = null, distro = null }
       expanded: false,
       expandedViewportY: null,
       pendingInputChoice: null,
+      fullBrowserOpen: false,
+      routeTargetId: null,
+      selectedAgent: agent || '',
+      stagedContexts: [],
+      routeBusy: false,
+      routeError: '',
+      routeStatus: '',
+      routeBlockedTargetId: null,
+      routeConfirmation: null,
     },
     els: null,
   };
@@ -3136,6 +3151,10 @@ function browserFullscreenShortcutLabel() {
   return state.env && state.env.primaryModifier === 'control' ? 'Ctrl+Shift+F' : '⌘⇧F';
 }
 
+function composerOpenShortcutLabel() {
+  return state.env && state.env.primaryModifier === 'control' ? 'Ctrl+Shift+Enter' : '⌘⇧Enter';
+}
+
 function applyBrowserLayout(session) {
   if (!session.els) return;
   const mode = BROWSER_LAYOUT_MODES.has(session.browser.layoutMode)
@@ -3168,6 +3187,8 @@ function applyBrowserLayout(session) {
   session.els.fullscreenBtn.setAttribute('aria-label', session.els.fullscreenBtn.title);
   session.els.fullscreenBtn.setAttribute('aria-pressed', String(expanded));
   session.els.fullscreenBtn.dataset.nextLayout = action.mode;
+  session.els.fullBrowserComposerBtn.classList.toggle('hidden', mode !== 'browserChromux');
+  renderFullBrowserComposer(session);
   syncBrowserChromuxActiveClass();
   refitTerminal(session);
 }
@@ -3176,6 +3197,7 @@ function setBrowserLayoutMode(session, mode, { recordReturn = false } = {}) {
   const next = BROWSER_LAYOUT_MODES.has(mode) ? mode : 'terminal';
   const current = session.browser.layoutMode;
   if (current === next) return false;
+  if (next !== 'browserChromux' && session.composer.fullBrowserOpen) closeFullBrowserComposer(session);
   if (current === 'paired' && next !== 'paired') {
     session.browser.expandedGridTemplate = session.els.view.style.gridTemplateColumns
       || session.browser.expandedGridTemplate;
@@ -3349,57 +3371,93 @@ function onElementPicked(session, data, targetTab = activePageTab(session)) {
 // file-drop. The payload contract lives in docs/capture-payload.md.
 // ───────────────────────────────────────────────────────────────────────────
 
-async function openCaptureModal(session, selection, targetTab = activePageTab(session)) {
+async function collectBrowserEvidence(session, selection = {}, targetTab = activePageTab(session)) {
   const b = targetTab;
-  if (!b || !b.webview) return;
+  if (!b || !b.webview) throw new Error('Open a browser page before capturing context.');
   let pngBase64 = null;
   let shotDataUrl = null;
   try {
     const image = await b.webview.capturePage();
     shotDataUrl = image.toDataURL();
     pngBase64 = shotDataUrl.split(',')[1];
-  } catch { /* screenshot failure keeps the payload (dx-journey failure map) */ }
+  } catch { /* evidence remains useful without a screenshot */ }
 
-  let title = selection.pageTitle;
+  let title = selection.pageTitle || null;
   if (!title) {
     try { title = await b.webview.executeJavaScript('document.title'); } catch { title = null; }
   }
-
-  const outerHTML = selection.outerHTML || null;
+  let visibleText = '';
+  try {
+    visibleText = await b.webview.executeJavaScript(
+      "String((document.body && document.body.innerText) || (document.documentElement && document.documentElement.innerText) || '').slice(0, 98304)"
+    );
+  } catch { visibleText = ''; }
+  visibleText = String(visibleText || '');
+  const boundedVisibleText = truncateUtf8(visibleText, BOUNDS.visibleTextBytes);
+  const outerHTML = typeof selection.outerHTML === 'string' ? selection.outerHTML : null;
   const truncatedHtml = outerHTML !== null && outerHTML.length > BOUNDS.outerHtmlChars;
-  const pageUrl = selection.pageUrl || b.currentUrl;
+  return {
+    pngBase64,
+    shotDataUrl,
+    pageUrl: selection.pageUrl || b.currentUrl,
+    title: title || null,
+    visibleText: boundedVisibleText,
+    visibleTextTruncated: boundedVisibleText !== visibleText,
+    selection: selection.selector ? {
+      selector: selection.selector,
+      outerHTML: truncatedHtml ? outerHTML.slice(0, BOUNDS.outerHtmlChars) : outerHTML,
+      truncated: truncatedHtml,
+    } : null,
+    consoleTotal: b.consoleTotal,
+    consoleEntries: b.consoleBuf.slice(-BOUNDS.consoleTail),
+  };
+}
+
+function capturePayloadBase(session, evidence) {
+  return {
+    schema_version: 1,
+    captured_at: new Date().toISOString(),
+    session: {
+      id: session.id,
+      name: session.name,
+      project_path: session.cwd,
+    },
+    page: {
+      url: evidence.pageUrl,
+      title: evidence.title,
+      visible_text: evidence.visibleText,
+      visible_text_truncated: evidence.visibleTextTruncated,
+    },
+    selection: evidence.selection ? {
+      selector: evidence.selection.selector,
+      outer_html: evidence.selection.outerHTML,
+      truncated: evidence.selection.truncated,
+    } : null,
+    console: {
+      total_captured: evidence.consoleTotal,
+      included: evidence.consoleEntries.length,
+      truncated: evidence.consoleTotal > evidence.consoleEntries.length,
+      entries: evidence.consoleEntries,
+    },
+    screenshot: evidence.pngBase64
+      ? { path: '(assigned on save)', mode: 'visible-viewport' }
+      : { path: null, mode: 'unavailable' },
+  };
+}
+
+async function openCaptureModal(session, selection, targetTab = activePageTab(session)) {
+  const b = targetTab;
+  if (!b || !b.webview) return;
+  const evidence = await collectBrowserEvidence(session, selection, targetTab);
+  const pageUrl = evidence.pageUrl;
 
   state.counter += 1;
   const captureId = 'c' + state.counter;
   apply({ type: 'capture-created', captureId, sessionId: session.id, url: pageUrl });
   state.ui.captureModal = {
     captureId,
-    pngBase64,
-    payloadBase: {
-      schema_version: 1,
-      captured_at: new Date().toISOString(),
-      session: {
-        id: session.id,
-        name: session.name,
-        project_path: session.cwd,
-      },
-      page: {
-        url: pageUrl,
-        title: title || null,
-      },
-      selection: selection.selector ? {
-        selector: selection.selector,
-        outer_html: truncatedHtml ? outerHTML.slice(0, BOUNDS.outerHtmlChars) : outerHTML,
-        truncated: truncatedHtml,
-      } : null,
-      console: {
-        total_captured: b.consoleTotal,
-        included: b.consoleBuf.length,
-        truncated: b.consoleTotal > b.consoleBuf.length,
-        entries: b.consoleBuf.slice(),
-      },
-      screenshot: pngBase64 ? { path: '(assigned on save)', mode: 'visible-viewport' } : { path: null, mode: 'unavailable' },
-    },
+    pngBase64: evidence.pngBase64,
+    payloadBase: capturePayloadBase(session, evidence),
   };
 
   // summary
@@ -3415,14 +3473,15 @@ async function openCaptureModal(session, selection, targetTab = activePageTab(se
   };
   addRow('SESSION', `${session.name} — ${session.cwd}`);
   addRow('URL', pageUrl || '—', 'url');
-  addRow('ELEMENT', selection.selector || 'none (page-level capture)', selection.selector ? 'sel' : '');
-  addRow('CONSOLE', `${b.consoleBuf.length} of ${b.consoleTotal} entries (tail)`);
+  addRow('ELEMENT', evidence.selection?.selector || 'none (page-level capture)', evidence.selection ? 'sel' : '');
+  addRow('VISIBLE TEXT', `${utf8ByteLength(evidence.visibleText).toLocaleString()} bytes${evidence.visibleTextTruncated ? ' (truncated)' : ''}`);
+  addRow('CONSOLE', `${evidence.consoleEntries.length} of ${evidence.consoleTotal} entries (tail)`);
 
   const shot = $('#cap-shot');
   shot.innerHTML = '';
-  if (shotDataUrl) {
+  if (evidence.shotDataUrl) {
     const img = document.createElement('img');
-    img.src = shotDataUrl;
+    img.src = evidence.shotDataUrl;
     shot.appendChild(img);
   } else {
     shot.innerHTML = '<span class="dim">screenshot unavailable — payload kept without it</span>';
@@ -3457,6 +3516,186 @@ async function openCaptureModal(session, selection, targetTab = activePageTab(se
   $('#cap-title').textContent = 'CAPTURE → AGENT';
   $('#modal-capture').classList.remove('hidden');
   invalidate('shortcutDebug');
+}
+
+async function persistComposerBrowserContext(session) {
+  const evidence = await collectBrowserEvidence(session, {}, activePageTab(session));
+  state.counter += 1;
+  const captureId = `c${state.counter}`;
+  apply({ type: 'capture-created', captureId, sessionId: session.id, url: evidence.pageUrl });
+  const payload = {
+    ...capturePayloadBase(session, evidence),
+    delivery: {
+      adapter: 'composer-context',
+      target: 'routed-composer',
+      target_cwd: session.cwd,
+    },
+    notes: session.composer.draft.trim() || null,
+  };
+  let result;
+  try {
+    result = await window.chromux.capturePrepare(payload, evidence.pngBase64);
+    apply({
+      type: 'capture-written',
+      captureId,
+      payloadPath: result.payloadPath,
+      screenshotPath: result.screenshotPath,
+      targetSessionId: null,
+    });
+  } catch (error) {
+    apply({
+      type: 'capture-failed',
+      captureId,
+      exitCode: null,
+      error: error?.message || String(error),
+    });
+    throw error;
+  }
+  return normalizeBrowserContextReference({
+    captureId,
+    payloadPath: result.payloadPath,
+    screenshotPath: result.screenshotPath,
+    url: evidence.pageUrl,
+    title: evidence.title || '',
+    capturedAt: payload.captured_at,
+    visibleTextTruncated: evidence.visibleTextTruncated,
+  });
+}
+
+function boundedComposerContextValue(value, fallback = '') {
+  return truncateUtf8(String(value || fallback), BOUNDS.composerContextReferenceBytes);
+}
+
+function composerContextReferences(contexts) {
+  const normalized = (Array.isArray(contexts) ? contexts : [])
+    .map(normalizeBrowserContextReference)
+    .filter(Boolean)
+    .slice(0, BOUNDS.stagedBrowserContexts);
+  if (!normalized.length) return '';
+  return [
+    'Attached browser evidence:',
+    ...normalized.flatMap((context, index) => [
+      `${index + 1}. Payload: ${boundedComposerContextValue(context.payloadPath)}`,
+      `   Screenshot: ${context.screenshotPath
+        ? boundedComposerContextValue(context.screenshotPath)
+        : 'unavailable'}`,
+      `   URL: ${boundedComposerContextValue(context.url)}`,
+      `   Title: ${boundedComposerContextValue(context.title, '(untitled page)')}`,
+    ]),
+  ].join('\n');
+}
+
+function composerPayloadWithContexts(instruction, contexts) {
+  const request = String(instruction || '').replace(/\r\n?/g, '\n').trim();
+  const evidenceReferences = composerContextReferences(contexts);
+  if (!evidenceReferences) return truncateComposerDraft(request);
+  const separator = '\n\n';
+  const requestBudget = Math.max(
+    0,
+    BOUNDS.composerDraftBytes - utf8ByteLength(separator) - utf8ByteLength(evidenceReferences)
+  );
+  return `${truncateUtf8(request, requestBudget)}${separator}${evidenceReferences}`;
+}
+
+async function refreshStagedBrowserContext(session, captureId) {
+  if (!session || session.composer.routeBusy) return null;
+  session.composer.routeBusy = true;
+  session.composer.routeError = '';
+  renderComposerContexts(session);
+  try {
+    const context = await persistComposerBrowserContext(session);
+    session.composer.stagedContexts = session.composer.stagedContexts
+      .map((candidate) => candidate.captureId === captureId ? context : candidate)
+      .slice(0, BOUNDS.stagedBrowserContexts);
+    renderComposerContexts(session);
+    return context;
+  } catch (error) {
+    session.composer.routeError = `Attachment refresh failed: ${error?.message || error}`;
+    renderComposerContexts(session);
+    return null;
+  } finally {
+    session.composer.routeBusy = false;
+    renderComposerContexts(session);
+  }
+}
+
+async function attachCurrentPage(source) {
+  if (!source || source.composer.routeBusy) return null;
+  source.composer.routeBusy = true;
+  source.composer.routeError = '';
+  source.composer.routeStatus = '';
+  renderComposer(source);
+  try {
+    const context = await persistComposerBrowserContext(source);
+    if (!context) throw new Error('Browser evidence could not be persisted.');
+    source.composer.stagedContexts = [context, ...source.composer.stagedContexts]
+      .slice(0, BOUNDS.stagedBrowserContexts);
+    renderComposer(source);
+    return context;
+  } catch (error) {
+    source.composer.routeError = `Page attachment failed: ${error?.message || error}`;
+    renderComposer(source);
+    return null;
+  } finally {
+    source.composer.routeBusy = false;
+    renderComposer(source);
+  }
+}
+
+async function createSessionFromPage(source, { grokAcknowledged = false } = {}) {
+  if (!source || source.composer.routeBusy) return null;
+  const agent = AGENT_ORDER.includes(source.composer.selectedAgent)
+    ? source.composer.selectedAgent
+    : (source.agent || '');
+  if (agent === 'grok' && !grokAcknowledged) {
+    openGrokContextAdvisory(source, 'page');
+    return null;
+  }
+  source.composer.routeBusy = true;
+  source.composer.routeError = '';
+  source.composer.routeStatus = '';
+  renderComposer(source);
+  const sourceDraft = source.composer.draft;
+  const stagedContexts = source.composer.stagedContexts.slice(0, BOUNDS.stagedBrowserContexts);
+  try {
+    const currentPage = activePageTab(source);
+    const currentUrl = normalizedBrowserUrl(currentPage?.currentUrl || source.els?.urlBar?.value);
+    const name = uniqueSessionName(`${source.name}-new`);
+    const pageTabId = currentUrl ? 'page-1' : null;
+    const created = await createSession({
+      name,
+      cwd: source.cwd,
+      runtime: source.runtime,
+      distro: source.distro,
+      agent,
+      initialUrl: currentUrl,
+      initialBrowserTabs: currentUrl ? [{
+        id: pageTabId,
+        type: 'page',
+        url: currentUrl,
+        title: currentPage?.title || currentUrl,
+      }] : [],
+      initialActiveBrowserTabId: pageTabId,
+      composerDraft: composerPayloadWithContexts(sourceDraft, stagedContexts),
+      initialStagedBrowserContexts: stagedContexts,
+      initialBrowserLayoutMode: 'browserChromux',
+      initialFullBrowserComposerOpen: true,
+      activate: true,
+    });
+    setComposerDraft(source, '');
+    source.composer.stagedContexts = [];
+    source.composer.routeError = '';
+    source.composer.routeStatus = '';
+    renderComposer(source);
+    return created;
+  } catch (error) {
+    source.composer.routeError = `New session failed: ${error?.message || error}`;
+    renderComposer(source);
+    return null;
+  } finally {
+    source.composer.routeBusy = false;
+    renderComposer(source);
+  }
 }
 
 function buildPayload() {
@@ -3615,6 +3854,9 @@ const AGENT_LABELS = { claude: 'CLAUDE CODE', codex: 'CODEX', grok: 'GROK BUILD'
 const ADOPTABLE_AGENTS = new Set(['claude', 'codex', 'grok']);
 const AGENT_ORDER = ['claude', 'codex', 'grok', ''];
 const SHELL_ADOPTION_SCAN_MS = 2500;
+const CODEX_COMPAT_TERM = 'xterm-color';
+const CODEX_ANSI_THEME_CONFIG = 'tui.theme="ansi"';
+const CODEX_UPDATE_CONFIG = 'check_for_update_on_startup=false';
 
 // POSIX single-quoting: close the quote, emit an escaped ', reopen. Safe for
 // any byte the filesystem allows (spaces, quotes, backslashes).
@@ -3627,9 +3869,9 @@ function shellQuote(value) {
 // settings) so deterministic turn signals flow back over the PTY. Codex gets
 // a notify config path. Grok Build installs hooks into ~/.grok/hooks at app
 // start (no launch flag), so the command is bare `grok` / `grok --resume`.
-function agentCommand(agent, resumeId = null) {
+function agentCommand(agent, resumeId = null, env = state.env) {
   if (agent === 'claude') {
-    const settingsPath = state.env && state.env.hooksSettingsPath;
+    const settingsPath = env && env.hooksSettingsPath;
     const base = settingsPath ? `claude --settings ${shellQuote(settingsPath)}` : 'claude';
     return resumeId ? `${base} --resume ${shellQuote(resumeId)}` : base;
   }
@@ -3637,13 +3879,14 @@ function agentCommand(agent, resumeId = null) {
     // Verified: the notify child's /dev/tty write rides the PTY back to us.
     // Codex only reports turn completion, so codex sessions signal turn-end
     // only; needsInput never fires and working is inferred from typed input.
-    const notifyPath = state.env && state.env.codexNotifyPath;
+    const notifyPath = env && env.codexNotifyPath;
     // The path sits inside a TOML string inside a shell arg — escape both
     // layers: backslash-escape for TOML, then single-quote for the shell.
-    const configs = [];
+    const configs = [CODEX_ANSI_THEME_CONFIG];
     if (notifyPath) configs.push(`notify=["${notifyPath.replace(/[\\"]/g, '\\$&')}"]`);
-    configs.push('check_for_update_on_startup=false');
-    const base = `codex ${configs.map((value) => `-c ${shellQuote(value)}`).join(' ')}`;
+    configs.push(CODEX_UPDATE_CONFIG);
+    const base = `TERM=${CODEX_COMPAT_TERM} codex ${configs
+      .map((value) => `-c ${shellQuote(value)}`).join(' ')}`;
     return resumeId ? `${base} resume ${shellQuote(resumeId)}` : base;
   }
   if (agent === 'grok') {
@@ -3707,27 +3950,45 @@ function claudeHasSettingsArg(tokens) {
   return tokens.slice(1).some((token) => token.text === '--settings' || token.text.startsWith('--settings='));
 }
 
-function codexHasNotifyConfigArg(tokens) {
+function codexConfigValues(tokens) {
+  const values = [];
   for (let i = 1; i < tokens.length; i += 1) {
     const text = tokens[i].text;
     if (text === '-c' || text === '--config') {
-      if (/\bnotify\b/.test(tokens[i + 1] ? tokens[i + 1].text : '')) return true;
-    } else if ((text.startsWith('-c') && text.length > 2) || text.startsWith('--config=')) {
-      if (/\bnotify\b/.test(text)) return true;
+      if (tokens[i + 1]) {
+        values.push(tokens[i + 1].text);
+        i += 1;
+      }
+    } else if (text.startsWith('--config=')) {
+      values.push(text.slice('--config='.length));
+    } else if (text.startsWith('-c') && text.length > 2) {
+      values.push(text.slice(2).replace(/^=/, ''));
     }
   }
-  return false;
+  return values;
+}
+
+function codexHasNotifyConfigArg(tokens) {
+  return codexConfigValues(tokens).some((value) => /\bnotify\b/.test(value));
 }
 
 function codexHasUpdateCheckOverride(tokens) {
-  for (let i = 1; i < tokens.length; i += 1) {
-    const text = tokens[i].text;
-    const next = tokens[i + 1] ? tokens[i + 1].text : '';
-    if ((text === '-c' || text === '--config') && /\bcheck_for_update_on_startup\s*=\s*false\b/.test(next)) return true;
-    if (((text.startsWith('-c') && text.length > 2) || text.startsWith('--config='))
-      && /\bcheck_for_update_on_startup\s*=\s*false\b/.test(text)) return true;
-  }
-  return false;
+  return codexConfigValues(tokens)
+    .some((value) => /\bcheck_for_update_on_startup\s*=\s*false\b/.test(value));
+}
+
+function codexThemeConfig(tokens) {
+  return codexConfigValues(tokens).find((value) => /\btui\.theme\s*=/.test(value)) || null;
+}
+
+function codexThemeIsAnsi(value) {
+  return typeof value === 'string'
+    && /\btui\.theme\s*=\s*(?:"ansi"|'ansi'|ansi)\s*$/.test(value);
+}
+
+function codexNotifyConfig() {
+  const notifyPath = state.env && state.env.codexNotifyPath;
+  return notifyPath ? `notify=["${notifyPath.replace(/[\\"]/g, '\\$&')}"]` : null;
 }
 
 function rewriteShellLaunchLine(line) {
@@ -3738,11 +3999,22 @@ function rewriteShellLaunchLine(line) {
   if (!ADOPTABLE_AGENTS.has(agent)) return null;
   if (commandToken.raw !== agent) return null;
   if (agent === 'claude' && claudeHasSettingsArg(parsed.tokens)) return null;
-  const hasCodexNotify = agent === 'codex' && codexHasNotifyConfigArg(parsed.tokens);
-  if (agent === 'codex' && hasCodexNotify && codexHasUpdateCheckOverride(parsed.tokens)) return null;
-  const base = agent === 'codex' && hasCodexNotify
-    ? `codex -c ${shellQuote('check_for_update_on_startup=false')}`
-    : agentCommand(agent);
+  let base = agentCommand(agent);
+  if (agent === 'codex') {
+    const themeConfig = codexThemeConfig(parsed.tokens);
+    const compatibilityProfile = !themeConfig || codexThemeIsAnsi(themeConfig);
+    const configs = [];
+    if (compatibilityProfile && !themeConfig) configs.push(CODEX_ANSI_THEME_CONFIG);
+    if (!codexHasNotifyConfigArg(parsed.tokens)) {
+      const notifyConfig = codexNotifyConfig();
+      if (notifyConfig) configs.push(notifyConfig);
+    }
+    if (!codexHasUpdateCheckOverride(parsed.tokens)) configs.push(CODEX_UPDATE_CONFIG);
+    if (!compatibilityProfile && configs.length === 0) return null;
+    base = `${compatibilityProfile ? `TERM=${CODEX_COMPAT_TERM} ` : ''}codex${configs.length
+      ? ` ${configs.map((value) => `-c ${shellQuote(value)}`).join(' ')}`
+      : ''}`;
+  }
   if (!base) return null;
   const args = parsed.line.slice(commandToken.end).trim();
   return {
@@ -3826,6 +4098,10 @@ function updateSessionAgentChrome(session) {
   if (session.els.termLabel) {
     session.els.termLabel.innerHTML = `TERMINAL <span class="lit">· ${sessionAgentHeaderText(session.agent)}</span>`;
   }
+  if (session.composer.routeTargetId !== COMPOSER_NEW_SESSION_TARGET) {
+    session.composer.selectedAgent = session.agent || '';
+    renderComposerContexts(session);
+  }
 }
 
 function otherAgents(agent) {
@@ -3875,7 +4151,9 @@ function openGrokContextAdvisory(session, mode = 'other') {
   $('#grok-context-confirm').disabled = true;
   $('#grok-advisory-target').textContent = mode === 'same'
     ? `Duplicate ${session.name} as a Grok Build session · ${session.cwd}`
-    : `Open ${session.name} in Grok Build · ${session.cwd}`;
+    : (mode === 'page'
+      ? `Capture this page and open a new Grok Build session · ${session.cwd}`
+      : `Open ${session.name} in Grok Build · ${session.cwd}`);
   $('#modal-grok-advisory').classList.remove('hidden');
   $('#grok-context-enable').focus();
 }
@@ -4026,6 +4304,46 @@ function buildSessionView(session) {
   expandComposerBtn.setAttribute('aria-label', 'Expand prompt composer'); expandComposerBtn.setAttribute('aria-pressed', 'false');
   const closeComposerBtn = document.createElement('button'); closeComposerBtn.type = 'button'; closeComposerBtn.className = 'head-btn'; closeComposerBtn.textContent = 'CLOSE';
   composerToolbar.append(composerLabel, composerStatus, historyBtn, expandComposerBtn, closeComposerBtn);
+  const composerContext = document.createElement('div');
+  composerContext.className = 'composer-context hidden';
+  const contextChips = document.createElement('div');
+  contextChips.className = 'composer-context-chips';
+  const contextActions = document.createElement('div');
+  contextActions.className = 'composer-context-actions';
+  const contextTargetLabel = document.createElement('label');
+  contextTargetLabel.className = 'composer-target-select';
+  const contextTargetText = document.createElement('span');
+  contextTargetText.textContent = 'TARGET';
+  const contextTarget = document.createElement('select');
+  contextTarget.setAttribute('aria-label', 'Prompt target session');
+  contextTargetLabel.append(contextTargetText, contextTarget);
+  const contextAgentLabel = document.createElement('label');
+  contextAgentLabel.className = 'composer-agent-select';
+  const contextAgentText = document.createElement('span');
+  contextAgentText.textContent = 'AGENT';
+  const contextAgent = document.createElement('select');
+  contextAgent.setAttribute('aria-label', 'Agent for new session from page');
+  for (const agent of AGENT_ORDER) {
+    const option = document.createElement('option');
+    option.value = agent;
+    option.textContent = agentLabel(agent);
+    contextAgent.appendChild(option);
+  }
+  contextAgent.value = session.composer.selectedAgent;
+  contextAgentLabel.append(contextAgentText, contextAgent);
+  const attachPageBtn = document.createElement('button');
+  attachPageBtn.type = 'button';
+  attachPageBtn.className = 'head-btn composer-attach-page';
+  attachPageBtn.textContent = 'ATTACH CURRENT PAGE';
+  const contextError = document.createElement('div');
+  contextError.className = 'composer-context-error hidden';
+  contextError.setAttribute('role', 'status');
+  const switchRouteTargetBtn = document.createElement('button');
+  switchRouteTargetBtn.type = 'button';
+  switchRouteTargetBtn.className = 'head-btn composer-switch-target hidden';
+  switchRouteTargetBtn.textContent = 'SWITCH TO TARGET';
+  contextActions.append(contextTargetLabel, contextAgentLabel, attachPageBtn);
+  composerContext.append(contextChips, contextActions, contextError, switchRouteTargetBtn);
   const composerInputChoice = document.createElement('div');
   composerInputChoice.className = 'composer-input-choice hidden'; composerInputChoice.setAttribute('role', 'alertdialog');
   composerInputChoice.setAttribute('aria-modal', 'true'); composerInputChoice.setAttribute('aria-labelledby', `composer-input-choice-${session.id}`);
@@ -4055,7 +4373,7 @@ function buildSessionView(session) {
   historyControls.append(historySearch, clearHistoryBtn);
   const historyList = document.createElement('div'); historyList.className = 'composer-history-list';
   historyDrawer.append(historyControls, historyList);
-  composer.append(composerToolbar, composerInputChoice, composerTextarea, composerActions, historyDrawer);
+  composer.append(composerToolbar, composerContext, composerInputChoice, composerTextarea, composerActions, historyDrawer);
   termPane.append(termHead, termHost, composer);
 
   // divider
@@ -4090,6 +4408,12 @@ function buildSessionView(session) {
   fullscreenBtn.setAttribute('aria-label', 'Fill Chromux with browser');
   fullscreenBtn.setAttribute('aria-pressed', 'false');
   renderBrowserFullscreenToggle(fullscreenBtn, 'terminal', 'browserChromux');
+  const fullBrowserComposerBtn = document.createElement('button');
+  fullBrowserComposerBtn.className = 'head-btn browser-rail-toggle browser-compose-toggle hidden';
+  fullBrowserComposerBtn.textContent = 'COMPOSE';
+  fullBrowserComposerBtn.title = `Open routed Composer (${composerOpenShortcutLabel()})`;
+  fullBrowserComposerBtn.setAttribute('aria-label', fullBrowserComposerBtn.title);
+  fullBrowserComposerBtn.setAttribute('aria-pressed', 'false');
   const urlBar = document.createElement('input');
   urlBar.className = 'url-bar'; urlBar.type = 'text'; urlBar.spellcheck = false;
   urlBar.setAttribute('autocomplete', 'off');
@@ -4168,7 +4492,7 @@ function buildSessionView(session) {
 
   const browserRail = document.createElement('div');
   browserRail.className = 'browser-rail';
-  browserRail.append(collapseBtn, fullscreenBtn);
+  browserRail.append(collapseBtn, fullscreenBtn, fullBrowserComposerBtn);
   browserContent.append(webHead, browserTabs, queuePanel, favoritesPanel, webHost);
   webPane.append(browserContent, browserRail);
   view.append(termPane, divider, webPane);
@@ -4212,8 +4536,30 @@ function buildSessionView(session) {
   composer.addEventListener('keydown', (event) => handleComposerKeydown(session, event));
   historySearch.addEventListener('input', () => { session.composer.query = historySearch.value; renderComposerHistory(session); });
   clearHistoryBtn.onclick = () => clearComposerHistory(session);
+  contextTarget.addEventListener('change', () => {
+    session.composer.routeTargetId = contextTarget.value;
+    session.composer.routeError = '';
+    session.composer.routeStatus = '';
+    session.composer.routeBlockedTargetId = null;
+    if (contextTarget.value === COMPOSER_NEW_SESSION_TARGET) {
+      session.composer.selectedAgent = session.agent || '';
+    }
+    renderComposer(session);
+  });
+  contextAgent.addEventListener('change', () => {
+    session.composer.selectedAgent = AGENT_ORDER.includes(contextAgent.value)
+      ? contextAgent.value : (session.agent || '');
+    session.composer.routeError = '';
+    renderComposerContexts(session);
+  });
+  attachPageBtn.onclick = () => attachCurrentPage(session).catch(() => {});
+  switchRouteTargetBtn.onclick = () => {
+    const targetId = session.composer.routeBlockedTargetId;
+    if (targetId && state.sessions.has(targetId)) activateSession(targetId);
+  };
   collapseBtn.onclick = () => setBrowserCollapsed(session, session.browser.layoutMode !== 'terminal');
   fullscreenBtn.onclick = () => advanceBrowserLayout(session);
+  fullBrowserComposerBtn.onclick = () => toggleFullBrowserComposer(session);
   pickBtn.onclick = () => (session.browser.picking ? null : startPick(session));
   captureBtn.onclick = () => openCaptureModal(session, { selector: null, outerHTML: null, pageTitle: null, pageUrl: activePageTab(session)?.currentUrl || null });
 
@@ -4242,10 +4588,12 @@ function buildSessionView(session) {
   return {
     view, termPane, termLabel, termHost, scrollToBottom, composeBtn, composer, composerTextarea, composerStatus, composerCount,
     submitComposerBtn, historyBtn, expandComposerBtn, closeComposerBtn, composerInputChoice, composerInputChoiceActions,
+    composerContext, contextChips, contextTarget, contextAgent, attachPageBtn, contextError, switchRouteTargetBtn,
     historyDrawer, historySearch, historyList, clearHistoryBtn,
     back, reload, searchHtmlBtn, urlBar, urlSuggestions, favoriteBtn, favoritesBtn, favoritesBadge, favoritesPanel, favoritesList, queueBtn, queueBadge, queuePanel, queueList,
     consoleChip, captureChip, pickBtn, captureBtn, webHost, placeholder, refreshFlash,
-    explorerHost, browserTabs, divider, webPane, browserContent, browserRail, browserToolbar, collapseBtn, fullscreenBtn,
+    explorerHost, browserTabs, divider, webPane, browserContent, browserRail, browserToolbar,
+    collapseBtn, fullscreenBtn, fullBrowserComposerBtn,
   };
 }
 
@@ -4274,6 +4622,153 @@ function truncateUtf8(value, maxBytes) {
 
 function truncateComposerDraft(value) {
   return truncateUtf8(value, BOUNDS.composerDraftBytes);
+}
+
+function normalizeBrowserContextReference(context) {
+  if (!context || typeof context !== 'object') return null;
+  const payloadPath = typeof context.payloadPath === 'string' ? context.payloadPath.slice(0, 8192) : '';
+  const url = normalizedBrowserUrl(context.url);
+  if (!payloadPath || !url) return null;
+  return {
+    captureId: typeof context.captureId === 'string' ? context.captureId.slice(0, 200) : '',
+    payloadPath,
+    screenshotPath: typeof context.screenshotPath === 'string' ? context.screenshotPath.slice(0, 8192) : null,
+    url,
+    title: typeof context.title === 'string' ? context.title.slice(0, 500) : '',
+    capturedAt: typeof context.capturedAt === 'string' ? context.capturedAt : new Date().toISOString(),
+    visibleTextTruncated: Boolean(context.visibleTextTruncated),
+  };
+}
+
+function renderComposerContexts(session) {
+  if (!session?.els?.composerContext) return;
+  const composer = session.composer;
+  const active = composer.fullBrowserOpen && session.browser.layoutMode === 'browserChromux';
+  const hasContexts = composer.stagedContexts.length > 0;
+  session.els.composerContext.classList.toggle('hidden', !active && !hasContexts);
+  const targetSelect = session.els.contextTarget;
+  const selectedTarget = composer.routeTargetId;
+  targetSelect.innerHTML = '';
+  for (const target of orderedSessions().filter((candidate) => candidate.lifecycle.alive)) {
+    const option = document.createElement('option');
+    option.value = target.id;
+    option.textContent = `${target.name} · ${agentLabel(target.agent)}`;
+    targetSelect.appendChild(option);
+  }
+  const selectedSession = selectedTarget && state.sessions.get(selectedTarget);
+  if (selectedTarget
+    && selectedTarget !== COMPOSER_NEW_SESSION_TARGET
+    && (!selectedSession || !selectedSession.lifecycle.alive)) {
+    const unavailable = document.createElement('option');
+    unavailable.value = selectedTarget;
+    unavailable.textContent = `${selectedSession?.name || 'Missing session'} · unavailable`;
+    unavailable.disabled = true;
+    targetSelect.prepend(unavailable);
+  }
+  const newOption = document.createElement('option');
+  newOption.value = COMPOSER_NEW_SESSION_TARGET;
+  newOption.textContent = 'New session';
+  targetSelect.appendChild(newOption);
+  const fallbackTarget = selectedTarget || (active
+    ? (session.lifecycle.alive
+      ? session.id
+      : orderedSessions().find((candidate) => candidate.lifecycle.alive)?.id)
+    : session.id);
+  composer.routeTargetId = selectedTarget === COMPOSER_NEW_SESSION_TARGET
+    ? selectedTarget : (fallbackTarget || COMPOSER_NEW_SESSION_TARGET);
+  targetSelect.value = composer.routeTargetId;
+  targetSelect.disabled = composer.routeBusy;
+  session.els.contextAgent.value = AGENT_ORDER.includes(composer.selectedAgent)
+    ? composer.selectedAgent
+    : (session.agent || '');
+  const creating = composer.routeTargetId === COMPOSER_NEW_SESSION_TARGET;
+  session.els.contextAgent.closest('label')?.classList.toggle('hidden', !creating);
+  session.els.contextAgent.disabled = composer.routeBusy;
+  session.els.attachPageBtn.disabled = composer.routeBusy || !activePageTab(session)?.currentUrl;
+  session.els.attachPageBtn.textContent = composer.routeBusy ? 'WORKING…' : 'ATTACH CURRENT PAGE';
+  const feedback = composer.routeError || composer.routeStatus || '';
+  session.els.contextError.textContent = feedback;
+  session.els.contextError.classList.toggle('hidden', !feedback);
+  session.els.contextError.classList.toggle('success', Boolean(composer.routeStatus && !composer.routeError));
+  session.els.switchRouteTargetBtn.classList.toggle('hidden', !composer.routeBlockedTargetId);
+  session.els.switchRouteTargetBtn.disabled = !state.sessions.has(composer.routeBlockedTargetId);
+  const host = session.els.contextChips;
+  host.innerHTML = '';
+  for (const context of composer.stagedContexts) {
+    const chip = document.createElement('span');
+    chip.className = 'composer-context-chip';
+    chip.title = `${context.url}\n${context.payloadPath}`;
+    const label = document.createElement('span');
+    label.className = 'composer-context-label';
+    label.textContent = `PAGE · ${context.title || context.url}`;
+    const refresh = document.createElement('button');
+    refresh.type = 'button';
+    refresh.textContent = '↻';
+    refresh.title = 'Refresh browser evidence';
+    refresh.setAttribute('aria-label', 'Refresh browser evidence');
+    refresh.disabled = composer.routeBusy;
+    refresh.onclick = () => refreshStagedBrowserContext(session, context.captureId).catch(() => {});
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.textContent = '×';
+    remove.title = 'Remove browser evidence';
+    remove.setAttribute('aria-label', 'Remove browser evidence');
+    remove.disabled = composer.routeBusy;
+    remove.onclick = () => {
+      session.composer.stagedContexts = session.composer.stagedContexts
+        .filter((candidate) => candidate.captureId !== context.captureId);
+      renderComposerContexts(session);
+    };
+    chip.append(label, refresh, remove);
+    host.appendChild(chip);
+  }
+}
+
+function renderFullBrowserComposer(session) {
+  if (!session?.els) return;
+  const active = Boolean(session.composer.fullBrowserOpen
+    && session.composer.open
+    && session.browser.layoutMode === 'browserChromux');
+  session.els.view.classList.toggle('full-browser-composer-open', active);
+  session.els.fullBrowserComposerBtn.classList.toggle('active', active);
+  session.els.fullBrowserComposerBtn.setAttribute('aria-pressed', String(active));
+  session.els.fullBrowserComposerBtn.title = active
+    ? 'Close routed Composer (Escape)'
+    : `Open routed Composer (${composerOpenShortcutLabel()})`;
+  session.els.fullBrowserComposerBtn.setAttribute(
+    'aria-label', session.els.fullBrowserComposerBtn.title
+  );
+  renderComposerContexts(session);
+}
+
+function openFullBrowserComposer(session) {
+  if (!session?.els || session.browser.layoutMode !== 'browserChromux') return null;
+  session.composer.routeTargetId = session.id;
+  session.composer.selectedAgent = session.agent || '';
+  session.composer.routeError = '';
+  session.composer.routeStatus = '';
+  session.composer.routeBlockedTargetId = null;
+  session.composer.fullBrowserOpen = true;
+  openComposer(session);
+  renderFullBrowserComposer(session);
+  requestAnimationFrame(() => {
+    autosizeComposer(session);
+  });
+  return { sessionId: session.id, open: true };
+}
+
+function closeFullBrowserComposer(session) {
+  if (!session?.composer?.fullBrowserOpen) return null;
+  session.composer.fullBrowserOpen = false;
+  closeComposer(session);
+  renderFullBrowserComposer(session);
+  return { sessionId: session.id, open: false };
+}
+
+function toggleFullBrowserComposer(session) {
+  return session?.composer?.fullBrowserOpen
+    ? closeFullBrowserComposer(session)
+    : openFullBrowserComposer(session);
 }
 
 function autosizeComposer(session) {
@@ -4324,7 +4819,11 @@ function updateComposerDraftFromInput(session) {
 function renderComposer(session) {
   if (!session.els || !session.els.composer) return;
   const { composer } = session;
-  const alive = Boolean(session.lifecycle.alive);
+  const routeTarget = composer.routeTargetId === COMPOSER_NEW_SESSION_TARGET
+    ? COMPOSER_NEW_SESSION_TARGET
+    : state.sessions.get(composer.routeTargetId || session.id);
+  const routeAvailable = routeTarget === COMPOSER_NEW_SESSION_TARGET
+    || Boolean(routeTarget && routeTarget.lifecycle.alive);
   session.els.composer.classList.toggle('hidden', !composer.open);
   session.els.termPane.classList.toggle('composer-expanded', composer.open && composer.expanded);
   session.els.composeBtn.classList.toggle('active', composer.open);
@@ -4332,13 +4831,24 @@ function renderComposer(session) {
   session.els.composeBtn.textContent = 'COMPOSE';
   session.els.composerTextarea.value = composer.draft;
   session.els.composerCount.textContent = `${utf8ByteLength(composer.draft).toLocaleString()} / ${BOUNDS.composerDraftBytes.toLocaleString()} BYTES`;
-  session.els.submitComposerBtn.disabled = !alive || !composer.draft.trim();
+  session.els.submitComposerBtn.disabled = composer.routeBusy
+    || !routeAvailable
+    || (routeTarget !== COMPOSER_NEW_SESSION_TARGET && !composer.draft.trim());
+  session.els.submitComposerBtn.textContent = routeTarget === COMPOSER_NEW_SESSION_TARGET
+    ? 'CREATE SESSION'
+    : 'SEND ⌘⇧↵';
   const pendingText = composer.pendingInputChoice ? composer.pendingInputChoice.text : '';
   const appendOverflows = Boolean(pendingText)
     && utf8ByteLength(`${composer.draft}\n${pendingText}`) > BOUNDS.composerDraftBytes;
-  session.els.composerStatus.textContent = !alive
-    ? 'SESSION EXITED · DRAFT PRESERVED'
-    : (appendOverflows ? 'APPEND EXCEEDS 64 KIB · CHOOSE REPLACE, COPY, OR DISMISS' : '⌘⇧ENTER SENDS · ENTER NEWLINE');
+  session.els.composerStatus.textContent = composer.routeBusy
+    ? 'WORKING…'
+    : (!routeAvailable
+      ? 'TARGET UNAVAILABLE · DRAFT PRESERVED'
+      : (appendOverflows
+        ? 'APPEND EXCEEDS 64 KIB · CHOOSE REPLACE, COPY, OR DISMISS'
+        : (routeTarget === COMPOSER_NEW_SESSION_TARGET
+          ? 'CREATE FOR REVIEW · PROMPT STAYS UNSENT'
+          : '⌘⇧ENTER SENDS · ENTER NEWLINE')));
   session.els.historyBtn.classList.toggle('active', composer.drawerOpen);
   session.els.historyDrawer.classList.toggle('hidden', !composer.drawerOpen);
   session.els.expandComposerBtn.textContent = composer.expanded ? 'COLLAPSE' : 'EXPAND';
@@ -4348,6 +4858,7 @@ function renderComposer(session) {
   const appendChoice = session.els.composerInputChoiceActions.querySelector('[data-composer-input-action="append"]');
   appendChoice.disabled = appendOverflows;
   appendChoice.title = appendOverflows ? 'Combined text exceeds the 64 KiB composer limit' : '';
+  renderComposerContexts(session);
   autosizeComposer(session);
 }
 
@@ -4430,6 +4941,11 @@ function openComposer(session) {
   // rendered editor is canonical; the session-local keystroke model is a
   // bounded fallback when the active buffer cannot be identified safely.
   const pending = resolveCurrentTerminalPrompt(session);
+  session.composer.routeTargetId = session.id;
+  session.composer.selectedAgent = session.agent || '';
+  session.composer.routeError = '';
+  session.composer.routeStatus = '';
+  session.composer.routeBlockedTargetId = null;
   session.composer.open = true;
   if (pending.text && !session.composer.draft) {
     setComposerDraft(session, pending.text);
@@ -4461,7 +4977,11 @@ function closeComposer(session) {
   session.composer.drawerOpen = false;
   session.composer.expanded = false;
   session.composer.pendingInputChoice = null;
+  session.composer.fullBrowserOpen = false;
+  session.composer.routeTargetId = null;
+  session.composer.routeBlockedTargetId = null;
   renderComposer(session);
+  renderFullBrowserComposer(session);
   requestAnimationFrame(() => {
     session.term.fit();
     if (Number.isFinite(restoringViewport)) {
@@ -4555,30 +5075,84 @@ function recallComposerHistory(session, direction) {
   session.els.composerTextarea.setSelectionRange(session.composer.draft.length, session.composer.draft.length);
 }
 
-async function submitComposer(session) {
-  const text = session.composer.draft.replace(/\r\n?/g, '\n');
-  if (!session.lifecycle.alive || !text.trim() || !utf8WithinLimit(text)) return false;
-  if (!session.agent && text.includes('\n') && !window.confirm('Submit this multiline prompt to the shell? Each line may be interpreted as shell input.')) return false;
-  session.term.term.paste(text);
-  session.term.term.input('\r', true);
-  setComposerDraft(session, '');
-  session.els.composerTextarea.focus();
+function blockComposerRoute(source, targetId, message) {
+  source.composer.routeError = message;
+  source.composer.routeStatus = '';
+  source.composer.routeBlockedTargetId = targetId && state.sessions.has(targetId) ? targetId : null;
+  renderComposer(source);
+  return false;
+}
+
+function composerRouteConflict(source, target) {
+  if (!target) return 'That target session no longer exists.';
+  if (!target.lifecycle.alive) return `${target.name} has exited.`;
+  if (target.id !== source.id && target.composer.draft) {
+    return `${target.name} already has a Composer draft.`;
+  }
+  if (target.composer.pendingInputChoice?.text) {
+    return `${target.name} has pending terminal input.`;
+  }
+  const pending = resolveCurrentTerminalPrompt(target);
+  if (pending.text) return `${target.name} has pending terminal input.`;
+  return '';
+}
+
+async function appendComposerHistory(recipient, text) {
   try {
-    session.composer.history = await window.chromux.promptHistoryAppend(session.cwd, {
+    recipient.composer.history = await window.chromux.promptHistoryAppend(recipient.cwd, {
       text,
-      agent: session.agent || 'shell',
-      sessionName: session.name,
+      agent: recipient.agent || 'shell',
+      sessionName: recipient.name,
       submittedAt: new Date().toISOString(),
     });
-    session.composer.historyLoaded = true;
-    renderComposerHistory(session);
+    recipient.composer.historyLoaded = true;
+    renderComposerHistory(recipient);
   } catch { /* PTY submission succeeded; persistence failure is non-fatal */ }
+}
+
+async function submitComposer(session) {
+  if (!session || session.composer.routeBusy) return false;
+  const routeTargetId = session.composer.routeTargetId || session.id;
+  if (routeTargetId === COMPOSER_NEW_SESSION_TARGET) {
+    return Boolean(await createSessionFromPage(session));
+  }
+  const recipient = state.sessions.get(routeTargetId);
+  const conflict = composerRouteConflict(session, recipient);
+  if (conflict) return blockComposerRoute(session, routeTargetId, `${conflict} Switch to the target to resolve it.`);
+  const text = session.composer.draft.replace(/\r\n?/g, '\n');
+  if (!text.trim() || !utf8WithinLimit(text)) return false;
+  const payload = composerPayloadWithContexts(text, session.composer.stagedContexts);
+  if (!recipient.agent && payload.includes('\n')) {
+    session.composer.routeConfirmation = { type: 'multiline-shell', targetId: recipient.id };
+    const confirmed = window.confirm(
+      `Send this multiline prompt to the ${recipient.name} shell? Each line may be interpreted as shell input.`
+    );
+    session.composer.routeConfirmation = null;
+    if (!confirmed) return false;
+  }
+  session.composer.routeBusy = true;
+  session.composer.routeError = '';
+  session.composer.routeStatus = '';
+  session.composer.routeBlockedTargetId = null;
+  renderComposer(session);
+  recipient.term.term.paste(payload);
+  recipient.term.term.input('\r', true);
+  setComposerDraft(session, '');
+  session.composer.stagedContexts = [];
+  session.composer.routeStatus = `Sent to ${recipient.name}.`;
+  session.composer.routeBusy = false;
+  renderComposer(session);
+  session.els.composerTextarea.focus();
+  await appendComposerHistory(recipient, payload);
   return true;
 }
 
 function handleComposerKeydown(session, event) {
   if (event.key === 'Escape') {
-    event.preventDefault(); event.stopPropagation(); closeComposer(session); return;
+    event.preventDefault(); event.stopPropagation();
+    if (session.composer.fullBrowserOpen) closeFullBrowserComposer(session);
+    else closeComposer(session);
+    return;
   }
   const primary = state.env && state.env.primaryModifier === 'control' ? event.ctrlKey && !event.metaKey : event.metaKey && !event.ctrlKey;
   if (event.key === 'Enter' && primary && event.shiftKey && !event.altKey) {
@@ -5590,6 +6164,7 @@ function appendThreadSessionRow(host, session, { attention = null } = {}) {
     openThreadPreview(session, row);
   });
   row.addEventListener('blur', () => {
+    pointerFocusPending = false;
     const preview = state.ui.threadPreview;
     if (preview?.sessionId === session.id) scheduleThreadPreviewClose(preview);
   });
@@ -6738,6 +7313,8 @@ async function createSession(options) {
 async function createSessionNow({
   name, cwd, agent, initialUrl = null, initialBrowserTabs = [], initialActiveBrowserTabId = null,
   initialQueue = [], initialAttentionRecords = [], command = undefined, resumeLaunch = null, composerDraft = '',
+  initialStagedBrowserContexts = [],
+  initialBrowserLayoutMode = 'terminal', initialFullBrowserComposerOpen = false,
   initialLastActivityAt = null,
   initialCustomTabGroupId = null,
   runtime = null, distro = null,
@@ -6751,6 +7328,20 @@ async function createSessionNow({
   const restoredActivityAt = Date.parse(initialLastActivityAt || '');
   if (Number.isFinite(restoredActivityAt)) session.lastActivityAt = restoredActivityAt;
   session.composer.draft = utf8WithinLimit(composerDraft) ? String(composerDraft || '') : '';
+  session.composer.stagedContexts = (Array.isArray(initialStagedBrowserContexts)
+    ? initialStagedBrowserContexts : [])
+    .map(normalizeBrowserContextReference)
+    .filter(Boolean)
+    .slice(0, BOUNDS.stagedBrowserContexts);
+  session.composer.selectedAgent = agent || '';
+  session.browser.layoutMode = BROWSER_LAYOUT_MODES.has(initialBrowserLayoutMode)
+    ? initialBrowserLayoutMode
+    : 'terminal';
+  session.composer.fullBrowserOpen = Boolean(
+    initialFullBrowserComposerOpen && session.browser.layoutMode === 'browserChromux'
+  );
+  session.composer.open = session.composer.fullBrowserOpen;
+  session.composer.routeTargetId = session.composer.fullBrowserOpen ? id : null;
   if (resumeLaunch) {
     session.lifecycle.resumeLaunch = {
       ...resumeLaunch,
@@ -6828,9 +7419,13 @@ async function createSessionNow({
   installTerminalScrollToBottom(session);
 
   term.onData((data) => handleTerminalInput(session, data));
-  new ResizeObserver(() => session.term.fit()).observe(viewEls.termHost);
+  session.term.resizeObserver = new ResizeObserver(() => session.term.fit());
+  session.term.resizeObserver.observe(viewEls.termHost);
 
   state.sessions.set(id, session);
+  session.composer.routeTargetId = session.composer.fullBrowserOpen ? id : session.composer.routeTargetId;
+  renderComposer(session);
+  for (const source of state.sessions.values()) renderComposerContexts(source);
   apply({ type: 'session-created', sessionId: id, name, cwd, agent });
   let ptyInfo;
   try {
@@ -6843,6 +7438,8 @@ async function createSessionNow({
     state.sessions.delete(id);
     viewEls.view.remove();
     tabEls.tab.remove();
+    session.term.resizeObserver?.disconnect();
+    session.term.resizeObserver = null;
     term.dispose();
     apply({ type: 'session-closed', sessionId: id });
     renderTabs();
@@ -6932,11 +7529,14 @@ function closeSession(id) {
   resetSynchronizedOutput(s);
   window.chromux.ptyKill(id);
   if (s.term.scrollToBottom) s.term.scrollToBottom.dispose();
+  s.term.resizeObserver?.disconnect();
+  s.term.resizeObserver = null;
   s.term.term.dispose();
   if (s.els.webPane.parentElement !== s.els.view) s.els.webPane.remove();
   s.els.view.remove();
   s.els.tab.remove();
   state.sessions.delete(id);
+  for (const source of state.sessions.values()) renderComposerContexts(source);
   for (const [groupId, sessionId] of state.ui.lastActiveSessionByGroup) {
     if (sessionId === id) state.ui.lastActiveSessionByGroup.delete(groupId);
   }
@@ -7174,6 +7774,13 @@ function snapshotOpenSessions() {
       ? { attentionRecords: attentionBySession.get(session.id) }
       : {}),
     ...(session.composer.draft ? { composerDraft: session.composer.draft } : {}),
+    ...(session.composer.stagedContexts.length
+      ? { stagedBrowserContexts: session.composer.stagedContexts.slice(0, BOUNDS.stagedBrowserContexts) }
+      : {}),
+    browserLayoutMode: session.browser.layoutMode,
+    fullBrowserComposerOpen: Boolean(
+      session.composer.fullBrowserOpen && session.browser.layoutMode === 'browserChromux'
+    ),
     lastActivityAt: new Date(sessionActivityAt(session)).toISOString(),
     savedAt: new Date().toISOString(),
   }));
@@ -7198,6 +7805,15 @@ function snapshotOpenSessions() {
         ? { attentionRecords: options.initialAttentionRecords }
         : {}),
       ...(options.composerDraft ? { composerDraft: options.composerDraft } : {}),
+      ...(Array.isArray(options.initialStagedBrowserContexts) && options.initialStagedBrowserContexts.length
+        ? { stagedBrowserContexts: options.initialStagedBrowserContexts.slice(0, BOUNDS.stagedBrowserContexts) }
+        : {}),
+      browserLayoutMode: BROWSER_LAYOUT_MODES.has(options.initialBrowserLayoutMode)
+        ? options.initialBrowserLayoutMode : 'terminal',
+      fullBrowserComposerOpen: Boolean(
+        options.initialFullBrowserComposerOpen
+        && options.initialBrowserLayoutMode === 'browserChromux'
+      ),
       lastActivityAt: new Date(Number.isFinite(Date.parse(options.initialLastActivityAt || ''))
         ? Date.parse(options.initialLastActivityAt) : Date.now()).toISOString(),
       savedAt: new Date().toISOString(),
@@ -7691,7 +8307,9 @@ function handlePtyData(id, data) {
       apply({ type: 'turn-signal', sessionId: id, signal: sig.event, detail: sig.detail, envelope: env });
     }
   }
-  if (res.clean) routeSynchronizedPtyOutput(s, res.clean);
+  if (res.clean) {
+    routeSynchronizedPtyOutput(s, res.clean);
+  }
   if (s.agent === '' && s.lifecycle.alive) scanPtyAgentDescendants(false).catch(() => {});
 }
 
@@ -7929,12 +8547,18 @@ async function openRestoredSession(row) {
   const session = await createSession({
     name,
     cwd: resolved.cwd || (state.env ? state.env.home : '~'),
+    runtime: resolved.runtime || null,
+    distro: resolved.distro || null,
     agent: resolved.agent || '',
     initialUrl: resolved.currentUrl || null,
     initialBrowserTabs: resolved.browserTabs || row.browserTabs || [],
     initialActiveBrowserTabId: resolved.activeBrowserTabId || row.activeBrowserTabId || null,
     initialQueue: resolved.queue || [],
+    initialAttentionRecords: resolved.attentionRecords || [],
     composerDraft: resolved.composerDraft || '',
+    initialStagedBrowserContexts: resolved.stagedBrowserContexts || [],
+    initialBrowserLayoutMode: resolved.browserLayoutMode || 'terminal',
+    initialFullBrowserComposerOpen: Boolean(resolved.fullBrowserComposerOpen),
     initialLastActivityAt: resolved.lastActivityAt || row.lastActivityAt || state.restoreSessions?.savedAt || null,
     initialCustomTabGroupId: validCustomTabGroup(resolved.customTabGroupId) ? resolved.customTabGroupId : null,
     command,
@@ -8418,6 +9042,9 @@ async function autoRestoreWorkspace() {
         initialQueue: row.queue || [],
         initialAttentionRecords: row.attentionRecords || [],
         composerDraft: row.composerDraft || '',
+        initialStagedBrowserContexts: row.stagedBrowserContexts || [],
+        initialBrowserLayoutMode: row.browserLayoutMode || 'terminal',
+        initialFullBrowserComposerOpen: Boolean(row.fullBrowserComposerOpen),
         initialLastActivityAt: row.lastActivityAt || snapshot.savedAt || null,
         initialCustomTabGroupId: validCustomTabGroup(row.customTabGroupId) ? row.customTabGroupId : null,
         command,
@@ -8713,7 +9340,8 @@ $('#grok-context-confirm').onclick = () => {
   const source = state.sessions.get(state.grokContextAction.sessionId);
   const mode = state.grokContextAction.mode;
   closeGrokContextAdvisory();
-  if (source) duplicateSession(source, 'grok', mode).catch(() => {});
+  if (source && mode === 'page') createSessionFromPage(source, { grokAcknowledged: true }).catch(() => {});
+  else if (source) duplicateSession(source, 'grok', mode).catch(() => {});
 };
 
 $('#ns-create').onclick = async () => {
@@ -8943,7 +9571,10 @@ function handleShortcutOpenDetectModal() {
 function handleShortcutOpenComposer() {
   if (guardedShortcutDisabledReason(shortcutFocusContext())) return null;
   const session = state.sessions.get(state.activeId);
-  return session ? openComposer(session) : null;
+  if (!session) return null;
+  return session.browser.layoutMode === 'browserChromux'
+    ? openFullBrowserComposer(session)
+    : openComposer(session);
 }
 
 function shortcutInputFromDomEvent(e) {
@@ -9032,6 +9663,9 @@ if (window.chromuxTest) {
         return Promise.resolve({ id: name, name });
       }
       return createSession({ name, cwd: '/tmp', agent: 'codex' });
+    },
+    launchOptions(options) {
+      return createSession({ cwd: '/tmp', ...options, agent: 'codex' });
     },
     setStatus(status) {
       state.codexUpdate.status = { ...status };
@@ -9182,6 +9816,7 @@ if (window.chromuxTest) {
     }
     session.term.fit = () => {};
     state.sessions.set(session.id, session);
+    for (const source of state.sessions.values()) renderComposerContexts(source);
     apply({ type: 'session-created', sessionId: session.id, name, cwd, agent });
     renderQueue(session);
     for (const item of session.browser.queue) {
@@ -9205,7 +9840,8 @@ if (window.chromuxTest) {
       session.term.fitAddon = fitAddon;
       session.term.fit = () => fitTerminalPreservingViewport(session, () => fitAddon.fit());
       session.term.fit();
-      new ResizeObserver(() => session.term.fit()).observe(session.els.termHost);
+      session.term.resizeObserver = new ResizeObserver(() => session.term.fit());
+      session.term.resizeObserver.observe(session.els.termHost);
       return id;
     },
     focus(id) { activateSession(id); flushRender(); },
@@ -9677,8 +10313,13 @@ if (window.chromuxTest) {
     focusRow(id) {
       const row = document.querySelector(`#thread-list .rail-session-row[data-session-id="${CSS.escape(id)}"]`);
       if (!row) throw new Error(`Missing rail row: ${id}`);
+      if (document.activeElement === row) row.blur();
       row.focus();
-      flushRender();
+      if (document.activeElement === row
+        && state.activeId !== id
+        && state.ui.threadPreview?.sessionId !== id) {
+        row.dispatchEvent(new FocusEvent('focus'));
+      }
     },
     rowKey(id, key) {
       const row = document.querySelector(`#thread-list .rail-session-row[data-session-id="${CSS.escape(id)}"]`);
@@ -10874,6 +11515,226 @@ if (window.chromuxTest) {
     flushRender,
   };
 
+  window.chromuxTestFullBrowserComposer = {
+    addSession({
+      name = 'composer-test', agent = 'codex', cwd = '/tmp', url = 'https://example.test/page',
+      title = 'Example page', visibleText = 'Visible browser evidence', consoleEntries = [],
+      stagedContexts = [], composerDraft = '', runtime = 'host', distro = null,
+    } = {}) {
+      const id = addRenderableTestSession({ name, agent, cwd, composerDraft, realTerminal: true });
+      const session = testSession(id);
+      session.runtime = runtime;
+      session.distro = distro;
+      const page = createPageTabState(`page-${id}`, url, title);
+      page.currentUrl = url;
+      page.consoleBuf = consoleEntries.slice(-BOUNDS.consoleTail);
+      page.consoleTotal = consoleEntries.length;
+      page.webContentsId = 1000 + state.counter;
+      const webview = {
+        capturePage: async () => ({ toDataURL: () => 'data:image/png;base64,aW1hZ2U=' }),
+        executeJavaScript: async (script) => (String(script).includes('document.title') ? title : visibleText),
+        getTitle: () => title,
+      };
+      page.webview = webview;
+      session.browser.tabs = [page];
+      session.browser.activeTabId = page.id;
+      session.browser.tabCounter = 1;
+      session.els.urlBar.value = url;
+      session.composer.stagedContexts = stagedContexts.map(normalizeBrowserContextReference).filter(Boolean);
+      session._composerTestWebview = webview;
+      renderBrowserTabs(session);
+      renderConsoleChip(session);
+      renderComposerContexts(session);
+      return id;
+    },
+    focus(id) { activateSession(id); flushRender(); },
+    enterFull(id) {
+      const session = testSession(id);
+      setBrowserLayoutMode(session, 'browserChromux', { recordReturn: true });
+      flushRender();
+    },
+    leaveFull(id, mode = 'paired') {
+      setBrowserLayoutMode(testSession(id), mode);
+      flushRender();
+    },
+    clickToggle(id) { testSession(id).els.fullBrowserComposerBtn.click(); flushRender(); },
+    shortcutOpen(id) {
+      activateSession(id);
+      const result = handleShortcutOpenComposer();
+      flushRender();
+      return result;
+    },
+    hostShortcut(id) {
+      activateSession(id);
+      document.dispatchEvent(new KeyboardEvent('keydown', {
+        key: 'Enter', code: 'Enter', metaKey: true, shiftKey: true, bubbles: true, cancelable: true,
+      }));
+      flushRender();
+    },
+    escape(id) {
+      activateSession(id);
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+      flushRender();
+    },
+    setDraft(id, value) { setComposerDraft(testSession(id), value); },
+    draft: (id) => testSession(id).composer.draft,
+    async submit(id) { return submitComposer(testSession(id)); },
+    async resolveConflict(id, action) { return resolveComposerInputChoice(testSession(id), action); },
+    rawInput(id, data) { testSession(id).term.term.input(String(data), true); flushRender(); },
+    pendingInput: (id) => testSession(id).term.typedInputBuf,
+    ptyInputs: (id) => (testSession(id)._ptyInputs || []).slice(),
+    clearPtyInputs(id) { testSession(id)._ptyInputs = []; },
+    exit(id, exitCode = 0) { handlePtyExit({ id, exitCode }); flushRender(); },
+    close(id) { closeSession(id); flushRender(); },
+    expand(id) { toggleComposerExpanded(testSession(id)); flushRender(); },
+    queue(id, url) {
+      apply({ type: 'preview-queued', sessionId: id, url, source: 'TERM' });
+      renderQueue(testSession(id));
+      flushRender();
+    },
+    snapshot: () => snapshotOpenSessions().map((row) => ({ ...row })),
+    activeId: () => state.activeId,
+    sessionCount: () => state.sessions.size,
+    sessionNames: () => orderedSessions().map((session) => session.name),
+    tabCount: () => orderedSessions().filter((session) => session.els?.tab?.isConnected).length,
+    threadSessionCount: () => new Set(
+      [...document.querySelectorAll('#thread-list [data-session-id]')]
+        .map((element) => element.dataset.sessionId)
+        .filter(Boolean)
+    ).size,
+    activityAt: (id) => testSession(id).lastActivityAt,
+    turnState: (id) => testSession(id).turn.state,
+    setTurnState(id, turnState) {
+      const session = testSession(id);
+      session.turn.state = turnState;
+      session.turn.since = Date.now();
+      renderTabs();
+      flushRender();
+    },
+    targetOptions(id) {
+      return [...testSession(id).els.contextTarget.options]
+        .map((option) => ({ value: option.value, text: option.textContent }));
+    },
+    selectedTarget(id) { return testSession(id).composer.routeTargetId; },
+    selectTarget(id, targetId) {
+      const session = testSession(id);
+      session.els.contextTarget.value = targetId;
+      session.els.contextTarget.dispatchEvent(new Event('change', { bubbles: true }));
+      return session.composer.routeTargetId;
+    },
+    newSessionTarget: COMPOSER_NEW_SESSION_TARGET,
+    selectedAgent(id) { return testSession(id).composer.selectedAgent; },
+    selectAgent(id, agent) {
+      const session = testSession(id);
+      session.els.contextAgent.value = agent;
+      session.els.contextAgent.dispatchEvent(new Event('change', { bubbles: true }));
+      return session.composer.selectedAgent;
+    },
+    async history(id) { return loadComposerHistory(testSession(id), { force: true }); },
+    async collectEvidence(id, selection = {}) {
+      const session = testSession(id);
+      const evidence = await collectBrowserEvidence(session, selection);
+      const payload = capturePayloadBase(session, evidence);
+      return {
+        payload,
+        screenshotIncluded: Boolean(evidence.pngBase64),
+        visibleTextBytes: utf8ByteLength(evidence.visibleText),
+      };
+    },
+    async captureContext(id) {
+      const context = await persistComposerBrowserContext(testSession(id));
+      return context ? { ...context } : null;
+    },
+    async attachCurrentPage(id) { return attachCurrentPage(testSession(id)); },
+    stageContext(id, context) {
+      const session = testSession(id);
+      const normalized = normalizeBrowserContextReference(context);
+      if (normalized) session.composer.stagedContexts = [normalized, ...session.composer.stagedContexts]
+        .slice(0, BOUNDS.stagedBrowserContexts);
+      renderComposerContexts(session);
+      return session.composer.stagedContexts.length;
+    },
+    async refreshContext(id, captureId) {
+      return refreshStagedBrowserContext(testSession(id), captureId);
+    },
+    removeFirstContext(id) {
+      const button = testSession(id).els.contextChips
+        .querySelector('.composer-context-chip button[aria-label="Remove browser evidence"]');
+      if (button) button.click();
+      return testSession(id).composer.stagedContexts.length;
+    },
+    async createFromPage(id, options = {}) {
+      const source = testSession(id);
+      const created = await createSessionFromPage(source, options);
+      flushRender();
+      return created ? {
+        id: created.id,
+        name: created.name,
+        cwd: created.cwd,
+        runtime: created.runtime,
+        distro: created.distro,
+        agent: created.agent,
+        layoutMode: created.browser.layoutMode,
+        fullBrowserComposerOpen: created.composer.fullBrowserOpen,
+        draft: created.composer.draft,
+        contexts: created.composer.stagedContexts.map((context) => ({ ...context })),
+        url: activePageTab(created)?.currentUrl || null,
+        partitionId: created.browser.partitionId,
+      } : null;
+    },
+    payloadWithContexts(instruction, contexts) {
+      return composerPayloadWithContexts(instruction, contexts);
+    },
+    removeWebview(id) {
+      const session = testSession(id);
+      const page = activePageTab(session);
+      if (page) page.webview = null;
+    },
+    routeError: (id) => testSession(id).composer.routeError,
+    routeStatus: (id) => testSession(id).composer.routeStatus,
+    switchOffered: (id) => !testSession(id).els.switchRouteTargetBtn.classList.contains('hidden'),
+    switchToTarget(id) { testSession(id).els.switchRouteTargetBtn.click(); flushRender(); },
+    contexts: (id) => testSession(id).composer.stagedContexts.map((context) => ({ ...context })),
+    grokWarningVisible: () => !$('#modal-grok-advisory').classList.contains('hidden'),
+    state(id) {
+      const session = testSession(id);
+      const browser = session.els.webPane.getBoundingClientRect();
+      const composer = session.els.composer.getBoundingClientRect();
+      const titlebar = $('#titlebar').getBoundingClientRect();
+      const browserRail = session.els.browserRail.getBoundingClientRect();
+      const composerButton = session.els.fullBrowserComposerBtn.getBoundingClientRect();
+      const hit = document.elementFromPoint(
+        composerButton.left + composerButton.width / 2,
+        composerButton.top + composerButton.height / 2
+      );
+      return {
+        layoutMode: session.browser.layoutMode,
+        open: session.composer.fullBrowserOpen,
+        composerOpen: session.composer.open,
+        expanded: session.composer.expanded,
+        draft: session.composer.draft,
+        browserBounds: { left: browser.left, right: browser.right, top: browser.top, bottom: browser.bottom },
+        composerBounds: { left: composer.left, right: composer.right, top: composer.top, bottom: composer.bottom },
+        titlebarBottom: titlebar.bottom,
+        browserRailUsable: Boolean(hit && session.els.browserRail.contains(hit)),
+        browserRailBounds: { left: browserRail.left, right: browserRail.right },
+        webviewIdentity: session.browser.webview === session._composerTestWebview,
+        currentUrl: session.browser.currentUrl,
+        activeTabId: session.browser.activeTabId,
+        consoleTotal: activePageTab(session)?.consoleTotal || 0,
+        queueCount: session.browser.queue.length,
+        partitionId: session.browser.partitionId,
+        composerToggleHidden: session.els.fullBrowserComposerBtn.classList.contains('hidden'),
+        toggleText: session.els.fullBrowserComposerBtn.textContent,
+        target: session.composer.routeTargetId,
+        targetSelectorVisible: getComputedStyle(session.els.contextTarget.closest('label')).display !== 'none',
+        agentSelectorVisible: getComputedStyle(session.els.contextAgent.closest('label')).display !== 'none',
+        sourceActive: state.activeId === id,
+      };
+    },
+    flushRender,
+  };
+
   window.chromuxTestFavorites = {
     ready: () => state.favoritesReady || Promise.resolve(),
     urls: () => state.favorites.map((item) => item.url),
@@ -10941,6 +11802,7 @@ if (window.chromuxTest) {
 
   window.chromuxTestAgentCommand = {
     build: (agent, resumeId = null) => agentCommand(agent, resumeId),
+    buildWithEnv: (agent, resumeId = null, env = {}) => agentCommand(agent, resumeId, { ...state.env, ...env }),
     env: () => ({ ...state.env }),
   };
 
@@ -11197,7 +12059,7 @@ if (window.chromuxTest) {
     bodyMode: () => document.body.dataset.themeMode,
     windowButtonPosition: () => state.ui.windowButtonPosition && { ...state.ui.windowButtonPosition },
     async addContextMenuSession() {
-      const session = await createSession({
+      const session = await createSessionNow({
         name: 'context-menu-test',
         cwd: '/tmp/chromux-context-menu',
         agent: 'codex',
@@ -11205,6 +12067,21 @@ if (window.chromuxTest) {
       return session.id;
     },
     sessionTab: (id) => testSession(id).els.tab,
+    trackRealTerminal(terminal) {
+      state.counter += 1;
+      const session = newSessionShape({
+        id: 's' + state.counter,
+        name: 'tracked-theme-terminal',
+        cwd: '/tmp',
+        agent: 'codex',
+      });
+      session.term.term = terminal;
+      state.sessions.set(session.id, session);
+      return session.id;
+    },
+    untrackRealTerminal(id) {
+      state.sessions.delete(id);
+    },
     addTerminalSession({
       rows = 24,
       content = '',
@@ -11358,6 +12235,26 @@ function fakeSessionEls() {
   const browserToolbar = document.createElement('div');
   const collapseBtn = document.createElement('button');
   const fullscreenBtn = document.createElement('button');
+  const fullBrowserComposerBtn = document.createElement('button');
+  const composerContext = document.createElement('div');
+  const contextChips = document.createElement('div');
+  const contextTargetLabel = document.createElement('label');
+  const contextTarget = document.createElement('select');
+  contextTargetLabel.appendChild(contextTarget);
+  const contextAgentLabel = document.createElement('label');
+  const contextAgent = document.createElement('select');
+  for (const agent of AGENT_ORDER) {
+    const option = document.createElement('option');
+    option.value = agent;
+    contextAgent.appendChild(option);
+  }
+  contextAgentLabel.appendChild(contextAgent);
+  const attachPageBtn = document.createElement('button');
+  const contextError = document.createElement('div');
+  const switchRouteTargetBtn = document.createElement('button');
+  composerContext.append(
+    contextChips, contextTargetLabel, contextAgentLabel, attachPageBtn, contextError, switchRouteTargetBtn
+  );
   const termLabel = document.createElement('span');
   const placeholder = document.createElement('div');
   webHost.appendChild(placeholder);
@@ -11382,6 +12279,14 @@ function fakeSessionEls() {
     browserToolbar,
     collapseBtn,
     fullscreenBtn,
+    fullBrowserComposerBtn,
+    composerContext,
+    contextChips,
+    contextTarget,
+    contextAgent,
+    attachPageBtn,
+    contextError,
+    switchRouteTargetBtn,
     urlBar: document.createElement('input'),
     captureChip: document.createElement('span'),
   };
@@ -11398,6 +12303,8 @@ document.addEventListener('keydown', (e) => {
     $('#modal-detect').classList.add('hidden');
     $('#drawer-log').classList.add('hidden');
     closeSessionSearch({ restoreFocus: true });
+    const activeSession = state.sessions.get(state.activeId);
+    if (activeSession?.composer.fullBrowserOpen) closeFullBrowserComposer(activeSession);
     for (const session of state.sessions.values()) {
       if (session.browser.serverLauncher) closeServerLauncher(session);
     }

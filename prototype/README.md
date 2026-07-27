@@ -102,8 +102,9 @@ Idle immediately. The thread-list filter defaults to **Recent**, ordering Workin
 groups by meaningful work (creation, submitted prompts, turn-state changes, or explicit attention actions)
 without moving rows or groups during session navigation; toggling it to **A–Z**
 alphabetizes group and session display labels instead. The icon-only control sits below the Threads header,
-and its validated choice stays in renderer local storage, does not affect Needs Attention urgency, and is
-hidden in Git Changes. Streaming terminal output does not reorder rows. Click an
+left-aligned within the toolbar's existing 8 px inset; its validated choice stays in renderer local storage,
+does not affect Needs Attention urgency, and is hidden in Git Changes. Streaming terminal output does not
+reorder rows. Click an
 inactive Threads row to activate that session, reveal its tab, and return focus to its terminal or open
 composer. Hover over an inactive row for a brief pause, or move keyboard focus to it, to inspect a live,
 read-only terminal preview without changing sessions. The preview stays open while the pointer is over
@@ -130,6 +131,24 @@ Drafts are capped at 64 KiB and persist independently in managed restore snapsho
 `Option+Up` / `Option+Down` reuse prompts from sessions with the same canonical working directory.
 History is local plaintext, searchable, individually deletable, clearable per project with confirmation,
 deduplicated by exact prompt text, limited to 100 entries per project, and capped at 5 MiB globally.
+
+In full-Chromux browser mode, use the browser rail’s **COMPOSE** control or
+`Command+Shift+Enter` (`Control+Shift+Enter` on Windows) to dock the existing Composer beneath the
+full-width mounted browser. `Escape` closes the drawer without clearing its draft. Choose any live
+session as the target; the paired session is selected fresh each time the drawer opens. Sends use the
+recipient’s normal terminal-input path and prompt history while the source browser stays visible.
+Working agents accept steering. A target that exited, has pending terminal input, or owns a Composer
+draft is blocked with a direct switch-to-target action.
+
+Page evidence is opt-in. **ATTACH CURRENT PAGE** persists the current URL, title, bounded visible text,
+console tail, and screenshot before showing a removable/refreshable chip. Only attached evidence adds
+bounded payload, screenshot, URL, and title references to the sent prompt. Successful existing-session
+sends clear attachments; failures preserve them.
+
+Select **New session** to choose Claude, Codex, Grok, or Shell; Grok still requires its data-risk
+acknowledgment. Chromux creates one canonical session in the same runtime, distribution, directory,
+and current URL with a fresh browser partition, activates it in full-browser mode, moves staged
+attachments, and leaves the composed prompt unsent for review.
 
 ### Host resources and parallel agents
 
@@ -169,6 +188,8 @@ Open **RESOURCES** to inspect host-wide owners, FIFO queues, lease expiry, wait 
    **Settings → Browser Fullscreen Behavior** to the active session: full Chromux, paired
    workspace, or the paired → terminal → full-Chromux cycle. This preserves native macOS
    `Control+Command+F` fullscreen. Popups queue too.
+   In full-Chromux mode, the rail also exposes **COMPOSE** for the routed browser/Composer
+   presentation; the mounted page, tabs, URL, queue, console tail, draft, and history remain intact.
 
    Each terminal session owns its own horizontally scrollable browser tab strip. Terminal
    links, queue entries, favorites, and project HTML selections open a new tab or focus an
@@ -192,10 +213,13 @@ Its shell tab remains available for logs and follows the normal Chromux PTY life
      directory with the payload as the prompt, streaming output back; or
    - **FILE-DROP ONLY**: just writes the payload to disk for manual use.
 
-Every capture is written to `~/.chromux/captures/<timestamp>/payload.yaml` (+
+Every capture is written to `~/.chromux/captures/<timestamp>-<unique-suffix>/payload.yaml` (+
 `screenshot.png`) *before* delivery, so a failed send is always manually retryable — the
 failure screen shows the exact retry command. Every attempt is logged to
 `~/.chromux/delivery-log.jsonl` (DELIVERY LOG button in the status bar).
+The full-browser Composer’s **ATTACH CURRENT PAGE** action uses the same persistence boundary, adds
+bounded visible page text to schema-v1 evidence, and stages local references. Selecting **New session**
+moves those references into an unsent draft instead of invoking a delivery adapter.
 
 ## What's in the box
 
@@ -237,9 +261,9 @@ See [`docs/troubleshooting.md`](docs/troubleshooting.md) for the full support gu
 
 | What | Where |
 | --- | --- |
-| Capture payloads + screenshots | `~/.chromux/captures/<timestamp>/` |
+| Capture payloads + screenshots | `~/.chromux/captures/<timestamp>-<unique-suffix>/` |
 | Delivery log | `~/.chromux/delivery-log.jsonl` |
-| Restore snapshot | `~/.chromux/restore-sessions.json` (schema v8; includes validated provider conversation IDs, custom tab-group membership/focus, last deliberate activity, ordered browser page/explorer tabs, optional 64 KiB composer drafts, and up to 20 bounded historical Needs Attention records per session) |
+| Restore snapshot | `~/.chromux/restore-sessions.json` (schema v9; includes validated provider conversation IDs, custom tab-group membership/focus, last deliberate activity, ordered browser page/explorer tabs, optional 64 KiB Composer drafts, staged browser-context references, the full-browser Composer-open flag, and up to 20 bounded historical Needs Attention records per session; routing targets remain ephemeral and old candidate `chatMessages` are discarded) |
 | Prompt history | `~/.chromux/prompt-history.json` (local plaintext, mode `0600`, 100 entries/project, 5 MiB total) |
 | Saved projects | `~/.chromux/projects.json` |
 | Update cache/source/install log | `~/.chromux/update-cache.json`, `~/.chromux/update-source.json`, `~/.chromux/update-install.log` |

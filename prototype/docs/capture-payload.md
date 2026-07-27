@@ -1,7 +1,7 @@
 # Chromux capture payload — YAML schema v1
 
 Every browser→agent capture is a single YAML document written to
-`~/.chromux/captures/<timestamp>/payload.yaml` **before** any delivery attempt, so payloads are
+`~/.chromux/captures/<timestamp>-<unique-suffix>/payload.yaml` **before** any delivery attempt, so payloads are
 always inspectable and manually retryable (`claude -p "$(cat payload.yaml)"`).
 
 ## Schema
@@ -16,6 +16,8 @@ session:
 page:
   url: http://localhost:5173/checkout
   title: Checkout — Web App
+  visible_text: 'Checkout Your cart …' # visible viewport/page text, bounded below
+  visible_text_truncated: false
 selection:                        # null for page-level captures (no element picked)
   selector: '#cart > div.line-item:nth-of-type(3) > button.remove'
   outer_html: '<button class="remove" …>'   # bounded, see limits
@@ -29,7 +31,7 @@ console:
       level: error                # debug | info | warn | error
       message: 'Uncaught TypeError: cart.items is undefined'
 screenshot:
-  path: /Users/me/.chromux/captures/2026-07-06_21-14-03/screenshot.png
+  path: /Users/me/.chromux/captures/2026-07-06_21-14-03-a1b2c3/screenshot.png
   mode: visible-viewport          # or "unavailable" — payload is kept without an image
 delivery:
   adapter: claude -p              # v1's only agent adapter; file-drop is logged separately
@@ -42,6 +44,7 @@ notes: the remove button deletes the wrong line item   # user note; null if omit
 
 | Field | Bound | On overflow |
 | --- | --- | --- |
+| `page.visible_text` | 24 KiB UTF-8 | truncate + `page.visible_text_truncated: true` |
 | `selection.outer_html` | 8,000 chars | truncate + `truncated: true` |
 | `console.entries` | last 50 messages | drop oldest + `truncated: true`, `total_captured` keeps the real count |
 | `console.entries[].message` | 500 chars each | truncate |
@@ -56,11 +59,18 @@ Chromux never deletes captures. Each capture directory is self-contained
 `~/.chromux/captures/`. Delivery attempts (adapter, target, exit status, payload path) append
 to `~/.chromux/delivery-log.jsonl`.
 
+Full-browser **ATTACH CURRENT PAGE** uses the same payload and screenshot persistence boundary before
+showing a Composer attachment chip. A routed prompt includes bounded local payload, screenshot, URL,
+and title references only while that attachment remains staged. Refresh writes a new capture
+directory; removing a chip does not delete either capture from disk.
+
 For the full local-data inventory, outbound delivery boundaries, and cleanup guidance, see
 [privacy-and-local-data.md](privacy-and-local-data.md).
 
 ## Versioning
 
 `schema_version` is bumped on any breaking change to field names, nesting, or semantics.
-Additive optional fields do not bump the version. v1 intentionally excludes network/telemetry
-capture (perf entries, request waterfall) — deferred per the idea brief.
+Additive optional fields do not bump the version. `page.visible_text` and
+`page.visible_text_truncated` were added in Chromux 0.63.0 without changing the v1 contract.
+v1 intentionally excludes network/telemetry capture (perf entries, request waterfall) — deferred
+per the idea brief.

@@ -32,7 +32,8 @@ fs.writeFileSync(e2ePath, `
 (async () => {
   const b = window.chromuxTestBrowser;
   const h = window.chromuxTestHotkeys;
-  if (!b || !h) throw new Error('Missing browser / hotkey test API');
+  const composer = window.chromuxTestFullBrowserComposer;
+  if (!b || !h || !composer) throw new Error('Missing browser / hotkey / full-browser-Composer test API');
   const expect = (cond, msg) => { if (!cond) throw new Error(msg); };
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const waitFor = async (fn, msg, timeout = 8000) => {
@@ -123,6 +124,11 @@ fs.writeFileSync(e2ePath, `
   await sendShortcut('F', ['meta', 'shift']);
   expect(b.state(firstId).layoutMode === 'browserChromux',
     'Command+Shift+F from non-editable guest focus should enter browser-Chromux layout');
+  await focusGuest('#noneditable', false);
+  await sendShortcut('Enter', ['meta', 'shift']);
+  expect(composer.state(firstId).open,
+    'Command+Shift+Enter from non-editable guest focus should open the full-browser Composer');
+  composer.escape(firstId);
   await sendShortcut('F', ['meta', 'shift']);
   expect(b.state(firstId).layoutMode === 'paired',
     'second Command+Shift+F from non-editable guest focus should restore paired layout');
@@ -145,6 +151,10 @@ fs.writeFileSync(e2ePath, `
     await sendShortcut('F', ['meta', 'shift']);
     expect(b.state(firstId).layoutMode === 'paired',
       'Command+Shift+F should be suppressed while guest editable is focused: ' + selector);
+
+    await sendShortcut('Enter', ['meta', 'shift']);
+    expect(!composer.state(firstId).open && !composer.state(firstId).composerOpen,
+      'Command+Shift+Enter should be suppressed while guest editable is focused: ' + selector);
 
     await sendShortcut('3', ['meta']);
     expect(b.state(firstId).active, 'Command+3 should be suppressed while guest editable is focused: ' + selector);

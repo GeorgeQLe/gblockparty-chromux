@@ -79,6 +79,14 @@ fs.writeFileSync(e2ePath, `
         popoverBottom: popoverRect?.bottom,
       }));
   };
+  const expectThreadSortLeftInset = (context) => {
+    const toolbarRect = document.querySelector('#thread-toolbar')?.getBoundingClientRect();
+    const controlRect = document.querySelector('#thread-sort-toggle')?.getBoundingClientRect();
+    const inset = toolbarRect && controlRect ? controlRect.left - toolbarRect.left : null;
+    expect(inset !== null && Math.abs(inset - 8) <= 0.5,
+      context + ' should align the thread filter to the toolbar\\'s 8px left inset: '
+        + JSON.stringify({ inset, toolbarLeft: toolbarRect?.left, controlLeft: controlRect?.left }));
+  };
   await wait(100);
 
   const holder = rail.addTerminalSession({ name: 'holder', agent: '', cwd: ${JSON.stringify(looseDir)} });
@@ -102,6 +110,7 @@ fs.writeFileSync(e2ePath, `
     && railHeaderControls.detect.bottom <= railHeaderControls.head.bottom
     && recentControl.geometry.top >= railHeaderControls.header.bottom,
   'Detect should match the compact control height while the filter moves below the Threads header');
+  expectThreadSortLeftInset('Initial Threads layout');
   rail.focusThreadSortControl();
   expect(rail.threadSortControl().focused, 'thread sort control should accept keyboard focus');
 
@@ -1042,6 +1051,7 @@ fs.writeFileSync(e2ePath, `
         && themedFilter.geometry.top >= themedHeader.header.bottom
         && themedFilter.geometry.right <= railRect.right,
       theme + ' ' + mode + ' should preserve compact Detect and the lower filter-icon layout');
+      expectThreadSortLeftInset(theme + ' ' + mode);
       const attentionGeometry = rail.attentionGeometry();
       expect(attentionGeometry.cards.length >= 2 && attentionGeometry.gaps.every((gap) => gap >= 5.9)
         && attentionGeometry.firstInset >= 5.9 && attentionGeometry.lastInset >= 5.9,

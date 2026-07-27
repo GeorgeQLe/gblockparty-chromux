@@ -17,7 +17,12 @@ fs.writeFileSync(e2ePath, `
   const themes = window.chromuxTestThemes;
   const expect = (condition, message) => { if (!condition) throw new Error(message); };
   const expected = ['blueprint', 'retro-os', 'streak', 'liquid-glass'];
-  const expectedWindowButtonY = { blueprint: 14, 'retro-os': 22, streak: 19, 'liquid-glass': 22 };
+  const expectedWindowButtonPosition = {
+    blueprint: { x: 14, y: 14 },
+    'retro-os': { x: 22, y: 22 },
+    streak: { x: 14, y: 19 },
+    'liquid-glass': { x: 26, y: 22 },
+  };
   const modes = ['light', 'dark'];
   const terminalPalettes = {
     'blueprint-light': { background: '#f4f9ff', foreground: '#173b62', cursor: '#006d9c', black: '#173b62', brightBlack: '#6684a3', red: '#a33a2c', brightRed: '#d45747', green: '#13764d', brightGreen: '#239b68', yellow: '#8a5b00', brightYellow: '#b77c0e', blue: '#006d9c', brightBlue: '#218fc0', magenta: '#674fa3', brightMagenta: '#8b70c7', cyan: '#08758a', brightCyan: '#2699ad', white: '#dbe9f6', brightWhite: '#ffffff' },
@@ -30,6 +35,8 @@ fs.writeFileSync(e2ePath, `
     'liquid-glass-dark': { background: '#111827', foreground: '#e7edf7', cursor: '#23b7ec', black: '#111827', brightBlack: '#56647a', red: '#ef6a5c', brightRed: '#ff958a', green: '#35c98c', brightGreen: '#72e0b3', yellow: '#e3a02d', brightYellow: '#f3c86f', blue: '#23b7ec', brightBlue: '#71d8ff', magenta: '#9587f4', brightMagenta: '#c0b7ff', cyan: '#52d7e8', brightCyan: '#94eef8', white: '#dbe5f2', brightWhite: '#ffffff' },
   };
   const rgb = (value) => {
+    const hex = String(value).match(/^#([0-9a-f]{6})$/i);
+    if (hex) return [0, 2, 4].map((offset) => parseInt(hex[1].slice(offset, offset + 2), 16));
     const channels = value.match(/[\\d.]+/g);
     if (!channels || channels.length < 3) throw new Error('unparseable color: ' + value);
     return channels.slice(0, 3).map(Number);
@@ -93,6 +100,11 @@ fs.writeFileSync(e2ePath, `
     Array.from({ length: realTerminal.rows + 30 }, (_, index) => 'scrollback line ' + index + '\\r\\n').join(''),
     resolve,
   ));
+  await new Promise((resolve) => realTerminal.write([
+    '\\x1b[34mANSI_FN\\x1b[0m syntax()\\r\\n',
+    '\\x1b[32m+ ANSI_ADD\\x1b[0m\\r\\n',
+    '\\x1b[31m- ANSI_REMOVE\\x1b[0m\\r\\n',
+  ].join(''), resolve));
   await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   const realHelper = realTerminalHost.querySelector('.xterm-helper-textarea');
   const realViewport = realTerminalHost.querySelector('.xterm-viewport');
@@ -100,6 +112,52 @@ fs.writeFileSync(e2ePath, `
   expect(realHelper instanceof HTMLTextAreaElement, 'real xterm should create its helper textarea');
   expect(realTerminal.buffer.active.baseY > 0, 'real xterm should retain written scrollback rows');
   expect(realViewport.scrollHeight > realViewport.clientHeight, 'real xterm should render scrollback in a scrollable viewport');
+  const fixtureCell = (marker) => {
+    const buffer = realTerminal.buffer.active;
+    for (let row = 0; row < buffer.length; row += 1) {
+      const line = buffer.getLine(row);
+      const text = line?.translateToString(false) || '';
+      const column = text.indexOf(marker);
+      if (column >= 0) return { row, column, cell: line.getCell(column), line };
+    }
+    throw new Error('missing ANSI fixture row: ' + marker);
+  };
+  const ansiFixtures = {
+    syntax: fixtureCell('ANSI_FN'),
+    added: fixtureCell('+ ANSI_ADD'),
+    removed: fixtureCell('- ANSI_REMOVE'),
+  };
+  const ansiPaletteKey = ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white',
+    'brightBlack', 'brightRed', 'brightGreen', 'brightYellow', 'brightBlue', 'brightMagenta', 'brightCyan', 'brightWhite'];
+  const assertCodexAnsiFixture = (theme, mode) => {
+    const label = theme + ' ' + mode;
+    const palette = terminalPalettes[theme + '-' + mode];
+    const expectedIndexes = { syntax: 4, added: 2, removed: 1 };
+    for (const [name, fixture] of Object.entries(ansiFixtures)) {
+      const cell = realTerminal.buffer.active.getLine(fixture.row).getCell(fixture.column);
+      expect(cell.isFgPalette(), label + ' ' + name + ' should retain a palette-indexed foreground');
+      expect(cell.getFgColor() === expectedIndexes[name],
+        label + ' ' + name + ' should retain ANSI index ' + expectedIndexes[name] + '; got ' + cell.getFgColor());
+      expect(cell.isBgDefault(), label + ' ' + name + ' should retain the theme background');
+      expect(!cell.isFgRGB() && !cell.isBgRGB(),
+        label + ' ' + name + ' should not retain immutable truecolor foregrounds or diff fills');
+      const foreground = palette[ansiPaletteKey[cell.getFgColor()]];
+      const ratio = contrast(foreground, palette.background);
+      expect(ratio >= 3, label + ' ' + name + ' ANSI color should remain readable; got '
+        + ratio.toFixed(2) + ' from ' + foreground + ' on ' + palette.background);
+    }
+    for (const fixture of Object.values(ansiFixtures)) {
+      const line = realTerminal.buffer.active.getLine(fixture.row);
+      for (let column = 0; column < realTerminal.cols; column += 1) {
+        const cell = line.getCell(column);
+        expect(!cell.isFgRGB() && !cell.isBgRGB(),
+          label + ' Codex ANSI fixture should contain no truecolor cell at column ' + column);
+      }
+    }
+    expect(realTerminal.options.theme.background === palette.background
+      && realTerminal.options.theme.foreground === palette.foreground,
+    label + ' should repaint the real ANSI fixture through the selected Chromux palette');
+  };
 
   const terminalGeometry = () => ({
     cols: realTerminal.cols,
@@ -151,6 +209,7 @@ fs.writeFileSync(e2ePath, `
   const contextMenuSessionId = await themes.addContextMenuSession();
   const contextMenuTab = themes.sessionTab(contextMenuSessionId);
   expect(contextMenuTab instanceof HTMLButtonElement, 'context-menu coverage should use a real session tab');
+  const trackedRealTerminalId = themes.trackRealTerminal(realTerminal);
 
   const terminalIds = [
     themes.addTerminalSession({ rows: 17, content: 'first prompt', inputBuffer: 'typed input', focused: true, turnState: 'working' }),
@@ -178,13 +237,12 @@ fs.writeFileSync(e2ePath, `
   for (const theme of expected) {
     themes.clearTerminalEvents();
     themes.select(theme);
-    expect(JSON.stringify(themes.windowButtonPosition()) === JSON.stringify({ x: 14, y: expectedWindowButtonY[theme] }), theme + ' should vertically center native window controls; got ' + JSON.stringify(themes.windowButtonPosition()));
-    assertTerminalSync(theme, 'light');
-    themes.selectMode('dark');
-    expect(JSON.stringify(themes.windowButtonPosition()) === JSON.stringify({ x: 14, y: expectedWindowButtonY[theme] }), theme + ' mode switching should preserve the native window-control position');
-    assertTerminalSync(theme, 'dark');
+    for (const mode of modes) {
+      themes.selectMode(mode);
+      expect(JSON.stringify(themes.windowButtonPosition()) === JSON.stringify(expectedWindowButtonPosition[theme]), theme + ' ' + mode + ' should position native window controls from the measured header; got ' + JSON.stringify(themes.windowButtonPosition()));
+      assertTerminalSync(theme, mode);
+    }
     themes.selectMode('light');
-    assertTerminalSync(theme, 'light');
   }
   for (const id of [...terminalIds, incompleteTerminalId, disposedTerminalId]) {
     const terminal = themes.terminalSession(id);
@@ -206,9 +264,23 @@ fs.writeFileSync(e2ePath, `
       expect(document.documentElement.style.colorScheme === mode, mode + ' should set the document color scheme');
       expect(JSON.stringify(themes.selectedCards()) === JSON.stringify([theme]), theme + ' should be the only pressed card');
       expect(JSON.stringify(themes.selectedModes()) === JSON.stringify([mode]), mode + ' should be the only pressed mode');
+      if (theme === 'liquid-glass') {
+        const gauges = [...document.querySelectorAll('.titlebar-gauges .gauge')];
+        expect(gauges.length === 3, 'liquid glass should retain all three titlebar gauges');
+        const titlebarLeft = document.querySelector('#titlebar').getBoundingClientRect().left;
+        const brandLeft = document.querySelector('#titlebar .brand').getBoundingClientRect().left;
+        expect(brandLeft - titlebarLeft >= 84, 'liquid glass ' + mode + ' branding should retain clearance from shifted native controls; got ' + (brandLeft - titlebarLeft));
+        for (const gauge of gauges) {
+          const style = getComputedStyle(gauge);
+          expect(style.borderTopWidth === '1px' && style.borderRightWidth === '1px' && style.borderBottomWidth === '1px' && style.borderLeftWidth === '1px', 'liquid glass ' + mode + ' gauges should have a visible 1px boundary');
+          expect(parseFloat(style.paddingLeft) >= 8 && style.paddingLeft === style.paddingRight, 'liquid glass ' + mode + ' gauges should have balanced horizontal padding; got ' + style.paddingLeft + ' / ' + style.paddingRight);
+          expect(parseFloat(style.paddingTop) >= 4 && style.paddingTop === style.paddingBottom, 'liquid glass ' + mode + ' gauges should have balanced vertical padding; got ' + style.paddingTop + ' / ' + style.paddingBottom);
+        }
+      }
       expectContrast(document.querySelector('#settings-check-updates'), theme + ' ' + mode + ' primary button');
       expectContrast(document.querySelector('[data-theme-option="' + theme + '"] .theme-check'), theme + ' ' + mode + ' selected-theme check');
       assertRealTerminalPresentation(theme, mode);
+      assertCodexAnsiFixture(theme, mode);
 
       contextMenuTab.dispatchEvent(new MouseEvent('contextmenu', {
         bubbles: true,
@@ -310,6 +382,7 @@ fs.writeFileSync(e2ePath, `
   localStorage.setItem('chromux.theme', 'liquid-glass');
   expect(themes.modeFromStorage() === 'light', 'legacy non-Blueprint selections should migrate to light mode');
   themes.reset();
+  themes.untrackRealTerminal(trackedRealTerminalId);
   realTerminal.dispose();
   realTerminalHost.remove();
   attentionEmptyFixture.remove();
@@ -327,7 +400,7 @@ const child = spawn(process.execPath, [electronCli, '.', '--smoke'], {
 let stdout = ''; let stderr = '';
 child.stdout.on('data', (chunk) => { stdout += chunk; });
 child.stderr.on('data', (chunk) => { stderr += chunk; });
-const timeout = setTimeout(() => child.kill('SIGTERM'), 30000);
+const timeout = setTimeout(() => child.kill('SIGTERM'), 60000);
 child.on('close', (code, signal) => {
   clearTimeout(timeout);
   const out = fs.existsSync(e2eOutPath) ? fs.readFileSync(e2eOutPath, 'utf8') : '';

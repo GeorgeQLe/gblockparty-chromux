@@ -1,5 +1,74 @@
 # Release Notes
 
+## GBlockParty Chromux v0.64.1
+
+Tag: `chromux-v0.64.1`
+
+- Launch every Chromux-managed Codex session with process-scoped `TERM=xterm-color` and Codex’s
+  ANSI TUI theme so syntax and diff colors remain mapped to the active Chromux terminal palette.
+- Apply the compatibility profile to new and resumed macOS/WSL sessions and bare Codex commands
+  adopted from a Chromux shell without changing Claude, Grok Build, or ordinary shell behavior.
+- Preserve explicit shell-launched Codex themes as an opt-out while adding only missing notify and
+  update-check settings, with no duplicated configuration arguments.
+- Repaint representative palette-indexed Codex syntax and diff output across all eight Chromux
+  appearances without retaining immutable truecolor diff backgrounds.
+- Keep Electron smoke tests from starting detached resource-broker daemons and disconnect terminal
+  resize observers before disposal so repeated renderer runs remain isolated and deterministic.
+
+## GBlockParty Chromux v0.64.0
+
+Tag: `chromux-v0.64.0` (superseded before publication by `chromux-v0.64.1`)
+
+- Replace the unpublished full-browser chat timeline with a full-width browser and routed
+  **COMPOSE** drawer.
+- Route prompts to any live session through the recipient’s existing terminal-input, history,
+  activity, and attention paths while keeping the source browser visible; allow working-agent
+  steering and block exited, missing, pending-input, or draft-owning targets.
+- Add explicit persisted **ATTACH CURRENT PAGE** evidence with removable/refreshable chips and
+  bounded payload, screenshot, URL, and title references that clear only after successful delivery.
+- Create **New session** targets through canonical session creation with inherited runtime,
+  distribution, directory, and current URL, a fresh browser partition, moved attachments, and an
+  editable unsent prompt.
+- Keep schema v9 while persisting `fullBrowserComposerOpen` and staged evidence, treating the
+  unpublished `chatOpen` field as a compatibility fallback and discarding `chatMessages`.
+
+## GBlockParty Chromux v0.63.1
+
+Tag: `chromux-v0.63.1` (superseded before publication by `chromux-v0.64.0`)
+
+- Keep the production Electron profile at the stable `chromux` app-data path instead of deriving it
+  from display-oriented packaging metadata.
+- Recover renderer settings automatically by preferring an existing legacy `chromux` profile, then
+  an existing `GBlockParty Chromux` profile, while using `chromux` for clean installations.
+- Preserve explicit `--user-data-dir` paths and isolated smoke profiles, and retain renderer Local
+  Storage during startup cleanup.
+- Left-align the icon-only Recent/A–Z thread filter within its existing 8 px toolbar inset while
+  preserving accessibility, persisted ordering, and the collapsed Git Changes layout.
+
+## GBlockParty Chromux v0.63.0
+
+Tag: `chromux-v0.63.0` (superseded before publication by `chromux-v0.63.1`)
+
+- Add an optional full-browser structured-chat presentation with a theme-width timeline, retained
+  mounted browser, docked/expandable Composer, exact Composer prompt tracking, and explicitly labeled
+  bounded terminal-derived assistant output.
+- Persist bounded per-session chat timelines and staged browser-context references in schema-v9
+  managed restore snapshots, restoring pending replies as interrupted while keeping schemas v1–v8
+  compatible with empty chat state.
+- Capture bounded visible page text alongside the existing URL, title, console tail, screenshot, and
+  optional picked element, then create fresh same-runtime browser sessions with removable/refreshable
+  context chips and editable unsent drafts for Claude, Codex, Grok, or Shell.
+- Preserve the Grok acknowledgment gate, source drafts on failure, raw-terminal escape hatch, exact
+  browser/tab/queue/console/history state, and all non-chat layouts.
+
+## GBlockParty Chromux v0.62.1
+
+Tag: `chromux-v0.62.1` (pending real Windows UAT for the v0.62 release line)
+
+- Position native macOS traffic-light controls from each theme header’s measured left edge so inset Liquid Glass and Retro-OS titlebars retain comfortable window-edge spacing.
+- Increase Liquid Glass titlebar branding clearance for the shifted native controls.
+- Give the SESSIONS, QUEUED, and SENT glass gauges visible 1 px boundaries with balanced internal padding in both Light and Dark modes.
+
 ## GBlockParty Chromux v0.62.0
 
 Tag: `chromux-v0.62.0` (pending real Windows UAT)

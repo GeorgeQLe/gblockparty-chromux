@@ -91,12 +91,34 @@ fs.writeFileSync(e2ePath, `
   gate.reset();
   gate.useFakeLauncher();
   gate.launch('codex', 'offline-one', []);
+  gate.launchOptions({
+    name: 'offline-composer',
+    composerDraft: 'review before sending',
+    initialStagedBrowserContexts: [{
+      captureId: 'held-capture',
+      payloadPath: '/tmp/held/payload.yaml',
+      screenshotPath: '/tmp/held/screenshot.png',
+      url: 'https://example.test/held',
+      title: 'Held page',
+      capturedAt: new Date().toISOString(),
+      visibleTextTruncated: false,
+    }],
+    initialBrowserLayoutMode: 'browserChromux',
+    initialFullBrowserComposerOpen: true,
+  });
   await gate.setStatus({ error: 'offline fixture' });
   warning = gate.warning();
   expect(warning.buttons.includes('RETRY CHECK') && warning.buttons.includes('RESUME ANYWAY'),
     'failed check should remain held with retry and bypass');
   expect(gate.snapshot().some((row) => row.name === 'offline-one' && row.agent === 'codex'),
     'held Codex launch should remain in quit/update snapshots');
+  const heldComposer = gate.snapshot().find((row) => row.name === 'offline-composer');
+  expect(heldComposer && heldComposer.composerDraft === 'review before sending'
+    && heldComposer.stagedBrowserContexts.length === 1
+    && heldComposer.browserLayoutMode === 'browserChromux'
+    && heldComposer.fullBrowserComposerOpen === true
+    && !Object.prototype.hasOwnProperty.call(heldComposer, 'chatMessages'),
+  'held Codex launches should retain initial routed-Composer state and requested presentation');
 
   gate.reset();
   const adoption = window.chromuxTestShellAdoption;
@@ -124,6 +146,7 @@ const child = spawn(process.execPath, [electronCli, '.', '--smoke'], {
     PATH: '/usr/bin:/bin',
     CHROMUX_E2E: e2ePath,
     CHROMUX_E2E_OUT: e2eOutPath,
+    CHROMUX_E2E_CODEX_UPDATE_ERROR: '1',
   },
   stdio: ['ignore', 'pipe', 'pipe'],
 });

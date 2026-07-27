@@ -98,6 +98,13 @@ function testRecognizedEntriesOnly() {
   ];
   for (const name of retainedHomeEntries) touch(path.join(fixture.chromuxHome, name));
   touch(path.join(fixture.chromuxHome, 'captures', 'capture-1', 'payload.yaml'));
+  const rendererLocalStorage = path.join(
+    fixture.userDataDir,
+    'Local Storage',
+    'leveldb',
+    '000003.log',
+  );
+  touch(rendererLocalStorage, 'renderer preferences');
 
   const matchingSignalDirectory = path.join(
     fixture.chromuxHome,
@@ -140,6 +147,7 @@ function testRecognizedEntriesOnly() {
     assert(exists(path.join(fixture.chromuxHome, name)), `${name} should remain`);
   }
   assert(exists(path.join(fixture.chromuxHome, 'captures', 'capture-1', 'payload.yaml')), 'captures should remain');
+  assert(exists(rendererLocalStorage), 'renderer Local Storage should remain');
   assert(fs.lstatSync(matchingSignalSymlink).isSymbolicLink(), 'matching signal symlink should remain');
   assert(exists(outsideSignal), 'signal symlink target should remain');
   assert(fs.lstatSync(matchingSignalDirectory).isDirectory(), 'matching signal directory should remain');
