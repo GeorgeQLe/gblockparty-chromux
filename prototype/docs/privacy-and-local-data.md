@@ -20,6 +20,24 @@ display name, absolute project directory, `package.json` script name, detected p
 start command. Chromux revalidates the directory and script against the current `package.json`; it does not
 store arbitrary command text and does not sync these paths or commands.
 
+## Project creation
+
+The **Create Project** launcher reads `~/.config/p/categories.conf` and the
+`P_BASE`, `XDG_CACHE_HOME`, and `P_NP_HOOK` environment values from the active
+host or WSL runtime. It creates only a validated destination inside the active
+runtime's configured Projects Root. Projects Root preferences live in
+`~/.chromux/preferences.json`, with separate entries for the host and each WSL
+distribution.
+
+Fresh creation runs local Git initialization. Clone creation passes the entered
+repository location directly to `git clone`, so Git and the selected remote may
+make network requests and apply their own authentication and retention rules.
+After success, Chromux updates `p`'s local `p_history`, invalidates its two
+completion caches, and may execute the user-configured `P_NP_HOOK`. That hook is
+outside Chromux's control and may read files, modify other systems, or use the
+network. A hook, history, or cache failure produces a visible warning and does
+not roll back the created repository.
+
 This document describes the current Chromux prototype. It is a product data
 handling notice, not a legal privacy policy, compliance certification, or legal
 advice.

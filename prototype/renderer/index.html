@@ -291,6 +291,21 @@
           </label>
         </section>
         <div id="settings-wsl-divider" class="settings-divider hidden" aria-hidden="true"></div>
+        <section class="settings-preferences" aria-labelledby="projects-root-heading">
+          <div>
+            <div id="projects-root-heading" class="microlabel">PROJECTS ROOT</div>
+            <div class="settings-section-copy">New projects are created inside this runtime-specific root. Windows stores a separate Linux path for each WSL distribution.</div>
+            <div id="settings-projects-root-status" class="settings-preference-status" aria-live="polite"></div>
+          </div>
+          <label class="settings-projects-root-control">
+            <span class="microlabel">ABSOLUTE PATH</span>
+            <span class="field-row">
+              <input id="settings-projects-root" type="text" spellcheck="false" aria-label="Projects Root">
+              <button id="settings-projects-root-save" class="btn" type="button">SAVE</button>
+            </span>
+          </label>
+        </section>
+        <div class="settings-divider" aria-hidden="true"></div>
         <section class="settings-preferences" aria-labelledby="prevent-sleep-heading">
           <div>
             <div id="prevent-sleep-heading" class="microlabel">PREVENT SLEEP</div>
@@ -341,37 +356,75 @@
     </div>
   </div>
 
-  <!-- ══ new session modal ══ -->
+  <!-- ══ unified project launcher ══ -->
   <div id="modal-new" class="overlay hidden">
-    <div class="modal">
+    <div class="modal modal-launcher">
       <div class="modal-head">
-        <span class="microlabel">NEW SESSION</span>
+        <span class="microlabel">PROJECT LAUNCHER</span>
         <button class="modal-x" data-close="modal-new">✕</button>
       </div>
       <div class="modal-body">
-        <label class="field">
-          <span class="microlabel">SESSION NAME</span>
-          <input id="ns-name" type="text" spellcheck="false" />
-        </label>
-        <label class="field">
-          <span class="microlabel">PROJECT DIRECTORY</span>
-          <div class="field-row">
-            <input id="ns-cwd" type="text" spellcheck="false" placeholder="~" />
-            <button id="ns-browse" class="btn">BROWSE…</button>
-          </div>
-        </label>
-        <div class="field saved-projects">
-          <div class="saved-projects-head"><span class="microlabel">SAVED PROJECTS</span><span id="ns-project-status" class="dim"></span></div>
-          <div id="ns-project-list" class="saved-project-list"></div>
-          <label class="field">
-            <span class="microlabel">START SCRIPT — PACKAGE.JSON</span>
-            <select id="ns-start-script" disabled><option value="">SELECT A VALID PROJECT DIRECTORY</option></select>
-          </label>
-          <div class="field-row">
-            <button id="ns-save-project" class="btn" disabled>SAVE PROJECT</button>
-            <button id="ns-start-project" class="btn btn-amber" disabled>START PROJECT</button>
-          </div>
+        <div class="launcher-tabs" role="tablist" aria-label="Project launcher mode">
+          <button id="launcher-tab-open" class="on" type="button" role="tab" aria-selected="true">OPEN EXISTING <kbd>⌘T</kbd></button>
+          <button id="launcher-tab-create" type="button" role="tab" aria-selected="false">CREATE PROJECT <kbd>⌘N</kbd></button>
         </div>
+        <section id="launcher-open-panel" class="launcher-panel" role="tabpanel" aria-labelledby="launcher-tab-open">
+          <label class="field">
+            <span class="microlabel">SESSION NAME</span>
+            <input id="ns-name" type="text" spellcheck="false" />
+          </label>
+          <label class="field">
+            <span class="microlabel">PROJECT DIRECTORY</span>
+            <div class="field-row">
+              <input id="ns-cwd" type="text" spellcheck="false" placeholder="~" />
+              <button id="ns-browse" class="btn">BROWSE…</button>
+            </div>
+          </label>
+          <div class="field saved-projects">
+            <div class="saved-projects-head"><span class="microlabel">SAVED PROJECTS</span><span id="ns-project-status" class="dim"></span></div>
+            <div id="ns-project-list" class="saved-project-list"></div>
+            <label class="field">
+              <span class="microlabel">START SCRIPT — PACKAGE.JSON</span>
+              <select id="ns-start-script" disabled><option value="">SELECT A VALID PROJECT DIRECTORY</option></select>
+            </label>
+            <div class="field-row">
+              <button id="ns-save-project" class="btn" disabled>SAVE PROJECT</button>
+              <button id="ns-start-project" class="btn btn-amber" disabled>START PROJECT</button>
+            </div>
+          </div>
+        </section>
+        <section id="launcher-create-panel" class="launcher-panel hidden" role="tabpanel" aria-labelledby="launcher-tab-create">
+          <div class="field">
+            <span class="microlabel">SOURCE</span>
+            <div class="segmented" id="pc-source">
+              <button type="button" data-source="fresh" class="on">FRESH GIT REPOSITORY</button>
+              <button type="button" data-source="clone">CLONE REPOSITORY</button>
+            </div>
+          </div>
+          <label id="pc-clone-field" class="field hidden">
+            <span class="microlabel">GIT CLONE URL</span>
+            <input id="pc-clone-url" type="text" spellcheck="false" placeholder="https://github.com/org/repo.git" />
+          </label>
+          <label class="field">
+            <span class="microlabel">PROJECT NAME — KEBAB-CASE</span>
+            <input id="pc-name" type="text" spellcheck="false" placeholder="my-project" />
+          </label>
+          <div class="launcher-create-grid">
+            <label class="field">
+              <span class="microlabel">CATEGORY</span>
+              <select id="pc-category"></select>
+            </label>
+            <label id="pc-sandbox-field" class="field hidden">
+              <span class="microlabel">SANDBOX TYPE</span>
+              <select id="pc-sandbox-type"></select>
+            </label>
+          </div>
+          <div class="field">
+            <span class="microlabel">DESTINATION</span>
+            <div id="pc-destination" class="launcher-destination">Complete the fields to preview the destination.</div>
+            <div id="pc-status" class="settings-preference-status" role="status" aria-live="polite"></div>
+          </div>
+        </section>
         <div class="field">
           <span class="microlabel">AGENT — CLI RUNS UNCHANGED</span>
           <div class="segmented" id="ns-agent">
@@ -398,7 +451,9 @@
       </div>
       <div class="modal-foot">
         <button class="btn" data-close="modal-new">CANCEL</button>
-        <button id="ns-create" class="btn btn-amber">LAUNCH SESSION</button>
+        <button id="ns-create" class="btn btn-amber">OPEN SESSION</button>
+        <button id="pc-create-only" class="btn hidden">CREATE ONLY</button>
+        <button id="pc-create-launch" class="btn btn-amber hidden">CREATE &amp; LAUNCH</button>
       </div>
     </div>
   </div>

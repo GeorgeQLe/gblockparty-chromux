@@ -15,6 +15,7 @@ const CHROMUX_SHORTCUT_ACTIONS = {
   BROWSER_FULLSCREEN: 'browser-fullscreen',
   GUARDED_QUIT: 'guarded-quit',
   NEW_SESSION: 'new-session',
+  CREATE_PROJECT: 'create-project',
   DETECT: 'detect',
   COMPOSER_OPEN: 'composer-open',
 };
@@ -112,6 +113,9 @@ function chromuxShortcutAction(input = {}, platform = process.platform) {
   }
   if (chord.key === 'T' && !chord.shift) {
     return { id: CHROMUX_SHORTCUT_ACTIONS.NEW_SESSION, key: 'T', label: `${prefix}+T` };
+  }
+  if (chord.key === 'N' && !chord.shift) {
+    return { id: CHROMUX_SHORTCUT_ACTIONS.CREATE_PROJECT, key: 'N', label: `${prefix}+N` };
   }
   if (chord.key === 'D' && !chord.shift) {
     return { id: CHROMUX_SHORTCUT_ACTIONS.DETECT, key: 'D', label: `${prefix}+D` };

@@ -64,6 +64,21 @@ back to npm. Started server URLs remain in the review queue until explicitly ope
 `~/.chromux/projects.json` while Chromux is closed to clear saved projects; malformed or stale entries are
 ignored safely.
 
+## Project creation fails
+
+- Confirm **Settings → Projects Root** is an absolute path in the active
+  runtime. On Windows it must be a canonical Linux path such as
+  `/home/me/projects`, and each WSL distribution has its own value.
+- Names must use lowercase letters, numbers, and hyphens, without leading or
+  trailing hyphens. Clone mode can derive the name from the repository URL.
+- An existing destination is never reused or overwritten. Choose another name
+  or move the existing directory yourself.
+- Fresh and clone creation require Git in the active runtime. Clone
+  authentication and network errors are reported from Git.
+- Chromux removes only its uniquely named staging directory after a creation
+  failure. A warning after **CREATED** means the repository is valid but
+  `p_history`, completion-cache invalidation, or `P_NP_HOOK` failed.
+
 This guide covers the first local loop: terminal output opens a paired browser preview, browser evidence becomes a capture payload, and delivery runs through `claude -p`.
 
 ## Preview detection

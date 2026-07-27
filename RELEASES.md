@@ -1,5 +1,25 @@
 # Release Notes
 
+## GBlockParty Chromux v0.66.0
+
+Tag: `chromux-v0.66.0`
+
+- Replace the overloaded new-session modal with a two-tab project launcher:
+  **Open Existing** on Command/Control-T and **Create Project** on
+  Command/Control-N, preserving editable-field and modal shortcut guards.
+- Add native `np`-compatible fresh and clone creation with configured flat,
+  lifecycle, and sandbox categories, destination previews, kebab-case and root
+  containment validation, unique staging directories, and atomic final moves.
+- Store Projects Root per host and WSL distribution, initially inherit
+  `P_BASE` or `<runtime-home>/projects`, and retain canonical Linux paths on
+  Windows.
+- Update `p` history, invalidate completion caches, and invoke executable
+  `P_NP_HOOK` integrations with visible non-fatal warnings after successful
+  creation.
+- Offer **Create Only** and emphasized **Create & Launch**, passing the
+  main-process-returned runtime, distribution, and path into canonical session
+  creation while retaining the Grok data-risk acknowledgment.
+
 ## GBlockParty Chromux v0.65.0
 
 Tag: `chromux-v0.65.0`

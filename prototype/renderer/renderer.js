@@ -139,6 +139,7 @@ const state = {
   favoritesReady: null,
   projects: [],
   projectConfig: null,
+  scaffolderConfig: null,
   events: [], // ring buffer of applied events (diagnostics), max EVENT_RING_MAX
   ui: {
     theme: storedTheme(),
@@ -168,6 +169,8 @@ const state = {
     lastQueueShortcutFocus: null,
     hoverTabSessionId: null,
     diagnosticSessionId: null,
+    launcherMode: 'open',
+    projectCreationPending: false,
   },
   lastCwd: null,
   contextMenu: null,
@@ -2411,8 +2414,9 @@ function computeShortcutCatalog() {
     { id: 'composer-open', label: `${primaryLabel}Shift+Enter`, key: 'Enter', modifiers: { ...primaryModifiers, shift: true }, kind: 'guarded', order: 23 },
     { id: 'quit', label: `${primaryLabel}Q`, key: 'Q', modifiers: primaryModifiers, kind: 'global', order: 30 },
     { id: 'new-session', label: `${primaryLabel}T`, key: 'T', modifiers: primaryModifiers, kind: 'document', order: 31 },
-    { id: 'detect', label: `${primaryLabel}D`, key: 'D', modifiers: primaryModifiers, kind: 'document', order: 32 },
-    { id: 'escape', label: 'Esc', key: 'Esc', modifiers: {}, kind: 'document', order: 33 },
+    { id: 'create-project', label: `${primaryLabel}N`, key: 'N', modifiers: primaryModifiers, kind: 'document', order: 32 },
+    { id: 'detect', label: `${primaryLabel}D`, key: 'D', modifiers: primaryModifiers, kind: 'document', order: 33 },
+    { id: 'escape', label: 'Esc', key: 'Esc', modifiers: {}, kind: 'document', order: 34 },
   );
 
   return definitions.map((shortcut) => {
@@ -2450,7 +2454,10 @@ function computeShortcutCatalog() {
       description = 'guarded quit';
     } else if (shortcut.id === 'new-session') {
       disabledReason = guardReason;
-      description = 'new session';
+      description = 'open existing project';
+    } else if (shortcut.id === 'create-project') {
+      disabledReason = guardReason;
+      description = 'create project';
     } else if (shortcut.id === 'detect') {
       disabledReason = guardReason;
       description = 'detect terminals';
@@ -8382,6 +8389,13 @@ function openSettings() {
   renderPreventSleepStatus();
   renderCustomTabGroups();
   $('#modal-settings').classList.remove('hidden');
+  window.chromux.projectScaffolderConfig().then((config) => {
+    state.scaffolderConfig = config;
+    renderProjectsRootSetting();
+  }).catch((error) => {
+    $('#settings-projects-root-status').textContent = error.message || 'Projects Root is unavailable.';
+    $('#settings-projects-root-status').classList.add('fail');
+  });
   invalidate('shortcutDebug');
   checkUpdates(false).catch(() => {});
 }
@@ -9531,22 +9545,137 @@ async function autoRestoreWorkspace() {
 // Modals, drawer, chrome wiring
 // ───────────────────────────────────────────────────────────────────────────
 
-function openNewSessionModal() {
+function launcherPrimaryModifierLabel() {
+  return state.env && state.env.primaryModifier === 'control' ? 'Ctrl' : '⌘';
+}
+
+function selectedLauncherAgent() {
+  return $('#ns-agent .on')?.dataset.agent || '';
+}
+
+function scaffolderRequest() {
+  const source = $('#pc-source .on')?.dataset.source || 'fresh';
+  return {
+    source,
+    cloneUrl: source === 'clone' ? $('#pc-clone-url').value.trim() : '',
+    name: $('#pc-name').value.trim(),
+    category: $('#pc-category').value,
+    sandboxType: $('#pc-sandbox-type').value,
+  };
+}
+
+function renderScaffolderCategories() {
+  const config = state.scaffolderConfig;
+  if (!config) return;
+  const category = $('#pc-category');
+  const previous = category.value;
+  category.replaceChildren(...config.categories.map((entry) => {
+    const option = document.createElement('option');
+    option.value = entry.name;
+    option.textContent = `${entry.name} — ${entry.description || entry.type}`;
+    return option;
+  }));
+  if (config.categories.some((entry) => entry.name === previous)) category.value = previous;
+  const sandbox = $('#pc-sandbox-type');
+  const previousSandbox = sandbox.value;
+  sandbox.replaceChildren(...config.sandboxTypes.map((name) => {
+    const option = document.createElement('option');
+    option.value = name;
+    option.textContent = name;
+    return option;
+  }));
+  if (config.sandboxTypes.includes(previousSandbox)) sandbox.value = previousSandbox;
+  renderScaffolderConditionalFields();
+}
+
+function renderScaffolderConditionalFields() {
+  const source = $('#pc-source .on')?.dataset.source || 'fresh';
+  $('#pc-clone-field').classList.toggle('hidden', source !== 'clone');
+  const category = state.scaffolderConfig?.categories.find((entry) => entry.name === $('#pc-category').value);
+  $('#pc-sandbox-field').classList.toggle('hidden', category?.type !== 'sandbox');
+}
+
+let scaffolderPreviewGeneration = 0;
+
+async function refreshScaffolderPreview() {
+  const generation = ++scaffolderPreviewGeneration;
+  renderScaffolderConditionalFields();
+  const status = $('#pc-status');
+  status.textContent = '';
+  status.classList.remove('fail');
+  try {
+    if (!state.scaffolderConfig) {
+      state.scaffolderConfig = await window.chromux.projectScaffolderConfig();
+      renderScaffolderCategories();
+    }
+    const preview = await window.chromux.projectScaffolderPreview(scaffolderRequest());
+    if (generation !== scaffolderPreviewGeneration) return null;
+    $('#pc-name').value = preview.name;
+    $('#pc-destination').textContent = preview.target;
+    if (preview.exists) {
+      status.textContent = 'Destination already exists.';
+      status.classList.add('fail');
+    }
+    $('#pc-create-only').disabled = preview.exists || state.ui.projectCreationPending;
+    $('#pc-create-launch').disabled = preview.exists || state.ui.projectCreationPending
+      || (selectedLauncherAgent() === 'grok' && !$('#ns-grok-enable').checked);
+    return preview;
+  } catch (error) {
+    if (generation !== scaffolderPreviewGeneration) return null;
+    $('#pc-destination').textContent = 'Complete the fields to preview the destination.';
+    status.textContent = error.message || 'Project destination is invalid.';
+    status.classList.add('fail');
+    $('#pc-create-only').disabled = true;
+    $('#pc-create-launch').disabled = true;
+    return null;
+  }
+}
+
+function selectLauncherMode(mode) {
+  const selected = mode === 'create' ? 'create' : 'open';
+  state.ui.launcherMode = selected;
+  const creating = selected === 'create';
+  $('#launcher-tab-open').classList.toggle('on', !creating);
+  $('#launcher-tab-open').setAttribute('aria-selected', String(!creating));
+  $('#launcher-tab-create').classList.toggle('on', creating);
+  $('#launcher-tab-create').setAttribute('aria-selected', String(creating));
+  $('#launcher-open-panel').classList.toggle('hidden', creating);
+  $('#launcher-create-panel').classList.toggle('hidden', !creating);
+  $('#ns-create').classList.toggle('hidden', creating);
+  $('#pc-create-only').classList.toggle('hidden', !creating);
+  $('#pc-create-launch').classList.toggle('hidden', !creating);
+  if (creating) {
+    refreshScaffolderPreview().finally(() => {
+      const target = $('#pc-name').value ? $('#pc-name') : ($('#pc-clone-url').value ? $('#pc-name') : $('#pc-name'));
+      target.focus();
+    });
+  } else {
+    $('#ns-name').focus();
+    $('#ns-name').select();
+  }
+  renderAgentDataWarning();
+}
+
+function openNewSessionModal(mode = 'open') {
   $('#ns-name').value = `session-${state.counter + 1}`;
   $('#ns-cwd').value = state.lastCwd || (state.env ? state.env.home : '');
+  $('#pc-name').value = '';
+  $('#pc-clone-url').value = '';
+  $('#pc-status').textContent = '';
   $('#ns-grok-enable').checked = false;
   renderAgentDataWarning();
   $('#modal-new').classList.remove('hidden');
   renderSavedProjects();
   refreshProjectConfig().catch(() => {});
   invalidate('shortcutDebug');
-  $('#ns-name').focus();
-  $('#ns-name').select();
+  $('#launcher-tab-open kbd').textContent = `${launcherPrimaryModifierLabel()}T`;
+  $('#launcher-tab-create kbd').textContent = `${launcherPrimaryModifierLabel()}N`;
+  selectLauncherMode(mode);
 }
 
 $('#btn-new-session').onclick = () => {
   closeSessionSearch();
-  openNewSessionModal();
+  openNewSessionModal('open');
 };
 $('#btn-search-sessions').onclick = toggleSessionSearch;
 $('#session-search-input').addEventListener('input', renderSessionSearch);
@@ -9576,7 +9705,7 @@ $('#session-search-results').addEventListener('keydown', (event) => {
     : (index === 0 ? $('#session-search-input') : rows[index - 1]);
   if (next) next.focus();
 });
-$('#btn-first-session').onclick = openNewSessionModal;
+$('#btn-first-session').onclick = () => openNewSessionModal('open');
 document.querySelectorAll('[data-rail-mode]').forEach((button) => {
   button.addEventListener('click', () => selectRailMode(button.dataset.railMode));
 });
@@ -9653,6 +9782,27 @@ $('#settings-wsl-distro').addEventListener('change', async (event) => {
     ? (result.readiness.warning || 'READY')
     : (result.readiness.error || 'NOT READY');
   $('#settings-wsl-status').classList.toggle('fail', !ready);
+  state.scaffolderConfig = await window.chromux.projectScaffolderConfig().catch(() => null);
+  renderProjectsRootSetting();
+});
+function renderProjectsRootSetting() {
+  if (!state.scaffolderConfig) return;
+  $('#settings-projects-root').value = state.scaffolderConfig.root;
+  const warnings = state.scaffolderConfig.warnings || [];
+  $('#settings-projects-root-status').textContent = warnings.join(' ');
+  $('#settings-projects-root-status').classList.toggle('fail', warnings.length > 0);
+}
+$('#settings-projects-root-save').addEventListener('click', async () => {
+  const status = $('#settings-projects-root-status');
+  try {
+    state.scaffolderConfig = await window.chromux.projectScaffolderSetRoot($('#settings-projects-root').value.trim());
+    renderProjectsRootSetting();
+    status.textContent = `SAVED FOR ${state.scaffolderConfig.distro || 'THIS MAC'}`;
+    status.classList.remove('fail');
+  } catch (error) {
+    status.textContent = error.message || 'Projects Root could not be saved.';
+    status.classList.add('fail');
+  }
 });
 $('#settings-developer-mode').addEventListener('change', (event) => {
   changeDeveloperMode(event.target.checked).catch(() => {
@@ -9749,6 +9899,7 @@ function renderAgentDataWarning() {
   $('#grok-data-warning').classList.toggle('hidden', !grokSelected);
   if (!grokSelected) $('#ns-grok-enable').checked = false;
   $('#ns-create').disabled = grokSelected && !$('#ns-grok-enable').checked;
+  if (state.ui.launcherMode === 'create') refreshScaffolderPreview().catch(() => {});
 }
 
 document.addEventListener('click', (e) => {
@@ -9778,6 +9929,73 @@ $('#ns-create').onclick = async () => {
   $('#modal-new').classList.add('hidden');
   await createSession({ name, cwd, agent });
 };
+
+$('#launcher-tab-open').addEventListener('click', () => selectLauncherMode('open'));
+$('#launcher-tab-create').addEventListener('click', () => selectLauncherMode('create'));
+$('#pc-source').addEventListener('click', (event) => {
+  const button = event.target.closest('button[data-source]');
+  if (!button) return;
+  for (const candidate of $('#pc-source').children) candidate.classList.toggle('on', candidate === button);
+  if (button.dataset.source === 'clone' && !$('#pc-name').value.trim()) $('#pc-clone-url').focus();
+  refreshScaffolderPreview().catch(() => {});
+});
+for (const id of ['pc-name', 'pc-clone-url', 'pc-category', 'pc-sandbox-type']) {
+  $(id.startsWith('#') ? id : `#${id}`).addEventListener(id.startsWith('pc-') && id !== 'pc-name' && id !== 'pc-clone-url' ? 'change' : 'input', () => {
+    refreshScaffolderPreview().catch(() => {});
+  });
+}
+
+async function createScaffoldedProject({ launch }) {
+  if (state.ui.projectCreationPending) return null;
+  state.ui.projectCreationPending = true;
+  const status = $('#pc-status');
+  $('#pc-create-only').disabled = true;
+  $('#pc-create-launch').disabled = true;
+  const preview = await refreshScaffolderPreview();
+  if (!preview || preview.exists) {
+    state.ui.projectCreationPending = false;
+    await refreshScaffolderPreview();
+    return null;
+  }
+  const agent = selectedLauncherAgent();
+  if (launch && agent === 'grok' && !$('#ns-grok-enable').checked) {
+    state.ui.projectCreationPending = false;
+    await refreshScaffolderPreview();
+    return null;
+  }
+  status.textContent = 'CREATING PROJECT…';
+  status.classList.remove('fail');
+  let created = null;
+  try {
+    created = await window.chromux.projectScaffolderCreate(scaffolderRequest());
+    const warning = created.warnings?.length ? ` ${created.warnings.join(' ')}` : '';
+    status.textContent = `CREATED ${created.target}.${warning}`;
+    if (launch) {
+      await createSession({
+        name: created.name,
+        runtime: created.runtime,
+        distro: created.distro,
+        cwd: created.target,
+        agent,
+      });
+      $('#modal-new').classList.add('hidden');
+    }
+    state.ui.projectCreationPending = false;
+    return created;
+  } catch (error) {
+    status.textContent = created
+      ? `CREATED ${created.target}, BUT THE SESSION COULD NOT LAUNCH: ${error.message || 'unknown error'}`
+      : (error.message || 'Project creation failed.');
+    status.classList.add('fail');
+    state.ui.projectCreationPending = false;
+    $('#pc-create-only').disabled = false;
+    $('#pc-create-launch').disabled = agent === 'grok' && !$('#ns-grok-enable').checked;
+    return null;
+  }
+}
+
+$('#pc-create-only').addEventListener('click', () => createScaffoldedProject({ launch: false }));
+$('#pc-create-launch').addEventListener('click', () => createScaffoldedProject({ launch: true }));
 
 document.querySelectorAll('[data-close]').forEach((btn) => {
   btn.addEventListener('click', () => {
@@ -9838,6 +10056,7 @@ window.chromux.onShortcutFocusNextQueueItem(handleShortcutFocusNextQueueItem);
 window.chromux.onShortcutToggleBrowser(handleShortcutToggleBrowser);
 window.chromux.onShortcutBrowserFullscreen(handleShortcutBrowserFullscreen);
 window.chromux.onShortcutOpenNewSession(handleShortcutOpenNewSession);
+window.chromux.onShortcutCreateProject(handleShortcutCreateProject);
 window.chromux.onShortcutOpenDetectModal(handleShortcutOpenDetectModal);
 window.chromux.onShortcutOpenComposer(handleShortcutOpenComposer);
 
@@ -9983,8 +10202,14 @@ function handleShortcutBrowserFullscreen() {
 
 function handleShortcutOpenNewSession() {
   if (guardedShortcutDisabledReason(shortcutFocusContext())) return null;
-  openNewSessionModal();
-  return { opened: true };
+  openNewSessionModal('open');
+  return { opened: true, mode: 'open' };
+}
+
+function handleShortcutCreateProject() {
+  if (guardedShortcutDisabledReason(shortcutFocusContext())) return null;
+  openNewSessionModal('create');
+  return { opened: true, mode: 'create' };
 }
 
 function handleShortcutOpenDetectModal() {
@@ -10023,6 +10248,7 @@ function fallbackChromuxShortcutAction(input, primaryModifier = state.env && sta
   const key = String(input.key || '').toUpperCase();
   if (/^[1-9]$/.test(key) && !input.shift) return { id: 'session-index', index: Number(key) - 1 };
   if (key === 'T' && !input.shift) return { id: 'new-session' };
+  if (key === 'N' && !input.shift) return { id: 'create-project' };
   if (key === 'D' && !input.shift) return { id: 'detect' };
   if (key === 'J' && !input.shift) return { id: 'queue-focus' };
   if (key === 'B' && input.shift) return { id: 'browser-toggle' };
@@ -10050,6 +10276,7 @@ function handleRendererShortcutKeydown(e) {
   else if (action.id === 'browser-toggle') result = handleShortcutToggleBrowser();
   else if (action.id === 'browser-fullscreen') result = handleShortcutBrowserFullscreen();
   else if (action.id === 'new-session') result = handleShortcutOpenNewSession();
+  else if (action.id === 'create-project') result = handleShortcutCreateProject();
   else if (action.id === 'detect') result = handleShortcutOpenDetectModal();
   else if (action.id === 'composer-open') result = handleShortcutOpenComposer();
   else return;
@@ -11516,6 +11743,11 @@ if (window.chromuxTest) {
       flushRender();
       return result;
     },
+    shortcutCreateProject() {
+      const result = handleShortcutCreateProject();
+      flushRender();
+      return result;
+    },
     fallbackAction: (input, primaryModifier) => fallbackChromuxShortcutAction(input, primaryModifier),
     focusTerminalTextarea: focusSyntheticTerminalTextarea,
     focusHostEditable() {
@@ -11547,6 +11779,7 @@ if (window.chromuxTest) {
     },
     currentUrl: (id) => testSession(id).browser.currentUrl,
     context: () => ({ ...shortcutFocusContext() }),
+    launcherMode: () => state.ui.launcherMode,
     flushRender,
   };
 
@@ -11654,6 +11887,11 @@ if (window.chromuxTest) {
       flushRender();
       return result;
     },
+    shortcutCreateProject() {
+      const result = handleShortcutCreateProject();
+      flushRender();
+      return result;
+    },
     shortcutDetect() {
       const result = handleShortcutOpenDetectModal();
       flushRender();
@@ -11665,6 +11903,7 @@ if (window.chromuxTest) {
       return result;
     },
     newModalOpen: () => !$('#modal-new').classList.contains('hidden'),
+    launcherMode: () => state.ui.launcherMode,
     detectModalOpen: () => !$('#modal-detect').classList.contains('hidden'),
     catalog() {
       renderShortcutDebug();
@@ -12252,6 +12491,78 @@ if (window.chromuxTest) {
     },
   };
 
+  window.chromuxTestProjectLauncher = {
+    ready: async () => {
+      if (!state.scaffolderConfig) state.scaffolderConfig = await window.chromux.projectScaffolderConfig();
+      renderScaffolderCategories();
+      return state.scaffolderConfig;
+    },
+    open: async (mode = 'open') => {
+      openNewSessionModal(mode);
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      return state.ui.launcherMode;
+    },
+    mode: () => state.ui.launcherMode,
+    selectMode: (mode) => selectLauncherMode(mode),
+    selectSource(source) {
+      const button = $(`#pc-source [data-source="${source}"]`);
+      if (!button) throw new Error(`Unknown source: ${source}`);
+      button.click();
+    },
+    setCloneUrl(value) { $('#pc-clone-url').value = value; return refreshScaffolderPreview(); },
+    setName(value) { $('#pc-name').value = value; return refreshScaffolderPreview(); },
+    setCategory(value) { $('#pc-category').value = value; return refreshScaffolderPreview(); },
+    setSandboxType(value) { $('#pc-sandbox-type').value = value; return refreshScaffolderPreview(); },
+    selectAgent(agent) {
+      const button = $(`#ns-agent [data-agent="${agent}"]`);
+      if (!button) throw new Error(`Unknown agent: ${agent}`);
+      button.click();
+    },
+    preview: () => refreshScaffolderPreview(),
+    destination: () => $('#pc-destination').textContent,
+    status: () => $('#pc-status').textContent,
+    cloneVisible: () => !$('#pc-clone-field').classList.contains('hidden'),
+    sandboxVisible: () => !$('#pc-sandbox-field').classList.contains('hidden'),
+    createOnly: () => createScaffoldedProject({ launch: false }),
+    createAndLaunch: () => createScaffoldedProject({ launch: true }),
+    buttons: () => ({
+      createOnly: !$('#pc-create-only').disabled,
+      createAndLaunch: !$('#pc-create-launch').disabled,
+    }),
+    sessionState: () => {
+      const session = state.sessions.get(state.activeId);
+      return session ? {
+        name: session.name,
+        cwd: session.cwd,
+        runtime: session.runtime,
+        distro: session.distro,
+        agent: session.agent,
+      } : null;
+    },
+    setRoot: async (root) => {
+      state.scaffolderConfig = await window.chromux.projectScaffolderSetRoot(root);
+      renderScaffolderCategories();
+      return state.scaffolderConfig;
+    },
+    setRootFromSettings: async (root) => {
+      openSettings();
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      $('#settings-projects-root').value = root;
+      $('#settings-projects-root-save').click();
+      const deadline = Date.now() + 2000;
+      while (Date.now() < deadline && state.scaffolderConfig?.root !== root) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      const result = {
+        root: state.scaffolderConfig?.root,
+        field: $('#settings-projects-root').value,
+        status: $('#settings-projects-root-status').textContent,
+      };
+      $('#modal-settings').classList.add('hidden');
+      return result;
+    },
+  };
+
   window.chromuxTestAgentCommand = {
     build: (agent, resumeId = null) => agentCommand(agent, resumeId),
     buildWithEnv: (agent, resumeId = null, env = {}) => agentCommand(agent, resumeId, { ...state.env, ...env }),
@@ -12817,6 +13128,7 @@ setInterval(() => {
   await state.favoritesReady;
   state.projects = await window.chromux.projectsRead().catch(() => []);
   state.env = await window.chromux.getEnv();
+  state.scaffolderConfig = await window.chromux.projectScaffolderConfig().catch(() => null);
   document.body.classList.toggle('host-win32', state.env.hostPlatform === 'win32');
   if (state.env.hostPlatform === 'win32') {
     const modifier = 'Ctrl';

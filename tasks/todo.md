@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Replace the overloaded new-session modal with a two-tab Open Existing/Create Project launcher; add native `np`-compatible fresh/clone scaffolding, per-runtime Projects Root settings, Command/Control-N, staging/history/cache/hook handling, focused renderer/platform coverage, and ship v0.66.0 after the user explicitly accepted the remaining real Windows/WSL UAT risk. _(source: user-supplied implementation plan, advanced from occupied v0.65.0; evidence: `prototype/project-scaffolder.js`, main/preload/renderer launcher flow, scaffolder/launcher/shortcut/webview/Windows tests, `docs/testing/project-launcher-uat-0.66.0.md`, package metadata, docs, and `RELEASES.md`)_
+
 - [ ] Create one durable real-HTTP localhost first-success fixture and archive a transcript covering queue detection, explicit open approval, capture or attachment, correct target routing, and an actionable agent response. _(source: `research/devtool-adoption.md`; proof gate: durable localhost proof)_
 
 - [ ] Create and archive one induced failure-recovery transcript proving that artifacts persist through failure and the documented retry route restores the intended result without hidden intervention. _(source: `research/devtool-adoption.md`; proof gate: recovery proof)_

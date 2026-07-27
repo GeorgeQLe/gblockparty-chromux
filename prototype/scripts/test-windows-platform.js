@@ -55,6 +55,9 @@ async function run() {
   const browserFullscreen = chromuxShortcutAction({ type: 'keyDown', key: 'F', control: true, shift: true }, 'win32');
   assert.strictEqual(browserFullscreen.id, 'browser-fullscreen');
   assert.strictEqual(browserFullscreen.label, 'Ctrl+Shift+F');
+  const createProject = chromuxShortcutAction({ type: 'keyDown', key: 'N', control: true }, 'win32');
+  assert.strictEqual(createProject.id, 'create-project');
+  assert.strictEqual(createProject.label, 'Ctrl+N');
 
   const blockers = new Set();
   const controller = createPreventSleepController({

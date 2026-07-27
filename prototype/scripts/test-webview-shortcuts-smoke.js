@@ -103,6 +103,13 @@ fs.writeFileSync(e2ePath, `
   await focusGuest('#noneditable', false);
   await sendShortcut('T', ['meta']);
   expect(h.newModalOpen(), 'Command+T from non-editable guest focus should open the new session modal');
+  expect(h.launcherMode() === 'open', 'Command+T should land on Open Existing');
+  h.closeModals();
+
+  await focusGuest('#noneditable', false);
+  await sendShortcut('N', ['meta']);
+  expect(h.newModalOpen(), 'Command+N from non-editable guest focus should open the project launcher');
+  expect(h.launcherMode() === 'create', 'Command+N should land on Create Project');
   h.closeModals();
 
   await focusGuest('#noneditable', false);
@@ -161,6 +168,9 @@ fs.writeFileSync(e2ePath, `
 
     await sendShortcut('T', ['meta']);
     expect(h.newModalOpen() === false, 'Command+T should be suppressed while guest editable is focused: ' + selector);
+
+    await sendShortcut('N', ['meta']);
+    expect(h.newModalOpen() === false, 'Command+N should be suppressed while guest editable is focused: ' + selector);
 
     await sendShortcut('D', ['meta']);
     expect(h.detectModalOpen() === false, 'Command+D should be suppressed while guest editable is focused: ' + selector);

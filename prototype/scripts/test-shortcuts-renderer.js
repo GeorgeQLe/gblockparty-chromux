@@ -25,6 +25,8 @@ expectShortcut(sessionShortcutDigit({ key: '', code: 'Digit1' }) === '1', 'short
 expectShortcut(sessionShortcutDigit({ key: 'Unidentified', code: 'Digit3' }) === '3', 'shortcut digit should accept code Digit3');
 expectShortcut(sessionShortcutDigit({ key: '', code: 'Numpad1' }) === null, 'shortcut digit should ignore numpad codes');
 expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 't', meta: true }).id === 'new-session', 'Command+T should be Chromux-owned');
+expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'n', meta: true }).id === 'create-project', 'Command+N should be Chromux-owned');
+expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'n', control: true }, 'win32').id === 'create-project', 'Control+N should be Chromux-owned on Windows');
 expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'd', meta: true }).id === 'detect', 'Command+D should be Chromux-owned');
 expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'Enter', meta: true, shift: true }).id === 'composer-open', 'Command+Shift+Enter should open composer');
 expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'f', meta: true, shift: true }).id === 'browser-fullscreen', 'Command+Shift+F should toggle browser fullscreen');
@@ -39,6 +41,10 @@ expectShortcut(chromuxShortcutAction({ type: 'keyUp', key: 'f', meta: true, shif
 expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'c', meta: true }) === null, 'Command+C should stay unowned');
 expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'v', meta: true }) === null, 'Command+V should stay unowned');
 expectShortcut(shouldRouteChromuxShortcut({ type: 'keyDown', key: '1', meta: true }, { focusKind: 'terminal' }), 'terminal focus should allow Chromux shortcuts');
+expectShortcut(shouldRouteChromuxShortcut({ type: 'keyDown', key: 'n', meta: true }, { focusKind: 'terminal' }), 'terminal focus should allow Command+N');
+expectShortcut(!shouldRouteChromuxShortcut({ type: 'keyDown', key: 'n', meta: true }, { focusKind: 'hostEditable' }), 'host editable focus should suppress Command+N');
+expectShortcut(!shouldRouteChromuxShortcut({ type: 'keyDown', key: 'n', meta: true }, { focusKind: 'guestEditable' }), 'guest editable focus should suppress Command+N');
+expectShortcut(!shouldRouteChromuxShortcut({ type: 'keyDown', key: 'n', meta: true }, { focusKind: 'modal' }), 'modal focus should suppress Command+N');
 expectShortcut(shouldRouteChromuxShortcut({ type: 'keyDown', key: 'f', meta: true, shift: true }, { focusKind: 'terminal' }), 'terminal focus should allow Command+Shift+F');
 expectShortcut(shouldRouteChromuxShortcut({ type: 'keyDown', key: 'f', meta: true, shift: true }, { focusKind: 'appSurface' }), 'app surface focus should allow Command+Shift+F');
 expectShortcut(shouldRouteChromuxShortcut({ type: 'keyDown', key: 'f', control: true, shift: true }, { focusKind: 'terminal' }, 'win32'), 'terminal focus should allow Control+Shift+F on Windows');
@@ -72,6 +78,8 @@ fs.writeFileSync(e2ePath, `
     'renderer fallback parser should recognize Control+Shift+F on Windows');
   expect(q.fallbackAction({ type: 'keyDown', key: 'f', meta: true, shift: true, control: true }) === null,
     'renderer fallback parser should preserve native Control+Command+F');
+  expect(q.fallbackAction({ type: 'keyDown', key: 'n', meta: true })?.id === 'create-project',
+    'renderer fallback parser should recognize Command+N');
 
   q.focusTerminalTextarea();
   expect(q.context().focusKind === 'terminal', 'xterm helper textarea should classify as terminal focus');
@@ -134,6 +142,11 @@ fs.writeFileSync(e2ePath, `
   input.remove();
   const afterBlur = q.shortcutFocusNextQueueItem();
   expect(afterBlur && afterBlur.sessionId === secondId, 'Command+J should work again once no editable is focused');
+
+  q.clearFocus();
+  const createProject = q.shortcutCreateProject();
+  expect(createProject?.mode === 'create' && q.launcherMode() === 'create',
+    'Command+N should open the launcher directly on Create Project');
 
   return JSON.stringify({
     ok: true,

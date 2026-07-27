@@ -22,6 +22,8 @@ WSL2 distribution containing Bash, Git, Node 22.12+, and each desired agent
 CLI. Windows 10, WSL1, ARM64, native PowerShell, and Git Bash sessions are not
 supported in v0.62. Choose the default distribution in Settings. Changing it
 affects new records only; existing sessions/projects retain their distribution.
+Each runtime has its own **Projects Root**; Windows keeps a separate canonical
+Linux path for every WSL distribution.
 
 ```sh
 cd prototype
@@ -162,9 +164,17 @@ continue video-only when loopback audio is unavailable. Results include direct
 images and private local `chromux://capture/...` resources. See
 [`docs/resource-broker.md`](docs/resource-broker.md#capture-control-and-artifact-resources).
 
-1. **Start a session** — `+ NEW`, pick your project directory, choose CLAUDE CODE / CODEX /
+1. **Start a session** — `+ NEW` or `Command+T` (`Control+T` on Windows) opens
+   **Open Existing**. Pick your project directory, choose CLAUDE CODE / CODEX /
    GROK BUILD / SHELL ONLY. Chromux spawns your login shell and launches the agent CLI
    *unchanged* — it wraps the CLIs, never modifies them.
+
+   **Create a project** — `Command+N` (`Control+N` on Windows) opens the
+   launcher's **Create Project** tab. Choose a fresh Git repository or a clone
+   URL, kebab-case name, configured category, optional sandbox type, and agent.
+   Chromux previews the canonical destination and offers **CREATE ONLY** or the
+   primary **CREATE & LAUNCH** action. Creation is native and does not require
+   the `p` shell function.
 
    **…or adopt what's already running** — hit **⛶ DETECT** (⌘D). Chromux scans your open
    terminal tabs (`ps` + `lsof`, tab titles via Terminal.app/iTerm2 AppleScript) and lists
@@ -213,6 +223,23 @@ never opened until you approve **OPEN**. v1 uses `package.json` scripts only; `d
 are deferred until their schema is defined. The offline-preview launcher uses the same validation and
 runner selection, recommends `dev`, `start`, `serve`, then `preview`, and never stores arbitrary command text.
 Its shell tab remains available for logs and follows the normal Chromux PTY lifecycle.
+
+### Native `np`-compatible project creation
+
+Chromux reads categories from `~/.config/p/categories.conf` inside the active
+runtime and uses `p`'s defaults when that file is absent. The initial Projects
+Root comes from `P_BASE` when available, otherwise `<runtime-home>/projects`;
+later changes are stored per host or WSL distribution in Chromux preferences.
+Flat, lifecycle, and sandbox categories resolve to `<category>/<name>`,
+`<category>/dev/<name>`, and `sandbox/<sandbox-type>/<name>`.
+
+Fresh projects run `git init`; clones run `git clone` with argument-safe process
+execution. Chromux builds in a unique sibling staging directory and moves the
+completed repository into place. It then updates `p`'s deduplicated 50-entry
+history, removes the `p_completion` and `sp_completion` caches, and invokes an
+executable `P_NP_HOOK` with name, category, category type, and final path.
+History, cache, or hook failures are shown as warnings without deleting a
+successfully created project.
 
 3. **Capture evidence** — hit **⌖ PICK ELEMENT**, hover to highlight, click the broken thing
    (Esc cancels). Or **⚡ CAPTURE** for a page-level capture. Review the YAML payload, add a

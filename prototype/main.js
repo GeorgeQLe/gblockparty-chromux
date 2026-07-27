@@ -28,6 +28,14 @@ const { createCodexUpdateService } = require('./codex-update-service');
 const { createDevModeRestart, resolveDevMode, restartArgs } = require('./dev-mode');
 const { BrokerClient } = require('./resource-broker/client');
 const { createPreventSleepController } = require('./prevent-sleep');
+const {
+  createHostAdapter,
+  createProject: scaffoldProject,
+  createWslAdapter,
+  loadScaffolderConfig,
+  previewProject: previewScaffoldProject,
+  validateAbsoluteRoot,
+} = require('./project-scaffolder');
 const { MAX_DRAFT_BYTES, createPromptHistoryStore } = require('./prompt-history');
 const { previewProbe } = require('./preview-probe');
 const { cleanupOrphanedStorage } = require('./storage-cleanup');
@@ -187,6 +195,72 @@ function readDevModePreference() {
 
 function writeDevModePreference(enabled) {
   writePreference('devMode', enabled);
+}
+
+async function readWslShellValue(name) {
+  if (!runtimeState.selectedDistro) return '';
+  const commands = {
+    P_BASE: 'printf %s "${P_BASE:-}"',
+    XDG_CACHE_HOME: 'printf %s "${XDG_CACHE_HOME:-}"',
+    P_NP_HOOK: 'printf %s "${P_NP_HOOK:-}"',
+  };
+  if (!commands[name]) return '';
+  try {
+    const result = await wslRuntime.run(runtimeState.selectedDistro, ['bash', '-lc', commands[name]]);
+    const value = result.stdout.trim();
+    return value.includes('\0') || value.includes('\n') ? '' : value;
+  } catch {
+    return '';
+  }
+}
+
+function persistedProjectsRoot(kind, distro = null) {
+  const roots = readPreferences().projectsRoots;
+  if (!roots || typeof roots !== 'object' || Array.isArray(roots)) return null;
+  if (kind === 'host') return typeof roots.host === 'string' ? roots.host : null;
+  const wsl = roots.wsl;
+  return wsl && typeof wsl === 'object' && !Array.isArray(wsl) && typeof wsl[distro] === 'string'
+    ? wsl[distro]
+    : null;
+}
+
+function persistProjectsRoot(kind, distro, root) {
+  const current = readPreferences().projectsRoots;
+  const roots = current && typeof current === 'object' && !Array.isArray(current) ? current : {};
+  if (kind === 'host') {
+    writePreference('projectsRoots', { ...roots, host: root });
+    return;
+  }
+  const wsl = roots.wsl && typeof roots.wsl === 'object' && !Array.isArray(roots.wsl) ? roots.wsl : {};
+  writePreference('projectsRoots', { ...roots, wsl: { ...wsl, [distro]: root } });
+}
+
+async function projectScaffolderAdapter() {
+  if (process.platform !== 'win32') {
+    return createHostAdapter({ home: os.homedir(), env: process.env });
+  }
+  if (!runtimeState.selectedDistro) throw new Error('Choose a ready WSL2 distribution first.');
+  wslRuntime.select(runtimeState.selectedDistro);
+  const [pBase, xdgCacheHome, hook] = await Promise.all([
+    readWslShellValue('P_BASE'),
+    readWslShellValue('XDG_CACHE_HOME'),
+    readWslShellValue('P_NP_HOOK'),
+  ]);
+  return createWslAdapter({
+    runtime: wslRuntime,
+    distro: runtimeState.selectedDistro,
+    home: runtimeState.home,
+    env: { P_BASE: pBase, XDG_CACHE_HOME: xdgCacheHome, P_NP_HOOK: hook },
+  });
+}
+
+async function projectScaffolderContext() {
+  const adapter = await projectScaffolderAdapter();
+  const config = await loadScaffolderConfig({
+    adapter,
+    projectsRoot: persistedProjectsRoot(adapter.kind, adapter.distro),
+  });
+  return { adapter, config };
 }
 
 const DEV_MODE = resolveDevMode({
@@ -841,6 +915,10 @@ function handleShellShortcutInput(event, input, source = 'host', webContentsId =
     send('shortcut-open-new-session');
     return true;
   }
+  if (action.id === CHROMUX_SHORTCUT_ACTIONS.CREATE_PROJECT) {
+    send('shortcut-create-project');
+    return true;
+  }
   if (action.id === CHROMUX_SHORTCUT_ACTIONS.DETECT) {
     send('shortcut-open-detect-modal');
     return true;
@@ -860,6 +938,31 @@ function installAppMenu() {
         {
           label: 'Quit Chromux',
           click: () => requestGuardedQuit('app-quit'),
+        },
+      ],
+    },
+    {
+      label: 'File',
+      submenu: [
+        {
+          label: 'Open Existing…',
+          accelerator: 'CommandOrControl+T',
+          click: () => {
+            const context = shortcutFocusContextForSource('host');
+            if (['terminal', 'appSurface'].includes(classifyShortcutFocusContext(context))) {
+              send('shortcut-open-new-session');
+            }
+          },
+        },
+        {
+          label: 'Create Project…',
+          accelerator: 'CommandOrControl+N',
+          click: () => {
+            const context = shortcutFocusContextForSource('host');
+            if (['terminal', 'appSurface'].includes(classifyShortcutFocusContext(context))) {
+              send('shortcut-create-project');
+            }
+          },
         },
       ],
     },
@@ -2784,6 +2887,24 @@ ipcMain.handle('favorites-read', () => readFavorites());
 ipcMain.handle('favorites-replace', (_e, records) => replaceFavorites(records));
 ipcMain.handle('projects-read', () => readProjects());
 ipcMain.handle('projects-replace', (_e, records) => replaceProjects(records));
+ipcMain.handle('project-scaffolder-config', async () => {
+  const { config } = await projectScaffolderContext();
+  return config;
+});
+ipcMain.handle('project-scaffolder-preview', async (_e, request = {}) => {
+  const { adapter, config } = await projectScaffolderContext();
+  return previewScaffoldProject({ adapter, config, request });
+});
+ipcMain.handle('project-scaffolder-root-set', async (_e, root) => {
+  const adapter = await projectScaffolderAdapter();
+  const normalized = validateAbsoluteRoot(root, adapter.path);
+  persistProjectsRoot(adapter.kind, adapter.distro, normalized);
+  return (await projectScaffolderContext()).config;
+});
+ipcMain.handle('project-scaffolder-create', async (_e, request = {}) => {
+  const { adapter, config } = await projectScaffolderContext();
+  return scaffoldProject({ adapter, config, request });
+});
 ipcMain.handle('prompt-history-read', (_e, cwd) => promptHistory.readProject(cwd));
 ipcMain.handle('prompt-history-append', (_e, cwd, entry) => promptHistory.append(cwd, entry));
 ipcMain.handle('prompt-history-delete', (_e, cwd, id) => promptHistory.remove(cwd, id));
