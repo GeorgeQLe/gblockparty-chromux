@@ -812,3 +812,17 @@
   exists; the GitHub Release is the required update channel. Next command:
   commit and push the scoped v0.65.0 change, publish
   `GBlockParty Chromux v0.65.0`, and verify `/releases/latest`.
+
+## 2026-07-27 — Codex Activity Indicator Lab
+
+- Added a dedicated temporary-profile Electron activity lab with isolated
+  interactive PTY and structured Codex JSONL lanes, explicit-run scenarios,
+  cancellation/timeouts/cleanup, bounded traces, and sanitized report export.
+- Added fake-Codex lifecycle/parser/isolation coverage and an Electron smoke
+  proving normal startup bypass, explicit-run gating, and animation only for
+  Working.
+- Ran the five-scenario opt-in UAT on `codex-cli 0.145.0`; production fallback
+  recognized Working promptly, but the resident interactive TUI produced
+  69–86 seconds of false-working time after structured completion. Recorded
+  evidence and a separately approvable production fix plan without changing
+  normal Chromux activity behavior.

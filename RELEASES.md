@@ -1,5 +1,25 @@
 # Release Notes
 
+## GBlockParty Chromux v0.67.0
+
+Tag: `chromux-v0.67.0`
+
+- Add an isolated Codex Activity Indicator Lab launched with
+  `npm run activity-lab`, using a temporary Electron profile and temporary
+  workspaces without restoring or launching normal Chromux sessions.
+- Compare production-style interactive PTY title/output inference with
+  `codex exec --json` structured lifecycle ground truth across response-only,
+  read-only inspection, concurrent, cancellation, and idle control scenarios.
+- Keep every scenario behind an explicit Run action, restrict both live lanes
+  to read-only/no-approval execution, bound output and runtime, support
+  cancellation, and clean up lab-created workspaces.
+- Show explicit launching, working, completed, failed, cancelled, and idle
+  states with animation limited to working, plus a timestamped signal trace and
+  sanitized JSON export that excludes response text.
+- Add fake-Codex parser, lifecycle, malformed-event, bounds, cancellation,
+  timeout, isolation, and Electron smoke coverage; keep live model tests
+  manual and opt-in.
+
 ## GBlockParty Chromux v0.66.0
 
 Tag: `chromux-v0.66.0`

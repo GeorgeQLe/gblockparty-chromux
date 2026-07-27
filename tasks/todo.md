@@ -6,6 +6,10 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Add an isolated Codex Activity Indicator Lab with paired interactive PTY and structured JSONL lanes, explicit model-usage gates, five live scenarios, sanitized evidence export, fake-CLI and Electron coverage, v0.67.0 metadata, and a live Codex 0.145.0 UAT report without changing production attention inference. _(source: user-supplied implementation plan; evidence: `prototype/activity-lab/`, activity-lab scripts/tests/docs, `docs/testing/activity-lab-uat-0.67.0.md`, and `RELEASES.md`)_
+
+- [ ] After separate approval, resolve whether Codex exposes a same-turn structured lifecycle source and implement the conservative production activity fix in `docs/plans/codex-activity-production-fix.md` without duplicate model invocation. _(blocks: separate user approval)_
+
 - [x] Replace the overloaded new-session modal with a two-tab Open Existing/Create Project launcher; add native `np`-compatible fresh/clone scaffolding, per-runtime Projects Root settings, Command/Control-N, staging/history/cache/hook handling, focused renderer/platform coverage, and ship v0.66.0 after the user explicitly accepted the remaining real Windows/WSL UAT risk. _(source: user-supplied implementation plan, advanced from occupied v0.65.0; evidence: `prototype/project-scaffolder.js`, main/preload/renderer launcher flow, scaffolder/launcher/shortcut/webview/Windows tests, `docs/testing/project-launcher-uat-0.66.0.md`, package metadata, docs, and `RELEASES.md`)_
 
 - [ ] Create one durable real-HTTP localhost first-success fixture and archive a transcript covering queue detection, explicit open approval, capture or attachment, correct target routing, and an actionable agent response. _(source: `research/devtool-adoption.md`; proof gate: durable localhost proof)_

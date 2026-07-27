@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chromux Activity Indicator Lab</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <div>
+      <p class="eyebrow">Developer diagnostic</p>
+      <h1>Codex Activity Indicator Lab</h1>
+      <p class="lede">Live PTY inference beside structured lifecycle ground truth. Nothing runs until you choose a scenario.</p>
+    </div>
+    <button id="export" disabled>Export report</button>
+  </header>
+
+  <section class="safety" aria-label="Safety boundaries">
+    <strong>Isolated by design</strong>
+    <span>Temporary profile</span><span>Temporary workspaces</span><span>Read-only sandbox</span>
+    <span>Approvals disabled</span><span>No response text in reports</span>
+  </section>
+
+  <main>
+    <section id="scenarios" class="scenarios" aria-label="Scenarios"></section>
+    <section class="evidence">
+      <div class="evidence-head">
+        <div>
+          <p class="eyebrow">Signal evidence</p>
+          <h2>Timestamped trace</h2>
+        </div>
+        <span id="versions">Loading versions…</span>
+      </div>
+      <div class="trace-wrap">
+        <table>
+          <thead><tr><th>Time</th><th>Run</th><th>Lane</th><th>Raw signal</th><th>State</th><th>Source / confidence</th><th>Process</th></tr></thead>
+          <tbody id="trace"><tr class="empty"><td colspan="7">Run a scenario to collect evidence.</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="../renderer/attention.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

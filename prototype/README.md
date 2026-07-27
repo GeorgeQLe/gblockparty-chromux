@@ -91,6 +91,17 @@ Packaged launches hide the strip by default. Use **SETTINGS → DEVELOPER MODE**
 setting; Chromux confirms when sessions are open, saves a restore snapshot, and restarts to apply it.
 The `--dev-mode` and `--no-dev-mode` flags take precedence over the saved preference.
 
+For live Codex lifecycle investigation, run `npm run activity-lab`. This opens
+a separate Activity Indicator Lab entry point with a temporary Electron profile;
+it never restores, changes, or launches normal Chromux sessions. Each scenario
+requires an explicit **Run**, states its model-turn usage, and compares an
+interactive Codex PTY with a structured `codex exec --json` reference in fresh
+temporary workspaces. Both lanes use a read-only sandbox, disabled approvals,
+bounded output and runtime, cancellation, and cleanup. Exported JSON contains
+signal ordering, timings, versions, and mismatch summaries but no response text.
+The real-Codex UAT is deliberately manual and opt-in:
+`CHROMUX_ACTIVITY_LAB_UAT=1 node scripts/run-activity-lab-uat.js`.
+
 ### Session rail
 
 The left rail has two persisted icon views while the horizontal tabs remain the primary navigator.

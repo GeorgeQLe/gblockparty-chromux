@@ -1,0 +1,24 @@
+#!/usr/bin/env node
+'use strict';
+
+const args = process.argv.slice(2);
+if (args[0] === '--version') {
+  process.stdout.write('codex-cli 0.145.0-fake\n');
+  process.exit(0);
+}
+if (args[0] === 'exec') {
+  process.stdout.write(`${JSON.stringify({ type: 'thread.started', thread_id: 'fake-thread' })}\n`);
+  process.stdout.write(`${JSON.stringify({ type: 'turn.started' })}\n`);
+  if (process.env.FAKE_CODEX_MALFORMED === '1') process.stdout.write('{broken json\n');
+  setTimeout(() => {
+    process.stdout.write(`${JSON.stringify({ type: 'turn.completed', usage: {} })}\n`);
+    process.exit(0);
+  }, Number(process.env.FAKE_CODEX_DELAY_MS) || 40);
+} else {
+  process.stdout.write('\u001b]0;⠋ Working\u0007');
+  process.stdout.write('Thinking about the isolated fixture.\r\n');
+  setTimeout(() => {
+    process.stdout.write('\u001b]0;Codex\u0007');
+    process.exit(0);
+  }, Number(process.env.FAKE_CODEX_DELAY_MS) || 40);
+}

@@ -319,6 +319,20 @@ Avoid public wording that is broader than the implementation:
 - "No third-party processing."
 - "No network activity."
 
+## Activity Indicator Lab
+
+`npm run activity-lab` uses a temporary Electron profile and creates fresh
+temporary workspaces for every interactive and structured Codex invocation.
+It does not read the normal Chromux restore snapshot or launch normal sessions.
+The lab requests a read-only Codex sandbox, disables approval prompts, bounds
+captured process output to 256 KiB per lane, terminates runs after 90 seconds,
+and removes its workspaces after completion, cancellation, timeout, or exit.
+
+Sanitized report exports contain lifecycle signal types, normalized states,
+sources, confidence, process status, timings, versions, and mismatch summaries.
+They deliberately omit prompts, response text, terminal output, and structured
+item content. The user explicitly selects the report destination.
+
 ## References
 
 - [FTC: Start with Security](https://www.ftc.gov/business-guidance/resources/start-security-guide-business)
