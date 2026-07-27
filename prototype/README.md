@@ -154,6 +154,14 @@ attachments, and leaves the composed prompt unsent for review.
 
 Open **RESOURCES** to inspect host-wide owners, FIFO queues, lease expiry, wait time, and iOS Simulator capacity. Chromux uses a background Unix-socket broker shared by the app and Codex MCP clients. See [`docs/resource-broker.md`](docs/resource-broker.md) for MCP registration, the optional LaunchAgent, global Computer Use guidance, and simulator wrapper contract. Prefer Codex's built-in Browser for web-app testing; native macOS and foreground Simulator work must lease `macos:foreground-input`.
 
+The same MCP server can list opaque local capture targets, request an approved
+paired-browser or whole-Chromux screenshot, and record the Chromux window for up
+to 60 seconds on macOS. Every capture requires **ALLOW ONCE** in the app; target
+listing never exposes page URLs. Recordings prefer system audio and visibly
+continue video-only when loopback audio is unavailable. Results include direct
+images and private local `chromux://capture/...` resources. See
+[`docs/resource-broker.md`](docs/resource-broker.md#capture-control-and-artifact-resources).
+
 1. **Start a session** — `+ NEW`, pick your project directory, choose CLAUDE CODE / CODEX /
    GROK BUILD / SHELL ONLY. Chromux spawns your login shell and launches the agent CLI
    *unchanged* — it wraps the CLIs, never modifies them.
@@ -261,7 +269,7 @@ See [`docs/troubleshooting.md`](docs/troubleshooting.md) for the full support gu
 
 | What | Where |
 | --- | --- |
-| Capture payloads + screenshots | `~/.chromux/captures/<timestamp>-<unique-suffix>/` |
+| Capture payloads, screenshots, recordings, contact sheets, and manifests | `~/.chromux/captures/<timestamp>-<unique-suffix>/` |
 | Delivery log | `~/.chromux/delivery-log.jsonl` |
 | Restore snapshot | `~/.chromux/restore-sessions.json` (schema v9; includes validated provider conversation IDs, custom tab-group membership/focus, last deliberate activity, ordered browser page/explorer tabs, optional 64 KiB Composer drafts, staged browser-context references, the full-browser Composer-open flag, and up to 20 bounded historical Needs Attention records per session; routing targets remain ephemeral and old candidate `chatMessages` are discarded) |
 | Prompt history | `~/.chromux/prompt-history.json` (local plaintext, mode `0600`, 100 entries/project, 5 MiB total) |
@@ -269,6 +277,7 @@ See [`docs/troubleshooting.md`](docs/troubleshooting.md) for the full support gu
 | Update cache/source/install log | `~/.chromux/update-cache.json`, `~/.chromux/update-source.json`, `~/.chromux/update-install.log` |
 | Hook settings and notify scripts | `~/.chromux/hooks-claude.json`, `~/.chromux/codex-notify.sh`, `~/.chromux/hooks-grok.json`, `~/.chromux/grok-hook.sh`, and `~/.grok/hooks/chromux-turn-signals.json` |
 | Resource broker | `~/.chromux/resource-broker.sock`, `~/.chromux/resource-broker.lock`, `~/.chromux/resource-broker-state.json`, and optional `~/.chromux/resource-broker.log` |
+| Capture control | `~/.chromux/capture-control.sock` while Chromux is running |
 | Browser pane profiles | Session-specific persistent Electron partitions shared by that session's page tabs |
 
 When Chromux launches, it reclaims browser partitions left by closed Chromux

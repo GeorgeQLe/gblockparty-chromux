@@ -1,5 +1,31 @@
 # Release Notes
 
+## GBlockParty Chromux v0.65.0
+
+Tag: `chromux-v0.65.0`
+
+- Add macOS-only MCP tools to list opaque Chromux-window and paired-browser
+  targets, capture browser evidence or the whole Chromux window, and start/stop
+  one bounded window recording.
+- Require a visible **ALLOW ONCE** approval for every screenshot and recording
+  before macOS capture access, identify the requester and target, deny unanswered
+  requests, and never remember approval or expose page URLs in target listings.
+- Record at up to 1280×720 and 15 fps for 60 seconds with a persistent red HUD,
+  user stop control, caller ownership, recording exclusivity, idempotent stop,
+  and automatic persistence on deadline, requester disconnect, window close, or
+  app shutdown.
+- Prefer WebM VP9/Opus then VP8/Opus, request system-loopback audio without
+  microphone capture, and continue visibly as video-only when audio is denied,
+  unsupported, or unusable.
+- Persist private screenshots, YAML evidence, recordings, timestamped contact
+  sheets, and manifests under `~/.chromux/captures`; expose approved images
+  directly and generated files through safe `chromux://capture/...` MCP
+  resources without opening a network listener.
+- Add a mode-`0600` capture-control socket, bounded/caller-aware request
+  transport, path and size validation, macOS audio privacy metadata, mocked
+  Electron recording smoke coverage, socket/coordinator/artifact/MCP contract
+  tests, and permission, retention, failure-recovery, and resource docs.
+
 ## GBlockParty Chromux v0.64.1
 
 Tag: `chromux-v0.64.1`

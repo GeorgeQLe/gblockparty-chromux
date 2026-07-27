@@ -6,6 +6,12 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [ ] Create one durable real-HTTP localhost first-success fixture and archive a transcript covering queue detection, explicit open approval, capture or attachment, correct target routing, and an actionable agent response. _(source: `research/devtool-adoption.md`; proof gate: durable localhost proof)_
+
+- [ ] Create and archive one induced failure-recovery transcript proving that artifacts persist through failure and the documented retry route restores the intended result without hidden intervention. _(source: `research/devtool-adoption.md`; proof gate: recovery proof)_
+
+- [x] Add macOS-only, one-time-approved local MCP browser/window screenshots and bounded Chromux-window recording with system-audio fallback, private artifacts/resources, contact sheets, caller ownership, disconnect/deadline cleanup, tests, docs, and the v0.65.0 release. _(source: user-supplied implementation plan; evidence: `prototype/capture/`, main/preload/renderer capture flow, MCP contract, capture integration/renderer tests, packaging privacy metadata, capture/privacy/resource docs, `RELEASES.md`)_
+
 - [ ] Complete real Windows 11 x64 / WSL2 UAT for the v0.62+ release line and build the three optional Squirrel assets for the published `chromux-v0.64.1` source/macOS release. _(implementation evidence: Windows runtime adapters, Forge/CI configuration, WSL-aware sessions/hooks/DETECT/resource transport, stable production user-data selection, routed full-browser Composer, Codex ANSI compatibility profile, `docs/testing/windows-uat-0.62.0.md`; the external real-machine validation remains open)_
 
 - [x] Keep Codex 0.145 syntax and diff colors inside Chromux palettes by applying process-scoped `TERM=xterm-color` plus `tui.theme="ansi"` to managed new/resumed sessions and bare adopted commands, while preserving explicit shell theme opt-outs; prepare v0.64.1 without tagging or publishing before the Windows UAT and Squirrel-asset gate. _(source: user-supplied implementation plan; evidence: macOS/WSL command quoting, shell-adoption, ANSI xterm theme, restore, update-gate, notifier, and complete prototype regressions)_

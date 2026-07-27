@@ -66,6 +66,7 @@ retention and sharing, and dispose of data that is no longer needed.
 | Product telemetry | None in the current prototype. |
 | Cloud sync | None. |
 | Capture upload by Chromux | None. Captures are local files unless the user delivers them. |
+| Local MCP capture | macOS only. Every screenshot or recording requires a visible one-time approval in Chromux. |
 | Update checks | Yes. Chromux checks GitHub Releases for newer versions. |
 | Browser network traffic | Yes. Pages loaded in the embedded browser behave like normal Chromium pages. |
 | Agent network traffic | Yes. Claude Code, Codex, Grok Build, shell commands, and `claude -p` use their own network behavior and account settings. |
@@ -92,7 +93,8 @@ and isolated smoke-test profiles are not replaced by this production policy.
 | Data | Trigger | Local location | Retention | Outbound behavior |
 | --- | --- | --- | --- | --- |
 | Capture payloads | User clicks `CAPTURE`, completes element picking, chooses `ATTACH CURRENT PAGE`, or refreshes a staged attachment. | `~/.chromux/captures/<timestamp>-<unique-suffix>/payload.yaml` | Never auto-deleted by Chromux. | Sent only when the user chooses `SEND - claude -p` or submits a routed Composer prompt that explicitly includes the staged reference; file-drop and New-session draft staging remain local until later submission. |
-| Screenshots | Capture attempts to save the visible browser viewport. | `~/.chromux/captures/<timestamp>-<unique-suffix>/screenshot.png` when available. | Never auto-deleted by Chromux. | Chromux includes the screenshot path in the payload. It does not separately upload image bytes, but the receiving CLI/agent may read local files according to its own capabilities and permissions. |
+| Screenshots | A user capture attempts to save the visible browser viewport, or an MCP client requests and the user approves a paired-browser or whole-Chromux screenshot. | `~/.chromux/captures/<timestamp>-<unique-suffix>/screenshot.png` when available. | Never auto-deleted by Chromux. | Chromux itself does not upload the image. An approved MCP response returns the image bytes and a local `chromux://capture/...` resource link to the requesting same-device client. |
+| Window recordings | A local MCP client requests the Chromux window and the user chooses **ALLOW ONCE**. | One private artifact directory containing `recording.webm`, `contact-sheet.png`, and `manifest.json` under `~/.chromux/captures/`. | Never auto-deleted by Chromux. Recordings stop at 60 seconds or sooner on user/requester stop, requester disconnect, window close, or app shutdown. | Chromux opens no upload or network listener. The requesting same-device MCP client receives local resource links and the contact-sheet image. |
 | Capture console tail | Browser console messages seen by the pane after it opens. | Included inside `payload.yaml`; also held in renderer memory while the pane is open. | Persisted only as part of a saved payload. In-memory state disappears when the session closes. | Sent with `SEND - claude -p` because it is part of the YAML payload. |
 | Selected element data | User selects an element with `PICK ELEMENT`. | Included inside `payload.yaml`. | Persisted only as part of a saved payload. | Sent with `SEND - claude -p` because it is part of the YAML payload. |
 | User capture notes | User types a note in the capture modal. | Included inside `payload.yaml` and the delivery prompt. | Persisted only as part of a saved payload. | Sent with `SEND - claude -p`. |
@@ -108,6 +110,7 @@ and isolated smoke-test profiles are not replaced by this production policy.
 | Browser profiles | All page tabs paired to one terminal session share one randomly identified persistent Electron partition; different terminal sessions use different partitions. | Chromium-managed Electron app data for the Chromux app, outside `~/.chromux`. | Closed-session Chromux partitions are removed on the next launch, before any new window or session is created. Unrelated partitions and symlinks are retained. | Pages loaded in each browser can make their own network requests and store isolated cookies/local storage/cache. |
 | Project HTML index | Opening/searching the HTML explorer walks the session Git root or launch directory and records relative `.html`/`.htm` paths in renderer memory. VCS, dependency/cache trees, directory symlinks, and targets outside the project are excluded. | In memory only. Explorer path/query may be included in the restore snapshot. | Rebuilt on refresh or restart. | Not sent by Chromux. |
 | Resource broker | Unix socket, singleton lock, and lease-recovery state under `~/.chromux/resource-broker.*`. | Client display names, process/session IDs, resource IDs, lease timing, and simulator capacity override. | Active state is replaced locally; the socket and lock exist only while the daemon runs. | The broker opens no network listener. Simulator actions explicitly requested through MCP invoke local `xcrun simctl`. |
+| Capture control | User-only socket at `~/.chromux/capture-control.sock` while Chromux is running. | The registered MCP caller identity, pending one-time approval, and active recording state. | Socket and pending state end with the app; completed artifacts follow the capture retention rule above. | No TCP or network listener is opened. The MCP bridge does not auto-launch Chromux. |
 | External terminal detection metadata | User clicks `DETECT`. | Read from local process tables, cwd lookup, Terminal/iTerm tab titles, and local agent session metadata. For Codex, a short-lived `codex app-server --stdio` process may return the newest exact-cwd interactive CLI thread's bounded name/first-user preview and latest-agent excerpt; older/incompatible versions fall back to the bounded `~/.codex/sessions` rollout index. | Detection results are runtime UI state. Codex labels are capped at 80 Unicode code points and latest-agent excerpts at 160; excerpts are discarded with the active scan and are not added to restore snapshots or other Chromux storage. Opening a session can persist the chosen launch name and validated provider conversation ID through the ordinary restore path. | Not sent by Chromux. Codex metadata remains subject to the Codex CLI's own local-data behavior. |
 | Terminal output preview hints | Session terminal prints localhost URLs or local HTML paths. | Held in renderer memory for preview routing; queued URLs may be stored in `restore-sessions.json`. Loopback liveness, probe timers, launcher state, and server-shell relationships remain runtime-only and are reprobed or discarded after restart. | In-memory unless the existing queue fields are saved in a restore snapshot. | Liveness checks make TCP connections only to validated local loopback ports; they do not make HTTP requests or contact remote hosts. |
 
@@ -131,6 +134,33 @@ These fields may include sensitive project data, local file paths, private
 localhost URLs, DOM text, error messages, tokens accidentally printed to the
 console, or visual information in screenshots. Inspect the payload before
 sending it to an agent.
+
+## Local MCP Screenshots And Recordings
+
+The MCP target list exposes opaque target IDs, labels, and screenshot/recording
+capabilities. It does not expose a paired page URL. For every capture, Chromux
+shows the requesting client identity, target, and capture type with **ALLOW
+ONCE** and **DENY**. Unanswered requests time out as denied, approvals are not
+remembered, and approval occurs before any macOS capture permission prompt.
+
+Paired-browser screenshots include the approved PNG plus the existing URL,
+title, bounded visible text, console tail, and YAML evidence bundle. Whole-window
+screenshots include the Chromux window image and capture metadata. Recording is
+limited to the Chromux window, 1280×720, 15 fps, and 60 seconds. A red HUD keeps
+the requester, elapsed time, audio state, and **STOP** action visible throughout.
+
+Chromux requests macOS system-loopback audio, never microphone audio. If system
+audio is denied, unsupported, or starts without a usable track, capture continues
+as video-only and the HUD, manifest, and MCP result say `audio: unavailable`.
+macOS may separately require Screen & System Audio Recording permission in
+System Settings. Other platforms return an explicit unsupported-platform result
+in this release.
+
+Artifact directories use mode `0700` and artifact files use mode `0600` on
+POSIX systems. MCP resource reads accept only generated
+`chromux://capture/<artifact-id>/<manifest-file>` links beneath the capture
+directory; arbitrary filesystem paths, symlinks, traversal, and oversized reads
+are rejected.
 
 ## Outbound Activity
 
@@ -241,6 +271,9 @@ Chromux app profile directory, not shared browser or unrelated app data.
 - Chromux does not redact secrets from screenshots, DOM snippets, console logs,
   local URLs, file paths, or user notes.
 - Chromux does not automatically delete old captures or delivery logs.
+- Approved MCP recordings can contain everything visible in the Chromux window
+  and any audible system output; video-only fallback does not imply visual
+  redaction.
 - Favorites are not encrypted or synced and may reveal local paths, hosts, or browsing targets to anyone who can read the user's local files or backups.
 - Composer drafts, staged browser-context paths, and prompt history are local plaintext and may contain source code, secrets, instructions, or other sensitive text. They are not included in diagnostics or console logs, but remain visible to the local account, backups, and anyone with filesystem access.
 - Chromux does not provide a current UI for clearing the browser profile.

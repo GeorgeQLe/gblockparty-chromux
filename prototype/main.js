@@ -3,7 +3,17 @@
 // claude -p delivery adapter, and webview popup interception (review-queue routing).
 'use strict';
 
-const { app, BrowserWindow, ipcMain, dialog, shell, Menu, clipboard, powerSaveBlocker, autoUpdater } = require('electron');
+const {
+  app,
+  BrowserWindow,
+  ipcMain,
+  dialog,
+  shell,
+  Menu,
+  clipboard,
+  powerSaveBlocker,
+  autoUpdater,
+} = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -22,6 +32,9 @@ const { MAX_DRAFT_BYTES, createPromptHistoryStore } = require('./prompt-history'
 const { previewProbe } = require('./preview-probe');
 const { cleanupOrphanedStorage } = require('./storage-cleanup');
 const { resolveChromuxUserDataPath } = require('./user-data-path');
+const { CaptureArtifactStore } = require('./capture/artifact-store');
+const { CaptureCoordinator } = require('./capture/coordinator');
+const { CaptureControlServer } = require('./capture/control');
 const { WslRuntime, linuxPathToWindows, windowsPathToLinux, workspaceLocation } = require('./platform/runtime');
 const { capabilities, windowOptions, windowsSupport } = require('./platform/host');
 const {
@@ -52,7 +65,7 @@ const SECURITY_RESOURCES = Object.freeze({
   'xai-privacy': 'https://x.ai/legal/privacy-policy',
 });
 
-const CHROMUX_HOME = path.join(os.homedir(), '.chromux');
+const CHROMUX_HOME = process.env.CHROMUX_HOME_DIR || path.join(os.homedir(), '.chromux');
 const CAPTURES_DIR = path.join(CHROMUX_HOME, 'captures');
 const DELIVERY_LOG = path.join(CHROMUX_HOME, 'delivery-log.jsonl');
 const UPDATE_CACHE = path.join(CHROMUX_HOME, 'update-cache.json');
@@ -112,6 +125,13 @@ const ptys = new Map(); // sessionId -> IPty
 const deliveries = new Map(); // deliveryId -> ChildProcess
 let closeConfirmed = false;
 let preventSleepController = null;
+let captureCoordinator = null;
+let captureControlServer = null;
+let displayMediaGrant = null;
+let captureRendererSequence = 0;
+let captureShutdownComplete = false;
+let captureShutdownPromise = null;
+const captureRendererPending = new Map();
 const wslRuntime = new WslRuntime();
 let runtimeState = {
   kind: process.platform === 'win32' ? 'wsl' : 'host',
@@ -415,6 +435,238 @@ function replaceProjects(records) {
 function send(channel, payload) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
 }
+
+function captureWindowTargetId() {
+  return win && !win.isDestroyed() ? `chromux-window:${win.id}` : null;
+}
+
+function requestCaptureRenderer(action, payload = {}, timeoutMs = 35_000) {
+  if (!win || win.isDestroyed() || win.webContents.isDestroyed()) {
+    return Promise.reject(new Error('Chromux window is not available for capture approval.'));
+  }
+  const requestId = `capture-rpc-${process.pid}-${++captureRendererSequence}`;
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      captureRendererPending.delete(requestId);
+      const error = new Error('Capture approval timed out and was denied.');
+      error.code = 'CAPTURE_DENIED';
+      reject(error);
+    }, timeoutMs);
+    captureRendererPending.set(requestId, { resolve, reject, timer, action });
+    win.webContents.send('capture-control-request', { requestId, action, payload });
+  });
+}
+
+function decodeCaptureBase64(value, maxBytes, label) {
+  if (typeof value !== 'string' || !value || value.length > Math.ceil(maxBytes * 4 / 3) + 16) {
+    throw new Error(`${label} is missing or too large`);
+  }
+  const bytes = Buffer.from(value, 'base64');
+  if (!bytes.length || bytes.length > maxBytes) throw new Error(`${label} is missing or too large`);
+  return bytes;
+}
+
+function configureDisplayMediaCapture() {
+  if (!win || win.isDestroyed()) return;
+  win.webContents.session.setDisplayMediaRequestHandler((request, callback) => {
+    const grant = displayMediaGrant;
+    displayMediaGrant = null;
+    const valid = grant
+      && grant.expiresAt > Date.now()
+      && request.videoRequested
+      && request.frame
+      && request.frame.top === request.frame
+      && request.frame.url.startsWith('file:');
+    if (!valid) {
+      callback({});
+      return;
+    }
+    callback({
+      video: { id: grant.sourceId, name: 'Chromux window' },
+      ...(request.audioRequested ? { audio: 'loopback' } : {}),
+    });
+  }, { useSystemPicker: false });
+}
+
+async function captureTargetsProvider() {
+  const windowId = captureWindowTargetId();
+  if (!windowId) return [];
+  let browsers = [];
+  try {
+    const result = await requestCaptureRenderer('targets-list', {}, 5000);
+    browsers = Array.isArray(result?.targets) ? result.targets : [];
+  } catch { /* renderer may still be loading */ }
+  const supported = process.platform === 'darwin';
+  return [
+    {
+      targetId: windowId,
+      kind: 'window',
+      label: 'Chromux window',
+      supportsScreenshot: supported,
+      supportsRecording: supported,
+    },
+    ...browsers.map((target) => ({
+      targetId: target.targetId,
+      kind: 'browser',
+      label: target.label,
+      supportsScreenshot: supported && target.supportsScreenshot !== false,
+      supportsRecording: false,
+    })),
+  ];
+}
+
+async function captureScreenshotProvider({ target, caller }) {
+  if (target.kind === 'window') {
+    const approval = await requestCaptureRenderer('approval', {
+      captureType: 'screenshot',
+      requester: caller,
+      target: {
+        targetId: target.targetId,
+        kind: target.kind,
+        label: target.label,
+      },
+    });
+    if (!approval?.approved) return { approved: false, reason: approval?.reason };
+    if (!win || win.isDestroyed()) throw new Error('Chromux window closed before capture.');
+    const image = await win.webContents.capturePage();
+    return {
+      approved: true,
+      png: image.toPNG(),
+      capturedAt: new Date().toISOString(),
+      dimensions: image.getSize(),
+      metadata: { mode: 'whole-chromux-window' },
+    };
+  }
+  const evidence = await requestCaptureRenderer('browser-screenshot', {
+    requester: caller,
+    target: {
+      targetId: target.targetId,
+      kind: target.kind,
+      label: target.label,
+    },
+  });
+  if (!evidence?.approved) return { approved: false, reason: evidence?.reason };
+  return {
+    approved: true,
+    png: decodeCaptureBase64(evidence.pngBase64, 12 * 1024 * 1024, 'browser screenshot'),
+    payload: evidence.payload,
+    capturedAt: evidence.capturedAt,
+    dimensions: evidence.dimensions || null,
+    metadata: { mode: 'visible-browser-viewport' },
+    result: {
+      pageUrl: evidence.pageUrl,
+      title: evidence.title || null,
+      visibleText: evidence.visibleText || '',
+      visibleTextTruncated: Boolean(evidence.visibleTextTruncated),
+      console: evidence.console || { total: 0, entries: [] },
+    },
+  };
+}
+
+async function captureRecordApprover({ recordingId: id, target, caller }) {
+  return requestCaptureRenderer('approval', {
+    recordingId: id,
+    captureType: 'recording',
+    requester: caller,
+    target: {
+      targetId: target.targetId,
+      kind: target.kind,
+      label: target.label,
+    },
+  });
+}
+
+async function captureRecordStarter({ recordingId: id, target, caller }) {
+  if (!win || win.isDestroyed()) throw new Error('Chromux window closed before recording.');
+  const startStream = async (audio) => {
+    displayMediaGrant = {
+      recordingId: id,
+      sourceId: win.getMediaSourceId(),
+      expiresAt: Date.now() + 10_000,
+    };
+    try {
+      return await requestCaptureRenderer('record-start-stream', {
+        recordingId: id,
+        targetId: target.targetId,
+        requester: caller,
+        deadlineMs: 60_000,
+        audio,
+      }, 25_000);
+    } finally {
+      if (displayMediaGrant?.recordingId === id) displayMediaGrant = null;
+    }
+  };
+  try {
+    return await startStream(true);
+  } catch (error) {
+    if (error.code !== 'CAPTURE_AUDIO_RETRY') throw error;
+    return startStream(false);
+  }
+}
+
+async function captureRecordStopper({ recordingId: id, reason }) {
+  await requestCaptureRenderer('record-stop', { recordingId: id, reason }, 15_000);
+}
+
+async function initializeCaptureControl() {
+  if (captureControlServer) return;
+  const store = new CaptureArtifactStore({ root: CAPTURES_DIR });
+  captureCoordinator = new CaptureCoordinator({
+    platform: process.platform,
+    store,
+    targetsProvider: captureTargetsProvider,
+    screenshotProvider: captureScreenshotProvider,
+    recordApprover: captureRecordApprover,
+    recordStarter: captureRecordStarter,
+    recordStopper: captureRecordStopper,
+  });
+  captureControlServer = new CaptureControlServer({
+    chromuxHome: CHROMUX_HOME,
+    dispatch: (method, params, caller) => captureCoordinator.dispatch(method, params, caller),
+    onDisconnect: (caller) => captureCoordinator.disconnect(caller),
+  });
+  await captureControlServer.start();
+}
+
+ipcMain.on('capture-control-response', (event, message = {}) => {
+  if (!win || event.sender !== win.webContents) return;
+  const pending = captureRendererPending.get(message.requestId);
+  if (!pending) return;
+  captureRendererPending.delete(message.requestId);
+  clearTimeout(pending.timer);
+  if (message.error) {
+    const error = new Error(message.error.message || `Capture renderer request failed: ${pending.action}`);
+    error.code = message.error.code || null;
+    pending.reject(error);
+  } else {
+    pending.resolve(message.result);
+  }
+});
+
+ipcMain.on('capture-record-chunk', (event, message = {}) => {
+  if (!win || event.sender !== win.webContents || !captureCoordinator) return;
+  try {
+    const chunk = decodeCaptureBase64(message.chunkBase64, 4 * 1024 * 1024, 'recording chunk');
+    captureCoordinator.appendChunk(message.recordingId, chunk);
+  } catch (error) {
+    console.error(`capture recording chunk rejected: ${error.message}`);
+  }
+});
+
+ipcMain.on('capture-record-complete', (event, message = {}) => {
+  if (!win || event.sender !== win.webContents || !captureCoordinator) return;
+  try {
+    const contactSheet = message.contactSheetBase64
+      ? decodeCaptureBase64(message.contactSheetBase64, 8 * 1024 * 1024, 'recording contact sheet')
+      : null;
+    captureCoordinator.complete(message.recordingId, {
+      contactSheet,
+      metadata: message.metadata || {},
+    });
+  } catch (error) {
+    console.error(`capture recording completion rejected: ${error.message}`);
+  }
+});
 
 function initializePreventSleep() {
   const persisted = readPreferences().preventSleep === true;
@@ -1422,6 +1674,7 @@ function createWindow() {
   });
 
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  configureDisplayMediaCapture();
 
   win.webContents.on('before-input-event', (event, input) => {
     handleShellShortcutInput(event, input, 'host', win.webContents.id);
@@ -1458,6 +1711,22 @@ function createWindow() {
   }
 
   win.on('close', (event) => {
+    if (!SMOKE && !closeConfirmed && captureCoordinator?.active) {
+      event.preventDefault();
+      const id = captureCoordinator.active.recordingId;
+      captureCoordinator.stopInternal(id, 'window-close').then(() => {
+        if (!win || win.isDestroyed()) return;
+        if (ptys.size === 0) {
+          closeConfirmed = true;
+          win.close();
+        } else {
+          requestGuardedQuit('app-close');
+        }
+      }).catch((error) => {
+        console.error(`recording stop before window close failed: ${error.message}`);
+      });
+      return;
+    }
     if (closeConfirmed || ptys.size === 0 || SMOKE) return;
     event.preventDefault();
     requestGuardedQuit('app-close');
@@ -2698,6 +2967,11 @@ app.whenReady().then(async () => {
     }
   }
   createWindow();
+  if (!SMOKE || process.env.CHROMUX_CAPTURE_CONTROL_SMOKE === '1') {
+    initializeCaptureControl().catch((error) => {
+      console.error(`capture control unavailable: ${error.message}`);
+    });
+  }
   getUpdateStatus().then((status) => send('update-status', status)).catch(() => {});
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -2709,7 +2983,26 @@ app.on('window-all-closed', () => {
   app.quit();
 });
 
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
+  if (captureCoordinator?.active && !captureShutdownComplete) {
+    event.preventDefault();
+    if (!captureShutdownPromise) {
+      captureShutdownPromise = captureCoordinator.shutdown().catch((error) => {
+        console.error(`recording stop before app shutdown failed: ${error.message}`);
+      }).finally(() => {
+        captureShutdownComplete = true;
+        app.quit();
+      });
+    }
+    return;
+  }
   if (preventSleepController) preventSleepController.shutdown();
   resourceClient.close();
+  captureCoordinator?.shutdown().catch(() => {});
+  captureControlServer?.close().catch(() => {});
+  for (const pending of captureRendererPending.values()) {
+    clearTimeout(pending.timer);
+    pending.reject(new Error('Chromux is shutting down.'));
+  }
+  captureRendererPending.clear();
 });

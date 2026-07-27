@@ -160,6 +160,9 @@ const state = {
     threadPreviewOpenTimer: null,
     reducedMotionOverride: null,
     captureModal: null, // { captureId, pngBase64, payloadBase } while composing/delivering
+    captureApproval: null,
+    recording: null,
+    captureMedia: null, // renderer E2E dependency seam; null in production
     dirty: new Set(),
     rafScheduled: false,
     lastQueueShortcutFocus: null,
@@ -3376,10 +3379,12 @@ async function collectBrowserEvidence(session, selection = {}, targetTab = activ
   if (!b || !b.webview) throw new Error('Open a browser page before capturing context.');
   let pngBase64 = null;
   let shotDataUrl = null;
+  let dimensions = null;
   try {
     const image = await b.webview.capturePage();
     shotDataUrl = image.toDataURL();
     pngBase64 = shotDataUrl.split(',')[1];
+    dimensions = typeof image.getSize === 'function' ? image.getSize() : null;
   } catch { /* evidence remains useful without a screenshot */ }
 
   let title = selection.pageTitle || null;
@@ -3399,6 +3404,7 @@ async function collectBrowserEvidence(session, selection = {}, targetTab = activ
   return {
     pngBase64,
     shotDataUrl,
+    dimensions,
     pageUrl: selection.pageUrl || b.currentUrl,
     title: title || null,
     visibleText: boundedVisibleText,
@@ -3444,6 +3450,425 @@ function capturePayloadBase(session, evidence) {
       : { path: null, mode: 'unavailable' },
   };
 }
+
+// ───────────────────────────────────────────────────────────────────────────
+// Local MCP capture control. Every screenshot and recording is approved in
+// this renderer before main requests either Electron or macOS capture access.
+// ───────────────────────────────────────────────────────────────────────────
+
+const CAPTURE_APPROVAL_TIMEOUT_MS = 30_000;
+const RECORDING_FRAME_INTERVAL_MS = 10_000;
+const RECORDING_MAX_STILLS = 7;
+
+function captureTargetIdForBrowser(session) {
+  return `browser:${session.id}`;
+}
+
+function browserSessionForCaptureTarget(targetId) {
+  if (typeof targetId !== 'string' || !targetId.startsWith('browser:')) return null;
+  const session = state.sessions.get(targetId.slice('browser:'.length));
+  const tab = session && activePageTab(session);
+  return session && tab?.webview && tab.currentUrl ? session : null;
+}
+
+function browserCaptureTargets() {
+  return [...state.sessions.values()].flatMap((session) => {
+    const tab = activePageTab(session);
+    if (!tab?.webview || !tab.currentUrl) return [];
+    return [{
+      targetId: captureTargetIdForBrowser(session),
+      kind: 'browser',
+      label: `Paired browser — ${session.name}`,
+      supportsScreenshot: true,
+      supportsRecording: false,
+    }];
+  });
+}
+
+function captureRequesterLabel(requester = {}) {
+  const name = String(requester.displayName || 'Local MCP client').trim() || 'Local MCP client';
+  const details = [
+    requester.sessionId ? `session ${requester.sessionId}` : null,
+    Number.isSafeInteger(requester.pid) ? `pid ${requester.pid}` : null,
+  ].filter(Boolean);
+  return details.length ? `${name} (${details.join(', ')})` : name;
+}
+
+function finishCaptureApproval(approved, reason = null) {
+  const pending = state.ui.captureApproval;
+  if (!pending) return false;
+  state.ui.captureApproval = null;
+  clearTimeout(pending.timer);
+  $('#modal-capture-approval').classList.add('hidden');
+  pending.resolve({
+    approved: Boolean(approved),
+    reason: approved ? null : (reason || 'Capture denied in Chromux.'),
+  });
+  invalidate('shortcutDebug');
+  return true;
+}
+
+function requestCaptureApproval({ requester, target, captureType }, timeoutMs = CAPTURE_APPROVAL_TIMEOUT_MS) {
+  if (state.ui.captureApproval) {
+    return Promise.resolve({ approved: false, reason: 'Another capture approval is already open.' });
+  }
+  const isRecording = captureType === 'recording';
+  $('#capture-approval-type').textContent = isRecording ? 'WINDOW RECORDING' : 'SCREENSHOT';
+  $('#capture-approval-requester').textContent = captureRequesterLabel(requester);
+  $('#capture-approval-target').textContent = target?.label || 'Chromux window';
+  $('#modal-capture-approval').classList.remove('hidden');
+  $('#capture-approval-allow').focus();
+  invalidate('shortcutDebug');
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      finishCaptureApproval(false, 'Capture approval timed out and was denied.');
+    }, timeoutMs);
+    state.ui.captureApproval = { resolve, timer, requester, target, captureType };
+  });
+}
+
+function recordingMimeType(RecorderClass = MediaRecorder) {
+  const candidates = [
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp8,opus',
+    'video/webm;codecs=vp9',
+    'video/webm;codecs=vp8',
+    'video/webm',
+  ];
+  return candidates.find((candidate) => RecorderClass.isTypeSupported(candidate)) || '';
+}
+
+function recordingCodec(mimeType) {
+  const match = String(mimeType || '').match(/codecs=([^;,]+)/i);
+  return match ? match[1].trim().toLowerCase() : 'webm';
+}
+
+function arrayBufferBase64(arrayBuffer) {
+  const bytes = new Uint8Array(arrayBuffer);
+  let binary = '';
+  for (let index = 0; index < bytes.length; index += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
+  }
+  return btoa(binary);
+}
+
+function formatRecordingElapsed(milliseconds) {
+  const seconds = Math.max(0, Math.floor(milliseconds / 1000));
+  return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
+function updateRecordingHud(recording) {
+  if (!recording || state.ui.recording !== recording) return;
+  $('#capture-recording-requester').textContent = `REQUESTED BY ${captureRequesterLabel(recording.requester)}`;
+  $('#capture-recording-elapsed').textContent = formatRecordingElapsed(Date.now() - recording.startedAtMs);
+  $('#capture-recording-audio').textContent = recording.audio === 'available'
+    ? 'AUDIO: SYSTEM'
+    : 'AUDIO: UNAVAILABLE';
+  $('#capture-recording-hud').classList.remove('hidden');
+}
+
+async function captureRecordingStill(recording) {
+  if (!recording || state.ui.recording !== recording || recording.stills.length >= RECORDING_MAX_STILLS) return;
+  const sourceWidth = recording.video.videoWidth || recording.dimensions.width || 1280;
+  const sourceHeight = recording.video.videoHeight || recording.dimensions.height || 720;
+  if (!sourceWidth || !sourceHeight) return;
+  const width = 320;
+  const height = Math.max(1, Math.round(width * sourceHeight / sourceWidth));
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  if (!context) return;
+  context.drawImage(recording.video, 0, 0, width, height);
+  recording.stills.push({
+    elapsedMs: Math.max(0, Date.now() - recording.startedAtMs),
+    canvas,
+  });
+}
+
+function buildRecordingContactSheet(recording) {
+  const frames = recording.stills.length ? recording.stills : [{ elapsedMs: 0, canvas: null }];
+  const columns = Math.min(3, frames.length);
+  const cellWidth = 320;
+  const cellImageHeight = 180;
+  const labelHeight = 28;
+  const rows = Math.ceil(frames.length / columns);
+  const canvas = document.createElement('canvas');
+  canvas.width = columns * cellWidth;
+  canvas.height = rows * (cellImageHeight + labelHeight);
+  const context = canvas.getContext('2d');
+  if (!context) return null;
+  context.fillStyle = '#08101d';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.font = '600 14px ui-monospace, SFMono-Regular, Menlo, monospace';
+  context.textBaseline = 'middle';
+  frames.forEach((frame, index) => {
+    const x = (index % columns) * cellWidth;
+    const y = Math.floor(index / columns) * (cellImageHeight + labelHeight);
+    if (frame.canvas) {
+      context.drawImage(frame.canvas, x, y, cellWidth, cellImageHeight);
+    } else {
+      context.fillStyle = '#15243a';
+      context.fillRect(x, y, cellWidth, cellImageHeight);
+      context.fillStyle = '#8aa5c8';
+      context.fillText('FRAME UNAVAILABLE', x + 16, y + cellImageHeight / 2);
+    }
+    context.fillStyle = '#08101d';
+    context.fillRect(x, y + cellImageHeight, cellWidth, labelHeight);
+    context.fillStyle = '#f2b84b';
+    context.fillText(formatRecordingElapsed(frame.elapsedMs), x + 12, y + cellImageHeight + labelHeight / 2);
+  });
+  return canvas.toDataURL('image/png').split(',')[1] || null;
+}
+
+async function stopChromuxRecording(reason = 'user') {
+  const recording = state.ui.recording;
+  if (!recording) return { stopped: true, alreadyStopped: true };
+  if (recording.stopPromise) return recording.stopPromise;
+  recording.stopReason = reason;
+  recording.stopPromise = (async () => {
+    clearTimeout(recording.deadlineTimer);
+    clearInterval(recording.hudTimer);
+    clearInterval(recording.stillTimer);
+    await captureRecordingStill(recording).catch(() => {});
+    if (recording.recorder.state !== 'inactive') {
+      await new Promise((resolve) => {
+        recording.recorder.addEventListener('stop', resolve, { once: true });
+        recording.recorder.stop();
+      });
+    }
+    await recording.chunkChain;
+    const stoppedAtMs = Date.now();
+    const contactSheetBase64 = buildRecordingContactSheet(recording);
+    for (const track of recording.stream.getTracks()) track.stop();
+    recording.video.pause();
+    recording.video.srcObject = null;
+    $('#capture-recording-hud').classList.add('hidden');
+    state.ui.recording = null;
+    const metadata = {
+      startedAt: new Date(recording.startedAtMs).toISOString(),
+      stoppedAt: new Date(stoppedAtMs).toISOString(),
+      durationMs: Math.max(0, stoppedAtMs - recording.startedAtMs),
+      dimensions: recording.dimensions,
+      mimeType: recording.mimeType || 'video/webm',
+      codec: recordingCodec(recording.mimeType),
+      audio: recording.audio,
+      stopReason: reason,
+    };
+    window.chromux.captureRecordComplete({
+      recordingId: recording.recordingId,
+      contactSheetBase64,
+      metadata,
+    });
+    state.ui.captureMedia?.onComplete?.({
+      recordingId: recording.recordingId,
+      contactSheetBase64,
+      metadata,
+    });
+    return { stopped: true, recordingId: recording.recordingId, ...metadata };
+  })().catch((error) => {
+    for (const track of recording.stream.getTracks()) track.stop();
+    $('#capture-recording-hud').classList.add('hidden');
+    if (state.ui.recording === recording) state.ui.recording = null;
+    throw error;
+  });
+  return recording.stopPromise;
+}
+
+async function startChromuxRecording(payload) {
+  if (state.ui.recording) throw new Error('A Chromux recording is already active.');
+  const media = state.ui.captureMedia || {};
+  const mediaDevices = media.mediaDevices || navigator.mediaDevices;
+  const RecorderClass = media.MediaRecorder || MediaRecorder;
+  const requestAudio = payload.audio !== false;
+  let stream;
+  try {
+    stream = await mediaDevices.getDisplayMedia({
+      audio: requestAudio,
+      video: {
+        width: { max: 1280 },
+        height: { max: 720 },
+        frameRate: { max: 15 },
+      },
+    });
+  } catch (error) {
+    if (requestAudio && ['AbortError', 'NotAllowedError', 'NotReadableError', 'NotSupportedError'].includes(error?.name)) {
+      const retry = new Error('System audio is unavailable; retry video-only.');
+      retry.code = 'CAPTURE_AUDIO_RETRY';
+      throw retry;
+    }
+    throw error;
+  }
+  const videoTrack = stream.getVideoTracks()[0];
+  if (!videoTrack || videoTrack.readyState !== 'live') {
+    for (const track of stream.getTracks()) track.stop();
+    throw new Error('Chromux window video capture did not start.');
+  }
+  const usableAudioTracks = stream.getAudioTracks().filter((track) => track.readyState === 'live' && !track.muted);
+  const audio = usableAudioTracks.length ? 'available' : 'unavailable';
+  if (audio === 'unavailable') {
+    for (const track of stream.getAudioTracks()) {
+      stream.removeTrack(track);
+      track.stop();
+    }
+  }
+  const video = media.createVideo ? media.createVideo() : document.createElement('video');
+  video.muted = true;
+  video.playsInline = true;
+  video.srcObject = stream;
+  try {
+    await video.play();
+  } catch (error) {
+    for (const track of stream.getTracks()) track.stop();
+    video.srcObject = null;
+    throw error;
+  }
+  const settings = videoTrack.getSettings ? videoTrack.getSettings() : {};
+  const dimensions = {
+    width: Number(settings.width || video.videoWidth || 0),
+    height: Number(settings.height || video.videoHeight || 0),
+  };
+  const mimeType = recordingMimeType(RecorderClass);
+  let recorder;
+  try {
+    recorder = new RecorderClass(stream, {
+      ...(mimeType ? { mimeType } : {}),
+      videoBitsPerSecond: 2_500_000,
+    });
+  } catch (error) {
+    for (const track of stream.getTracks()) track.stop();
+    video.pause();
+    video.srcObject = null;
+    throw error;
+  }
+  const recording = {
+    recordingId: payload.recordingId,
+    requester: payload.requester,
+    stream,
+    video,
+    recorder,
+    mimeType: recorder.mimeType || mimeType || 'video/webm',
+    audio,
+    dimensions,
+    startedAtMs: Date.now(),
+    stills: [],
+    chunkChain: Promise.resolve(),
+    stopPromise: null,
+    stopReason: null,
+    deadlineTimer: null,
+    hudTimer: null,
+    stillTimer: null,
+  };
+  recorder.addEventListener('dataavailable', (event) => {
+    if (!event.data || !event.data.size) return;
+    recording.chunkChain = recording.chunkChain.then(async () => {
+      const chunkBase64 = arrayBufferBase64(await event.data.arrayBuffer());
+      window.chromux.captureRecordChunk({ recordingId: recording.recordingId, chunkBase64 });
+      state.ui.captureMedia?.onChunk?.({ recordingId: recording.recordingId, chunkBase64 });
+    });
+  });
+  recorder.addEventListener('error', () => {
+    stopChromuxRecording('recorder-error').catch(() => {});
+  });
+  videoTrack.addEventListener('ended', () => {
+    stopChromuxRecording('stream-ended').catch(() => {});
+  }, { once: true });
+  state.ui.recording = recording;
+  try {
+    recorder.start(1000);
+  } catch (error) {
+    state.ui.recording = null;
+    for (const track of stream.getTracks()) track.stop();
+    video.pause();
+    video.srcObject = null;
+    throw error;
+  }
+  updateRecordingHud(recording);
+  await captureRecordingStill(recording).catch(() => {});
+  recording.hudTimer = setInterval(() => updateRecordingHud(recording), 250);
+  recording.stillTimer = setInterval(() => {
+    captureRecordingStill(recording).catch(() => {});
+  }, RECORDING_FRAME_INTERVAL_MS);
+  recording.deadlineTimer = setTimeout(() => {
+    stopChromuxRecording('deadline').catch(() => {});
+  }, Math.min(60_000, Math.max(1, Number(payload.deadlineMs) || 60_000)));
+  return {
+    approved: true,
+    recordingId: recording.recordingId,
+    startedAt: new Date(recording.startedAtMs).toISOString(),
+    audio,
+    dimensions,
+    mimeType: recording.mimeType,
+    codec: recordingCodec(recording.mimeType),
+  };
+}
+
+async function capturePairedBrowser(payload) {
+  const session = browserSessionForCaptureTarget(payload.target?.targetId);
+  if (!session) throw new Error('Paired browser target is no longer available.');
+  const approval = await requestCaptureApproval({
+    captureType: 'screenshot',
+    requester: payload.requester,
+    target: payload.target,
+  });
+  if (!approval.approved) return approval;
+  const evidence = await collectBrowserEvidence(session, {}, activePageTab(session));
+  if (!evidence.pngBase64) throw new Error('Browser screenshot is unavailable.');
+  const capturePayload = capturePayloadBase(session, evidence);
+  return {
+    approved: true,
+    pngBase64: evidence.pngBase64,
+    dimensions: evidence.dimensions,
+    capturedAt: capturePayload.captured_at,
+    payload: capturePayload,
+    pageUrl: evidence.pageUrl,
+    title: evidence.title,
+    visibleText: evidence.visibleText,
+    visibleTextTruncated: evidence.visibleTextTruncated,
+    console: {
+      total: evidence.consoleTotal,
+      entries: evidence.consoleEntries,
+    },
+  };
+}
+
+async function handleCaptureControlRequest(message = {}) {
+  switch (message.action) {
+    case 'targets-list':
+      return { targets: browserCaptureTargets() };
+    case 'approval':
+      return requestCaptureApproval(message.payload || {});
+    case 'browser-screenshot':
+      return capturePairedBrowser(message.payload || {});
+    case 'record-start-stream':
+      return startChromuxRecording(message.payload || {});
+    case 'record-stop':
+      if (!state.ui.recording && state.ui.captureApproval?.captureType === 'recording') {
+        finishCaptureApproval(false, 'Recording request was cancelled.');
+      }
+      return stopChromuxRecording(message.payload?.reason || 'requester');
+    default:
+      throw new Error(`Unknown capture control request: ${message.action}`);
+  }
+}
+
+$('#capture-approval-allow').onclick = () => finishCaptureApproval(true);
+$('#capture-approval-deny').onclick = () => finishCaptureApproval(false);
+$('#capture-recording-stop').onclick = () => stopChromuxRecording('user').catch(() => {});
+window.chromux.onCaptureControlRequest((message) => {
+  Promise.resolve(handleCaptureControlRequest(message)).then((result) => {
+    window.chromux.captureControlRespond({ requestId: message.requestId, result });
+  }).catch((error) => {
+    window.chromux.captureControlRespond({
+      requestId: message.requestId,
+      error: { message: error?.message || String(error), code: error?.code || null },
+    });
+  });
+});
+window.addEventListener('beforeunload', () => {
+  if (state.ui.captureApproval) finishCaptureApproval(false, 'Chromux window closed.');
+  if (state.ui.recording) stopChromuxRecording('window-close').catch(() => {});
+});
 
 async function openCaptureModal(session, selection, targetTab = activePageTab(session)) {
   const b = targetTab;
@@ -9636,6 +10061,33 @@ function handleRendererShortcutKeydown(e) {
 }
 
 if (window.chromuxTest) {
+  window.chromuxTestCaptureControl = {
+    targets: () => browserCaptureTargets(),
+    requestApproval: (payload, timeoutMs) => requestCaptureApproval(payload, timeoutMs),
+    allow: () => finishCaptureApproval(true),
+    deny: (reason) => finishCaptureApproval(false, reason),
+    approval: () => state.ui.captureApproval ? {
+      captureType: state.ui.captureApproval.captureType,
+      requester: captureRequesterLabel(state.ui.captureApproval.requester),
+      target: state.ui.captureApproval.target?.label || null,
+      visible: !$('#modal-capture-approval').classList.contains('hidden'),
+    } : null,
+    setMediaMocks(mocks) { state.ui.captureMedia = mocks || null; },
+    start: (payload) => startChromuxRecording(payload),
+    stop: (reason) => stopChromuxRecording(reason),
+    recording: () => state.ui.recording ? {
+      recordingId: state.ui.recording.recordingId,
+      audio: state.ui.recording.audio,
+      dimensions: { ...state.ui.recording.dimensions },
+      visible: !$('#capture-recording-hud').classList.contains('hidden'),
+    } : null,
+    hud: () => ({
+      visible: !$('#capture-recording-hud').classList.contains('hidden'),
+      requester: $('#capture-recording-requester').textContent,
+      elapsed: $('#capture-recording-elapsed').textContent,
+      audio: $('#capture-recording-audio').textContent,
+    }),
+  };
   window.chromuxTestCodexGate = {
     reset() {
       state.codexUpdate.phase = 'checking';
@@ -12295,6 +12747,11 @@ function fakeSessionEls() {
 document.addEventListener('keydown', (e) => {
   handleRendererShortcutKeydown(e);
   if (e.key === 'Escape') {
+    if (state.ui.captureApproval) {
+      e.preventDefault();
+      finishCaptureApproval(false, 'Capture denied in Chromux.');
+      return;
+    }
     noteShortcutDebugInput(shortcutDebugInputFromDomEvent(e, 'renderer'));
     closeSessionContextMenu();
     $('#modal-settings').classList.add('hidden');

@@ -9,6 +9,7 @@ module.exports = {
     executableName: 'GBlockParty Chromux',
     icon: path.join(__dirname, 'build', process.platform === 'win32' ? 'icon.ico' : 'icon'),
     appBundleId: 'dev.georgele.chromux',
+    extendInfo: path.join(__dirname, 'build', 'Info.plist'),
     asar: true,
     ignore: [/^\/dist/, /^\/out/, /^\/build\/icon\.iconset/],
   },

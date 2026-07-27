@@ -148,6 +148,42 @@ If screenshots are missing:
 2. Make sure the browser pane is showing the page you meant to capture.
 3. Use the payload path shown in the capture modal; the YAML is still usable without the image.
 
+## Local MCP screenshots and recordings
+
+The four capture tools are macOS-only in Chromux 0.65:
+
+- `chromux_capture_targets_list`
+- `chromux_capture_screenshot`
+- `chromux_record_start`
+- `chromux_record_stop`
+
+Keep Chromux open before calling them. The capture bridge intentionally does not
+launch the app; “Chromux is not running” means open it and retry. Each screenshot
+or recording opens an in-app approval dialog. A denial, Escape, or 30 seconds
+without an answer rejects that request. The page URL remains hidden until a
+paired-browser screenshot is approved.
+
+For first use, macOS may ask for Screen & System Audio Recording access after
+you choose **ALLOW ONCE**. If video capture is denied, enable Chromux under
+**System Settings → Privacy & Security → Screen & System Audio Recording**, then
+quit and reopen Chromux if macOS requests it. Chromux never asks for microphone
+capture. If loopback audio is unavailable, recording continues visibly as
+`AUDIO: UNAVAILABLE`; this is expected video-only fallback, not a failed video
+recording.
+
+Only one recording can run at a time. The red HUD must remain visible until the
+recording is persisted. Stop it from that HUD or through
+`chromux_record_stop` from the same MCP client that started it. It also stops on
+the 60-second deadline, requesting-client disconnect, window close, or app
+shutdown. A repeated stop returns the completed artifact.
+
+Generated resource links use `chromux://capture/...` and can be read through MCP
+`resources/read`; they are not ordinary web URLs. A recording returns the WebM
+link plus a directly viewable contact-sheet image. If a resource read fails,
+confirm the capture directory still exists and use the exact URI from the tool
+result. Chromux rejects edited paths, traversal, symlinks, files absent from the
+manifest, and files over the read limit.
+
 ## Console logs
 
 Chromux records browser console messages seen by the pane after it opens. Capture includes the last 50 entries, and each message is capped at 500 characters. The payload reports `console.total_captured`, `console.included`, and whether entries were truncated.
@@ -200,12 +236,13 @@ Chromux stores local artifacts under your home directory:
 
 | Data | Location |
 | --- | --- |
-| Capture payloads and screenshots | `~/.chromux/captures/<timestamp>-<unique-suffix>/` |
+| Capture payloads, screenshots, recordings, manifests, and contact sheets | `~/.chromux/captures/<timestamp>-<unique-suffix>/` |
 | Delivery log | `~/.chromux/delivery-log.jsonl` |
 | Global favorites | `~/.chromux/favorites.json` |
 | Hook settings and notify scripts | `~/.chromux/` |
 | Renderer settings | `Local Storage` inside the selected stable Electron app profile |
 | Browser profiles | Session-specific Electron partitions `persist:chromux-<session ID>` |
+| Capture control socket | `~/.chromux/capture-control.sock` while the app is running |
 
 Closed-session browser profiles and exact stale
 `signal-<24 lowercase hex>.json` files are reclaimed automatically the next
@@ -217,7 +254,8 @@ restore snapshots, prompt history, and agent-owned directories are not removed.
 
 Chromux does not currently expire capture directories. To reclaim disk space, delete old directories under `~/.chromux/captures/`. To clear delivery history, delete `~/.chromux/delivery-log.jsonl`.
 
-Do not delete a capture directory until you no longer need its `payload.yaml` or `screenshot.png` for manual retry or audit.
+Do not delete a capture directory until you no longer need its payload,
+screenshot, recording, contact sheet, or manifest for manual retry or audit.
 
 ### Resource broker unavailable or stuck
 

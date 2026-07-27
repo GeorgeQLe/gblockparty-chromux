@@ -11,7 +11,11 @@ Codex. The launcher invokes the installed Windows Electron executable with
 `ELECTRON_RUN_AS_NODE=1`, so the helper reaches the named pipe without exposing
 a network port.
 
-Chromux 0.32 coordinates exclusive host resources across Chromux windows, Codex app sessions, and Codex CLI processes. One background service owns a user-only Unix socket at `~/.chromux/resource-broker.sock`; the Electron app and the stdio MCP bridge are clients of that service. The socket is mode `0600`, requests are bounded JSON records, and no network listener is opened.
+Chromux coordinates exclusive host resources across Chromux windows, Codex app
+sessions, and Codex CLI processes. One background service owns a user-only Unix
+socket at `~/.chromux/resource-broker.sock`; the Electron app and the stdio MCP
+bridge are clients of that service. The socket is mode `0600`, requests are
+bounded JSON records, and no network listener is opened.
 
 The daemon starts automatically when either client first connects and outlives the Chromux window. For login startup and global Codex guidance, run:
 
@@ -47,8 +51,41 @@ The MCP bridge exposes:
 - `chromux_lease_renew` / `chromux_lease_release`
 - `chromux_simulator_execute`
 - `chromux_client_rename`
+- `chromux_capture_targets_list`
+- `chromux_capture_screenshot`
+- `chromux_record_start` / `chromux_record_stop`
 
 Chromux's **RESOURCES** view shows owners, expirations, queues, wait time, simulator capacity, cancellation, and force release. Force release does not stop an operation that is already running; use it only after checking the owner is stale.
+
+## Capture control and artifact resources
+
+The stdio server advertises MCP resource support in addition to tools. Capture
+tools use a separate user-only `~/.chromux/capture-control.sock` owned by the
+running Electron app. This keeps window access and the approval UI inside
+Chromux while preserving the MCP caller identity. Requests and responses are
+bounded, disconnects stop caller-owned recordings, and no TCP listener is
+opened. If the app is not running, the bridge returns an actionable error and
+does not auto-launch it.
+
+`chromux_capture_targets_list` returns only opaque Chromux-window or
+paired-browser target IDs, labels, and capability flags; page URLs remain hidden
+until an approved browser screenshot. Each capture requires **ALLOW ONCE** in
+Chromux. Recording is limited to one Chromux-window stream at a time and only
+the starting MCP client or the visible in-app **STOP** control can stop it.
+
+Screenshot results include direct MCP `image` content and generated
+`chromux://capture/...` resource links. Recording stop results include a direct
+contact-sheet image plus links to the WebM, contact sheet, and manifest.
+`resources/read` returns text for YAML/JSON and base64 blobs for binary files.
+It resolves only opaque generated IDs and manifest-listed files beneath
+`~/.chromux/captures`, rejecting traversal, symlinks, arbitrary paths, and
+oversized reads.
+
+Capture is macOS-only in 0.65. Other platforms retain the protocol boundary but
+return an explicit unsupported-platform result. See
+[`capture-payload.md`](capture-payload.md) for evidence/manifest contracts and
+[`privacy-and-local-data.md`](privacy-and-local-data.md) for permission, audio,
+and retention behavior.
 
 ## Simulator capacity
 

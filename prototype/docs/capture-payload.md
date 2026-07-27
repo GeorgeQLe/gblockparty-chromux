@@ -64,6 +64,26 @@ showing a Composer attachment chip. A routed prompt includes bounded local paylo
 and title references only while that attachment remains staged. Refresh writes a new capture
 directory; removing a chip does not delete either capture from disk.
 
+## MCP evidence bundles and recording manifests
+
+An approved `chromux_capture_screenshot` for a paired browser reuses this schema
+and returns the PNG directly alongside structured URL, title, bounded visible
+text, console-tail metadata, and resource links for `screenshot.png`,
+`payload.yaml`, and `manifest.json`. In the MCP-saved YAML, `screenshot.path` is
+the generated `chromux://capture/<artifact-id>/screenshot.png` URI. The ordinary
+capture modal continues to use a local filesystem path.
+
+A whole-Chromux screenshot has `screenshot.png` and `manifest.json` but no
+browser payload. A completed recording has `recording.webm`,
+`contact-sheet.png`, and `manifest.json`. Its manifest records the opaque target,
+requester identity, start/stop timestamps, duration, dimensions, MIME type,
+codec, audio availability, stop reason, and generated file list.
+
+Resource URIs resolve only through the Chromux MCP server. They cannot name
+arbitrary local paths, and only files listed in their artifact manifest are
+readable. Capture artifact directories and files are private to the current
+POSIX user (`0700` directories, `0600` files).
+
 For the full local-data inventory, outbound delivery boundaries, and cleanup guidance, see
 [privacy-and-local-data.md](privacy-and-local-data.md).
 

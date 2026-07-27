@@ -471,6 +471,41 @@
     </div>
   </div>
 
+  <!-- ══ one-time local capture approval ══ -->
+  <div id="modal-capture-approval" class="overlay hidden">
+    <div class="modal capture-approval-modal" role="dialog" aria-modal="true"
+      aria-labelledby="capture-approval-title">
+      <div class="modal-head">
+        <span class="microlabel" id="capture-approval-title">LOCAL CAPTURE REQUEST</span>
+      </div>
+      <div class="modal-body capture-approval-body">
+        <div class="capture-approval-icon" aria-hidden="true">◉</div>
+        <div>
+          <div id="capture-approval-type" class="capture-approval-type">SCREENSHOT</div>
+          <div id="capture-approval-requester" class="capture-approval-requester"></div>
+          <div id="capture-approval-target" class="capture-approval-target"></div>
+          <p class="capture-approval-note">Approval applies to this capture only. Chromux will not remember it.</p>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button id="capture-approval-deny" class="btn btn-red">DENY</button>
+        <button id="capture-approval-allow" class="btn btn-amber">ALLOW ONCE</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ persistent recording status ══ -->
+  <section id="capture-recording-hud" class="capture-recording-hud hidden"
+    role="status" aria-live="polite">
+    <span class="capture-recording-dot" aria-hidden="true"></span>
+    <div class="capture-recording-copy">
+      <strong>RECORDING CHROMUX</strong>
+      <span id="capture-recording-requester"></span>
+      <span><span id="capture-recording-elapsed">00:00</span> · <span id="capture-recording-audio">AUDIO: CHECKING</span></span>
+    </div>
+    <button id="capture-recording-stop" class="btn btn-red">STOP</button>
+  </section>
+
   <!-- ══ capture modal ══ -->
   <div id="modal-capture" class="overlay hidden">
     <div class="modal modal-wide">

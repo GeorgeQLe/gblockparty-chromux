@@ -2139,6 +2139,82 @@ input[type="text"]:focus, #cap-notes:focus, select:focus { border-color: var(--a
 .deliver-meta { font-size: 10.5px; color: var(--dim); line-height: 1.8; }
 .deliver-meta code { color: var(--cyan); user-select: all; }
 
+/* ── local capture approval + persistent recording status ─────────────── */
+.capture-approval-modal { width: min(560px, calc(100vw - 32px)); }
+.capture-approval-body {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+.capture-approval-icon {
+  color: var(--amber);
+  font-size: 34px;
+  line-height: 1;
+  text-shadow: 0 0 18px color-mix(in srgb, var(--amber) 55%, transparent);
+}
+.capture-approval-type {
+  color: var(--amber);
+  font: 700 18px/1.2 var(--font-ui);
+  letter-spacing: .08em;
+}
+.capture-approval-requester,
+.capture-approval-target {
+  margin-top: 10px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.capture-approval-requester::before { content: "REQUESTER  "; color: var(--dim); }
+.capture-approval-target::before { content: "TARGET  "; color: var(--dim); }
+.capture-approval-note {
+  margin: 14px 0 0;
+  color: var(--dim);
+  line-height: 1.5;
+}
+.capture-recording-hud {
+  position: fixed;
+  z-index: 10050;
+  top: calc(var(--browser-chromux-top-inset, 48px) + 10px);
+  right: 12px;
+  display: grid;
+  grid-template-columns: auto minmax(180px, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 330px;
+  max-width: min(520px, calc(100vw - 24px));
+  padding: 9px 10px;
+  border: 1px solid color-mix(in srgb, #ff4d5e 72%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 94%, #35030a);
+  box-shadow: 0 10px 34px rgba(0, 0, 0, .38);
+  backdrop-filter: blur(18px);
+}
+.capture-recording-hud.hidden { display: none; }
+.capture-recording-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #ff3045;
+  box-shadow: 0 0 0 4px rgba(255, 48, 69, .14), 0 0 16px rgba(255, 48, 69, .75);
+  animation: capture-recording-pulse 1.2s ease-in-out infinite;
+}
+.capture-recording-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  color: var(--dim);
+  font: 600 10px/1.25 var(--font-ui);
+  letter-spacing: .04em;
+}
+.capture-recording-copy strong { color: #ff7180; letter-spacing: .09em; }
+.capture-recording-copy span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@keyframes capture-recording-pulse {
+  50% { opacity: .45; transform: scale(.82); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .capture-recording-dot { animation: none; }
+}
+
 .lifecycle-copy {
   color: var(--text);
   font-size: 12px;

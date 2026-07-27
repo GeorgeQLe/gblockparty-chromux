@@ -17,6 +17,10 @@ contextBridge.exposeInMainWorld('chromux', {
 
   // capture + delivery
   capturePrepare: (payload, pngBase64) => ipcRenderer.invoke('capture-prepare', { payload, pngBase64 }),
+  onCaptureControlRequest: (cb) => ipcRenderer.on('capture-control-request', (_e, message) => cb(message)),
+  captureControlRespond: (message) => ipcRenderer.send('capture-control-response', message),
+  captureRecordChunk: (message) => ipcRenderer.send('capture-record-chunk', message),
+  captureRecordComplete: (message) => ipcRenderer.send('capture-record-complete', message),
   deliverClaude: (opts) => ipcRenderer.invoke('deliver-claude', opts),
   deliverCancel: (deliveryId) => ipcRenderer.send('deliver-cancel', { deliveryId }),
   onDeliverOutput: (cb) => ipcRenderer.on('deliver-output', (_e, m) => cb(m)),

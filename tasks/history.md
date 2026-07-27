@@ -740,3 +740,67 @@
 - Projected Codex `pending` turns through the existing Working spinner class when activity indicators are enabled while retaining **Awaiting agent activity** tooltip/ARIA semantics and the internal pending state.
 - Kept pending turns in their ordinary Threads directory groups until provider evidence confirms Working, and preserved the non-spinning pending presentation when indicators are disabled.
 - Ship manifest — User goal: restore an immediate spinner after Codex submission without weakening pending-state `/clear`, stale-completion, update-safety, or provider-evidence safeguards. Changed files: `prototype/renderer/attention.js` contains the single presentation-only projection change; tab-activity, attention-diagnostics, and session-rail renderer tests prove immediate and continuous spinners, retained pending state, `/clear` Idle resolution and delayed-completion rejection, Working-section exclusion, disabled-indicator behavior, and unchanged Claude/Grok coverage; `prototype/package.json`, `prototype/package-lock.json`, `RELEASES.md`, `tasks/todo.md`, and this entry define v0.59.1. Per-file purpose and user-goal mapping: no reducer transition, completion barrier, provider-evidence path, Working-group filter, update-safety rule, CSS animation, API, IPC, persistence, or schema changed. Tests run: the tab regression first failed against v0.59.0’s pending class; all five focused suites passed, then all 43 registered `test:*` scripts passed serially; changed JavaScript syntax, version consistency, `git diff --check`, source `SMOKE_OK`, package build, plist/ASAR 0.59.1 inspection, and packaged `SMOKE_OK` passed. Skipped tests: static website route/build suites were skipped because no landing, gallery, mobile, design, or website build input changed; executable verification covered the full desktop prototype and packaged application. Adversarial review: traced enabled/disabled projection precedence, action/dead/completed/idle precedence, pending-to-confirmed Working DOM identity and ARIA change, active/background `/clear` redraw, delayed completion rejection, update blocking, Working-section membership/deduplication, grouped and ungrouped tabs, Claude/Grok signals, version metadata, and exact exclusion of the user’s three integration-map/alignment edits. No blocking finding remains. Accepted warning: Electron Packager probed for an optional `.icon` format before producing the correctly versioned arm64 bundle. Residual risk: the visual spinner deliberately represents an outstanding submitted turn before provider activity, so it no longer means provider-confirmed work by itself; the tooltip and Working section preserve that distinction. Rollback: revert the v0.59.1 commit and delete tag/GitHub Release `chromux-v0.59.1`; v0.59.0 remains the prior release. Deploy: no explicit manual deploy contract exists; the GitHub Release is the required update channel. Next command: commit and push the scoped v0.59.1 change, publish `GBlockParty Chromux v0.59.1`, and verify `/releases/latest`.
+
+## 2026-07-27 — Chromux v0.65.0 local MCP capture
+
+- Added one-time-approved macOS MCP screenshots for the Chromux window and
+  paired browsers, including direct image content, structured browser evidence,
+  YAML, manifests, and safe local artifact resources.
+- Added one exclusive 60-second Chromux-window WebM recording path with
+  VP9/Opus and VP8/Opus preference, system-audio fallback, a persistent
+  requester/audio/elapsed HUD, visible user stop, requester ownership,
+  idempotent stop, streamed persistence, and timestamped contact sheets.
+- Added the user-only capture-control socket, bounded stable caller identity,
+  disconnect/deadline/window/app cleanup, private artifact modes, safe
+  `resources/read`, macOS audio privacy metadata, documentation, and release
+  metadata.
+- Ship manifest — User goal: ship local-agent browser/window screenshots and
+  Chromux-window recording as a separate v0.65.0 release after publishing the
+  prerequisite v0.64.1 work. Changed files and per-file purpose:
+  `prototype/capture/` owns socket addressing/transport, artifact persistence,
+  resource validation, and capture coordination; `prototype/main.js`,
+  `prototype/preload.js`, and `prototype/renderer/` own correlated approval,
+  Electron capture, system-audio retry, MediaRecorder chunks, HUD/contact sheet,
+  and lifecycle stops; `prototype/resource-broker/mcp-server.js` owns the four
+  MCP tools, structured/image results, resource links, and binary/text reads;
+  capture/MCP/Electron tests and `scripts/uat-macos-capture.js` prove the
+  contracts; packaging metadata, README/docs, package metadata, `RELEASES.md`,
+  `tasks/todo.md`, and this entry define and explain v0.65.0. User-goal mapping:
+  target lists hide URLs, every capture is approved before macOS access,
+  browser evidence reuses the bounded contract, recording is window-only and
+  capped, audio failure stays visibly video-only, ownership and automatic stops
+  persist artifacts, and resources never resolve arbitrary paths. Tests run:
+  the complete final `npm test` matrix passed, including capture artifact,
+  socket, coordinator, renderer, main-process, packaging, MCP, every existing
+  Electron/browser/terminal/resource/update test, and Windows platform unit
+  coverage; changed JavaScript syntax and scoped `git diff --check` passed;
+  macOS packaging succeeded; packaged plist/ASAR inspection confirmed v0.65.0,
+  the capture MCP surface, and `NSAudioCaptureUsageDescription`; final real
+  packaged UAT produced non-empty PNG, WebM, and contact-sheet files at private
+  modes during a two-second 1096×718 recording with system audio available.
+  Skipped tests: static website route/build suites were skipped because no
+  landing, gallery, mobile, or deployment input changed; the real first-time
+  macOS permission prompt was not reset because this host already had capture
+  permission, while actual packaged capture and audio were exercised. Adversarial
+  review: checked denial without artifacts, approval timeout/cancellation races,
+  immediate user stop during startup, concurrent clients/recordings, stable
+  caller identity, owner-only and idempotent stop, disconnect/deadline/close/
+  shutdown paths, audio denial/dead tracks, MIME fallback, chunk ordering,
+  contact-sheet fallback, malformed/oversized socket data, target/recording ID
+  validation, URL non-disclosure, traversal/encoded traversal/symlink/manifest/
+  size restrictions, POSIX modes, unsupported platforms, no network listener,
+  package privacy metadata, and exact exclusion of unrelated alignment,
+  research, interrogation, and advisory-task edits. Findings fixed before ship
+  included splitting approval from persistence/stream startup, removing denied
+  artifacts, closing startup/stop races, preserving app-shutdown persistence,
+  making caller registration immutable, correcting self-sized manifests, and
+  retrying video-only after denied system audio. Accepted warning: Electron
+  Packager probes for an optional `.icon` format before successfully producing
+  the correctly versioned app. Residual risk: the first-time macOS permission
+  dialog itself remains unobserved on this already-authorized host, and
+  Windows/WSL real-machine UAT remains the separate promoted task. Rollback:
+  revert the v0.65.0 commit and delete tag/GitHub Release `chromux-v0.65.0`;
+  v0.64.1 remains the prior release. Deploy: no explicit manual deploy contract
+  exists; the GitHub Release is the required update channel. Next command:
+  commit and push the scoped v0.65.0 change, publish
+  `GBlockParty Chromux v0.65.0`, and verify `/releases/latest`.
