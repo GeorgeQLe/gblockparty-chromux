@@ -1017,3 +1017,56 @@
   Release is the required update channel. Next command: commit the isolated
   v0.69.4 boundary, push it to `main`, publish the matching release, and verify
   `/releases/latest`.
+
+## 2026-07-28 — Threads inbox and Git worktree triage
+
+- Replaced the Threads priority rail with always-visible Action Required,
+  Ready to Finish, Working, and All Sessions sections. Added keyboard
+  processing plus bounded Done/Snooze state in restore schema v10; new turns,
+  attention sequences, Git state, and expired snoozes reopen obligations.
+- Added a private, bounded repository catalog and provider-neutral linked
+  worktree service. Inventory distinguishes stale work from Git-prunable
+  metadata, ranks blockers and unfinished delivery work, and validates
+  repository/worktree/file/status identity before every mutation.
+- Added the Git review drawer with bounded diffs, binary/oversized fallbacks,
+  whole-file stage/unstage, manual commit previews and hook warnings, confirmed
+  fetch/fast-forward pull/publish/push/sync, and terminal focus/creation.
+- Ship manifest — User goal: implement and publish the supplied v0.70.0 Threads
+  inbox and Git worktree-triage plan. Changed files: `prototype/main.js`,
+  `prototype/preload.js`, `prototype/dev-mode.js`,
+  `prototype/git-worktree-service.js`, renderer HTML/JS/CSS, focused parser,
+  restore, attention, queue, and real-Electron tests, package metadata,
+  prototype README/privacy/troubleshooting docs, `RELEASES.md`,
+  `tasks/todo.md`, and this history entry. Per-file purpose: own validated Git
+  and schema-v10 persistence in the main process; expose only discriminated
+  renderer requests; present the hybrid inbox and review workflow; prove
+  parsing, mutation safety, persistence, interaction, accessibility, and theme
+  behavior; document storage and recovery; prepare the minor release.
+  User-goal mapping: each planned inbox section, triage transition, catalog
+  field, worktree signal, review action, confirmation boundary, and excluded
+  destructive operation maps to the service, renderer, or documented contract.
+  Tests run: JavaScript syntax checks; `git diff --check`; Git parser and
+  temporary multi-worktree integration tests; Windows platform checks; the
+  complete prototype test matrix outside the command sandbox for macOS AppKit;
+  and final directly affected session-rail, turn-signal, update-queue, restore,
+  composer, and Git-service reruns. All executable checks passed with no
+  product warnings. Skipped tests: real Windows 11/WSL2 UAT and live remote
+  authentication were not available locally; deterministic WSL routing,
+  noninteractive environment, rejected-push, hook-failure, and symlink fixtures
+  cover those boundaries without contacting a real provider. Adversarial
+  review: checked renderer path/argument isolation, catalog bounds and modes,
+  malformed porcelain, Unicode/spaces/renames, missing/deleted-file stale
+  conservatism, symlink escape rejection, linked/detached/locked/prunable
+  worktrees, commit-preview invalidation, hook failure, rejected publish,
+  fast-forward-only pulls, and omission of destructive/force/rebase/stash
+  actions. Review findings fixed WSL noninteractive routing, unknown-mtime stale
+  classification, hover-preview refresh races, xterm disposal timing, global
+  update placement, and conflict-resolution staging. Residual risk: real
+  Windows/WSL path behavior and provider-specific authentication UX remain
+  covered by deterministic tests rather than physical-machine/live-account
+  UAT. Rollback: revert the scoped v0.70.0 commit and remove
+  `chromux-v0.70.0`; v0.69.4 remains the prior release. Deploy: no explicit
+  manual deploy contract exists; the required update channel is the matching
+  GitHub tag and latest Release. Next command: commit the scoped boundary,
+  integrate it onto current `origin/main`, push, publish the release, and verify
+  `/releases/latest`.
