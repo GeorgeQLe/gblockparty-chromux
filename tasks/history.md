@@ -826,3 +826,64 @@
   69–86 seconds of false-working time after structured completion. Recorded
   evidence and a separately approvable production fix plan without changing
   normal Chromux activity behavior.
+
+## 2026-07-28 — Chromux v0.69.0 conservative Codex activity fix
+
+- Added an opt-in, explicitly turn-budgeted same-turn probe using a private
+  Unix-socket Codex app-server, WebSocket framing through `app-server proxy`,
+  ephemeral read-only threads, bounded sanitized lifecycle records, a
+  no-`codex exec` process assertion, and deterministic cleanup.
+- Gate 1 proved the handshake but not same-turn observation: the independent
+  observer received no `turn/started` or `turn/completed` for either visible
+  TUI attempt. The persistent sidecar pilot and Gate 2 live turns were
+  rejected, as required by the approved decision rule.
+- Shipped the conservative route: Pending/Awaiting agent activity remains
+  update-unsafe but non-animated, while only provider-confirmed Working uses
+  the spinner. Preserved title/output/notify, completion, failure,
+  cancellation, process-exit, `/clear`, resume, restore, Threads, diagnostics,
+  update queue, disabled indicators, and shell-adoption behavior.
+- Stabilized the broad Threads preview regression with a bounded paint poll and
+  preserved complete visible-layer accounting during in-place xterm repaint.
+- Ship manifest — User goal: approve or reject exact visible-TUI observation
+  within five live turns, implement the selected route, archive sanitized
+  evidence, and release v0.69.0. Changed files and per-file purpose:
+  `prototype/codex-app-server-lifecycle.js` owns qualified 0.145.x
+  capability/transport handling and sanitized lifecycle parsing;
+  `prototype/scripts/run-same-turn-probe.js` owns explicit turn accounting,
+  ephemeral TUI scenarios, no-exec and cleanup assertions;
+  `prototype/scripts/test-codex-app-server-lifecycle.js` covers versions,
+  parsing, content exclusion, malformed/oversized data, IDs, disconnects, and
+  timeouts; `prototype/renderer/attention.js` owns the conservative Pending
+  presentation; `prototype/renderer/renderer.js` preserves complete visible
+  preview-frame accounting; focused renderer tests prove Pending/Working,
+  Threads, diagnostics, update safety, and preview behavior; README, plan,
+  testing evidence, package metadata, `RELEASES.md`, and task files document
+  v0.69.0. User-goal mapping: Gate 1 used no reference lane, never spawned
+  `codex exec`, retained no prompt/output/item content, cleaned its private
+  resources, rejected the unproven pilot, and left normal session launch free
+  of app-server integration. Tests run: Activity Lab core/runner/Electron and
+  lifecycle observer suites passed; idle/no-process control passed; focused tab
+  activity, diagnostics, turn-signal, Threads, update queue, restore,
+  shell-adoption, Codex metadata, and lifecycle suites passed; two consecutive
+  Threads suites passed after paint stabilization; the final exact-state
+  `npm test` matrix passed every registered Node/Electron/macOS/Windows suite
+  without retry or warning. Skipped tests: the three Gate 2 live turns were not
+  authorized after Gate 1 failure; website and real Windows/WSL UAT were out of
+  scope because no website/platform packaging behavior changed. Adversarial
+  review: checked version qualification, WebSocket masking/length bounds,
+  malformed and oversized messages, unknown/wrong/stale IDs, duplicate event
+  non-escalation, disconnect/timeout behavior, no prompt/response/item
+  retention, explicit allowance refusal, no-exec accounting, cleanup, Pending animation semantics,
+  pending-to-Working continuity, update safety, `/clear`, exit/cancellation,
+  concurrent projection isolation, and preview atomicity. Findings fixed were
+  the required WebSocket framing for Unix proxy transport, a missing-allowance
+  `null` coercion to zero, fixed-delay preview sampling, and transient
+  visible-layer paint accounting. Residual risk: the
+  observer could not prove whether the two TUI launch attempts reached the
+  model service, Codex remote app-server remains experimental, and the
+  conservative fallback may miss some Working intervals by design. Rollback:
+  revert the scoped v0.69.0 commit and delete tag/GitHub Release
+  `chromux-v0.69.0`; v0.68.0 remains the prior release. Deploy: no explicit
+  manual deploy contract exists; the GitHub Release is the required update
+  channel. Next command: commit and push the scoped v0.69.0 boundary, publish
+  `GBlockParty Chromux v0.69.0`, and verify `/releases/latest`.

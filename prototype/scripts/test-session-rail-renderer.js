@@ -640,9 +640,9 @@ fs.writeFileSync(e2ePath, `
   const pendingRow = rail.groups().filter((group) => group.key.startsWith('cwd:'))
     .flatMap((group) => group.rows).find((row) => row.id === pendingWorker);
   expect(pendingRow?.status === 'Awaiting agent activity'
-    && pendingRow.animationName === 'tabActivitySpin'
+    && pendingRow.animationName === 'none'
     && !workingGroup.rows.some((row) => row.id === pendingWorker),
-  'pending Codex sessions should spin in their directory row without joining the Working section');
+  'pending Codex sessions should remain non-animated outside the Working section');
   expect(workingGroup.rows.map((row) => row.id).join(',') === [webTwo, worker].join(','),
     'Recent should order Working rows newest first');
   const workingActivityBeforeFocus = rail.activityAt(worker);
@@ -1085,8 +1085,14 @@ fs.writeFileSync(e2ePath, `
         rail.setPreviewSize(size);
         rail.focusThreadSortControl();
         rail.focusRow(noAttentionPreview);
-        await wait(100);
-        expectNoAttentionPreview(rail.preview(), theme + ' ' + mode + ' ' + size + ' no-attention preview');
+        const paintedNoAttentionPreview = await waitFor(() => {
+          const candidate = rail.preview();
+          return candidate?.text.includes('NO ATTENTION PREVIEW') ? candidate : null;
+        });
+        expectNoAttentionPreview(
+          paintedNoAttentionPreview,
+          theme + ' ' + mode + ' ' + size + ' no-attention preview',
+        );
         rail.outsideClick();
       }
     }

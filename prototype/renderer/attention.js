@@ -444,7 +444,7 @@
     }
     if (turnState === 'pending') {
       return {
-        kind: activityIndicators ? 'working' : 'pending',
+        kind: 'pending',
         icon: '',
         label: 'Awaiting agent activity',
         status: 'Awaiting agent activity',

@@ -1,11 +1,36 @@
 # Codex Activity Production Fix Plan
 
-Status: awaiting separate approval
-Evidence: `docs/testing/activity-lab-uat-0.67.0.md`
+Status: Gate 1 rejected persistent app-server integration; conservative fallback selected
+Evidence: `docs/testing/codex-activity-approval-0.69.0.md`
+
+## Approval result
+
+Codex 0.145.0 accepted a private Unix-socket app-server handshake and an
+ephemeral `thread/start`, but a second observer connection did not receive
+`turn/started` or `turn/completed` for the visible TUI launched with
+`codex resume <thread> --remote unix://…`. Both bounded Gate 1 attempts reached
+their pre-event timeout, created no `codex exec` process, and removed every
+temporary socket and workspace. Because the same-turn signal was not proven,
+the persistent app-server lifecycle pilot is rejected.
+
+Chromux 0.69.0 therefore takes the conservative route:
+
+1. submitted Codex input remains `pending` / Awaiting agent activity;
+2. Pending is never projected as animated Working;
+3. existing recognized title/output/native evidence alone activates Working;
+4. existing completion, cancellation, process-exit, `/clear`, restore, update
+   safety, Threads, diagnostics, and disabled-indicator contracts remain in
+   force.
+
+The experimental same-turn probe remains opt-in in the Activity Lab tooling for
+future Codex minors. Each new minor must be qualified separately. It is not
+started by normal Chromux sessions and can be disabled immediately by simply
+not invoking the probe command.
 
 ## Smallest viable signal change
 
-Add a Chromux-owned structured lifecycle sidecar for managed Codex sessions.
+The rejected pilot would have added a Chromux-owned structured lifecycle
+sidecar for managed Codex sessions.
 For each submitted interactive turn, start a correlated
 `codex exec --json --ephemeral --ignore-user-config --ignore-rules` reference
 only when the installed CLI advertises the required flags. Treat its
@@ -79,5 +104,5 @@ missed-working intervals.
 11. Electron smoke confirms only Working has a non-`none` animation name.
 12. Opt-in real-CLI UAT repeats all five lab scenarios without CI model usage.
 
-No production implementation should begin until this plan receives explicit
-approval and the same-turn/no-duplicate-invocation question is resolved.
+No persistent production app-server lifecycle implementation is authorized by
+this result. A future attempt requires a new version-specific approval gate.

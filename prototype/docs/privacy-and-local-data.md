@@ -333,6 +333,17 @@ sources, confidence, process status, timings, versions, and mismatch summaries.
 They deliberately omit prompts, response text, terminal output, and structured
 item content. The user explicitly selects the report destination.
 
+The separate `probe:codex-same-turn` command is also manual and refuses live
+execution without `--allow-model-turns <count>`. It qualifies only Codex
+0.145.x, creates a private temporary Unix socket and read-only workspace,
+starts an ephemeral thread with approval policy `never`, and discards TUI
+output while retaining only its bounded byte count. Sanitized probe reports
+contain timestamps, CLI version, thread/turn IDs, lifecycle status, process
+status, pass/fail reasons, turn counts, and cleanup state. The archived approval
+report separately records the generated protocol schema hash. Neither contains
+a prompt, response, terminal output, or structured item content. Normal Chromux
+sessions do not start this observer.
+
 ## References
 
 - [FTC: Start with Security](https://www.ftc.gov/business-guidance/resources/start-security-guide-business)

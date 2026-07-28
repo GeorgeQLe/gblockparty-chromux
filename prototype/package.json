@@ -1,6 +1,6 @@
 {
   "name": "chromux",
-  "version": "0.68.0",
+  "version": "0.69.0",
   "productName": "GBlockParty Chromux",
   "description": "OSS desktop front-end for local and GBlockParty-managed agent/browser workspaces.",
   "main": "main.js",
@@ -25,7 +25,9 @@
     "start": "electron .",
     "smoke": "electron . --smoke --dev-mode",
     "activity-lab": "electron activity-lab-main.js --activity-lab",
-    "test:activity-lab": "node scripts/test-activity-lab-core.js && node scripts/test-activity-lab-runner.js && node scripts/test-activity-lab-smoke.js",
+    "test:activity-lab": "node scripts/test-activity-lab-core.js && node scripts/test-activity-lab-runner.js && node scripts/test-activity-lab-smoke.js && node scripts/test-codex-app-server-lifecycle.js",
+    "test:codex-app-server-lifecycle": "node scripts/test-codex-app-server-lifecycle.js",
+    "probe:codex-same-turn": "node scripts/run-same-turn-probe.js",
     "capture:themes": "node scripts/capture-themes.js",
     "capture:composer-themes": "node scripts/capture-full-browser-composer-themes.js",
     "broker:install": "node scripts/install-resource-broker-platform.js",

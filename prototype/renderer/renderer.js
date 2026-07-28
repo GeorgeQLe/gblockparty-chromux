@@ -7085,7 +7085,10 @@ function scheduleThreadPreviewPaint(preview = state.ui.threadPreview, layer = pr
       || preview.lifecycleGeneration !== lifecycleGeneration
       || preview.visibleLayer !== layer
       || !preview.layers.includes(layer)) return;
-    layer.paintedRows.clear();
+    // Keep the last complete visible-frame accounting intact while xterm
+    // repaints in place. Staging layers clear their accounting separately
+    // before a swap, but the mounted layer must never look incomplete between
+    // requestAnimationFrame delivery and xterm's render callback.
     preview.paintCount += 1;
     layer.terminal.refresh(0, Math.max(0, layer.terminal.rows - 1));
   });

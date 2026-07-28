@@ -102,6 +102,23 @@ signal ordering, timings, versions, and mismatch summaries but no response text.
 The real-Codex UAT is deliberately manual and opt-in:
 `CHROMUX_ACTIVITY_LAB_UAT=1 node scripts/run-activity-lab-uat.js`.
 
+To probe whether one visible TUI turn can be observed through Codex 0.145.x's
+experimental app-server without launching `codex exec`, use the separately
+budgeted same-turn harness:
+
+```bash
+npm run probe:codex-same-turn -- --scenario idle --allow-model-turns 0
+npm run probe:codex-same-turn -- --scenario gate1 --allow-model-turns 2
+```
+
+The live command refuses to run without an explicit allowance. It creates
+ephemeral read-only threads and temporary workspaces/sockets, records no prompt,
+response, terminal output, or structured item content, and does not retry after
+`turn/started`. Codex 0.145.0 did not expose the visible TUI lifecycle to the
+observer in the v0.69.0 approval run, so normal Chromux sessions do not start a
+persistent app-server sidecar. Pending Codex submissions are shown without
+animation; only confirmed Working animates.
+
 ### Session rail
 
 The left rail has two persisted icon views while the horizontal tabs remain the primary navigator.

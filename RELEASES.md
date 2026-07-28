@@ -1,5 +1,23 @@
 # Release Notes
 
+## GBlockParty Chromux v0.69.0
+
+Tag: `chromux-v0.69.0`
+
+- Stop rendering unconfirmed Codex Pending/Awaiting agent activity as an
+  animated Working spinner; only existing provider evidence activates Working.
+- Preserve Pending as update-unsafe while retaining completion, cancellation,
+  process-exit, `/clear`, restore, Threads, diagnostics, disabled-indicator,
+  title/output, and notify fallback behavior.
+- Add an explicitly turn-budgeted same-turn Activity Lab probe for Codex
+  0.145.x using ephemeral read-only threads, a private Unix-socket app-server,
+  a WebSocket-framed observer through `app-server proxy`, bounded sanitized
+  lifecycle evidence, and verified cleanup without `codex exec`.
+- Record the Gate 1 rejection of persistent app-server lifecycle integration:
+  the separate observer did not receive the visible TUI turn stream, so the
+  capability-gated production pilot and its three Gate 2 live turns remain
+  disabled.
+
 ## GBlockParty Chromux v0.68.0
 
 Tag: `chromux-v0.68.0`
