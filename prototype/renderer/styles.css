@@ -394,8 +394,8 @@ body.host-win32 #titlebar {
 .rail-status.action { border-radius: 50%; background: var(--amber); color: var(--on-amber); }
 .rail-status.working { border: 2px solid color-mix(in srgb, var(--cyan) 28%, transparent); border-top-color: var(--cyan); border-radius: 50%; animation: tabActivitySpin .8s linear infinite; }
 .rail-status.completed { color: var(--green); }
-.rail-status.idle::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--faint); opacity: .7; }
-.rail-status.live::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+.rail-status.idle::before,
+.rail-status.live::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--faint); opacity: .7; }
 
 .thread-terminal-preview {
   position: fixed;
@@ -788,7 +788,14 @@ body[data-thread-preview-size="large"] .thread-preview-attention { max-height: 1
   font: 10.5px var(--font-mono);
 }
 .tab-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; box-sizing: border-box; }
-.tab-dot.live { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.tab-dot.live,
+.tab-dot.idle {
+  width: 7px;
+  height: 7px;
+  background: var(--faint);
+  box-shadow: none;
+  opacity: .7;
+}
 .tab-dot.dead { background: var(--red); box-shadow: none; }
 .tab-dot.action {
   width: 10px;
@@ -820,13 +827,6 @@ body[data-thread-preview-size="large"] .thread-preview-attention { max-height: 1
   font: 800 11px/10px var(--font-mono);
 }
 .tab-dot.completed::before { content: "✓"; }
-.tab-dot.idle {
-  width: 7px;
-  height: 7px;
-  background: var(--faint);
-  box-shadow: none;
-  opacity: .7;
-}
 @keyframes tabActivitySpin { to { transform: rotate(360deg); } }
 .tab-label-wrap {
   flex: 1;

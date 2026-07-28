@@ -1,7 +1,6 @@
 // Renderer E2E: capture/delivery records. Overlapping deliveries resolve
 // independently via the delivery index, failures attribute to the record's
-// own session (never the focused one), the SENT gauge counts only delivered
-// records, and records survive modal close.
+// own session (never the focused one), and records survive modal close.
 'use strict';
 
 const fs = require('fs');
@@ -45,7 +44,6 @@ fs.writeFileSync(e2ePath, `
   caps.closeDelivery(d2, 1, 'boom');
   expect(rec(c2).status === 'failed' && rec(c2).error === 'boom', 'failed record captured exit + error');
   expect(rec(c1).status === 'delivering', 'overlapping delivery unaffected by the other closing');
-  expect(caps.sentGauge() === '0', 'gauge counts only delivered');
 
   // One-off failure attributes to the capturing session, not the focused one.
   const fails = failItems();
@@ -55,7 +53,6 @@ fs.writeFileSync(e2ePath, `
   // First delivery lands.
   caps.closeDelivery(d1, 0);
   expect(rec(c1).status === 'delivered', 'first delivery resolves independently');
-  expect(caps.sentGauge() === '1', 'gauge counts the delivered record');
 
   // A late/duplicate close for an already-resolved delivery is ignored.
   caps.closeDelivery(d1, 1, 'late duplicate');
@@ -64,7 +61,7 @@ fs.writeFileSync(e2ePath, `
   // Records survive modal close.
   caps.closeCaptureModal();
   expect(caps.captureRecords().length === 2, 'records survive modal close');
-  expect(rec(c2).status === 'failed' && caps.sentGauge() === '1', 'statuses/gauge unchanged by modal close');
+  expect(rec(c2).status === 'failed', 'failed status survives modal close');
   expect(failItems().length === 1, 'failure attention survives modal close');
 
   // Browser pane chip derives from records matching the pane URL.

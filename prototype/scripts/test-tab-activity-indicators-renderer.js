@@ -19,6 +19,10 @@ if (!/\.tab-dot\.working\s*\{[^}]*animation:\s*tabActivitySpin/.test(styles)
 if (!/@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*?\.tab-dot\.working,\s*\.rail-status\.working\s*\{\s*animation:\s*none/.test(styles)) {
   throw new Error('tab and Threads working indicators must stop under reduced motion');
 }
+if (!/\.tab-dot\.live,\s*\.tab-dot\.idle\s*\{[^}]*background:\s*var\(--faint\)[^}]*opacity:\s*\.7/.test(styles)
+  || !/\.rail-status\.idle::before,\s*\.rail-status\.live::before\s*\{[^}]*background:\s*var\(--faint\)[^}]*opacity:\s*\.7/.test(styles)) {
+  throw new Error('live and idle tabs and Threads rows must share the neutral indicator rules');
+}
 
 fs.mkdirSync(homeDir, { recursive: true });
 
@@ -40,6 +44,9 @@ fs.writeFileSync(e2ePath, `
   tabs.focus(active);
   expect(tabs.state(active).indicator === 'live', 'unknown active turn should retain live dot');
   expect(tabs.state(background).indicator === 'live', 'unknown background turn should retain live dot');
+  expect(tabs.state(active).ariaLabel.includes('Session live'),
+    'unknown state should retain live accessibility semantics');
+  const liveTabPresentation = tabs.state(active).indicatorPresentation;
 
   tabs.typeInput(active, 'build this\\r');
   tabs.emitSignal(background, 'turn-start');
@@ -66,6 +73,10 @@ fs.writeFileSync(e2ePath, `
   await wait(30); tabs.flushRender();
   expect(tabs.state(active).indicator === 'idle',
     'a focused composer redraw without activity should resolve pending to idle');
+  expect(JSON.stringify(tabs.state(active).indicatorPresentation) === JSON.stringify(liveTabPresentation),
+  'live and idle tab states should have the same neutral presentation');
+  expect(tabs.state(active).ariaLabel.includes('Agent idle'),
+    'idle state should retain idle accessibility semantics');
   tabs.emitSignal(active, 'turn-end');
   expect(tabs.state(active).indicator === 'idle',
     'a delayed completion signal after /clear redraw must not revive the spinner');

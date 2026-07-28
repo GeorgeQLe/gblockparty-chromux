@@ -264,9 +264,16 @@ fs.writeFileSync(e2ePath, `
       expect(document.documentElement.style.colorScheme === mode, mode + ' should set the document color scheme');
       expect(JSON.stringify(themes.selectedCards()) === JSON.stringify([theme]), theme + ' should be the only pressed card');
       expect(JSON.stringify(themes.selectedModes()) === JSON.stringify([mode]), mode + ' should be the only pressed mode');
+      const gaugeLabels = [...document.querySelectorAll('.titlebar-gauges .gauge')]
+        .map((gauge) => gauge.textContent.trim().replace(/\\s+/g, ' ').replace(/^\\d+\\s*/, ''));
+      expect(JSON.stringify(gaugeLabels) === JSON.stringify(['SESSIONS', 'QUEUED']),
+        theme + ' ' + mode + ' title bar should contain only SESSIONS and QUEUED gauges; got '
+          + JSON.stringify(gaugeLabels));
+      expect(document.querySelector('#g-captures') === null,
+        theme + ' ' + mode + ' should not expose the removed SENT gauge');
       if (theme === 'liquid-glass') {
         const gauges = [...document.querySelectorAll('.titlebar-gauges .gauge')];
-        expect(gauges.length === 3, 'liquid glass should retain all three titlebar gauges');
+        expect(gauges.length === 2, 'liquid glass should retain both titlebar gauges');
         const titlebarLeft = document.querySelector('#titlebar').getBoundingClientRect().left;
         const brandLeft = document.querySelector('#titlebar .brand').getBoundingClientRect().left;
         expect(brandLeft - titlebarLeft >= 84, 'liquid glass ' + mode + ' branding should retain clearance from shifted native controls; got ' + (brandLeft - titlebarLeft));

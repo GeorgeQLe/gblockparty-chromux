@@ -2146,14 +2146,6 @@ function renderQueue(session) {
   invalidate('attention', 'badges', 'shortcutDebug');
 }
 
-function deliveredCaptureCount() {
-  let n = 0;
-  for (const rec of state.captures.values()) {
-    if (rec.status === 'delivered') n += 1;
-  }
-  return n;
-}
-
 function updateBadges() {
   let queued = 0;
   for (const s of state.sessions.values()) {
@@ -2164,8 +2156,6 @@ function updateBadges() {
   }
   $('#g-queued').textContent = String(queued);
   $('#g-sessions').textContent = String(state.sessions.size);
-  // "SENT" counts exactly what its label says: deliveries that exited 0.
-  $('#g-captures').textContent = String(deliveredCaptureCount());
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -10688,6 +10678,7 @@ if (window.chromuxTest) {
       const tab = session.els.tab;
       const wrap = session.els.tabLabelWrap;
       const label = session.els.tabLabel;
+      const dotStyle = getComputedStyle(session.els.dot);
       return {
         active: tab.classList.contains('active'),
         truncated: tab.classList.contains('truncated'),
@@ -10696,6 +10687,13 @@ if (window.chromuxTest) {
         hoverScroll: tab.classList.contains('hover-scroll'),
         indicator: ['dead', 'action', 'working', 'pending', 'completed', 'idle', 'live']
           .find((kind) => session.els.dot.classList.contains(kind)) || 'unknown',
+        indicatorPresentation: {
+          backgroundColor: dotStyle.backgroundColor,
+          boxShadow: dotStyle.boxShadow,
+          height: dotStyle.height,
+          opacity: dotStyle.opacity,
+          width: dotStyle.width,
+        },
         indicatorCount: tab.querySelectorAll('.tab-dot').length,
         label: label.textContent,
         title: tab.title,
@@ -11680,7 +11678,6 @@ if (window.chromuxTest) {
       flushRender();
     },
     captureModalId: () => (state.ui.captureModal ? state.ui.captureModal.captureId : null),
-    sentGauge: () => $('#g-captures').textContent,
     setCurrentUrl(id, url) {
       testSession(id).browser.currentUrl = url;
       invalidate('captureChips');

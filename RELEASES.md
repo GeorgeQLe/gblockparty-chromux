@@ -1,5 +1,19 @@
 # Release Notes
 
+## GBlockParty Chromux v0.68.0
+
+Tag: `chromux-v0.68.0`
+
+- Present live sessions with unknown turn state and idle agents using the same
+  neutral gray indicator across session tabs, grouped tabs, Threads, themes,
+  and the disabled-activity-indicators mode while retaining distinct lifecycle
+  state, tooltips, and accessibility descriptions.
+- Remove the misleading **SENT** title-bar gauge while preserving capture
+  records, delivery outcomes, failure handling, and contextual **CAPTURE SENT**
+  chips.
+- Keep Working, Completed, Action required, and Exited indicators visually
+  distinct as cyan spinners, green checks, amber alerts, and red dots.
+
 ## GBlockParty Chromux v0.67.0
 
 Tag: `chromux-v0.67.0`
