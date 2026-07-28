@@ -144,10 +144,6 @@ function markdown(report) {
     events.queueDetectedAt = new Date().toISOString();
     events.autoNavigated = u.currentUrl(source) !== null;
     expect(!events.autoNavigated, 'fixture auto-navigated before approval');
-    const healthResponse = await fetch(fixtureUrl + 'healthz');
-    events.healthOk = healthResponse.status === 200
-      && (await healthResponse.json()).ok === true;
-    expect(events.healthOk, 'fixture health endpoint failed');
     u.openQueued(source, fixtureUrl);
     events.openedAt = new Date().toISOString();
     const page = await waitFor(async () => {
@@ -251,9 +247,21 @@ function markdown(report) {
   let stderr = '';
   child.stdout.on('data', (chunk) => { stdout += chunk; });
   child.stderr.on('data', (chunk) => { stderr += chunk; });
+  const healthPromise = (async () => {
+    const deadline = Date.now() + 20_000;
+    while (Date.now() < deadline) {
+      try {
+        const response = await fetch(`${fixtureUrl}healthz`, { signal: AbortSignal.timeout(500) });
+        if (response.status === 200 && (await response.json()).ok === true) return true;
+      } catch { /* fixture session may still be starting */ }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    return false;
+  })();
   const killTimer = setTimeout(() => child.kill('SIGTERM'), 180_000);
   const exit = await new Promise((resolve) => child.once('close', (code, signal) => resolve({ code, signal })));
   clearTimeout(killTimer);
+  const healthOk = await healthPromise;
 
   let raw = {};
   try { raw = JSON.parse(fs.readFileSync(outPath, 'utf8')); } catch { raw = { ok: false, error: 'missing UAT result' }; }
@@ -261,6 +269,7 @@ function markdown(report) {
   if (exit.code !== 0 || exit.signal) failureReasons.push(`Electron exit ${exit.code ?? exit.signal}`);
   if (!raw.ok) failureReasons.push(raw.error || 'UAT assertion failed');
   if (raw.submittedTurns > 1) failureReasons.push('model-turn allowance exceeded');
+  if (!healthOk) failureReasons.push('fixture health endpoint failed');
 
   const artifact = (name) => {
     const artifactPath = raw.paths?.[name];
@@ -284,7 +293,7 @@ function markdown(report) {
     startedAt,
     finishedAt: new Date().toISOString(),
     fixtureUrl,
-    healthOk: Boolean(raw.events?.healthOk),
+    healthOk,
     queueDetectedAt: raw.events?.queueDetectedAt || 'not observed',
     openedAt: raw.events?.openedAt || 'not observed',
     autoNavigated: Boolean(raw.events?.autoNavigated),
