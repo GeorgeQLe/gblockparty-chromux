@@ -25,13 +25,13 @@ fs.writeFileSync(e2ePath, `
   };
   const modes = ['light', 'dark'];
   const terminalPalettes = {
-    'blueprint-light': { background: '#f4f9ff', foreground: '#173b62', cursor: '#006d9c', black: '#173b62', brightBlack: '#6684a3', red: '#a33a2c', brightRed: '#d45747', green: '#13764d', brightGreen: '#239b68', yellow: '#8a5b00', brightYellow: '#b77c0e', blue: '#006d9c', brightBlue: '#218fc0', magenta: '#674fa3', brightMagenta: '#8b70c7', cyan: '#08758a', brightCyan: '#2699ad', white: '#dbe9f6', brightWhite: '#ffffff' },
+    'blueprint-light': { background: '#f4f9ff', foreground: '#173b62', cursor: '#006d9c', black: '#173b62', brightBlack: '#6684a3', red: '#a33a2c', brightRed: '#d45747', green: '#13764d', brightGreen: '#239b68', yellow: '#8a5b00', brightYellow: '#b77c0e', blue: '#006d9c', brightBlue: '#218fc0', magenta: '#674fa3', brightMagenta: '#8b70c7', cyan: '#08758a', brightCyan: '#2699ad', white: '#173b62', brightWhite: '#173b62' },
     'blueprint-dark': { background: '#061b38', foreground: '#dceeff', cursor: '#7fd8ff', black: '#082346', brightBlack: '#527ca7', red: '#ff9d86', brightRed: '#ffc0af', green: '#8af0bd', brightGreen: '#b7ffd9', yellow: '#ffd88f', brightYellow: '#ffe8bd', blue: '#7fd8ff', brightBlue: '#b8eaff', magenta: '#c6adff', brightMagenta: '#e0d2ff', cyan: '#8fe7f5', brightCyan: '#c6f6ff', white: '#dceeff', brightWhite: '#ffffff' },
-    'retro-os-light': { background: '#ffffff', foreground: '#141414', cursor: '#30309a', black: '#141414', brightBlack: '#666666', red: '#9b1c1c', brightRed: '#d6393b', green: '#1f7a34', brightGreen: '#37b24d', yellow: '#a05a00', brightYellow: '#e8940a', blue: '#30309a', brightBlue: '#5656c7', magenta: '#7d2c85', brightMagenta: '#a94eb3', cyan: '#0b6a7d', brightCyan: '#18a5c0', white: '#d0d0d0', brightWhite: '#ffffff' },
+    'retro-os-light': { background: '#ffffff', foreground: '#141414', cursor: '#30309a', black: '#141414', brightBlack: '#666666', red: '#9b1c1c', brightRed: '#d6393b', green: '#1f7a34', brightGreen: '#37b24d', yellow: '#a05a00', brightYellow: '#e8940a', blue: '#30309a', brightBlue: '#5656c7', magenta: '#7d2c85', brightMagenta: '#a94eb3', cyan: '#0b6a7d', brightCyan: '#18a5c0', white: '#141414', brightWhite: '#141414' },
     'retro-os-dark': { background: '#101214', foreground: '#eeeeee', cursor: '#9c9cff', black: '#101214', brightBlack: '#777b80', red: '#ff8585', brightRed: '#ffaaaa', green: '#79d990', brightGreen: '#a4edb4', yellow: '#e8b45a', brightYellow: '#f5d28f', blue: '#9c9cff', brightBlue: '#c0c0ff', magenta: '#d58bdc', brightMagenta: '#ebb4ef', cyan: '#72ccd9', brightCyan: '#a4e5ed', white: '#d6d6d6', brightWhite: '#ffffff' },
-    'streak-light': { background: '#f7fbff', foreground: '#293244', cursor: '#3f9b00', black: '#293244', brightBlack: '#748096', red: '#c83c3c', brightRed: '#e85c5c', green: '#3f9b00', brightGreen: '#58cc02', yellow: '#9a6900', brightYellow: '#cc9100', blue: '#087eae', brightBlue: '#1cb0f6', magenta: '#8d4eb4', brightMagenta: '#b16bda', cyan: '#087f6b', brightCyan: '#20ad94', white: '#dce5ee', brightWhite: '#ffffff' },
+    'streak-light': { background: '#f7fbff', foreground: '#293244', cursor: '#3f9b00', black: '#293244', brightBlack: '#748096', red: '#c83c3c', brightRed: '#e85c5c', green: '#3f9b00', brightGreen: '#58cc02', yellow: '#9a6900', brightYellow: '#cc9100', blue: '#087eae', brightBlue: '#1cb0f6', magenta: '#8d4eb4', brightMagenta: '#b16bda', cyan: '#087f6b', brightCyan: '#20ad94', white: '#293244', brightWhite: '#293244' },
     'streak-dark': { background: '#172033', foreground: '#f7fbff', cursor: '#58cc02', black: '#172033', brightBlack: '#62708a', red: '#ff5d5d', brightRed: '#ff8b8b', green: '#58cc02', brightGreen: '#8ee83f', yellow: '#ffc800', brightYellow: '#ffe45c', blue: '#1cb0f6', brightBlue: '#70d2ff', magenta: '#ce82ff', brightMagenta: '#e1b3ff', cyan: '#49e5c2', brightCyan: '#94f3de', white: '#dfe8f5', brightWhite: '#ffffff' },
-    'liquid-glass-light': { background: '#f7faff', foreground: '#172231', cursor: '#0f86b3', black: '#172231', brightBlack: '#637188', red: '#b83c31', brightRed: '#df5a4d', green: '#137c55', brightGreen: '#26a874', yellow: '#8a5c08', brightYellow: '#bd8215', blue: '#0f78a0', brightBlue: '#199dcc', magenta: '#6656b8', brightMagenta: '#8979dc', cyan: '#0d7886', brightCyan: '#28a2b1', white: '#dbe5f2', brightWhite: '#ffffff' },
+    'liquid-glass-light': { background: '#f7faff', foreground: '#172231', cursor: '#0f86b3', black: '#172231', brightBlack: '#637188', red: '#b83c31', brightRed: '#df5a4d', green: '#137c55', brightGreen: '#26a874', yellow: '#8a5c08', brightYellow: '#bd8215', blue: '#0f78a0', brightBlue: '#199dcc', magenta: '#6656b8', brightMagenta: '#8979dc', cyan: '#0d7886', brightCyan: '#28a2b1', white: '#172231', brightWhite: '#172231' },
     'liquid-glass-dark': { background: '#111827', foreground: '#e7edf7', cursor: '#23b7ec', black: '#111827', brightBlack: '#56647a', red: '#ef6a5c', brightRed: '#ff958a', green: '#35c98c', brightGreen: '#72e0b3', yellow: '#e3a02d', brightYellow: '#f3c86f', blue: '#23b7ec', brightBlue: '#71d8ff', magenta: '#9587f4', brightMagenta: '#c0b7ff', cyan: '#52d7e8', brightCyan: '#94eef8', white: '#dbe5f2', brightWhite: '#ffffff' },
   };
   const rgb = (value) => {
@@ -90,6 +90,7 @@ fs.writeFileSync(e2ePath, `
     fontSize: 12.5,
     lineHeight: 1.25,
     scrollback: 200,
+    minimumContrastRatio: 4.5,
     theme: terminalPalettes['liquid-glass-light'],
   });
   const realFitAddon = new FitAddon.FitAddon();
@@ -158,6 +159,16 @@ fs.writeFileSync(e2ePath, `
       && realTerminal.options.theme.foreground === palette.foreground,
     label + ' should repaint the real ANSI fixture through the selected Chromux palette');
   };
+
+  expect(realTerminal.options.minimumContrastRatio === 4.5, 'real xterm should enforce WCAG AA terminal contrast');
+
+  for (const [name, palette] of Object.entries(terminalPalettes)) {
+    if (!name.endsWith('-light')) continue;
+    for (const slot of ['white', 'brightWhite']) {
+      const ratio = contrast(palette[slot], palette.background);
+      expect(ratio >= 4.5, name + ' ANSI ' + slot + ' should remain readable for Codex header text; got ' + ratio.toFixed(2));
+    }
+  }
 
   const terminalGeometry = () => ({
     cols: realTerminal.cols,

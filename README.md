@@ -12,12 +12,13 @@ npm install
 npm start
 ```
 
-Chromux v0.62 supports macOS and Windows 11 22H2+ x64. Windows sessions run
-inside a selected WSL2 distribution; Bash, Git, Node 22.12+, and the desired
-agent CLIs must be installed there. The initial Windows installer is unsigned,
-so SmartScreen normally shows **Windows protected your PC**. Use **More info →
-Run anyway** only after verifying the installer came from the official GitHub
-Release; enterprise policy may prevent bypassing the warning.
+Chromux supports macOS and Windows 10 22H2+ x64 (build 19045 or newer),
+including Windows 11. Windows sessions run inside a selected, updated WSL2
+distribution; Bash, Git, Node 22.12+, and the desired agent CLIs must be
+installed there. Run `wsl --update` before setup. The initial Windows installer
+is unsigned, so SmartScreen normally shows **Windows protected your PC**. Use
+**More info → Run anyway** only after verifying the installer came from the
+official GitHub Release; enterprise policy may prevent bypassing the warning.
 
 For the full prototype guide, see [`prototype/README.md`](prototype/README.md).
 
