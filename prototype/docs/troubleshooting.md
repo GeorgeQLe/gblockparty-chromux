@@ -236,6 +236,9 @@ If delivery fails:
 4. Open DELIVERY LOG from the status bar to inspect prior attempts.
 
 Every capture is written before delivery, so a failed send does not lose the payload.
+The controlled failure-to-recovery proof and its exact artifact checks are
+archived in
+[`capture-delivery-recovery-uat-0.69.4.md`](../../docs/testing/capture-delivery-recovery-uat-0.69.4.md).
 
 ## Wrong-session routing
 

@@ -201,6 +201,21 @@ That UAT submits once with no retry, retains only a bounded sanitized response
 excerpt and artifact metadata, and removes its temporary Chromux profile and
 captures after recording the report.
 
+### Capture delivery recovery proof
+
+Run the deterministic recovery UAT with:
+
+```sh
+npm run uat:capture-delivery-recovery
+```
+
+It uses an isolated Chromux home and controlled local `claude` fixture: the
+first real Electron delivery exits nonzero, the payload, screenshot, and
+delivery-log entry are verified, and the documented manual retry command
+delivers the persisted YAML content on the second invocation. It never calls a
+real account, network service, or model. The sanitized transcript is archived
+at [`docs/testing/capture-delivery-recovery-uat-0.69.4.md`](../docs/testing/capture-delivery-recovery-uat-0.69.4.md).
+
 Select **New session** to choose Claude, Codex, Grok, or Shell; Grok still requires its data-risk
 acknowledgment. Chromux creates one canonical session in the same runtime, distribution, directory,
 and current URL with a fresh browser partition, activates it in full-browser mode, moves staged
