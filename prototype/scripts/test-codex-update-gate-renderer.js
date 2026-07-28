@@ -47,6 +47,9 @@ fs.writeFileSync(e2ePath, `
   const second = gate.launch('codex', 'codex-two', immediate);
   expect(immediate.join(',') === 'claude-now,shell-now', 'non-Codex launches should not wait');
   expect(gate.waiting().join(',') === 'codex-one,codex-two', 'Codex queue should preserve saved order');
+  let warning = gate.warning();
+  expect(warning.title.includes('Checking Codex'), 'queued sessions should remain in the checking state during service retries');
+  expect(!warning.buttons.includes('RETRY CHECK'), 'intermediate retry failures must not expose the final failure action');
 
   await gate.setStatus({
     currentVersion: '1.2.3',
@@ -55,7 +58,7 @@ fs.writeFileSync(e2ePath, `
     installKind: 'homebrew',
     releaseUrl: 'https://github.com/openai/codex/releases/tag/rust-v1.2.4',
   });
-  let warning = gate.warning();
+  warning = gate.warning();
   expect(!warning.hidden, 'one workspace prompt should be visible');
   expect(warning.title.includes('2 sessions waiting'), 'prompt should aggregate waiting sessions: ' + warning.title);
   expect(warning.buttons.join(',') === 'RELEASE NOTES,UPDATE CODEX,RESUME ANYWAY',
@@ -74,9 +77,12 @@ fs.writeFileSync(e2ePath, `
   gate.reset();
   gate.useFakeLauncher();
   const currentOne = gate.launch('codex', 'current-one', []);
+  const currentTwo = gate.launch('codex', 'current-two', []);
+  expect(gate.waiting().join(',') === 'current-one,current-two', 'retrying preflight should retain every queued Codex launch');
   await gate.setStatus({ currentVersion: '1.2.4', latestVersion: '1.2.4', updateAvailable: false });
-  await currentOne;
-  expect(gate.launched().join(',') === 'current-one', 'current Codex should release automatically');
+  await Promise.all([currentOne, currentTwo]);
+  expect(gate.launched().join(',') === 'current-one,current-two',
+    'a successful retry cycle should release every queued Codex launch automatically in saved order');
   expect(gate.phase() === 'released', 'current status should release the gate');
 
   gate.reset();

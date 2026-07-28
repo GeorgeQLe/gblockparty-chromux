@@ -12,6 +12,7 @@ const NPM_PACKAGE_URL = 'https://registry.npmjs.org/@openai%2fcodex';
 const RELEASE_URL = 'https://github.com/openai/codex/releases/latest';
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_CACHE_MS = 60 * 60 * 1000;
+const DEFAULT_RETRY_DELAYS_MS = [1000, 2000];
 const MAX_OUTPUT_BYTES = 32 * 1024;
 
 function boundedText(value, max = 1000) {
@@ -158,9 +159,14 @@ function createCodexUpdateService({
   resolveExecutable = () => resolveCodexExecutable({ envPath }),
   cacheMs = DEFAULT_CACHE_MS,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  retryDelaysMs = DEFAULT_RETRY_DELAYS_MS,
+  wait = (delayMs) => new Promise((resolve) => setTimeout(resolve, delayMs)),
 } = {}) {
   let cache = null;
   const childEnv = { ...process.env, PATH: envPath };
+  const checkRetryDelays = Array.isArray(retryDelaysMs)
+    ? retryDelaysMs.filter((delayMs) => Number.isFinite(delayMs) && delayMs >= 0)
+    : [...DEFAULT_RETRY_DELAYS_MS];
 
   async function installedVersion(executable) {
     const result = await run(executable, ['--version'], { timeoutMs, env: childEnv });
@@ -197,36 +203,45 @@ function createCodexUpdateService({
     };
   }
 
+  async function checkAttempt() {
+    const executable = resolveExecutable();
+    if (!executable) throw new Error('Codex executable was not found on PATH');
+    const currentVersion = await installedVersion(executable);
+    const installKind = installKindFor(executable);
+    const latest = await latestFor(installKind);
+    return {
+      currentVersion,
+      latestVersion: latest.version,
+      updateAvailable: compareVersions(latest.version, currentVersion) > 0,
+      installKind,
+      releaseUrl: latest.releaseUrl,
+      checkedAt: new Date(now()).toISOString(),
+      error: null,
+    };
+  }
+
   async function check({ force = false } = {}) {
     if (!force && cache && now() - Date.parse(cache.checkedAt) < cacheMs) return { ...cache };
-    try {
-      const executable = resolveExecutable();
-      if (!executable) throw new Error('Codex executable was not found on PATH');
-      const currentVersion = await installedVersion(executable);
-      const installKind = installKindFor(executable);
-      const latest = await latestFor(installKind);
-      const status = {
-        currentVersion,
-        latestVersion: latest.version,
-        updateAvailable: compareVersions(latest.version, currentVersion) > 0,
-        installKind,
-        releaseUrl: latest.releaseUrl,
-        checkedAt: new Date(now()).toISOString(),
-        error: null,
-      };
-      cache = status;
-      return { ...status };
-    } catch (error) {
-      return {
-        currentVersion: null,
-        latestVersion: null,
-        updateAvailable: null,
-        installKind: null,
-        releaseUrl: RELEASE_URL,
-        checkedAt: new Date(now()).toISOString(),
-        error: sanitizeError(error),
-      };
+    let finalError = null;
+    for (let attempt = 0; attempt <= checkRetryDelays.length; attempt += 1) {
+      try {
+        const status = await checkAttempt();
+        cache = status;
+        return { ...status };
+      } catch (error) {
+        finalError = error;
+        if (attempt < checkRetryDelays.length) await wait(checkRetryDelays[attempt]);
+      }
     }
+    return {
+      currentVersion: null,
+      latestVersion: null,
+      updateAvailable: null,
+      installKind: null,
+      releaseUrl: RELEASE_URL,
+      checkedAt: new Date(now()).toISOString(),
+      error: sanitizeError(finalError),
+    };
   }
 
   async function install({ onProgress = null } = {}) {
@@ -286,6 +301,7 @@ function createCodexUpdateService({
 
 module.exports = {
   DEFAULT_CACHE_MS,
+  DEFAULT_RETRY_DELAYS_MS,
   DEFAULT_TIMEOUT_MS,
   GITHUB_LATEST_URL,
   HOMEBREW_CASK_URL,
