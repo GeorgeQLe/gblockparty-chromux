@@ -101,6 +101,20 @@ If a preview did not open:
 
 If the same URL is printed again, Chromux refreshes the pane instead of adding a duplicate queue item.
 
+To distinguish fixture/server trouble from preview-routing trouble, run the
+durable local fixture from `prototype/`:
+
+```sh
+PORT=0 npm run fixture:localhost-first-success
+```
+
+Copy the emitted `Local: http://localhost:<port>/` URL and check
+`http://localhost:<port>/healthz`. If health succeeds but QUEUE stays empty,
+reprint the complete canonical `Local:` line in the originating Chromux
+session. If health fails, stop any stale fixture process and restart it; the
+server reports an occupied port and exits instead of silently choosing another
+port.
+
 ## File previews
 
 Chromux detects absolute `.html` and `.htm` paths only after confirming the file exists. The resulting preview loads through `file://`.
@@ -268,6 +282,11 @@ files, top-level symlinks, nonmatching signal files, captures, delivery history,
 restore snapshots, prompt history, and agent-owned directories are not removed.
 
 Chromux does not currently expire capture directories. To reclaim disk space, delete old directories under `~/.chromux/captures/`. To clear delivery history, delete `~/.chromux/delivery-log.jsonl`.
+
+The opt-in localhost first-success UAT is an exception to normal retention: it
+uses an isolated temporary `CHROMUX_HOME_DIR`, records only sanitized artifact
+existence/size metadata in its report, then removes the temporary profile and
+capture directory. It never deletes captures from the normal Chromux home.
 
 Do not delete a capture directory until you no longer need its payload,
 screenshot, recording, contact sheet, or manifest for manual retry or audit.

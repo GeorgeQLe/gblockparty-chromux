@@ -12245,6 +12245,11 @@ if (window.chromuxTest) {
       renderComposerContexts(session);
       return id;
     },
+    addLiveBrowserSession({
+      name = 'live-browser-test', agent = 'codex', cwd = '/tmp', composerDraft = '',
+    } = {}) {
+      return addRenderableTestSession({ name, agent, cwd, composerDraft, realTerminal: true });
+    },
     focus(id) { activateSession(id); flushRender(); },
     enterFull(id) {
       const session = testSession(id);
@@ -12344,6 +12349,23 @@ if (window.chromuxTest) {
       return context ? { ...context } : null;
     },
     async attachCurrentPage(id) { return attachCurrentPage(testSession(id)); },
+    async livePage(id) {
+      const tab = activePageTab(testSession(id));
+      if (!tab?.webview) return null;
+      let visibleText = '';
+      try {
+        visibleText = await tab.webview.executeJavaScript(
+          "String((document.body && document.body.innerText) || '')"
+        );
+      } catch { /* page may still be loading */ }
+      return {
+        url: tab.currentUrl || '',
+        title: tab.title || '',
+        loading: Boolean(tab.loading),
+        hasWebview: Boolean(tab.webview?.isConnected),
+        visibleText,
+      };
+    },
     stageContext(id, context) {
       const session = testSession(id);
       const normalized = normalizeBrowserContextReference(context);
@@ -12431,6 +12453,68 @@ if (window.chromuxTest) {
       };
     },
     flushRender,
+  };
+
+  window.chromuxTestLocalhostFirstSuccess = {
+    async createManagedSession(options = {}) {
+      const session = await createSessionNow({
+        name: options.name || 'localhost-first-success',
+        cwd: options.cwd || '/tmp',
+        agent: options.agent || '',
+        command: options.command,
+        activate: options.activate !== false,
+        initialBrowserLayoutMode: options.initialBrowserLayoutMode || 'terminal',
+      });
+      session._ptyInputs = [];
+      return session.id;
+    },
+    sessionIds: () => orderedSessions().map((session) => session.id),
+    terminalText(id, maxChars = 24_000) {
+      const session = testSession(id);
+      if (!session.term.serializer) {
+        session.term.serializer = new SerializeAddon.SerializeAddon();
+        session.term.term.loadAddon(session.term.serializer);
+      }
+      return session.term.serializer.serialize({ scrollback: 500 })
+        .slice(-Math.max(1, Number(maxChars) || 1));
+    },
+    queueUrls: (id) => testSession(id).browser.queue.map((item) => item.url),
+    currentUrl: (id) => testSession(id).browser.currentUrl,
+    openQueued(id, url) {
+      window.chromuxTestPreviews.openQueued(id, url);
+    },
+    async page(id) {
+      return window.chromuxTestFullBrowserComposer.livePage(id);
+    },
+    async attach(id) {
+      return attachCurrentPage(testSession(id));
+    },
+    async refresh(id, captureId) {
+      return refreshStagedBrowserContext(testSession(id), captureId);
+    },
+    contexts(id) {
+      return testSession(id).composer.stagedContexts.map((context) => ({ ...context }));
+    },
+    selectTarget(sourceId, targetId) {
+      return window.chromuxTestFullBrowserComposer.selectTarget(sourceId, targetId);
+    },
+    setDraft(id, value) {
+      setComposerDraft(testSession(id), value);
+    },
+    async submit(id) {
+      return submitComposer(testSession(id));
+    },
+    ptyInputs(id) {
+      return (testSession(id)._ptyInputs || []).slice();
+    },
+    close(id) {
+      closeSession(id);
+      flushRender();
+    },
+    closeAll() {
+      for (const id of [...state.sessions.keys()]) closeSession(id);
+      flushRender();
+    },
   };
 
   window.chromuxTestFavorites = {

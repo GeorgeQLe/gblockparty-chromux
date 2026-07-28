@@ -34,6 +34,9 @@ if (isBackgroundE2E({
 if (!/\bshow:\s*!BACKGROUND_E2E\b/.test(windowOptions[1])) {
   throw new Error('Chromux BrowserWindow visibility must follow the background E2E flag');
 }
+if (!/\bpaintWhenInitiallyHidden:\s*true\b/.test(windowOptions[1])) {
+  throw new Error('Hidden scripted E2E windows must keep painting for layout and capture checks');
+}
 if (!/\bacceptFirstMouse:\s*true\b/.test(windowOptions[1])) {
   throw new Error('Chromux must accept the first click while its macOS window is inactive');
 }

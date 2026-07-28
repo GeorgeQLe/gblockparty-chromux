@@ -1773,6 +1773,7 @@ function createWindow() {
     minHeight: 640,
     title: 'Chromux',
     show: !BACKGROUND_E2E,
+    paintWhenInitiallyHidden: true,
     acceptFirstMouse: true,
     backgroundColor: '#0b0e11',
     ...windowOptions(process.platform),

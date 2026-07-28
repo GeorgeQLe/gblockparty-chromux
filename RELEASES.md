@@ -13,6 +13,16 @@ Tag: `chromux-v0.69.2` (pending real Windows 10 UAT)
   previews, and renderer test terminals.
 - Resolve `tar` and `brace-expansion` to patched releases, bringing the
   production dependency audit to zero findings.
+- Add a dependency-free, loopback-only localhost first-success fixture with
+  stable review markers, health routing, a documented fixed port, and
+  ephemeral-port test support.
+- Prove real HTTP queue detection, approval-gated OPEN, mounted-page
+  attachment persistence, selected-session Composer routing, decoy isolation,
+  actionable response handling, timeout behavior, and complete cleanup without
+  model use in deterministic coverage.
+- Add a visible UAT that requires exactly one authorized Codex turn, never
+  retries after submission, archives a bounded sanitized report, and removes
+  its isolated Chromux profile and captures.
 
 ## GBlockParty Chromux v0.69.1
 

@@ -177,6 +177,30 @@ console tail, and screenshot before showing a removable/refreshable chip. Only a
 bounded payload, screenshot, URL, and title references to the sent prompt. Successful existing-session
 sends clear attachments; failures preserve them.
 
+### Durable localhost first-success proof
+
+The dependency-free fixture under `examples/localhost-first-success/` is the
+stable local review target used by Chromux's first-success proof:
+
+```sh
+npm run fixture:localhost-first-success
+npm run test:localhost-first-success
+```
+
+It binds only to `127.0.0.1`, defaults to `http://localhost:43117/`, serves
+`/` and `/healthz` without external resources, and prints one canonical
+`Local:` line for preview detection. The deterministic test uses an ephemeral
+port and no model. The visible live proof is intentionally separate and
+refuses to run unless exactly one model turn is authorized:
+
+```sh
+npm run uat:localhost-first-success -- --allow-model-turns 1
+```
+
+That UAT submits once with no retry, retains only a bounded sanitized response
+excerpt and artifact metadata, and removes its temporary Chromux profile and
+captures after recording the report.
+
 Select **New session** to choose Claude, Codex, Grok, or Shell; Grok still requires its data-risk
 acknowledgment. Chromux creates one canonical session in the same runtime, distribution, directory,
 and current URL with a fresh browser partition, activates it in full-browser mode, moves staged
