@@ -1,5 +1,16 @@
 # Release Notes
 
+## GBlockParty Chromux v0.69.4
+
+Tag: `chromux-v0.69.4`
+
+- Add a repeatable isolated Electron recovery UAT that deliberately fails the
+  first `claude -p` delivery, verifies the persisted payload, screenshot, and
+  delivery-log entry, then runs the documented manual retry command against
+  the unchanged YAML content.
+- Archive a sanitized passing recovery transcript without using a real Claude
+  account, credential, network request, or model turn.
+
 ## GBlockParty Chromux v0.69.3
 
 Tag: `chromux-v0.69.3`

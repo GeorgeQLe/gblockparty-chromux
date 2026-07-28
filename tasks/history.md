@@ -977,3 +977,43 @@
   required update channel. Next command: commit the isolated v0.69.3 boundary,
   push it to `main`, publish the matching tag/release, and verify
   `/releases/latest`.
+
+## 2026-07-28 — Capture delivery failure-recovery proof
+
+- Added a repeatable isolated Electron UAT that persists a real Chromux capture
+  and screenshot, invokes the production `claude -p` delivery adapter through a
+  controlled local fixture, deliberately exits 23 on the first attempt, and
+  verifies the matching failed delivery-log record.
+- Ran the exact documented manual retry form against the retained payload. The
+  second fixture invocation exited 0 with the expected YAML-content hash, while
+  the payload and screenshot file hashes remained unchanged. The fixture made
+  no real Claude, credential, network, or model request and removed all
+  temporary artifacts after writing the sanitized v0.69.4 transcript.
+- Ship manifest — User goal: close the recovery-proof gate despite inactive
+  real Claude access, without claiming an account recovery. Changed files:
+  recovery UAT script and archived report, package metadata, README,
+  troubleshooting guide, release notes, task queue, and history. Per-file
+  purpose: execute the real persistence/delivery boundary with a bounded fake
+  adapter; preserve sanitized evidence; expose the repeatable command; set
+  v0.69.4 metadata; record completion. User-goal mapping: the induced first
+  failure proves disk-first artifacts and delivery history; the documented
+  retry proves recovery using the same artifact content and no hidden mutation.
+  Tests run: recovery UAT with report generation, JavaScript syntax check,
+  focused capture delivery/renderer checks, and the complete prototype matrix.
+  Skipped tests: real Claude authentication and model delivery were excluded
+  because the subscription is inactive and the proof targets recovery
+  mechanics, not account remediation; real Windows/WSL UAT remains separately
+  queued. Adversarial review: checked isolation, real Electron IPC boundaries,
+  fixture precedence, bounded invocation count, path containment, failure/log
+  attribution, pre/post hashes, output sanitization, cleanup, no-network/no-real
+  CLI behavior, and shell command-substitution semantics. The first run exposed
+  that command substitution strips trailing newlines; the proof now records
+  the normalized retry-input hash separately without weakening immutable-file
+  checks. Residual risk: controlled fixture recovery does not establish that a
+  human can restore an expired Claude subscription, and the POSIX manual-retry
+  fixture is skipped on Windows. Rollback: revert the scoped v0.69.4 commit and
+  remove tag/GitHub Release `chromux-v0.69.4`; v0.69.3 remains the prior
+  release. Deploy: no explicit manual deploy contract exists; the GitHub
+  Release is the required update channel. Next command: commit the isolated
+  v0.69.4 boundary, push it to `main`, publish the matching release, and verify
+  `/releases/latest`.

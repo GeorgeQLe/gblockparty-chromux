@@ -1,6 +1,6 @@
 {
   "name": "chromux",
-  "version": "0.69.3",
+  "version": "0.69.4",
   "productName": "GBlockParty Chromux",
   "description": "OSS desktop front-end for local and GBlockParty-managed agent/browser workspaces.",
   "main": "main.js",
@@ -56,6 +56,7 @@
     "test:capture-records-renderer": "node scripts/test-capture-records-renderer.js",
     "test:capture-control-renderer": "node scripts/test-capture-control-renderer.js",
     "test:capture-main-integration": "node scripts/test-capture-main-integration.js",
+    "uat:capture-delivery-recovery": "node scripts/test-capture-delivery-recovery.js --write-report",
     "test:preview-queue-renderer": "node scripts/test-preview-queue-renderer.js",
     "test:preview-probe": "node scripts/test-preview-probe.js",
     "test:favorites-renderer": "node scripts/test-favorites-renderer.js",
