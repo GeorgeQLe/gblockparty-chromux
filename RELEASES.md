@@ -1,5 +1,16 @@
 # Release Notes
 
+## GBlockParty Chromux v0.69.3
+
+Tag: `chromux-v0.69.3`
+
+- Retry the complete Codex executable, installed-version, and stable-release
+  preflight after one second and two seconds before showing the existing
+  update-check failure prompt.
+- Keep restored Codex sessions queued in saved order during automatic retries,
+  release every waiting session as soon as any attempt succeeds, and retain
+  **RETRY CHECK** as a fresh three-attempt cycle without retrying installations.
+
 ## GBlockParty Chromux v0.69.2
 
 Tag: `chromux-v0.69.2`

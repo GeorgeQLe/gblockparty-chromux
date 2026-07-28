@@ -938,3 +938,42 @@
 - The passing sanitized report replaced the earlier HOLD transcript at
   `docs/testing/localhost-first-success-uat-0.69.2.md`. Runtime behavior did not
   change after the recorded candidate SHA.
+
+## 2026-07-28 — Automatic Codex update-check retries
+
+- Added a bounded three-attempt Codex preflight cycle with one-second and
+  two-second delays. Every attempt repeats executable resolution, installed
+  version detection, and stable release-source lookup; successful results keep
+  the existing one-hour cache, while forced checks start a fresh cycle.
+- Preserved the renderer's existing Checking Codex state and saved-order queue
+  during retries. Any successful attempt releases all waiting Codex sessions
+  automatically; only the third failure exposes the sanitized error and
+  **RETRY CHECK**. Codex installation itself remains single-shot.
+- Ship manifest — User goal: tolerate transient Codex startup update-check
+  failures without manual intervention and release v0.69.3. Changed files:
+  `prototype/codex-update-service.js`,
+  `prototype/scripts/test-codex-update-service.js`,
+  `prototype/scripts/test-codex-update-gate-renderer.js`,
+  `prototype/package.json`, `prototype/package-lock.json`, `RELEASES.md`,
+  `tasks/todo.md`, and `tasks/history.md`. Per-file purpose: implement bounded
+  retries; prove retry, cache, error, and queue behavior; bump app metadata;
+  document the release and completed task. User-goal mapping: the service owns
+  the complete retry cycle so the renderer receives no intermediate error,
+  while its existing single check promise retains and releases queued sessions
+  in sequence. Tests run: JavaScript syntax checks, focused Codex update service
+  and Electron renderer-gate suites, task-doc audit, and the complete
+  `prototype` test matrix; all passed without warnings. Skipped tests: no live
+  network or installation smoke was run because deterministic injection covers
+  the retry boundary and the change must not execute or retry a real update.
+  Adversarial review: checked attempt bounds, exact delays, complete preflight
+  restart after release-source failures, final-error sanitization, success-only
+  caching, forced cache bypass, saved-order queue release, intermediate prompt
+  suppression, and install isolation. The review tightened complete-attempt
+  coverage; no production defect remained. Residual risk: permanent failures
+  now add roughly three seconds plus the existing per-attempt timeouts before
+  the prompt appears. Rollback: revert the scoped v0.69.3 commit and remove the
+  `chromux-v0.69.3` tag/GitHub Release; v0.69.2 remains the prior release.
+  Deploy: no explicit manual deploy contract exists; the GitHub Release is the
+  required update channel. Next command: commit the isolated v0.69.3 boundary,
+  push it to `main`, publish the matching tag/release, and verify
+  `/releases/latest`.

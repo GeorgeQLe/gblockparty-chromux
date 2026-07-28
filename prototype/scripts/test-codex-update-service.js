@@ -19,6 +19,8 @@ function fixture({
   now = 1_800_000_000_000,
   npmReady = true,
   envPath = '/augmented/codex/path',
+  retryDelaysMs = [],
+  wait = async () => {},
 } = {}) {
   let installed = current;
   let clock = now;
@@ -27,6 +29,8 @@ function fixture({
   const service = createCodexUpdateService({
     envPath,
     now: () => clock,
+    retryDelaysMs,
+    wait,
     resolveExecutable: () => executable,
     run: async (_file, args, options = {}) => {
       calls.push(['run', ...args]);
@@ -114,9 +118,12 @@ function fixture({
   const callCount = brew.calls.length;
   await brew.service.check();
   assert.equal(brew.calls.length, callCount, 'fresh successful checks should use the one-hour cache');
+  await brew.service.check({ force: true });
+  assert.ok(brew.calls.length > callCount, 'forced checks should bypass the one-hour cache');
+  const forcedCallCount = brew.calls.length;
   brew.advance(60 * 60 * 1000 + 1);
   await brew.service.check();
-  assert.ok(brew.calls.length > callCount, 'stale cache should refresh');
+  assert.ok(brew.calls.length > forcedCallCount, 'stale cache should refresh');
   assert.ok(brew.calls.some((call) => call[1] === HOMEBREW_CASK_URL), 'Homebrew installs must use cask metadata');
   const brewLag = fixture({ current: '1.2.4', latest: '1.2.3' });
   assert.equal((await brewLag.service.check()).updateAvailable, false, 'Homebrew cask lag must not suggest an unavailable update');
@@ -138,7 +145,7 @@ function fixture({
   });
   assert.match((await npmLag.service.check()).error, /not yet available from npm/);
 
-  const missing = createCodexUpdateService({ resolveExecutable: () => null });
+  const missing = createCodexUpdateService({ resolveExecutable: () => null, retryDelaysMs: [] });
   assert.match((await missing.check()).error, /not found on PATH/);
 
   for (const error of [new Error('offline fixture'), new Error('Codex update check timed out')]) {
@@ -146,6 +153,7 @@ function fixture({
       resolveExecutable: () => '/usr/local/bin/codex',
       run: async () => ({ stdout: 'codex 1.2.3', stderr: '' }),
       request: async () => { throw error; },
+      retryDelaysMs: [],
     });
     assert.match((await failing.check()).error, new RegExp(error.message));
   }
@@ -154,8 +162,58 @@ function fixture({
     resolveExecutable: () => '/usr/local/bin/codex',
     run: async () => ({ stdout: 'codex 1.2.3', stderr: '' }),
     request: async () => ({ tag_name: 'nightly' }),
+    retryDelaysMs: [],
   });
   assert.match((await malformed.check()).error, /malformed Codex release/);
+
+  const retryWaits = [];
+  let retryResolves = 0;
+  let retryRuns = 0;
+  let retryRequests = 0;
+  const transient = createCodexUpdateService({
+    resolveExecutable: () => {
+      retryResolves += 1;
+      return '/usr/local/bin/codex';
+    },
+    run: async () => {
+      retryRuns += 1;
+      return { stdout: 'codex 1.2.3', stderr: '' };
+    },
+    request: async () => {
+      retryRequests += 1;
+      if (retryRequests < 3) throw new Error(`transient attempt ${retryRequests}`);
+      return {
+        tag_name: 'rust-v1.2.4',
+        html_url: 'https://github.com/openai/codex/releases/tag/rust-v1.2.4',
+      };
+    },
+    retryDelaysMs: [1000, 2000],
+    wait: async (delayMs) => { retryWaits.push(delayMs); },
+  });
+  const transientStatus = await transient.check();
+  assert.equal(transientStatus.error, null, 'failure/failure/success should return only the successful status');
+  assert.deepEqual(
+    [retryResolves, retryRuns, retryRequests],
+    [3, 3, 3],
+    'failure/failure/success should rerun executable detection, version detection, and release lookup',
+  );
+  assert.deepEqual(retryWaits, [1000, 2000], 'automatic retries should wait one second and then two seconds');
+
+  const failedWaits = [];
+  let failedAttempts = 0;
+  const exhausted = createCodexUpdateService({
+    resolveExecutable: () => '/usr/local/bin/codex',
+    run: async () => {
+      failedAttempts += 1;
+      throw new Error(`unsafe\u0000 final ${failedAttempts}`);
+    },
+    retryDelaysMs: [1000, 2000],
+    wait: async (delayMs) => { failedWaits.push(delayMs); },
+  });
+  const exhaustedStatus = await exhausted.check();
+  assert.equal(failedAttempts, 3, 'three consecutive failures should stop after the third attempt');
+  assert.deepEqual(failedWaits, [1000, 2000], 'final failure should be returned only after both retry delays');
+  assert.equal(exhaustedStatus.error, 'unsafe final 3', 'only the final sanitized failure should be exposed');
 
   const install = fixture();
   const progress = [];
