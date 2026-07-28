@@ -344,6 +344,24 @@ report separately records the generated protocol schema hash. Neither contains
 a prompt, response, terminal output, or structured item content. Normal Chromux
 sessions do not start this observer.
 
+## Localhost first-success UAT
+
+`npm run uat:localhost-first-success -- --allow-model-turns 1` is a manual,
+visible proof and refuses a missing, zero, duplicate, or larger model-turn
+allowance. It starts a loopback-only fixture, uses an isolated temporary
+Chromux home, attaches the real loaded page, routes one bounded prompt to a
+selected Codex session while a decoy remains open, and does not retry after
+submission.
+
+The versioned report retains the candidate commit, fixture URL and health
+state, session aliases, event timestamps, artifact existence and byte sizes,
+target/decoy write counts, one-turn accounting, a bounded sanitized response
+excerpt, an actionability rubric, cleanup state, and failure reasons. It does
+not retain unrelated terminal output, credentials, user home paths, full
+payload or screenshot contents, Codex provider metadata, or the temporary
+profile. The temporary capture directory is removed after its metadata is
+recorded.
+
 ## References
 
 - [FTC: Start with Security](https://www.ftc.gov/business-guidance/resources/start-security-guide-business)
