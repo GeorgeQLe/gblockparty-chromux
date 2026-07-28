@@ -1016,3 +1016,19 @@
   corrected live response/routing rubric is unproven. Rollback: revert
   `952e420` and `537a07f`; no v0.69.2 tag or GitHub Release exists. Deploy:
   blocked by the HOLD; GitHub latest remains v0.69.1.
+
+## 2026-07-28 — Localhost first-success proof passed
+
+- A separately authorized run on candidate `f497832` passed with exactly one
+  submitted Codex turn and zero retries. The real fixture returned HTTP 200,
+  entered QUEUE without automatic navigation, opened only through explicit
+  approval, and exposed its stable release, blocker, and action markers.
+- Page attachment persisted a 991-byte payload and 70,501-byte screenshot.
+  The selected Codex target received one prompt payload with attachment
+  references; the open decoy received none.
+- The bounded response cited the visible approval-transcript blocker and
+  supplied a concrete action. All managed sessions, the fixture listener,
+  temporary profile, and temporary captures were removed.
+- The passing sanitized report replaced the earlier HOLD transcript at
+  `docs/testing/localhost-first-success-uat-0.69.2.md`. Runtime behavior did not
+  change after the recorded candidate SHA.
