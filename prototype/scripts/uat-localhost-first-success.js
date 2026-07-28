@@ -79,8 +79,8 @@ function markdown(report) {
 - Attached: ${report.attachedAt}
 - Payload: exists=${report.payload.exists}, bytes=${report.payload.bytes}
 - Screenshot: exists=${report.screenshot.exists}, bytes=${report.screenshot.bytes}
-- Selected target Composer writes: ${report.targetWrites}
-- Decoy Composer writes: ${report.decoyWrites}
+- Selected target prompt payloads: ${report.targetWrites}
+- Decoy prompt payloads: ${report.decoyWrites}
 - Submitted model turns: ${report.submittedTurns}
 - Retry count after submission: ${report.retryCount}
 
@@ -132,6 +132,10 @@ function markdown(report) {
   let source = null;
   let target = null;
   let decoy = null;
+  let context = null;
+  let pageMarker = null;
+  let writes = { target: 0, decoy: 0 };
+  let responseExcerpt = '';
   try {
     source = await u.createManagedSession({
       name: 'fixture-shell',
@@ -152,9 +156,10 @@ function markdown(report) {
         && candidate.visibleText.includes('Release status: candidate ready for review')
         ? candidate : null;
     }, 15000, 'fixture page load');
+    pageMarker = 'Release status: candidate ready for review';
 
     await new Promise((resolve) => setTimeout(resolve, 250));
-    let context = await u.attach(source);
+    context = await u.attach(source);
     for (let attempt = 0; context && !context.screenshotPath && attempt < 3; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, 150));
       context = await u.refresh(source, context.captureId);
@@ -179,15 +184,24 @@ function markdown(report) {
     expect(await u.submit(source), 'Composer rejected the bounded prompt');
     submittedTurns += 1;
     events.submittedAt = new Date().toISOString();
-    const targetInput = u.ptyInputs(target).join('');
-    const decoyInput = u.ptyInputs(decoy).join('');
+    const targetInputs = u.ptyInputs(target);
+    const decoyInputs = u.ptyInputs(decoy);
+    const isPromptPayload = (input) => String(input).includes(
+      'Review only the attached localhost fixture evidence.'
+    );
+    const targetInput = targetInputs.join('');
     expect(targetInput.includes('Review only the attached localhost fixture evidence.'),
       'chosen target did not receive the bounded prompt');
     expect(targetInput.includes('Attached browser evidence:')
       && targetInput.includes('Payload: ' + context.payloadPath)
       && targetInput.includes('Screenshot: ' + context.screenshotPath),
     'chosen target did not receive attachment references');
-    expect(decoyInput === '', 'decoy target received input');
+    writes = {
+      target: targetInputs.filter(isPromptPayload).length,
+      decoy: decoyInputs.filter(isPromptPayload).length
+    };
+    expect(writes.target === 1, 'chosen target must receive exactly one Composer prompt payload');
+    expect(writes.decoy === 0, 'decoy target received the Composer prompt payload');
 
     const responseText = await waitFor(() => {
       const text = u.terminalText(target, 30000);
@@ -200,12 +214,7 @@ function markdown(report) {
     const action = /ACTION:\\s*[^\\r\\n]{8,}/i.test(responseText);
     expect(marker, 'response did not cite a visible fixture marker');
     expect(action, 'response did not recommend a concrete action');
-    const writes = {
-      target: u.ptyInputs(target).length,
-      decoy: u.ptyInputs(decoy).length
-    };
-    expect(writes.target === 2, 'chosen target must receive one prompt plus Enter');
-    expect(writes.decoy === 0, 'decoy target received input');
+    responseExcerpt = responseText.slice(-4000);
     const paths = { payload: context.payloadPath, screenshot: context.screenshotPath };
     u.closeAll();
     return JSON.stringify({
@@ -213,10 +222,10 @@ function markdown(report) {
       events,
       submittedTurns,
       retryCount: 0,
-      pageMarker: 'Release status: candidate ready for review',
+      pageMarker,
       paths,
       writes,
-      responseExcerpt: responseText.slice(-4000)
+      responseExcerpt
     });
   } catch (error) {
     u.closeAll();
@@ -225,6 +234,10 @@ function markdown(report) {
       events,
       submittedTurns,
       retryCount: 0,
+      pageMarker,
+      paths: context ? { payload: context.payloadPath, screenshot: context.screenshotPath } : null,
+      writes,
+      responseExcerpt,
       error: error.message
     });
   }

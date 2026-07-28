@@ -981,3 +981,38 @@
   manual deploy contract exists; the GitHub Release is the required update
   channel. Next command: commit and push the scoped v0.69.0 boundary, publish
   `GBlockParty Chromux v0.69.0`, and verify `/releases/latest`.
+
+## 2026-07-28 — Localhost first-success candidate held after one live turn
+
+- Added the loopback-only dependency-free fixture, deterministic real-HTTP and
+  Electron proof, exact one-turn UAT allowance, sanitized v1 report, docs, and
+  v0.69.2 candidate metadata. Fixed hidden Electron E2E painting after the full
+  matrix exposed background compositor suspension.
+- Focused localhost, preview, projects, Composer, capture, browser, restore,
+  shell-adoption, window, and session-rail suites passed. The final `npm test`
+  matrix passed without retry or warning.
+- Candidate `537a07f` stopped before submission because renderer CSP blocked
+  its health fetch; it used zero turns and cleaned up. Candidate `952e420`
+  verified health outside the renderer, queued and explicitly opened the real
+  fixture, attached payload and screenshot evidence, and routed one prompt plus
+  attachment references to the chosen Codex target.
+- The single submitted turn remains a HOLD: the runner incorrectly treated
+  decoy xterm protocol replies as Composer input and closed the sessions before
+  retaining a response. No post-submission retry was made. The corrected runner
+  now counts only matching Composer prompt payloads and preserves checkpoint
+  metadata on failure, but it has not consumed another live turn.
+- Ship manifest — User goal: durable localhost first-success proof and release.
+  Changed files: fixture/server docs, HTTP/Electron/UAT scripts, test-only
+  renderer seams, hidden-window paint option/contract, README/privacy/
+  troubleshooting, package metadata, release notes, UAT report, and task
+  records. User-goal mapping: deterministic checks prove queue/open/attachment/
+  routing/decoy/timeout/cleanup; the live report records the one-turn HOLD.
+  Tests run: focused matrix above plus clean full `npm test`; post-HOLD runner
+  syntax and allowance tests passed. Skipped tests: no second live turn because
+  the approved plan forbids retry after submission; Windows/WSL real-machine
+  UAT is a separate gate. Adversarial review fixed CSP health checking, prompt
+  versus terminal-protocol accounting, response-field sanitization, screenshot
+  compositor stability, and failure checkpoint retention. Residual risk: the
+  corrected live response/routing rubric is unproven. Rollback: revert
+  `952e420` and `537a07f`; no v0.69.2 tag or GitHub Release exists. Deploy:
+  blocked by the HOLD; GitHub latest remains v0.69.1.
