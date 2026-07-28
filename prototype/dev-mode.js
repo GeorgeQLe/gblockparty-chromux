@@ -25,10 +25,10 @@ function restartArgs(argv = [], enabled) {
 }
 
 function createDevModeRestart({ persist, snapshot, relaunch, quit }) {
-  return ({ enabled, sessions } = {}) => {
+  return ({ enabled, sessions, inboxTriage = [] } = {}) => {
     if (typeof enabled !== 'boolean') throw new TypeError('enabled must be a boolean');
     if (!Array.isArray(sessions)) throw new TypeError('sessions must be an array');
-    const restore = snapshot({ reason: 'dev-mode-restart', sessions });
+    const restore = snapshot({ reason: 'dev-mode-restart', sessions, inboxTriage });
     persist(enabled);
     relaunch(enabled);
     quit();

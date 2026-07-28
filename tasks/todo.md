@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Redesign Threads as an Action Required / Ready to Finish / Working / All Sessions hybrid inbox with persisted Done/Snooze triage, and replace flat Git changes with a bounded repository catalog, ranked linked-worktree inventory, validated review/commit/sync actions, schema v10, documentation, and the v0.70.0 release. _(source: user-supplied implementation plan; evidence: `prototype/git-worktree-service.js`, main/preload discriminated IPC, renderer inbox/review drawer, parser/temp-repository/real-Electron coverage, package metadata, docs, and `RELEASES.md`)_
+
 - [x] Retry the complete Codex startup update check up to three times, keep restored Codex tabs queued without exposing intermediate errors, release them in saved order on retry success, preserve manual retry and install behavior, and ship v0.69.3. _(source: user-supplied implementation plan; evidence: `prototype/codex-update-service.js`, focused service/renderer-gate coverage, complete prototype suite, package metadata, and `RELEASES.md`)_
 
 - [x] Add an isolated Codex Activity Indicator Lab with paired interactive PTY and structured JSONL lanes, explicit model-usage gates, five live scenarios, sanitized evidence export, fake-CLI and Electron coverage, v0.67.0 metadata, and a live Codex 0.145.0 UAT report without changing production attention inference. _(source: user-supplied implementation plan; evidence: `prototype/activity-lab/`, activity-lab scripts/tests/docs, `docs/testing/activity-lab-uat-0.67.0.md`, and `RELEASES.md`)_

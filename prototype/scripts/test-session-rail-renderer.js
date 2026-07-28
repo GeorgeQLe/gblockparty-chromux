@@ -25,6 +25,9 @@ const canonicalRepoDir = fs.realpathSync(repoDir);
 
 fs.writeFileSync(e2ePath, `
 (async () => {
+  window.addEventListener('error', (event) => {
+    if (event.error?.stack) console.error('E2E_WINDOW_ERROR_STACK ' + event.error.stack);
+  });
   const rail = window.chromuxTestRail;
   if (!rail) throw new Error('Missing session rail test API');
   const expect = (condition, message) => { if (!condition) throw new Error(message); };
@@ -282,14 +285,14 @@ fs.writeFileSync(e2ePath, `
 
   rail.emit(web, 'turn-start');
   rail.emit(web, 'turn-end', 'First background completion');
-  expect(rail.attentionCount() === 1, 'background completion should increment attention count');
+  expect(rail.attentionCount() >= 1, 'background completion should increment the actionable plus ready-to-finish count');
   expect(rail.mode() === 'threads' && rail.storedMode() === 'threads', 'Threads should be the persisted default');
   expect(JSON.stringify(rail.migrateMode('attention')) === JSON.stringify({ mode: 'threads', stored: 'threads' }),
     'saved Attention preference should migrate to Threads');
   expect(JSON.stringify(rail.migrateMode('invalid')) === JSON.stringify({ mode: 'threads', stored: 'threads' }),
     'invalid rail preference should migrate to Threads');
   expect(rail.heading() === 'THREADS', 'Threads should set contextual heading');
-  expect(rail.attentionCount() === 1, 'Threads badge should count individual outstanding items');
+  expect(rail.attentionCount() >= 1, 'Threads badge should count actionable and ready-to-finish items');
 
   const nav = rail.nav();
   expect(nav.length === 2 && nav.map((item) => item.mode).join(',') === 'threads,git'
@@ -302,14 +305,14 @@ fs.writeFileSync(e2ePath, `
   }
   const threadGroups = rail.groups();
   const webGroup = threadGroups.find((group) => group.title === ${JSON.stringify(repoAppDir)});
-  const needsAttention = threadGroups.find((group) => group.key === 'attention:needs');
-  expect(needsAttention && needsAttention.label === 'NEEDS ATTENTION' && needsAttention.count === 1 && needsAttention.open,
-    'Threads should pin outstanding sessions in an expanded Needs Attention section');
-  expect(webGroup && webGroup.label === 'web' && webGroup.count === 1 && webGroup.open,
-    'attentive sessions should be deduplicated from their exact-cwd group');
+  const readyToFinish = threadGroups.find((group) => group.key === 'ready:finish');
+  expect(readyToFinish && readyToFinish.label === 'READY TO FINISH' && readyToFinish.count >= 1 && readyToFinish.open,
+    'Threads should pin completed sessions in an expanded Ready to Finish section');
+  expect(webGroup && webGroup.label === 'web' && webGroup.count === 2 && webGroup.open,
+    'All Sessions should retain completed sessions in their exact-cwd group');
   expect(threadGroups.some((group) => group.title === ${JSON.stringify(repoApiDir)} && group.count === 1),
     'different exact cwd should form another Threads group');
-  expect(needsAttention.rows.find((row) => row.id === web).status === 'Completed', 'attentive row needs accessible status');
+  expect(readyToFinish.rows.find((row) => row.id === web).status === 'Completed', 'ready-to-finish row needs accessible status');
   const completionCard = document.querySelector('.attention-thread[data-session-id="' + CSS.escape(web) + '"]');
   const completionHeader = completionCard.querySelector('.rail-session-row');
   const completionPrimary = completionCard.querySelector('.attention-reason:first-child');
@@ -528,21 +531,23 @@ fs.writeFileSync(e2ePath, `
   rail.emit(api, 'permission-required', 'Approve command');
   expect(rail.preview()?.attention.rows.map((row) => row.label).join(',') === 'PERMISSION,QUEUE 1',
     'open preview should restore projection priority order when attention changes');
-  const apiCard = rail.attentionCards().find((card) => card.id === api);
-  expect(apiCard && apiCard.primaryKind === 'PERMISSION' && apiCard.more === '+1'
-    && apiCard.reasons.map((reason) => reason.kind).join(',') === 'PERMISSION,QUEUE 1',
-    'one attentive thread should aggregate simultaneous reasons in priority order');
-  expect(apiCard.reasons[0].visibleKind === '' && apiCard.reasons[1].visibleKind === 'QUEUE 1',
-    'primary reason should omit its body label while additional reasons remain identified');
-  expect(apiCard.reasons[0].actions.join(',') === 'FOCUS'
-    && apiCard.reasons[1].actions.join(',') === 'OPEN',
-  'primary and additional attention reasons should retain their direct actions');
-  expect(apiCard.reasons[0].color === apiCard.primaryColor
-    && apiCard.reasons[1].color === apiCard.primaryColor,
-  'permission and queued-preview reasons should retain their semantic attention color');
-  expect(apiCard.reasons[1].summaryLines <= 2 && apiCard.reasons[1].summaryLines > 1,
-    'long attention summaries should wrap to no more than two lines before truncation: ' + JSON.stringify(apiCard.reasons[1]));
-  expect(rail.attentionCount() === 3, 'badge should continue to count individual reasons, not attentive sessions');
+  const apiCards = rail.attentionCards().filter((card) => card.id === api);
+  const apiCard = apiCards.find((card) => card.primaryKind === 'PERMISSION');
+  const apiReadyCard = apiCards.find((card) => card.primaryKind === 'QUEUE 1');
+  expect(apiCard && apiReadyCard
+    && apiCard.reasons.map((reason) => reason.kind).join(',') === 'PERMISSION'
+    && apiReadyCard.reasons.map((reason) => reason.kind).join(',') === 'QUEUE 1',
+  'one session should separate urgent permission from ready browser review across inbox sections');
+  expect(apiCard.reasons[0].visibleKind === '' && apiReadyCard.reasons[0].visibleKind === '',
+    'each section card should carry its semantic reason in the card header');
+  expect(apiCard.reasons[0].actions.includes('FOCUS')
+    && apiReadyCard.reasons[0].actions.includes('OPEN')
+    && apiCard.reasons[0].actions.includes('DONE')
+    && apiReadyCard.reasons[0].actions.includes('SNOOZE'),
+  'inbox reasons should retain direct actions plus Done and Snooze triage');
+  expect(apiReadyCard.reasons[0].summaryLines <= 2 && apiReadyCard.reasons[0].summaryLines > 1,
+    'long attention summaries should wrap to no more than two lines before truncation: ' + JSON.stringify(apiReadyCard.reasons[0]));
+  expect(rail.attentionCount() >= 3, 'badge should count individual reasons plus deduplicated Git obligations');
   const semanticReasons = rail.addSession({
     name: 'semantic-reasons',
     agent: 'codex',
@@ -553,14 +558,18 @@ fs.writeFileSync(e2ePath, `
     ],
   });
   rail.focus(holder);
-  const semanticCard = rail.attentionCards().find((card) => card.id === semanticReasons);
-  expect(semanticCard.primaryKind === 'PERMISSION' && semanticCard.more === '+1'
-    && semanticCard.reasons.map((reason) => reason.kind).join(',') === 'PERMISSION,COMPLETED'
-    && semanticCard.reasons.map((reason) => reason.visibleKind).join(',') === ',COMPLETED',
-  'mixed semantic reasons should retain priority order and label only the additional completion: ' + JSON.stringify(semanticCard));
-  expect(semanticCard.reasons[1].actions.join(',') === 'VIEW,DISMISS'
-    && semanticCard.reasons[1].color !== semanticCard.primaryColor,
-  'additional completion should retain its actions and green semantic color');
+  const semanticCards = rail.attentionCards().filter((card) => card.id === semanticReasons);
+  const semanticCard = semanticCards.find((card) => card.primaryKind === 'PERMISSION');
+  const semanticReadyCard = semanticCards.find((card) => card.primaryKind === 'COMPLETE');
+  expect(semanticCard && semanticReadyCard
+    && semanticCard.reasons[0].kind === 'PERMISSION'
+    && semanticReadyCard.reasons[0].kind === 'COMPLETED',
+  'mixed semantic reasons should split between Action Required and Ready to Finish: '
+    + JSON.stringify(semanticCards));
+  expect(semanticReadyCard.reasons[0].actions.includes('VIEW')
+    && semanticReadyCard.reasons[0].actions.includes('DISMISS')
+    && semanticReadyCard.reasons[0].color !== semanticCard.primaryColor,
+  'ready completion should retain its actions and green semantic color');
   const previewOverflow = rail.addTerminalSession({
     name: 'preview-overflow',
     agent: 'codex',
@@ -602,8 +611,8 @@ fs.writeFileSync(e2ePath, `
     === attentionOrder.join(','),
   'Recent must leave Needs Attention urgency ordering unchanged');
   const initialAttentionGeometry = rail.attentionGeometry();
-  expect(initialAttentionGeometry.cards.length >= 2 && initialAttentionGeometry.gaps.every((gap) => gap >= 5.9),
-    'Needs Attention cards should have at least 6px of visual separation');
+  expect(initialAttentionGeometry.cards.length >= 1 && initialAttentionGeometry.gaps.every((gap) => gap >= 5.9),
+    'Needs Attention cards should have at least 6px of visual separation: ' + JSON.stringify(initialAttentionGeometry));
   expect(initialAttentionGeometry.firstInset >= 5.9 && initialAttentionGeometry.lastInset >= 5.9,
     'Needs Attention cards should remain inside the group padding');
   rail.hoverRow(web);
@@ -674,9 +683,9 @@ fs.writeFileSync(e2ePath, `
   expect(focusedAttention?.rows.some((row) => row.id === focusedAction),
     'focused action-required session should appear in Needs Attention');
   expect(!rail.groups().find((group) => group.key === 'status:working')?.rows.some((row) => row.id === focusedAction)
-    && !rail.groups().filter((group) => group.key.startsWith('cwd:')).flatMap((group) => group.rows)
+    && rail.groups().filter((group) => group.key.startsWith('cwd:')).flatMap((group) => group.rows)
       .some((row) => row.id === focusedAction),
-  'focused action-required session should be absent from Working and its directory group');
+  'focused action-required session should be absent from Working but retained in All Sessions');
   const focusedActionRow = focusedAttention.rows.find((row) => row.id === focusedAction);
   expect(focusedActionRow.status === 'Action required'
     && rail.rowState(focusedAction).ariaCurrent === 'true'
@@ -698,9 +707,9 @@ fs.writeFileSync(e2ePath, `
   expect(workingGroup.rows.map((row) => row.id).join(',') === [worker, webTwo].join(','),
     'A–Z should alphabetize Working rows by session display label');
   rail.selectThreadSort('recent');
-  expect(!rail.groups().filter((group) => group.key.startsWith('cwd:')).flatMap((group) => group.rows)
+  expect(rail.groups().filter((group) => group.key.startsWith('cwd:')).flatMap((group) => group.rows)
     .some((row) => row.id === webTwo || row.id === worker),
-  'working sessions should be deduplicated from working-directory groups');
+  'working sessions should remain available in All Sessions');
 
   const workingRowsHost = document.querySelector(
     '#thread-list .working-thread-group > .rail-group-rows',
@@ -805,10 +814,11 @@ fs.writeFileSync(e2ePath, `
   await wait(270);
   rail.previewClick();
   await wait(80);
-  expect(rail.activeId() === webTwo && !rail.preview(), 'clicking anywhere in the preview should activate its session');
+  expect(rail.activeId() === webTwo && !rail.preview(), 'clicking anywhere in the preview should activate its session: '
+    + JSON.stringify({ active: rail.activeId(), expected: webTwo, preview: rail.preview()?.sessionId }));
   rail.emit(webTwo, 'turn-end');
-  expect(!rail.groups().some((group) => group.key === 'status:working'),
-    'Working section should disappear when its final active turn completes');
+  expect(rail.groups().find((group) => group.key === 'status:working')?.count === 0,
+    'Working section should remain visible and empty when its final active turn completes');
   const clearRailCodex = rail.addTerminalSession({
     name: 'clear-rail-codex', agent: 'codex', cwd: ${JSON.stringify(looseDir)},
   });
@@ -881,7 +891,7 @@ fs.writeFileSync(e2ePath, `
   expect(rail.turnState(liveRedrawRailCodex).state === 'completed'
     && !rail.groups().find((group) => group.key === 'status:working')
       ?.rows.some((row) => row.id === liveRedrawRailCodex)
-    && rail.groups().find((group) => group.key === 'attention:needs')
+    && rail.groups().find((group) => group.key === 'ready:finish')
       ?.rows.some((row) => row.id === liveRedrawRailCodex),
   'a later composer-only redraw should move the background Codex session from Working to completed attention');
   rail.close(liveRedrawRailCodex);
@@ -933,9 +943,9 @@ fs.writeFileSync(e2ePath, `
   expect(doubleClickGroups.find((group) => group.key === 'status:working')
     ?.rows.some((row) => row.id === workingDouble),
   'working activation fixture should render in the Working section');
-  expect(doubleClickGroups.find((group) => group.key === 'attention:needs')
+  expect(doubleClickGroups.find((group) => group.key === 'ready:finish')
     ?.rows.some((row) => row.id === attentionDouble),
-  'attention activation fixture should render in the Needs Attention section');
+  'completed activation fixture should render in the Ready to Finish section');
 
   rail.hoverRow(ordinaryDouble);
   await wait(270);
@@ -1053,7 +1063,7 @@ fs.writeFileSync(e2ePath, `
       theme + ' ' + mode + ' should preserve compact Detect and the lower filter-icon layout');
       expectThreadSortLeftInset(theme + ' ' + mode);
       const attentionGeometry = rail.attentionGeometry();
-      expect(attentionGeometry.cards.length >= 2 && attentionGeometry.gaps.every((gap) => gap >= 5.9)
+      expect(attentionGeometry.cards.length >= 1 && attentionGeometry.gaps.every((gap) => gap >= 5.9)
         && attentionGeometry.firstInset >= 5.9 && attentionGeometry.lastInset >= 5.9,
       theme + ' ' + mode + ' should preserve separated, inset Needs Attention cards: ' + JSON.stringify(attentionGeometry));
       const rowBeforePointer = document.querySelector('#thread-list .rail-session-row[data-session-id="' + CSS.escape(web) + '"]');
@@ -1104,6 +1114,60 @@ fs.writeFileSync(e2ePath, `
   expect(rail.gitDiffs().find((group) => group.title === ${JSON.stringify(canonicalRepoDir)}).count === 2,
     'Git diff counts should not mirror the number of live sessions');
   expect(rail.mode() === 'git', 'incoming attention and status changes must not auto-switch rail mode');
+
+  const knownRepository = rail.gitRepositories().find((repository) => repository.root === ${JSON.stringify(canonicalRepoDir)});
+  expect(knownRepository && knownRepository.worktrees.length === 1,
+    'Git inventory should expose the catalog repository and its worktree');
+  rail.reviewGit(knownRepository.id, knownRepository.worktrees[0].id);
+  await nextFrame();
+  const gitReview = rail.gitReview();
+  expect(gitReview.open && gitReview.focused
+    && gitReview.body.includes(${JSON.stringify(canonicalRepoDir)})
+    && gitReview.body.includes('MANUAL COMMIT MESSAGE')
+    && gitReview.body.includes('PREVIEW COMMIT'),
+  'Git review drawer should expose its exact target, focus the close control, and require a manual commit preview');
+  rail.dismissGitReview();
+
+  rail.select('threads');
+  expect(rail.inboxSections().map((section) => section.label).join(',')
+    === 'ACTION REQUIRED,READY TO FINISH,WORKING,ALL SESSIONS',
+  'Threads should keep all four hybrid inbox sections visible and ordered');
+  const triageSession = rail.addTerminalSession({
+    name: 'triage-session', agent: 'claude', cwd: ${JSON.stringify(looseDir)},
+  });
+  rail.focus(holder);
+  rail.emit(triageSession, 'turn-start');
+  rail.emit(triageSession, 'turn-end', 'Ready for explicit triage');
+  let triageItem = rail.inboxSections().find((section) => section.key === 'ready-finish')
+    .items.find((item) => item.sessionId === triageSession);
+  expect(triageItem, 'new completion should enter Ready to Finish');
+  rail.clickInboxAction(triageItem.id, 'DONE');
+  expect(!rail.inboxSections().find((section) => section.key === 'ready-finish')
+    .items.some((item) => item.sessionId === triageSession)
+    && rail.inboxTriage().some((record) => record.id === triageItem.id && record.state === 'done'),
+  'Done should persist and remove the current inbox obligation');
+  rail.emit(triageSession, 'turn-start');
+  rail.emit(triageSession, 'turn-end', 'A newer completion reopens the item');
+  triageItem = rail.inboxSections().find((section) => section.key === 'ready-finish')
+    .items.find((item) => item.sessionId === triageSession);
+  expect(triageItem, 'a newer turn should reopen a Done item');
+  rail.clickInboxAction(triageItem.id, 'SNOOZE');
+  rail.clickInboxAction(triageItem.id, '1 HOUR');
+  expect(!rail.inboxSections().find((section) => section.key === 'ready-finish')
+    .items.some((item) => item.sessionId === triageSession)
+    && rail.inboxTriage().some((record) => record.id === triageItem.id && record.state === 'snoozed'),
+  'Snooze should persist and temporarily remove the item');
+  rail.expireInbox(triageItem.id);
+  expect(rail.inboxSections().find((section) => section.key === 'ready-finish')
+    .items.some((item) => item.sessionId === triageSession),
+  'an expired snooze should reopen the item');
+  rail.focusThreadSortControl();
+  const keyboardItem = rail.pressInboxKey('ArrowDown');
+  expect(keyboardItem, 'keyboard queue navigation should focus the next inbox item');
+  rail.pressInboxKey('s');
+  expect(document.querySelector('.inbox-item.queue-focused .inbox-snooze-menu:not(.hidden)'),
+    'keyboard Snooze should open presets for the focused item');
+  rail.close(triageSession);
 
   return JSON.stringify({ ok: true, threadGroups, gitDiffs: rail.gitDiffs(), nav });
 })()

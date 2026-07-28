@@ -320,12 +320,12 @@ fs.writeFileSync(e2ePath, `
     sessions: composer.snapshot(),
   });
   const createdRow = snapshot.sessions.find((row) => row.name === created.name);
-  expect(snapshot.schemaVersion === 9
+  expect(snapshot.schemaVersion === 10
     && createdRow.fullBrowserComposerOpen === false
     && createdRow.stagedBrowserContexts.length === 1
     && !Object.prototype.hasOwnProperty.call(createdRow, 'chatMessages')
     && !Object.prototype.hasOwnProperty.call(createdRow, 'chatOpen'),
-  'schema v9 should persist staged evidence while discarding chat ledger fields');
+  'schema v10 should persist staged evidence while discarding chat ledger fields');
 
   composer.enterFull(created.id);
   composer.clickToggle(created.id);

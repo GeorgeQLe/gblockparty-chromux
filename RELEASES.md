@@ -1,5 +1,25 @@
 # Release Notes
 
+## GBlockParty Chromux v0.70.0
+
+Tag: `chromux-v0.70.0`
+
+- Redesign Threads as a four-section hybrid inbox: **Action Required**,
+  **Ready to Finish**, **Working**, and the complete directory-grouped
+  **All Sessions** navigator. Add keyboard queue navigation plus explicit,
+  persisted Done and Snooze processing in restore schema v10.
+- Replace the live-session flat diff with a bounded local repository catalog
+  and ranked linked-worktree inventory. Keep stale work distinct from Git's
+  formal prunable state and deduplicate repository obligations across sessions.
+- Add a focused repository review drawer with bounded text diffs, binary and
+  oversized fallbacks, whole-file stage/unstage, manual commit preview,
+  commit-hook warnings, and confirmed provider-neutral fetch, fast-forward
+  pull, branch publish, push, and sync actions.
+- Revalidate catalog, worktree, branch, status, and selected-file state before
+  each mutation; run remote Git operations non-interactively and surface
+  authentication, hook, ruleset, divergence, and conflict failures without
+  automatic commit or push retries.
+
 ## GBlockParty Chromux v0.69.4
 
 Tag: `chromux-v0.69.4`

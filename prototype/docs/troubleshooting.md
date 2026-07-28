@@ -271,6 +271,8 @@ Chromux stores local artifacts under your home directory:
 | Capture payloads, screenshots, recordings, manifests, and contact sheets | `~/.chromux/captures/<timestamp>-<unique-suffix>/` |
 | Delivery log | `~/.chromux/delivery-log.jsonl` |
 | Global favorites | `~/.chromux/favorites.json` |
+| Git repository catalog | `~/.chromux/git-repositories.json` |
+| Restore and inbox triage state | `~/.chromux/restore-sessions.json` |
 | Hook settings and notify scripts | `~/.chromux/` |
 | Renderer settings | `Local Storage` inside the selected stable Electron app profile |
 | Browser profiles | Session-specific Electron partitions `persist:chromux-<session ID>` |
@@ -318,14 +320,27 @@ See [privacy-and-local-data.md](privacy-and-local-data.md) for the complete loca
 
 ## A thread's attention reason is missing or marked legacy
 
-Use the rail's **Threads** icon for actionable items and unseen background completions. Sessions with
-outstanding work are pinned in the expanded **Needs Attention** section above working-directory groups.
-Opening a completed session removes only that completion reason and returns the session to its directory
-group when no other reasons remain. Permission, authentication, input, rate-limit, and tool-failure items are
-not cleared by opening their session. **Git Changes** resolves the repositories used
-by live sessions and tracks their staged, unstaged, untracked, renamed, and conflicted files. Clean working
-trees remain visible as clean; non-repository sessions are omitted. New outstanding work changes the Threads
-badge but does not switch away from Git Changes.
+Use the rail's **Threads** icon for the always-visible **Action Required**,
+**Ready to Finish**, **Working**, and **All Sessions** sections. Done and Snooze
+hide only the current obligation; a new turn, changed attention sequence,
+changed Git status, or expired snooze reopens it. Permission, authentication,
+input, conflict, rate-limit, tool-failure, and delivery failures remain urgent.
+Completed turns, queued previews, uncommitted changes, unpublished branches,
+and outgoing commits appear in Ready to Finish.
+
+**Git Changes** reads the bounded repository catalog rather than only live
+sessions. If a repository is missing, open a session anywhere inside it. If it
+should no longer appear, choose **Forget**; this removes catalog metadata only.
+The review drawer intentionally does not offer discard/reset, force push,
+rebase, worktree pruning/removal, branch deletion, stash mutation, or
+partial-hunk staging.
+
+Remote actions set `GIT_TERMINAL_PROMPT=0`. Authentication failures therefore
+return immediately instead of opening a hidden prompt. Authenticate with the
+provider in a terminal, then explicitly retry. Pull and Sync use fast-forward
+only; divergence or conflicts are surfaced for manual resolution. Commit
+failures include bounded hook output, and a changed staged state invalidates
+the prior commit preview.
 
 Chromux regenerates its classifier and installed hook files at startup. New v2
 events are authenticated to one PTY; copied terminal output, callbacks from a

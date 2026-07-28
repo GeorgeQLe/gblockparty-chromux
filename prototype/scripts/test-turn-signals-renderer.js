@@ -603,11 +603,11 @@ fs.writeFileSync(e2ePath, `
   expect(sig.turnState(b).state === 'needsInput', 'DISMISS never deletes state');
 
   const focusedActionCases = [
-    ['focused-input', 'input-needed', 'INPUT NEEDED', ['FOCUS', 'DISMISS']],
-    ['focused-permission', 'permission-required', 'PERMISSION', ['FOCUS']],
-    ['focused-auth', 'authentication-required', 'AUTH REQUIRED', ['FOCUS']],
-    ['focused-rate-limit', 'rate-limited', 'RATE LIMITED', ['FOCUS']],
-    ['focused-tool-failure', 'tool-failed', 'TOOL FAILED', ['FOCUS']],
+    ['focused-input', 'input-needed', 'INPUT NEEDED', ['FOCUS', 'DISMISS', 'DONE', 'SNOOZE']],
+    ['focused-permission', 'permission-required', 'PERMISSION', ['FOCUS', 'DONE', 'SNOOZE']],
+    ['focused-auth', 'authentication-required', 'AUTH REQUIRED', ['FOCUS', 'DONE', 'SNOOZE']],
+    ['focused-rate-limit', 'rate-limited', 'RATE LIMITED', ['FOCUS', 'DONE', 'SNOOZE']],
+    ['focused-tool-failure', 'tool-failed', 'TOOL FAILED', ['FOCUS', 'DONE', 'SNOOZE']],
   ];
   for (const [name, event, kind, actions] of focusedActionCases) {
     const id = sig.addFakeSession({ name, agent: 'claude' });

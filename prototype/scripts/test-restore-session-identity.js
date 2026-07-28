@@ -151,6 +151,8 @@ fs.writeFileSync(e2ePath, `
     && schemaNine.sessions[0].browserLayoutMode === 'browserChromux'
     && schemaNine.sessions[0].fullBrowserComposerOpen === true,
   'schema v9 should preserve staged browser context and migrate old chatOpen to the Composer drawer');
+  expect(Array.isArray(schemaNine.inboxTriage) && schemaNine.inboxTriage.length === 0,
+    'schema v9 should migrate with empty inbox triage state');
 
   const exact = await window.chromux.resolveRestoreSessions({ sessions: [
     { name: 'tab-a', cwd: ${JSON.stringify(shared)}, agent: 'claude', resumeId: ${JSON.stringify(ids.exactA)} },
@@ -200,7 +202,15 @@ fs.writeFileSync(e2ePath, `
   expect(mixed.sessions[2].resume.id !== '../../bad' && mixed.inferred.length === 3,
     'malformed saved ID must be discarded and inferred safely');
 
-  const saved = await window.chromux.saveRestoreSnapshot({ reason: 'manual', sessions: [
+  const saved = await window.chromux.saveRestoreSnapshot({ reason: 'manual', inboxTriage: [
+    { id: 'attention:session:permission:s1', state: 'done',
+      updatedAt: '2026-07-23T01:02:03.000Z', reopenToken: 'turn:1' },
+    { id: 'git:worktree-1', state: 'snoozed',
+      updatedAt: '2026-07-23T01:02:03.000Z', snoozedUntil: '2026-07-30T01:02:03.000Z',
+      reopenToken: 'head:status' },
+    { id: '', state: 'done', updatedAt: 'bad' },
+    { id: 'bad-state', state: 'ignored', updatedAt: '2026-07-23T01:02:03.000Z' },
+  ], sessions: [
     { name: 'valid', cwd: ${JSON.stringify(shared)}, agent: 'claude', resumeId: ${JSON.stringify(ids.exactB)}, composerDraft: 'saved draft',
       customTabGroupId: 'group-saved-valid', wasActive: true, wasLastActiveInGroup: true,
       chatMessages: [{ id: 'discard-saved', role: 'assistant', text: 'discard',
@@ -233,20 +243,24 @@ fs.writeFileSync(e2ePath, `
         { id: 'bad-time:1', type: 'delivery', detail: 'no', occurredAt: 0 },
       ] },
   ] });
-  expect(saved.schemaVersion === 9, 'new snapshot must use schema v9');
+  expect(saved.schemaVersion === 10, 'new snapshot must use schema v10');
+  expect(saved.inboxTriage.length === 2
+    && saved.inboxTriage[0].state === 'done'
+    && saved.inboxTriage[1].state === 'snoozed',
+  'schema v10 should bound and sanitize Done/Snooze inbox records');
   expect(saved.sessions[0].lastActivityAt === '2026-07-23T01:02:03.000Z'
     && typeof saved.sessions[1].lastActivityAt === 'string',
-  'schema v9 should retain schema-v7 activity timestamps and provide a valid fallback for malformed or absent activity');
+  'schema v10 should retain schema-v7 activity timestamps and provide a valid fallback for malformed or absent activity');
   expect(saved.sessions[0].resumeId === ${JSON.stringify(ids.exactB)}, 'valid resumeId not persisted');
   expect(saved.sessions[0].customTabGroupId === 'group-saved-valid'
     && saved.sessions[0].wasActive === true && saved.sessions[0].wasLastActiveInGroup === true,
-  'schema v9 group membership and focus metadata did not round-trip');
+  'schema v10 group membership and focus metadata did not round-trip');
   expect(!Object.prototype.hasOwnProperty.call(saved.sessions[0], 'chatMessages')
     && !Object.prototype.hasOwnProperty.call(saved.sessions[0], 'chatOpen')
     && saved.sessions[0].stagedBrowserContexts.length === 1
     && saved.sessions[0].browserLayoutMode === 'browserChromux'
     && saved.sessions[0].fullBrowserComposerOpen === true,
-  'schema v9 Composer context and presentation metadata did not round-trip');
+  'schema v10 Composer context and presentation metadata did not round-trip');
   expect(!Object.prototype.hasOwnProperty.call(saved.sessions[0], 'resume')
     && !Object.prototype.hasOwnProperty.call(saved.sessions[0], 'agentMessagePreview'),
   'transient DETECT name/excerpt metadata must not enter restore snapshots');
@@ -311,7 +325,12 @@ fs.writeFileSync(e2ePath, `
 `);
 
 const electronCli = path.join(appDir, 'node_modules', '.bin', 'electron');
-const child = spawn(process.execPath, [electronCli, '.', '--smoke'], {
+const child = spawn(process.execPath, [
+  electronCli,
+  '.',
+  '--smoke',
+  `--user-data-dir=${path.join(tmpDir, 'electron-profile')}`,
+], {
   cwd: appDir,
   env: { ...process.env, HOME: homeDir, PATH: '/usr/bin:/bin', CHROMUX_E2E: e2ePath, CHROMUX_E2E_OUT: e2eOutPath },
   stdio: ['ignore', 'pipe', 'pipe'],

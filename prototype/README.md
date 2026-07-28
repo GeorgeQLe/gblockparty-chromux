@@ -367,7 +367,8 @@ See [`docs/troubleshooting.md`](docs/troubleshooting.md) for the full support gu
 | --- | --- |
 | Capture payloads, screenshots, recordings, contact sheets, and manifests | `~/.chromux/captures/<timestamp>-<unique-suffix>/` |
 | Delivery log | `~/.chromux/delivery-log.jsonl` |
-| Restore snapshot | `~/.chromux/restore-sessions.json` (schema v9; includes validated provider conversation IDs, custom tab-group membership/focus, last deliberate activity, ordered browser page/explorer tabs, optional 64 KiB Composer drafts, staged browser-context references, the full-browser Composer-open flag, and up to 20 bounded historical Needs Attention records per session; routing targets remain ephemeral and old candidate `chatMessages` are discarded) |
+| Restore snapshot | `~/.chromux/restore-sessions.json` (schema v10; includes validated provider conversation IDs, custom tab-group membership/focus, last deliberate activity, ordered browser page/explorer tabs, optional 64 KiB Composer drafts, staged browser-context references, the full-browser Composer-open flag, up to 20 bounded historical attention records per session, and up to 200 bounded Done/Snooze inbox records; routing targets remain ephemeral and old candidate `chatMessages` are discarded) |
+| Git repository catalog | `~/.chromux/git-repositories.json` (mode `0600`; at most 100 canonical host/WSL repository roots previously seen through sessions, with first/last-seen and latest associated-session activity) |
 | Prompt history | `~/.chromux/prompt-history.json` (local plaintext, mode `0600`, 100 entries/project, 5 MiB total) |
 | Saved projects | `~/.chromux/projects.json` |
 | Update cache/source/install log | `~/.chromux/update-cache.json`, `~/.chromux/update-source.json`, `~/.chromux/update-install.log` |
@@ -375,6 +376,24 @@ See [`docs/troubleshooting.md`](docs/troubleshooting.md) for the full support gu
 | Resource broker | `~/.chromux/resource-broker.sock`, `~/.chromux/resource-broker.lock`, `~/.chromux/resource-broker-state.json`, and optional `~/.chromux/resource-broker.log` |
 | Capture control | `~/.chromux/capture-control.sock` while Chromux is running |
 | Browser pane profiles | Session-specific persistent Electron partitions shared by that session's page tabs |
+
+## Threads inbox and Git review
+
+Threads always shows **Action Required**, **Ready to Finish**, **Working**, and
+**All Sessions** in that order. The badge counts only actionable and
+ready-to-finish obligations. Use Up/Down or `j`/`k` to move through inbox
+items, Enter or `o` to open, `d` to mark Done, and `s` to open Snooze presets.
+A new turn or attention sequence, changed Git state, or expired snooze reopens
+the matching item.
+
+Git Changes catalogs repositories seen by Chromux and enumerates every linked
+worktree. Selecting a worktree opens a review drawer for bounded diffs,
+whole-file staging, explicit commit previews, and confirmed remote actions.
+**Forget** removes only the catalog entry; it never deletes or changes
+repository files. **Stale** means uncommitted, unpublished, or outgoing work
+whose session, changed-file, and relevant HEAD activity are all at least seven
+days old. Git's separate **Prunable** warning is reported verbatim and does not
+mean merely old.
 
 When Chromux launches, it reclaims browser partitions left by closed Chromux
 sessions and exact stale `signal-<24 lowercase hex>.json` correlation files.

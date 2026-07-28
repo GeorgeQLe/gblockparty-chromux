@@ -308,10 +308,11 @@ fs.writeFileSync(e2ePath, `
   expect(!q.attentionKinds().includes('UPDATE FAILED'), 'dismissed failed update should leave unified Threads');
   q.queue();
   expect(q.phase() === 'ready', 'queueing again after failed dismissal should return to ready');
-  expect(q.attentionKinds()[0] === 'UPDATE READY', 'ready update should stay pinned above attentive sessions');
+  expect(q.attentionKinds().includes('UPDATE READY'),
+    'ready update should remain visible while urgent session items stay above Ready to Finish');
 
-  // The Chromux Update system row stays first. Attentive sessions retain the
-  // domain priority order below it, aggregating all reasons for each session.
+  // Urgent session items stay in Action Required. The update and other
+  // completion obligations remain ordered in Ready to Finish.
   const orderHolder = await q.addSession({ name: 'order-holder', agent: '', turnState: 'completed' });
   sig.focus(orderHolder);
   q.setSession(liveId, { turnState: 'completed' });
@@ -335,9 +336,12 @@ fs.writeFileSync(e2ePath, `
   const entryKinds = [...document.querySelectorAll('.attention-thread .attention-reason:first-child')]
     .map((element) => element.dataset.attentionKind);
   expect(q.phase() === 'ready', 'all safe order sessions should make update ready');
-  expect(kinds[0] === 'UPDATE READY', 'UPDATE READY should be pinned above Needs Attention');
+  expect(kinds[0] === 'INPUT NEEDED' && kinds.includes('UPDATE READY'),
+    'Action Required should precede the ready update');
   expect(indexOf(entryKinds, 'INPUT NEEDED') < indexOf(entryKinds, 'DELIVERY FAIL'), 'input thread should outrank delivery thread');
-  expect(indexOf(entryKinds, 'DELIVERY FAIL') < indexOf(entryKinds, 'QUEUE 1'), 'delivery thread should outrank queued-preview thread');
+  expect(indexOf(kinds, 'DELIVERY FAIL') < indexOf(kinds, 'UPDATE READY')
+    && indexOf(kinds, 'UPDATE READY') < indexOf(kinds, 'QUEUE 1'),
+  'ready update should follow urgent delivery failure and precede ready session work');
   expect(indexOf(entryKinds, 'QUEUE 1') < indexOf(entryKinds, 'COMPLETED'), 'queued-preview thread should outrank completion-only threads');
   const attentionSnapshots = q.snapshot();
   const snapshotTypes = attentionSnapshots.flatMap((row) => (row.attentionRecords || []).map((record) => record.type));
@@ -353,7 +357,8 @@ fs.writeFileSync(e2ePath, `
   q.setSession(orderQueue, { turnState: 'unknown' });
   kinds = q.attentionKinds();
   expect(q.phase() === 'waiting', 'unknown order queue session should make update waiting');
-  expect(kinds[0] === 'UPDATE WAITING', 'UPDATE WAITING should remain the pinned system row');
+  expect(kinds.includes('UPDATE WAITING') && kinds[0] === 'INPUT NEEDED',
+    'UPDATE WAITING should remain visible below Action Required');
 
   sig.focus(orderInput);
   expect(sig.attentionItems().some((i) => i.kind === 'INPUT NEEDED' && i.name === 'order-input'),

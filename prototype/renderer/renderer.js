@@ -156,6 +156,12 @@ const state = {
     lastActiveSessionByGroup: new Map(),
     gitRoots: new Map(), // exact cwd -> { value: string|null|undefined, promise }
     gitDiffs: new Map(), // repository root -> { value: summary|null|undefined, promise }
+    gitInventory: null,
+    gitInventoryPromise: null,
+    gitInventoryError: null,
+    gitReview: null,
+    inboxTriage: new Map(),
+    inboxQueueIndex: 0,
     railExpanded: new Map(),
     threadPreview: null,
     threadPreviewOpenTimer: null,
@@ -6439,6 +6445,13 @@ function attentionSessionRows(items) {
   return [...grouped.values()];
 }
 
+function inboxAttentionRows(items) {
+  return [
+    ...items.filter(({ item }) => !item.sessionId),
+    ...attentionSessionRows(items),
+  ];
+}
+
 function syncThreadSessionRowPresentation(row, session) {
   if (!row || !session) return;
   const status = sessionRailStatus(session);
@@ -6682,26 +6695,282 @@ function appendWorkingSessionsGroup(host, sessions) {
   details.append(summary, rows); host.appendChild(details);
 }
 
+function snapshotInboxTriage() {
+  return [...state.ui.inboxTriage.values()]
+    .sort((a, b) => Date.parse(a.updatedAt) - Date.parse(b.updatedAt))
+    .slice(-200)
+    .map((record) => ({ ...record }));
+}
+
+function inboxTriageKey(item) {
+  if (item.inboxId) return item.inboxId;
+  return `attention:${item.scope || 'session'}:${item.type || 'unknown'}:${item.sessionId || 'global'}`.slice(0, 200);
+}
+
+function inboxReopenToken(item) {
+  if (item.reopenToken) return String(item.reopenToken).slice(0, 200);
+  return `${item.id || ''}:${item.createdAt || 0}:${item.detail || ''}`.slice(0, 200);
+}
+
+function inboxItemVisible(item) {
+  const key = inboxTriageKey(item);
+  const record = state.ui.inboxTriage.get(key);
+  if (!record) return true;
+  if (record.reopenToken !== inboxReopenToken(item)) {
+    state.ui.inboxTriage.delete(key);
+    return true;
+  }
+  if (record.state === 'snoozed' && Date.parse(record.snoozedUntil || '') <= Date.now()) {
+    state.ui.inboxTriage.delete(key);
+    return true;
+  }
+  return false;
+}
+
+function persistInboxTriage() {
+  window.chromux.saveRestoreSnapshot({
+    reason: 'inbox-triage',
+    sessions: snapshotOpenSessions(),
+    inboxTriage: snapshotInboxTriage(),
+  }).catch(() => {});
+}
+
+function setInboxTriage(item, stateName, snoozedUntil = null) {
+  const updatedAt = new Date().toISOString();
+  state.ui.inboxTriage.set(inboxTriageKey(item), {
+    id: inboxTriageKey(item),
+    state: stateName,
+    updatedAt,
+    ...(snoozedUntil ? { snoozedUntil: new Date(snoozedUntil).toISOString() } : {}),
+    reopenToken: inboxReopenToken(item),
+  });
+  persistInboxTriage();
+  invalidate('attention');
+}
+
+function snoozeTarget(preset) {
+  const now = new Date();
+  if (preset === 'hour') return now.getTime() + 60 * 60 * 1000;
+  if (preset === 'tomorrow') {
+    const target = new Date(now); target.setDate(target.getDate() + 1); target.setHours(9, 0, 0, 0); return target.getTime();
+  }
+  if (preset === 'week') {
+    const target = new Date(now); target.setDate(target.getDate() + 7); target.setHours(9, 0, 0, 0); return target.getTime();
+  }
+  return null;
+}
+
+function openCustomSnooze(item) {
+  const value = window.prompt('Snooze until (local date and time)', new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16));
+  if (!value) return;
+  const target = Date.parse(value);
+  if (Number.isFinite(target) && target > Date.now()) setInboxTriage(item, 'snoozed', target);
+}
+
+function appendInboxItem(host, rowData, { git = false } = {}) {
+  const { session } = rowData;
+  const items = rowData.items || [rowData.item];
+  const item = items[0];
+  const card = document.createElement('article');
+  const system = !git && !session.id;
+  card.className = `inbox-item${git ? '' : system
+    ? ` attention-item attention-system-row ${item.cls || ''}`
+    : ` attention-item attention-thread ${item.cls || ''}`}`.trim();
+  if (system) card.dataset.attentionKind = item.kind;
+  card.tabIndex = -1;
+  card.dataset.inboxId = inboxTriageKey(item);
+  if (!git) card.dataset.sessionId = session.id;
+  let open;
+  const snoozeButtons = [];
+  let snoozeItem = item;
+  if (git || system) {
+    const main = document.createElement('button');
+    main.type = 'button';
+    main.className = 'inbox-item-main';
+    const title = document.createElement('span'); title.className = 'inbox-item-title'; title.textContent = sessionDisplayLabel(session);
+    const kind = document.createElement('span'); kind.className = 'inbox-item-kind'; kind.textContent = item.kind || 'REVIEW';
+    const detail = document.createElement('span'); detail.className = 'inbox-item-detail'; detail.textContent = item.detail || session.cwd || '';
+    main.append(title, kind, detail);
+    open = git ? () => openGitReview(item.repositoryId, item.worktreeId) : attentionAction(item);
+    main.onclick = open;
+    const actions = document.createElement('div'); actions.className = `inbox-item-actions${system ? ' attention-actions' : ''}`;
+    const openButton = document.createElement('button'); openButton.type = 'button';
+    if (system) openButton.className = 'qi-btn open';
+    openButton.textContent = git ? 'REVIEW GIT' : (item.primaryAction || 'OPEN'); openButton.onclick = open;
+    const done = document.createElement('button'); done.type = 'button'; done.textContent = 'DONE';
+    if (system) done.className = 'qi-btn';
+    done.onclick = () => setInboxTriage(item, 'done');
+    const snooze = document.createElement('button'); snooze.type = 'button'; snooze.textContent = 'SNOOZE';
+    if (system) snooze.className = 'qi-btn';
+    snoozeButtons.push([snooze, item]);
+    actions.appendChild(openButton);
+    if (system && attentionItemDismissible(item)) {
+      const dismiss = document.createElement('button'); dismiss.type = 'button'; dismiss.className = 'qi-btn'; dismiss.textContent = 'DISMISS';
+      dismiss.onclick = () => dismissAttentionItem(item); actions.appendChild(dismiss);
+    }
+    actions.append(done, snooze);
+    card.append(main, actions);
+  } else {
+    appendThreadSessionRow(card, session, { attention: { session, items } });
+    const reasons = document.createElement('div'); reasons.className = 'attention-reasons';
+    items.forEach((reasonItem, index) => {
+      const reason = document.createElement('div');
+      reason.className = `attention-reason ${index === 0 ? 'primary ' : ''}${reasonItem.cls || ''}`.trim();
+      reason.dataset.attentionKind = reasonItem.kind;
+      const copy = document.createElement('div'); copy.className = 'attention-reason-copy';
+      if (index > 0) {
+        const kind = document.createElement('span'); kind.className = `attention-kind ${reasonItem.cls || ''}`;
+        kind.textContent = reasonItem.kind; copy.appendChild(kind);
+      }
+      const detail = document.createElement('span'); detail.className = 'attention-detail';
+      detail.textContent = reasonItem.detail || session.cwd || ''; detail.title = detail.textContent; copy.appendChild(detail);
+      const actions = document.createElement('div'); actions.className = 'attention-actions';
+      appendAttentionActions(actions, reasonItem);
+      const done = document.createElement('button'); done.type = 'button'; done.className = 'qi-btn'; done.textContent = 'DONE';
+      done.onclick = () => setInboxTriage(reasonItem, 'done');
+      const snooze = document.createElement('button'); snooze.type = 'button'; snooze.className = 'qi-btn'; snooze.textContent = 'SNOOZE';
+      snoozeButtons.push([snooze, reasonItem]);
+      actions.append(done, snooze); reason.append(copy, actions); reasons.appendChild(reason);
+    });
+    card.appendChild(reasons);
+  }
+  const menu = document.createElement('div'); menu.className = 'inbox-snooze-menu hidden';
+  for (const [preset, label] of [['hour', '1 HOUR'], ['tomorrow', 'TOMORROW'], ['week', 'NEXT WEEK']]) {
+    const button = document.createElement('button'); button.type = 'button'; button.textContent = label;
+    button.onclick = () => setInboxTriage(snoozeItem, 'snoozed', snoozeTarget(preset));
+    menu.appendChild(button);
+  }
+  const custom = document.createElement('button'); custom.type = 'button'; custom.textContent = 'CUSTOM DATE';
+  custom.onclick = () => openCustomSnooze(snoozeItem); menu.appendChild(custom);
+  for (const [button, target] of snoozeButtons) {
+    button.onclick = () => {
+      snoozeItem = target;
+      menu.classList.toggle('hidden');
+    };
+  }
+  card.appendChild(menu);
+  host.appendChild(card);
+}
+
+function appendInboxSection(host, { key, label, rows, css = '', renderRow = appendInboxItem }) {
+  const section = document.createElement('section');
+  section.className = `inbox-section ${css}${key === 'action-required' ? ' rail-group attention-thread-group' : ''}${key === 'ready-finish' ? ' rail-group ready-finish-group' : ''}${key === 'working' ? ' rail-group working-thread-group' : ''}`.trim();
+  section.dataset.inboxSection = key;
+  if (key === 'action-required') section.dataset.groupKey = 'attention:needs';
+  if (key === 'ready-finish') section.dataset.groupKey = 'ready:finish';
+  if (key === 'working') section.dataset.groupKey = 'status:working';
+  section.open = true;
+  const header = document.createElement('header');
+  const title = document.createElement('span'); title.className = 'rail-group-label'; title.textContent = label;
+  const count = document.createElement('span'); count.className = 'inbox-section-count rail-group-count'; count.textContent = String(rows.length);
+  header.append(title, count);
+  const body = document.createElement('div');
+  body.className = 'inbox-section-body rail-group-rows';
+  if (rows.length === 0) {
+    const empty = document.createElement('div'); empty.className = 'inbox-empty'; empty.textContent = 'Nothing here.';
+    body.appendChild(empty);
+  } else {
+    for (const row of rows) renderRow(body, row);
+  }
+  section.append(header, body); host.appendChild(section);
+  return body;
+}
+
+function gitInboxRows() {
+  const repositories = state.ui.gitInventory?.repositories || [];
+  const sessions = orderedSessions();
+  const byId = new Map(sessions.map((session) => [session.id, session]));
+  const rows = [];
+  for (const repository of repositories) {
+    for (const worktree of repository.worktrees || []) {
+      if (!(worktree.conflicted || worktree.dirty || worktree.unpublished || worktree.ahead > 0)) continue;
+      const associated = worktree.associatedSessionIds.map((id) => byId.get(id)).filter(Boolean)
+        .sort((a, b) => sessionActivityAt(b) - sessionActivityAt(a));
+      const session = associated[0] || {
+        name: repository.label,
+        cwd: worktree.path,
+        id: `repository:${repository.id}`,
+      };
+      const obligations = [
+        worktree.conflicted ? `${worktree.totals.conflicted} conflicted` : null,
+        worktree.totals.staged ? `${worktree.totals.staged} staged` : null,
+        worktree.totals.unstaged ? `${worktree.totals.unstaged} unstaged` : null,
+        worktree.unpublished ? 'unpublished branch' : null,
+        worktree.ahead ? `${worktree.ahead} outgoing` : null,
+      ].filter(Boolean);
+      const item = {
+        id: `git:${worktree.id}`,
+        inboxId: `git:${worktree.id}`,
+        reopenToken: `${worktree.head || ''}:${worktree.latestRelevantAt || ''}:${worktree.totals.files}:${worktree.ahead}:${worktree.behind}`,
+        type: worktree.conflicted ? 'conflict' : 'git',
+        kind: worktree.conflicted ? 'CONFLICT' : (worktree.stale ? 'STALE GIT' : 'GIT REVIEW'),
+        detail: `${worktree.branch || 'detached'} · ${obligations.join(' · ')}`,
+        repositoryId: repository.id,
+        worktreeId: worktree.id,
+        createdAt: Date.parse(worktree.latestRelevantAt || repository.lastSeenAt) || 0,
+      };
+      rows.push({ session, item });
+    }
+  }
+  return rows.sort((a, b) => (a.item.type === 'conflict' ? -1 : b.item.type === 'conflict' ? 1 : 0)
+    || b.item.createdAt - a.item.createdAt);
+}
+
 function renderAttentionQueue() {
   const host = $('#thread-list');
   if (!host) return;
+  for (const session of orderedSessions()) {
+    if (session.lifecycle?.alive) ensureGitRoot(session.cwd || '~');
+  }
   host.innerHTML = '';
   const items = attentionItems();
-  renderRailNavigation(items.length);
+  const gitRows = gitInboxRows();
+  const visibleAttention = items.filter(({ item }) => inboxItemVisible(item));
+  const visibleGit = gitRows.filter(({ item }) => inboxItemVisible(item));
+  const actionTypes = new Set(['permission', 'authentication', 'input', 'rateLimited', 'toolFailed', 'delivery', 'updateFailed']);
+  const actionRequired = visibleAttention.filter(({ item }) => actionTypes.has(item.type));
+  const gitBlockers = visibleGit.filter(({ item }) => item.type === 'conflict');
+  const readyAttention = visibleAttention.filter(({ item }) => !actionTypes.has(item.type));
+  const ready = [
+    ...inboxAttentionRows(readyAttention),
+    ...visibleGit.filter(({ item }) => item.type !== 'conflict'),
+  ];
+  renderRailNavigation(actionRequired.length + gitBlockers.length + ready.length);
   if (state.ui.railMode === 'git') {
     renderGitDiffRail(host);
     return;
   }
-  const update = items.find((row) => row.item.scope === 'global') || null;
-  const attentive = attentionSessionRows(items);
   const working = workingSessionRows();
-  appendUpdateAttentionRow(host, update);
-  appendNeedsAttentionGroup(host, attentive);
-  appendWorkingSessionsGroup(host, working);
-  renderGroupedSessionRail(host, 'threads', new Set([
-    ...attentive.map((row) => row.session.id),
-    ...working.map((session) => session.id),
-  ]));
+  appendInboxSection(host, {
+    key: 'action-required',
+    label: 'ACTION REQUIRED',
+    css: 'action-required',
+    rows: [...inboxAttentionRows(actionRequired), ...gitBlockers],
+    renderRow: (body, row) => appendInboxItem(body, row, { git: Boolean(row.item?.repositoryId) }),
+  });
+  appendInboxSection(host, {
+    key: 'ready-finish',
+    label: 'READY TO FINISH',
+    css: 'ready-finish',
+    rows: ready,
+    renderRow: (body, row) => appendInboxItem(body, row, { git: Boolean(row.item?.repositoryId) }),
+  });
+  appendInboxSection(host, {
+    key: 'working',
+    label: 'WORKING',
+    css: 'working',
+    rows: working,
+    renderRow: (body, session) => appendThreadSessionRow(body, session),
+  });
+  const allBody = appendInboxSection(host, {
+    key: 'all-sessions',
+    label: 'ALL SESSIONS',
+    css: 'all-sessions',
+    rows: [],
+  });
+  allBody.innerHTML = '';
+  renderGroupedSessionRail(allBody, 'threads');
+  syncInboxQueueFocus();
 }
 
 function renderRailNavigation(attentionCount) {
@@ -6785,11 +7054,58 @@ function ensureGitRoot(cwd) {
   if (state.ui.gitRoots.has(cwd)) return state.ui.gitRoots.get(cwd);
   const entry = { value: undefined, promise: null };
   entry.promise = Promise.resolve(window.chromux.gitRoot(cwd))
-    .then((root) => { entry.value = typeof root === 'string' && root ? root : null; })
+    .then((root) => {
+      entry.value = typeof root === 'string' && root ? root : null;
+      const session = orderedSessions().filter((candidate) => candidate.cwd === cwd)
+        .sort((a, b) => sessionActivityAt(b) - sessionActivityAt(a))[0];
+      if (entry.value && session) {
+        window.chromux.gitRepositoryObserve({
+          runtime: session.runtime === 'wsl' ? 'wsl' : 'host',
+          distro: session.distro || null,
+          cwd,
+          activityAt: sessionActivityAt(session),
+        }).then(() => refreshGitInventory({ force: true })).catch(() => {});
+      }
+    })
     .catch(() => { entry.value = null; })
     .finally(() => invalidate('attention'));
   state.ui.gitRoots.set(cwd, entry);
   return entry;
+}
+
+function gitInventorySessions() {
+  return orderedSessions().map((session) => ({
+    sessionId: session.id,
+    runtime: session.runtime === 'wsl' ? 'wsl' : 'host',
+    distro: session.distro || null,
+    cwd: session.cwd,
+    activityAt: sessionActivityAt(session),
+  }));
+}
+
+function refreshGitInventory({ force = false } = {}) {
+  if (state.ui.gitInventoryPromise && !force) return state.ui.gitInventoryPromise;
+  if (state.ui.gitInventoryPromise && force) return state.ui.gitInventoryPromise;
+  const sessions = gitInventorySessions();
+  state.ui.gitInventoryPromise = Promise.all(sessions.map((session) => window.chromux.gitRepositoryObserve({
+    runtime: session.runtime,
+    distro: session.distro,
+    cwd: session.cwd,
+    activityAt: session.activityAt,
+  }).catch(() => null))).then(() => window.chromux.gitWorktreeInventory({ sessions })).then((response) => {
+    if (!response?.ok) throw new Error(response?.error?.message || 'Git inventory failed.');
+    state.ui.gitInventory = response;
+    state.ui.gitInventoryError = null;
+    return response;
+  }).catch((error) => {
+    state.ui.gitInventoryError = error.message || 'Git inventory failed.';
+    return null;
+  }).finally(() => {
+    state.ui.gitInventoryPromise = null;
+    invalidate('attention');
+    if (state.ui.gitReview) refreshOpenGitReview();
+  });
+  return state.ui.gitInventoryPromise;
 }
 
 function loadGitDiff(root, { force = false } = {}) {
@@ -6816,63 +7132,369 @@ function gitFileStatus(file) {
 }
 
 function renderGitDiffRail(host) {
-  const live = orderedSessions().filter((session) => session.lifecycle && session.lifecycle.alive);
-  const roots = new Map();
-  let pending = false;
-  for (const session of live) {
-    const entry = ensureGitRoot(session.cwd || '~');
-    if (entry.value === undefined) pending = true;
-    else if (entry.value) roots.set(entry.value, entry.value);
-  }
-  if (roots.size === 0) {
+  if (!state.ui.gitInventory && !state.ui.gitInventoryPromise) refreshGitInventory();
+  if (state.ui.gitInventoryError) {
     const empty = document.createElement('div');
-    empty.className = 'attention-empty';
-    empty.textContent = pending ? 'Resolving Git repositories…' : 'No Git repositories in live sessions.';
+    empty.className = 'attention-empty error';
+    empty.textContent = state.ui.gitInventoryError;
     host.appendChild(empty);
     return;
   }
-  for (const root of [...roots.keys()].sort((a, b) => a.localeCompare(b))) {
-    const entry = loadGitDiff(root);
-    const details = document.createElement('details');
-    details.className = 'rail-group git-diff-group';
-    details.dataset.groupKey = `git:${root}`;
-    details.open = state.ui.railExpanded.get(`git:${root}`) !== false;
-    details.addEventListener('toggle', () => state.ui.railExpanded.set(`git:${root}`, details.open));
-    const summary = document.createElement('summary');
-    summary.title = root;
-    const label = document.createElement('span'); label.className = 'rail-group-label'; label.textContent = directoryBasename(root);
-    const count = document.createElement('span'); count.className = 'rail-group-count';
-    count.textContent = entry.value === undefined ? '…' : String(entry.value?.totals?.files || 0);
-    summary.append(label, count);
-    const rows = document.createElement('div'); rows.className = 'rail-group-rows';
-    if (entry.value === undefined) {
-      const message = document.createElement('div'); message.className = 'git-diff-empty'; message.textContent = 'Scanning changes…'; rows.appendChild(message);
-    } else if (!entry.value) {
-      const message = document.createElement('div'); message.className = 'git-diff-empty error'; message.textContent = 'Could not read Git changes.'; rows.appendChild(message);
-    } else if (entry.value.files.length === 0) {
-      const message = document.createElement('div'); message.className = 'git-diff-empty clean'; message.textContent = 'Working tree clean'; rows.appendChild(message);
-    } else {
-      const totals = document.createElement('div');
-      totals.className = 'git-diff-totals';
-      totals.textContent = `${entry.value.totals.staged} staged · ${entry.value.totals.unstaged} unstaged`;
-      rows.appendChild(totals);
-      for (const file of entry.value.files) {
-        const status = gitFileStatus(file);
-        const row = document.createElement('div');
-        row.className = 'git-diff-row';
-        row.title = file.originalPath ? `${file.originalPath} → ${file.path}` : file.path;
-        row.setAttribute('aria-label', `${status.label}: ${file.path}`);
-        const badge = document.createElement('span'); badge.className = `git-diff-status ${status.kind}`; badge.textContent = status.code; badge.title = status.label;
-        const name = document.createElement('span'); name.className = 'git-diff-path'; name.textContent = file.path;
-        const staged = document.createElement('span'); staged.className = 'git-diff-stage'; staged.textContent = ![' ', '?'].includes(file.index) ? 'S' : '';
-        staged.title = staged.textContent ? 'Has staged changes' : '';
-        row.append(badge, name, staged);
-        rows.appendChild(row);
-      }
-    }
-    details.append(summary, rows);
-    host.appendChild(details);
+  const repositories = state.ui.gitInventory?.repositories || [];
+  if (repositories.length === 0) {
+    const empty = document.createElement('div'); empty.className = 'attention-empty';
+    empty.textContent = state.ui.gitInventoryPromise ? 'Scanning known repositories…' : 'No known Git repositories yet.';
+    host.appendChild(empty); return;
   }
+  for (const repository of repositories) {
+    const card = document.createElement('section'); card.className = 'git-repository-card'; card.dataset.repositoryId = repository.id;
+    const head = document.createElement('div'); head.className = 'git-repository-head';
+    const copy = document.createElement('div'); copy.className = 'git-repository-copy';
+    const label = document.createElement('b'); label.textContent = repository.label;
+    const root = document.createElement('span'); root.textContent = repository.root; root.title = repository.root;
+    copy.append(label, root);
+    const forget = document.createElement('button'); forget.type = 'button'; forget.className = 'git-mini-button'; forget.textContent = 'FORGET';
+    forget.title = 'Remove from Chromux catalog without touching repository files';
+    forget.onclick = async () => {
+      if (!window.confirm(`Forget ${repository.root} from Chromux?\n\nNo repository files will be changed.`)) return;
+      const result = await window.chromux.gitRepositoryForget(repository.id);
+      if (result?.ok) refreshGitInventory({ force: true });
+    };
+    head.append(copy, forget); card.appendChild(head);
+    if (repository.error) {
+      const message = document.createElement('div'); message.className = 'git-diff-empty error'; message.textContent = repository.error;
+      card.appendChild(message);
+    }
+    for (const worktree of repository.worktrees || []) {
+      const row = document.createElement('button'); row.type = 'button';
+      row.className = `git-worktree-row${worktree.conflicted || worktree.locked ? ' blocked' : ''}`;
+      row.dataset.worktreeId = worktree.id;
+      const name = document.createElement('span'); name.className = 'git-worktree-name';
+      name.textContent = worktree.branch || 'DETACHED HEAD';
+      const badges = document.createElement('span'); badges.className = 'git-worktree-badges';
+      badges.textContent = [
+        worktree.conflicted ? 'CONFLICT' : null,
+        worktree.stale ? 'STALE' : null,
+        worktree.prunable ? 'PRUNABLE' : null,
+        worktree.locked ? 'LOCKED' : null,
+      ].filter(Boolean).join(' · ') || 'REVIEW';
+      const detail = document.createElement('span'); detail.className = 'git-worktree-detail';
+      detail.textContent = `${worktree.path} · ${worktree.totals?.files || 0} files · ↑${worktree.ahead || 0} ↓${worktree.behind || 0}`;
+      row.append(name, badges, detail);
+      row.onclick = () => openGitReview(repository.id, worktree.id);
+      card.appendChild(row);
+    }
+    host.appendChild(card);
+  }
+}
+
+function selectedGitWorktree(repositoryId, worktreeId) {
+  const repository = state.ui.gitInventory?.repositories?.find((candidate) => candidate.id === repositoryId);
+  const worktree = repository?.worktrees?.find((candidate) => candidate.id === worktreeId);
+  return repository && worktree ? { repository, worktree } : null;
+}
+
+function closeGitReview() {
+  state.ui.gitReview = null;
+  $('#git-review-drawer')?.classList.add('hidden');
+  $('#git-review-scrim')?.classList.add('hidden');
+}
+
+function gitActionMessage(result) {
+  return result?.ok
+    ? (result.output || `${String(result.kind || 'action').toUpperCase()} completed.`)
+    : `${result?.error?.message || 'Git action failed.'}${result?.error?.details ? `\n${result.error.details}` : ''}`;
+}
+
+async function runGitFileAction(action, repositoryId, worktreeId, paths) {
+  const api = action === 'stage' ? window.chromux.gitWorktreeStage : window.chromux.gitWorktreeUnstage;
+  const result = await api({ repositoryId, worktreeId, paths });
+  if (!result?.ok) {
+    state.ui.gitReview.status = gitActionMessage(result);
+    state.ui.gitReview.error = true;
+    renderGitReview();
+    return;
+  }
+  await refreshGitInventory({ force: true });
+}
+
+async function showGitDiff(repositoryId, worktreeId, file, staged) {
+  const review = state.ui.gitReview;
+  if (!review) return;
+  review.diff = { loading: true, path: file.path, staged };
+  renderGitReview();
+  const result = await window.chromux.gitWorktreeDiff({
+    repositoryId, worktreeId, path: file.path, staged,
+  });
+  if (!state.ui.gitReview) return;
+  state.ui.gitReview.diff = result?.ok ? {
+    path: file.path,
+    staged,
+    text: result.binary ? 'Binary file — text diff unavailable.'
+      : result.truncated && !result.text ? `Diff exceeds the ${Math.round(256)} KiB review limit.`
+        : `${result.text || '(No text diff for this side.)'}${result.truncated ? '\n\n[Diff truncated]' : ''}`,
+  } : { path: file.path, text: gitActionMessage(result), error: true };
+  renderGitReview();
+}
+
+async function previewGitCommit(repositoryId, worktreeId) {
+  const review = state.ui.gitReview;
+  if (!review) return;
+  const result = await window.chromux.gitWorktreeCommitPreview({
+    repositoryId,
+    worktreeId,
+    message: review.message || '',
+  });
+  review.preview = result?.ok ? result : null;
+  review.status = result?.ok ? '' : gitActionMessage(result);
+  review.error = !result?.ok;
+  renderGitReview();
+}
+
+async function executeGitCommit(repositoryId, worktreeId) {
+  const review = state.ui.gitReview;
+  if (!review?.preview) return;
+  const preview = review.preview;
+  if (!window.confirm(
+    `Create this commit in ${preview.target}?\n\nBranch: ${preview.branch || 'detached'}\nMessage: ${preview.message}\nFiles: ${preview.files.length}\n\nRepository hooks will execute.`,
+  )) return;
+  const result = await window.chromux.gitWorktreeCommit({
+    repositoryId,
+    worktreeId,
+    message: preview.message,
+    fingerprint: preview.fingerprint,
+  });
+  review.preview = null;
+  review.status = gitActionMessage(result);
+  review.error = !result?.ok;
+  if (result?.ok) await refreshGitInventory({ force: true });
+  else renderGitReview();
+}
+
+async function executeGitRemoteAction(action, repository, worktree) {
+  const effects = {
+    fetch: `Fetch remote state for ${worktree.path}. No working files will be changed.`,
+    pull: `Fast-forward ${worktree.branch || 'this worktree'} from ${worktree.upstream || 'its upstream'} in ${worktree.path}.`,
+    publish: `Push ${worktree.branch} and set its upstream for ${worktree.path}.`,
+    push: `Push ${worktree.ahead} outgoing commit${worktree.ahead === 1 ? '' : 's'} from ${worktree.path}.`,
+    sync: `Fast-forward pull, then push ${worktree.path}. Sync stops if the pull cannot fast-forward.`,
+  };
+  if (!window.confirm(`${effects[action]}\n\nGit authentication and repository rules apply. Continue?`)) return;
+  const api = {
+    fetch: window.chromux.gitWorktreeFetch,
+    pull: window.chromux.gitWorktreePull,
+    publish: window.chromux.gitWorktreePublish,
+    push: window.chromux.gitWorktreePush,
+    sync: window.chromux.gitWorktreeSync,
+  }[action];
+  const review = state.ui.gitReview;
+  review.status = `Running ${action}…`;
+  review.error = false;
+  renderGitReview();
+  const result = await api({ repositoryId: repository.id, worktreeId: worktree.id });
+  review.status = gitActionMessage(result);
+  review.error = !result?.ok;
+  if (result?.ok) await refreshGitInventory({ force: true });
+  else renderGitReview();
+}
+
+function renderGitReview() {
+  const review = state.ui.gitReview;
+  const target = review && selectedGitWorktree(review.repositoryId, review.worktreeId);
+  if (!review || !target) {
+    if (review) closeGitReview();
+    return;
+  }
+  const { repository, worktree } = target;
+  const body = $('#git-review-body');
+  $('#git-review-title').textContent = worktree.branch || 'DETACHED HEAD';
+  body.innerHTML = '';
+  const summary = document.createElement('section'); summary.className = 'git-review-summary';
+  const summaryRows = [
+    ['REPOSITORY', repository.root],
+    ['WORKTREE', worktree.path],
+    ['BRANCH', worktree.branch || 'Detached HEAD'],
+    ['UPSTREAM', worktree.upstream || 'Not published'],
+    ['SYNC', `↑ ${worktree.ahead || 0} outgoing · ↓ ${worktree.behind || 0} incoming`],
+    ['AGE', worktree.latestRelevantAt ? `${relativeAge(Date.parse(worktree.latestRelevantAt))} since relevant activity` : 'Unknown'],
+    ['STASHES', String(worktree.stashCount || 0)],
+  ];
+  for (const [key, value] of summaryRows) {
+    const row = document.createElement('div'); row.className = 'git-review-summary-row';
+    const label = document.createElement('b'); label.textContent = key;
+    const copy = document.createElement('span'); copy.textContent = value; copy.title = value;
+    row.append(label, copy); summary.appendChild(row);
+  }
+  if (worktree.stale || worktree.prunable || worktree.locked || worktree.detached || worktree.conflicted) {
+    const warning = document.createElement('div'); warning.className = 'git-warning';
+    warning.textContent = [
+      worktree.conflicted ? 'This worktree has unresolved conflicts.' : null,
+      worktree.stale ? 'Stale: all relevant session, file, and HEAD activity is at least seven days old.' : null,
+      worktree.prunable ? `Git reports this worktree as prunable${typeof worktree.prunable === 'string' ? `: ${worktree.prunable}` : '.'}` : null,
+      worktree.locked ? `Git reports this worktree as locked: ${worktree.locked}` : null,
+      worktree.detached ? 'Detached HEAD cannot be published as a named branch.' : null,
+    ].filter(Boolean).join(' ');
+    summary.appendChild(warning);
+  }
+  body.appendChild(summary);
+
+  const files = document.createElement('section'); files.className = 'git-file-list';
+  for (const file of worktree.files || []) {
+    const row = document.createElement('div'); row.className = 'git-file-row';
+    const select = document.createElement('input'); select.type = 'checkbox'; select.value = file.path; select.setAttribute('aria-label', `Select ${file.path}`);
+    const name = document.createElement('span'); name.className = 'git-file-path'; name.textContent = file.path;
+    name.title = file.originalPath ? `${file.originalPath} → ${file.path}` : file.path;
+    const actions = document.createElement('span'); actions.className = 'git-file-actions';
+    const diff = document.createElement('button'); diff.type = 'button'; diff.className = 'git-mini-button'; diff.textContent = 'DIFF';
+    diff.onclick = () => showGitDiff(repository.id, worktree.id, file, ![' ', '?', '.'].includes(file.index));
+    const staged = ![' ', '?', '.'].includes(file.index);
+    const fileAction = file.conflicted ? 'stage' : (staged ? 'unstage' : 'stage');
+    const stage = document.createElement('button'); stage.type = 'button'; stage.className = 'git-mini-button';
+    stage.textContent = file.conflicted ? 'STAGE RESOLUTION' : (staged ? 'UNSTAGE' : 'STAGE');
+    stage.onclick = () => runGitFileAction(fileAction, repository.id, worktree.id, [file.path]);
+    actions.append(diff, stage); row.append(select, name, actions); files.appendChild(row);
+  }
+  if ((worktree.files || []).length === 0) {
+    const clean = document.createElement('div'); clean.className = 'git-diff-empty clean'; clean.textContent = 'Working tree clean';
+    files.appendChild(clean);
+  } else {
+    const bulk = document.createElement('div'); bulk.className = 'git-review-actions';
+    for (const [action, label] of [['stage', 'STAGE SELECTED'], ['unstage', 'UNSTAGE SELECTED']]) {
+      const button = document.createElement('button'); button.type = 'button'; button.className = 'git-mini-button'; button.textContent = label;
+      button.onclick = () => {
+        const paths = [...files.querySelectorAll('input[type="checkbox"]:checked')].map((input) => input.value);
+        if (paths.length) runGitFileAction(action, repository.id, worktree.id, paths);
+      };
+      bulk.appendChild(button);
+    }
+    files.appendChild(bulk);
+  }
+  body.appendChild(files);
+  if (review.diff) {
+    const diff = document.createElement('pre'); diff.className = `git-diff-view${review.diff.error ? ' error' : ''}`;
+    diff.textContent = review.diff.loading ? 'Loading bounded diff…' : review.diff.text;
+    body.appendChild(diff);
+  }
+
+  const commitPanel = document.createElement('section'); commitPanel.className = 'git-commit-panel';
+  const commitLabel = document.createElement('label'); commitLabel.className = 'microlabel'; commitLabel.textContent = 'MANUAL COMMIT MESSAGE';
+  const message = document.createElement('textarea'); message.placeholder = 'Describe the staged change'; message.maxLength = 1000; message.value = review.message || '';
+  message.oninput = () => { review.message = message.value; review.preview = null; };
+  const commitActions = document.createElement('div'); commitActions.className = 'git-review-actions';
+  const preview = document.createElement('button'); preview.type = 'button'; preview.className = 'btn'; preview.textContent = 'PREVIEW COMMIT';
+  preview.onclick = () => previewGitCommit(repository.id, worktree.id);
+  commitActions.appendChild(preview);
+  commitPanel.append(commitLabel, message, commitActions);
+  if (review.preview) {
+    const panel = document.createElement('div'); panel.className = 'git-preview-panel';
+    panel.textContent = `Target: ${review.preview.target}\nBranch: ${review.preview.branch || 'detached'}\nFiles: ${review.preview.files.join(', ')}\nMessage: ${review.preview.message}\n${review.preview.warning}`;
+    const confirm = document.createElement('button'); confirm.type = 'button'; confirm.className = 'btn btn-amber'; confirm.textContent = 'COMMIT';
+    confirm.onclick = () => executeGitCommit(repository.id, worktree.id);
+    panel.append(document.createElement('br'), confirm); commitPanel.appendChild(panel);
+  }
+  body.appendChild(commitPanel);
+
+  const actions = document.createElement('div'); actions.className = 'git-review-actions';
+  const nextAction = worktree.nextAction;
+  if (['fetch', 'pull', 'publish', 'push', 'sync'].includes(nextAction)) {
+    const next = document.createElement('button'); next.type = 'button'; next.className = 'btn btn-amber';
+    next.textContent = nextAction.toUpperCase(); next.onclick = () => executeGitRemoteAction(nextAction, repository, worktree);
+    actions.appendChild(next);
+  }
+  if (nextAction !== 'fetch') {
+    const fetch = document.createElement('button'); fetch.type = 'button'; fetch.className = 'btn'; fetch.textContent = 'FETCH';
+    fetch.onclick = () => executeGitRemoteAction('fetch', repository, worktree); actions.appendChild(fetch);
+  }
+  const associated = worktree.associatedSessionIds.map((id) => state.sessions.get(id)).filter(Boolean)
+    .sort((a, b) => sessionActivityAt(b) - sessionActivityAt(a))[0];
+  const terminal = document.createElement('button'); terminal.type = 'button'; terminal.className = 'btn';
+  terminal.textContent = associated ? 'FOCUS TERMINAL' : 'CREATE TERMINAL';
+  terminal.onclick = () => {
+    if (associated) activateSession(associated.id);
+    else createSession({ name: worktree.branch || directoryBasename(worktree.path), cwd: worktree.path, agent: '' }).catch(() => {});
+    closeGitReview();
+  };
+  actions.appendChild(terminal); body.appendChild(actions);
+  const status = document.createElement('div'); status.className = `git-action-status${review.error ? ' error' : ''}`;
+  status.textContent = review.status || ''; body.appendChild(status);
+}
+
+function refreshOpenGitReview() {
+  if (state.ui.gitReview) renderGitReview();
+}
+
+function openGitReview(repositoryId, worktreeId) {
+  const target = selectedGitWorktree(repositoryId, worktreeId);
+  if (!target) {
+    selectRailMode('git');
+    refreshGitInventory({ force: true });
+    return;
+  }
+  state.ui.gitReview = {
+    repositoryId,
+    worktreeId,
+    message: '',
+    preview: null,
+    diff: null,
+    status: '',
+    error: false,
+  };
+  $('#git-review-drawer').classList.remove('hidden');
+  $('#git-review-scrim').classList.remove('hidden');
+  renderGitReview();
+  requestAnimationFrame(() => $('#git-review-close')?.focus());
+}
+
+function inboxQueueCards() {
+  return [...document.querySelectorAll('#thread-list .inbox-item')];
+}
+
+function syncInboxQueueFocus() {
+  const cards = inboxQueueCards();
+  if (cards.length === 0) {
+    state.ui.inboxQueueIndex = 0;
+    return;
+  }
+  state.ui.inboxQueueIndex = Math.max(0, Math.min(state.ui.inboxQueueIndex, cards.length - 1));
+  cards.forEach((card, index) => card.classList.toggle('queue-focused', index === state.ui.inboxQueueIndex));
+}
+
+function focusInboxQueue(delta) {
+  const cards = inboxQueueCards();
+  if (cards.length === 0) return;
+  state.ui.inboxQueueIndex = (state.ui.inboxQueueIndex + delta + cards.length) % cards.length;
+  syncInboxQueueFocus();
+  cards[state.ui.inboxQueueIndex].querySelector('.inbox-item-main, .rail-session-row')?.focus();
+  cards[state.ui.inboxQueueIndex].scrollIntoView({ block: 'nearest' });
+}
+
+function handleInboxQueueKeydown(event) {
+  if (state.ui.railMode !== 'threads' || event.defaultPrevented) return false;
+  const active = document.activeElement;
+  const railContext = active === document.body || active?.closest?.('#rail');
+  if (!railContext || ['INPUT', 'TEXTAREA', 'SELECT'].includes(active?.tagName)) return false;
+  const card = active?.closest?.('.inbox-item') || inboxQueueCards()[state.ui.inboxQueueIndex];
+  if (event.key === 'j' || event.key === 'ArrowDown') {
+    event.preventDefault(); focusInboxQueue(1); return true;
+  }
+  if (event.key === 'k' || event.key === 'ArrowUp') {
+    event.preventDefault(); focusInboxQueue(-1); return true;
+  }
+  if (!card) return false;
+  if (event.key === 'o' || event.key === 'Enter') {
+    event.preventDefault(); card.querySelector('.inbox-item-main, .rail-session-row')?.click(); return true;
+  }
+  if (event.key === 'd') {
+    event.preventDefault();
+    [...card.querySelectorAll('button')].find((button) => button.textContent === 'DONE')?.click();
+    return true;
+  }
+  if (event.key === 's') {
+    event.preventDefault();
+    [...card.querySelectorAll('button')].find((button) => button.textContent === 'SNOOZE')?.click();
+    return true;
+  }
+  return false;
 }
 
 function groupedRailSessions(mode, excludedSessionIds = new Set()) {
@@ -6996,11 +7618,13 @@ function scheduleThreadPreviewOpen(session, anchor) {
     sessionId: session.id,
     timer: setTimeout(() => {
       state.ui.threadPreviewOpenTimer = null;
+      const currentAnchor = anchor.isConnected ? anchor
+        : document.querySelector(`#thread-list .rail-session-row[data-session-id="${CSS.escape(session.id)}"]`);
       if (session.id === state.activeId
         || state.ui.railMode !== 'threads'
         || !session.lifecycle?.alive
-        || !anchor.isConnected) return;
-      openThreadPreview(session, anchor, { anchorHovered: true });
+        || !currentAnchor) return;
+      openThreadPreview(session, currentAnchor, { anchorHovered: true });
     }, THREAD_PREVIEW_HOVER_DELAY_MS),
   };
 }
@@ -7284,8 +7908,14 @@ function dismissThreadPreview({ cancelPendingOpen = true } = {}) {
   window.removeEventListener('resize', preview.reposition);
   $('#thread-list')?.removeEventListener('scroll', preview.reposition);
   document.removeEventListener('pointerdown', preview.outsidePointer, true);
-  for (const layer of preview.layers) layer.terminal.dispose();
   preview.popover.remove();
+  // xterm schedules a viewport sync after writes and resize. Disposing in the
+  // same task can leave that callback reading a released render service.
+  setTimeout(() => {
+    for (const layer of preview.layers) {
+      try { layer.terminal.dispose(); } catch { /* already released */ }
+    }
+  }, 50);
   if (preview.anchor?.isConnected) {
     preview.anchor.setAttribute('aria-expanded', 'false');
   }
@@ -8336,6 +8966,7 @@ async function installUpdate({ forceBlockers = false } = {}) {
       await window.chromux.saveRestoreSnapshot({
         reason: 'update-install',
         sessions: snapshotOpenSessions(),
+        inboxTriage: snapshotInboxTriage(),
       });
     }
   }
@@ -8405,7 +9036,7 @@ async function changeDeveloperMode(enabled) {
     if (toggle) toggle.checked = current;
     return false;
   }
-  const payload = { enabled: Boolean(enabled), sessions: snapshotOpenSessions() };
+  const payload = { enabled: Boolean(enabled), sessions: snapshotOpenSessions(), inboxTriage: snapshotInboxTriage() };
   if (state.testDevModeRestart) {
     state.testDevModeRestart.calls.push(payload);
     return true;
@@ -10044,7 +10675,7 @@ $('#lifecycle-confirm').onclick = () => answerLifecyclePrompt(true);
 
 window.chromux.onLifecycleConfirmClose(async (payload = {}) => {
   if (!(await showLifecyclePrompt(payload.reason || 'app-close'))) return;
-  await window.chromux.confirmAppClose({ sessions: snapshotOpenSessions() });
+  await window.chromux.confirmAppClose({ sessions: snapshotOpenSessions(), inboxTriage: snapshotInboxTriage() });
 });
 
 window.chromux.onShortcutDebugInput(noteShortcutDebugInput);
@@ -10944,8 +11575,8 @@ if (window.chromuxTest) {
       };
     },
     clickAttentionAction(id, kind, label) {
-      const card = document.querySelector(`.attention-thread[data-session-id="${CSS.escape(id)}"]`);
-      const reason = [...(card?.querySelectorAll('.attention-reason') || [])]
+      const cards = [...document.querySelectorAll(`.attention-thread[data-session-id="${CSS.escape(id)}"]`)];
+      const reason = cards.flatMap((card) => [...card.querySelectorAll('.attention-reason')])
         .find((candidate) => candidate.dataset.attentionKind === kind);
       const button = [...(reason?.querySelectorAll('.attention-actions .qi-btn') || [])]
         .find((candidate) => candidate.textContent === label);
@@ -11049,8 +11680,8 @@ if (window.chromuxTest) {
       };
     },
     doubleClickAttentionAction(id, kind, label) {
-      const card = document.querySelector(`.attention-thread[data-session-id="${CSS.escape(id)}"]`);
-      const reason = [...(card?.querySelectorAll('.attention-reason') || [])]
+      const cards = [...document.querySelectorAll(`.attention-thread[data-session-id="${CSS.escape(id)}"]`)];
+      const reason = cards.flatMap((card) => [...card.querySelectorAll('.attention-reason')])
         .find((candidate) => candidate.dataset.attentionKind === kind);
       const button = [...(reason?.querySelectorAll('.attention-actions .qi-btn') || [])]
         .find((candidate) => candidate.textContent === label);
@@ -11233,23 +11864,75 @@ if (window.chromuxTest) {
       .map((el) => el.dataset.attentionKind || ''),
     resolveGitRoot: (cwd) => window.chromux.gitRoot(cwd),
     gitCacheSize: () => state.ui.gitRoots.size,
+    inboxSections: () => [...document.querySelectorAll('#thread-list .inbox-section')].map((section) => ({
+      key: section.dataset.inboxSection,
+      label: section.querySelector(':scope > header .rail-group-label')?.textContent || '',
+      count: Number(section.querySelector(':scope > header .inbox-section-count')?.textContent || 0),
+      items: [...section.querySelectorAll(':scope > .inbox-section-body > .inbox-item')].map((item) => ({
+        id: item.dataset.inboxId,
+        sessionId: item.dataset.sessionId || null,
+        kind: item.querySelector('.attention-row-reason, .inbox-item-kind')?.textContent || '',
+      })),
+    })),
+    inboxTriage: () => snapshotInboxTriage(),
+    clickInboxAction(id, label) {
+      const card = [...document.querySelectorAll('#thread-list .inbox-item')]
+        .find((candidate) => candidate.dataset.inboxId === id);
+      const button = [...(card?.querySelectorAll('button') || [])].find((candidate) => candidate.textContent === label);
+      if (!button) throw new Error(`Missing inbox action ${label} for ${id}`);
+      button.click(); flushRender();
+    },
+    expireInbox(id) {
+      const record = state.ui.inboxTriage.get(id);
+      if (record) record.snoozedUntil = new Date(Date.now() - 1000).toISOString();
+      invalidate('attention'); flushRender();
+    },
+    pressInboxKey(key) {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+      flushRender();
+      return document.activeElement?.closest?.('.inbox-item')?.dataset.inboxId || null;
+    },
+    gitRepositories: () => (state.ui.gitInventory?.repositories || []).map((repository) => ({
+      id: repository.id,
+      root: repository.root,
+      worktrees: repository.worktrees.map((worktree) => ({
+        id: worktree.id,
+        path: worktree.path,
+        rank: worktree.rank,
+        stale: worktree.stale,
+        prunable: worktree.prunable,
+        nextAction: worktree.nextAction,
+      })),
+    })),
+    reviewGit(repositoryId, worktreeId) { openGitReview(repositoryId, worktreeId); flushRender(); },
+    gitReview: () => ({
+      open: !$('#git-review-drawer').classList.contains('hidden'),
+      title: $('#git-review-title').textContent,
+      body: $('#git-review-body').textContent,
+      focused: document.activeElement === $('#git-review-close'),
+    }),
+    dismissGitReview() { closeGitReview(); flushRender(); },
     async waitForGit() {
       await Promise.all([...state.ui.gitRoots.values()].map((entry) => entry.promise));
       flushRender();
-      await Promise.all([...state.ui.gitDiffs.values()].map((entry) => entry.promise));
+      await refreshGitInventory({ force: true });
       flushRender();
     },
-    gitDiffs: () => [...document.querySelectorAll('#thread-list .git-diff-group')].map((group) => ({
-      title: group.querySelector('summary')?.title || '',
-      count: Number(group.querySelector('.rail-group-count')?.textContent || 0),
-      totals: group.querySelector('.git-diff-totals')?.textContent || '',
-      clean: Boolean(group.querySelector('.git-diff-empty.clean')),
-      files: [...group.querySelectorAll('.git-diff-row')].map((row) => ({
-        path: row.querySelector('.git-diff-path')?.textContent || '',
-        status: row.querySelector('.git-diff-status')?.title || '',
-        staged: row.querySelector('.git-diff-stage')?.textContent === 'S',
-      })),
-    })),
+    gitDiffs: () => (state.ui.gitInventory?.repositories || []).map((repository) => {
+      const files = repository.worktrees.flatMap((worktree) => worktree.files || []);
+      const staged = files.filter((file) => ![' ', '?', '.'].includes(file.index)).length;
+      const unstaged = files.filter((file) => ![' ', '.'].includes(file.worktree)).length;
+      return {
+        title: repository.root,
+        count: files.length,
+        totals: `${staged} staged · ${unstaged} unstaged`,
+        clean: files.length === 0,
+        files: files.map((file) => {
+          const status = gitFileStatus(file);
+          return { path: file.path, status: status.label, staged: ![' ', '?', '.'].includes(file.index) };
+        }),
+      };
+    }),
     flushRender,
   };
 
@@ -13149,8 +13832,14 @@ function fakeSessionEls() {
 }
 
 document.addEventListener('keydown', (e) => {
+  handleInboxQueueKeydown(e);
   handleRendererShortcutKeydown(e);
   if (e.key === 'Escape') {
+    if (state.ui.gitReview) {
+      e.preventDefault();
+      closeGitReview();
+      return;
+    }
     if (state.ui.captureApproval) {
       e.preventDefault();
       finishCaptureApproval(false, 'Capture denied in Chromux.');
@@ -13172,6 +13861,9 @@ document.addEventListener('keydown', (e) => {
     invalidate('shortcutDebug');
   }
 });
+
+$('#git-review-close').onclick = closeGitReview;
+$('#git-review-scrim').onclick = closeGitReview;
 
 document.addEventListener('click', (event) => {
   if (event.target.closest('.server-launcher-popover, .start-server')) return;
@@ -13208,9 +13900,9 @@ setInterval(() => {
 }, 1000);
 
 setInterval(() => {
-  if (state.ui.railMode !== 'git') return;
-  for (const root of state.ui.gitDiffs.keys()) loadGitDiff(root, { force: true });
-}, 2000);
+  if (state.ui.threadPreview) return;
+  if (state.ui.railMode === 'git' || state.ui.railMode === 'threads') refreshGitInventory({ force: true });
+}, 5000);
 
 // boot
 (async () => {
@@ -13250,6 +13942,7 @@ setInterval(() => {
     $('#resource-capacity-select').closest('.resource-capacity-control').classList.add('hidden');
   }
   state.restoreSessions = state.env.restoreSessions || null;
+  state.ui.inboxTriage = new Map((state.restoreSessions?.inboxTriage || []).map((record) => [record.id, record]));
   window.chromux.onUpdateStatus((status) => renderUpdateStatus(status));
   window.chromux.onCodexUpdateProgress((progress) => {
     if (progress && progress.output) {
@@ -13267,6 +13960,8 @@ setInterval(() => {
   await autoRestoreWorkspace().catch((err) => {
     renderRestoreWarning([{ name: 'restore failed', cwd: err.message, agent: 'chromux' }]);
   });
+  for (const session of orderedSessions()) ensureGitRoot(session.cwd || '~');
+  await refreshGitInventory({ force: true }).catch(() => {});
   await checkUpdates(false).catch(() => {});
   updateBadges();
   renderAttentionQueue();

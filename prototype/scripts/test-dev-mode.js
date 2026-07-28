@@ -20,11 +20,19 @@ const restart = createDevModeRestart({
 });
 assert.throws(() => restart({ enabled: 'yes', sessions: [] }), /boolean/);
 assert.throws(() => restart({ enabled: true, sessions: null }), /array/);
-assert.deepStrictEqual(restart({ enabled: false, sessions: [{ name: 'one' }] }), {
+assert.deepStrictEqual(restart({
+  enabled: false,
+  sessions: [{ name: 'one' }],
+  inboxTriage: [{ id: 'attention:one', state: 'done' }],
+}), {
   ok: true, enabled: false, restoreId: 'restore-test',
 });
 assert.deepStrictEqual(calls, [
-  ['snapshot', { reason: 'dev-mode-restart', sessions: [{ name: 'one' }] }],
+  ['snapshot', {
+    reason: 'dev-mode-restart',
+    sessions: [{ name: 'one' }],
+    inboxTriage: [{ id: 'attention:one', state: 'done' }],
+  }],
   ['persist', false],
   ['relaunch', false],
   ['quit'],

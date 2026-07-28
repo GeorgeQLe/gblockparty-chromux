@@ -39,6 +39,7 @@ const {
 const { MAX_DRAFT_BYTES, createPromptHistoryStore } = require('./prompt-history');
 const { previewProbe } = require('./preview-probe');
 const { cleanupOrphanedStorage } = require('./storage-cleanup');
+const { createGitWorktreeService } = require('./git-worktree-service');
 const { resolveChromuxUserDataPath } = require('./user-data-path');
 const { CaptureArtifactStore } = require('./capture/artifact-store');
 const { CaptureCoordinator } = require('./capture/coordinator');
@@ -88,12 +89,14 @@ const UPDATE_CACHE = path.join(CHROMUX_HOME, 'update-cache.json');
 const UPDATE_SOURCE = path.join(CHROMUX_HOME, 'update-source.json');
 const UPDATE_INSTALL_LOG = path.join(CHROMUX_HOME, 'update-install.log');
 const RESTORE_SESSIONS = path.join(CHROMUX_HOME, 'restore-sessions.json');
+const GIT_REPOSITORIES_FILE = path.join(CHROMUX_HOME, 'git-repositories.json');
 const RESTORE_ATTENTION_TYPES = new Set([
   'permission', 'authentication', 'input', 'rateLimited', 'toolFailed', 'delivery', 'completed',
 ]);
 const MAX_RESTORE_ATTENTION_RECORDS = 20;
 const MAX_RESTORE_ATTENTION_DETAIL_BYTES = 4096;
 const MAX_RESTORE_ATTENTION_ID_CHARS = 200;
+const MAX_INBOX_TRIAGE_RECORDS = 200;
 const MAX_STAGED_BROWSER_CONTEXTS = 5;
 const MAX_RESTORE_PATH_CHARS = 8192;
 const BROWSER_LAYOUT_MODES = new Set(['paired', 'terminal', 'browserWorkspace', 'browserChromux']);
@@ -1515,7 +1518,36 @@ function sanitizeRestoreSession(session) {
   };
 }
 
-function writeRestoreSnapshot({ sessions, reason = 'manual', restoreId = null, savedAt = null, consumed = false, consumedAt = null }) {
+function sanitizeInboxTriage(records) {
+  if (!Array.isArray(records)) return [];
+  return records.slice(-MAX_INBOX_TRIAGE_RECORDS).map((record) => {
+    if (!record || typeof record !== 'object') return null;
+    if (typeof record.id !== 'string' || record.id.length === 0
+      || record.id.length > MAX_RESTORE_ATTENTION_ID_CHARS) return null;
+    if (!['done', 'snoozed'].includes(record.state)) return null;
+    const updatedAt = normalizedActivityTimestamp(record.updatedAt);
+    const snoozedUntil = record.state === 'snoozed' ? normalizedActivityTimestamp(record.snoozedUntil) : null;
+    if (!updatedAt || (record.state === 'snoozed' && !snoozedUntil)) return null;
+    return {
+      id: record.id,
+      state: record.state,
+      updatedAt,
+      ...(snoozedUntil ? { snoozedUntil } : {}),
+      reopenToken: typeof record.reopenToken === 'string'
+        ? record.reopenToken.slice(0, MAX_RESTORE_ATTENTION_ID_CHARS) : '',
+    };
+  }).filter(Boolean);
+}
+
+function writeRestoreSnapshot({
+  sessions,
+  inboxTriage = [],
+  reason = 'manual',
+  restoreId = null,
+  savedAt = null,
+  consumed = false,
+  consumedAt = null,
+}) {
   ensureDirs();
   const snapshotSavedAt = normalizedActivityTimestamp(savedAt) || new Date().toISOString();
   const clean = Array.isArray(sessions) ? sessions.map(sanitizeRestoreSession).filter(Boolean)
@@ -1524,12 +1556,13 @@ function writeRestoreSnapshot({ sessions, reason = 'manual', restoreId = null, s
       lastActivityAt: normalizedActivityTimestamp(session.lastActivityAt, snapshotSavedAt),
     })) : [];
   const payload = {
-    schemaVersion: 9,
+    schemaVersion: 10,
     restoreId: restoreId || `restore-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     reason,
     savedAt: snapshotSavedAt,
     consumed: Boolean(consumed),
     consumedAt: consumedAt || null,
+    inboxTriage: sanitizeInboxTriage(inboxTriage),
     sessions: clean,
   };
   fs.writeFileSync(RESTORE_SESSIONS, JSON.stringify(payload, null, 2) + '\n');
@@ -1549,6 +1582,7 @@ function readRestoreSnapshot() {
     savedAt: snapshotSavedAt,
     consumed: Boolean(payload.consumed),
     consumedAt: payload.consumedAt || null,
+    inboxTriage: schemaVersion >= 10 ? sanitizeInboxTriage(payload.inboxTriage) : [],
     sessions: payload.sessions.map(sanitizeRestoreSession).filter(Boolean).map((session) => {
       const clean = {
         ...session,
@@ -1591,6 +1625,7 @@ function markRestoreSnapshotConsumed(restoreId, restoredSessions = []) {
         ? { ...session, opened: true, restoredAt: consumedAt }
         : session;
     }),
+    inboxTriage: snapshot.inboxTriage,
   });
 }
 
@@ -2065,6 +2100,91 @@ function runCmd(cmd, args, timeout = 10000) {
     });
   });
 }
+
+function gitCommandResult(location, args, options = {}) {
+  if (!location || !Array.isArray(args) || args.some((arg) => typeof arg !== 'string' || arg.includes('\0'))) {
+    return Promise.resolve({ ok: false, stdout: '', stderr: 'Invalid Git request.', code: -1 });
+  }
+  const timeout = Math.min(Math.max(Number(options.timeout) || 10000, 1000), 120000);
+  const maxBuffer = Math.min(Math.max(Number(options.maxBuffer) || 8 * 1024 * 1024, 1024), 16 * 1024 * 1024);
+  if (location.runtime === 'wsl') {
+    return wslRuntime.run(location.distro, ['env', 'GIT_TERMINAL_PROMPT=0', 'git', '-C', location.cwd, ...args], {
+      timeout,
+      maxBuffer,
+      env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+    }).then((result) => ({
+      ok: true,
+      stdout: String(result.stdout || ''),
+      stderr: String(result.stderr || ''),
+      code: 0,
+    })).catch((err) => ({
+      ok: false,
+      stdout: String(err.stdout || ''),
+      stderr: String(err.stderr || err.message || ''),
+      code: Number.isInteger(err.code) ? err.code : 1,
+    }));
+  }
+  return new Promise((resolve) => {
+    execFile('/usr/bin/git', ['-C', location.cwd, ...args], {
+      timeout,
+      maxBuffer,
+      env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+    }, (err, stdout, stderr) => resolve({
+      ok: !err,
+      stdout: String(stdout || ''),
+      stderr: String(stderr || ''),
+      code: err && Number.isInteger(err.code) ? err.code : (err ? 1 : 0),
+    }));
+  });
+}
+
+async function canonicalGitPath(location) {
+  if (!location || typeof location.cwd !== 'string' || location.cwd.includes('\0')) throw new Error('Invalid path');
+  if (location.runtime === 'wsl') {
+    const base = path.posix.normalize(location.cwd);
+    const candidate = location.child ? path.posix.resolve(base, location.child) : base;
+    const response = await wslRuntime.run(location.distro, ['realpath', '-m', '--', candidate]);
+    const resolved = response.stdout.trim();
+    if (!resolved.startsWith('/')) throw new Error('Invalid WSL path');
+    if (location.child && resolved !== base && !resolved.startsWith(`${base.replace(/\/+$/, '')}/`)) {
+      throw new Error('Path leaves worktree');
+    }
+    return resolved;
+  }
+  const base = fs.realpathSync(location.cwd);
+  if (!location.child) return base;
+  const candidate = fs.realpathSync(path.resolve(base, location.child));
+  if (candidate !== base && !candidate.startsWith(`${base}${path.sep}`)) throw new Error('Path leaves worktree');
+  return candidate;
+}
+
+async function gitFileMtime(location) {
+  if (location.runtime === 'wsl') {
+    const candidate = path.posix.resolve(location.cwd, location.path);
+    if (candidate !== location.cwd && !candidate.startsWith(`${location.cwd.replace(/\/+$/, '')}/`)) return 0;
+    try {
+      const response = await wslRuntime.run(location.distro, ['stat', '-c', '%Y', '--', candidate]);
+      return Number(response.stdout.trim()) * 1000 || 0;
+    } catch {
+      return 0;
+    }
+  }
+  try {
+    const base = fs.realpathSync(location.cwd);
+    const candidate = path.resolve(base, location.path);
+    if (candidate !== base && !candidate.startsWith(`${base}${path.sep}`)) return 0;
+    return fs.lstatSync(candidate).mtimeMs;
+  } catch {
+    return 0;
+  }
+}
+
+const gitWorktrees = createGitWorktreeService({
+  catalogFile: GIT_REPOSITORIES_FILE,
+  run: gitCommandResult,
+  canonicalize: canonicalGitPath,
+  statMtime: gitFileMtime,
+});
 
 async function gitRoot(cwd) {
   if (process.platform === 'win32') {
@@ -2869,8 +2989,9 @@ ipcMain.handle('prevent-sleep-set', (event, enabled) => {
 
 const restartWithDevMode = createDevModeRestart({
   persist: writeDevModePreference,
-  snapshot: ({ reason, sessions }) => writeRestoreSnapshot({
+  snapshot: ({ reason, sessions, inboxTriage = [] }) => writeRestoreSnapshot({
     reason,
+    inboxTriage,
     sessions: sessions.slice(0, 100).map(sanitizeRestoreSession).filter(Boolean),
   }),
   relaunch: (enabled) => app.relaunch({ args: restartArgs(process.argv.slice(1), enabled) }),
@@ -2938,6 +3059,18 @@ ipcMain.handle('project-script-resolve', (_e, { cwd, location: inputLocation, sc
 ipcMain.handle('preview-probe', (_e, url) => previewProbe(url));
 ipcMain.handle('git-root', (_e, cwd) => gitRoot(cwd));
 ipcMain.handle('git-diff-summary', (_e, cwd) => gitDiffSummary(cwd));
+ipcMain.handle('git-repositories-read', () => gitWorktrees.catalog());
+ipcMain.handle('git-repository-observe', (_e, request = {}) => gitWorktrees.observe(request));
+ipcMain.handle('git-repository-forget', (_e, repositoryId) => gitWorktrees.forget(repositoryId));
+ipcMain.handle('git-worktree-inventory', (_e, request = {}) => gitWorktrees.inventory(request));
+ipcMain.handle('git-worktree-diff', (_e, request = {}) => gitWorktrees.diff(request));
+ipcMain.handle('git-worktree-stage', (_e, request = {}) => gitWorktrees.stage(request));
+ipcMain.handle('git-worktree-unstage', (_e, request = {}) => gitWorktrees.unstage(request));
+ipcMain.handle('git-worktree-commit-preview', (_e, request = {}) => gitWorktrees.commitPreview(request));
+ipcMain.handle('git-worktree-commit', (_e, request = {}) => gitWorktrees.commit(request));
+for (const action of ['fetch', 'pull', 'publish', 'push', 'sync']) {
+  ipcMain.handle(`git-worktree-${action}`, (_e, request = {}) => gitWorktrees[action](request));
+}
 
 ipcMain.handle('check-updates', (_e, opts = {}) => getUpdateStatus(opts));
 ipcMain.handle('codex-update-check', (_e, opts = {}) => {
@@ -2960,8 +3093,8 @@ ipcMain.handle('codex-update-install', (event) => codexUpdateService.install({
   },
 }));
 
-ipcMain.handle('save-restore-snapshot', (_e, { reason = 'manual', sessions = [] } = {}) => (
-  writeRestoreSnapshot({ reason, sessions })
+ipcMain.handle('save-restore-snapshot', (_e, { reason = 'manual', sessions = [], inboxTriage = [] } = {}) => (
+  writeRestoreSnapshot({ reason, sessions, inboxTriage })
 ));
 
 ipcMain.handle('get-restore-snapshot', () => readRestoreSnapshot());
@@ -2979,14 +3112,14 @@ ipcMain.handle('resolve-restore-sessions', (_e, { sessions = [] } = {}) => (
   resolveRestoreSessions(sessions)
 ));
 
-ipcMain.handle('confirm-app-close', (_e, { sessions = [] } = {}) => {
+ipcMain.handle('confirm-app-close', (_e, { sessions = [], inboxTriage = [] } = {}) => {
   // An idle quit (no open sessions) must not clobber a pending restore
   // snapshot the user hasn't reopened yet.
   const incoming = Array.isArray(sessions) ? sessions : [];
   const existing = readRestoreSnapshot();
   const pendingOnDisk = existing && !existing.consumed && existing.sessions.length > 0;
   if (incoming.length > 0 || !pendingOnDisk) {
-    writeRestoreSnapshot({ reason: 'app-close', sessions: incoming });
+    writeRestoreSnapshot({ reason: 'app-close', sessions: incoming, inboxTriage });
   }
   closeConfirmed = true;
   for (const p of ptys.values()) p.kill();
