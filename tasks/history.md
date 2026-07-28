@@ -3,8 +3,9 @@
 ## 2026-07-28 — Chromux v0.69.2 Windows 10 and dependency-audit candidate
 
 - **User goal:** Resolve the post-sync Windows 10/terminal-contrast stash
-  conflicts on top of published v0.67.0, preserve upstream work and the backup
-  stash, then apply safe npm audit fixes and ship the resulting candidate.
+  conflicts originally based on published v0.67.0, preserve upstream work and
+  the backup stash, apply safe npm audit fixes, then rebase the candidate over
+  concurrent published work through v0.69.1 and ship it as v0.69.2.
 - **Changed files:** `.github/workflows/windows.yml`, `README.md`,
   `RELEASES.md`, deletion of `docs/testing/windows-uat-0.62.0.md`, addition of
   `docs/testing/windows-uat-0.69.2.md`, `prototype/README.md`,
@@ -27,9 +28,9 @@
 - **User-goal mapping:** Windows x64 build 19045 and newer, including Windows
   11, is accepted; older, malformed, ARM64, and ia32 environments are rejected.
   Light-terminal Codex headers remain readable without changing dark palettes.
-  Upstream v0.62-v0.67 release history and project-root behavior remain intact,
-  the obsolete v0.62 UAT is replaced by the v0.69.2 gate, every resolved path
-  is included, and `stash@{0}` remains available.
+  Upstream v0.62-v0.69.1 release history and project-root behavior remain
+  intact, the obsolete v0.62 UAT is replaced by the v0.69.2 gate, every
+  resolved path is included, and `stash@{0}` remains available.
 - **Tests run:** `npm install` rebuilt `node-pty`; changed JavaScript passed
   `node --check`; `npm run test:themes-renderer`,
   `npm run test:windows-platform`, `npm run test:ci:windows`,
@@ -39,7 +40,10 @@
   platform-applicable suite outside the host limitations below passed.
   `npm audit --omit=dev` reports zero vulnerabilities. Package/lock/version,
   single-gate, conflict-marker, staged-boundary, and `git diff --check` audits
-  passed.
+  passed. After rebasing over concurrent v0.68.0-v0.69.1 changes, the changed
+  JavaScript syntax checks, theme renderer, complete Windows CI command,
+  capture-packaging test, production audit, and source smoke all passed again
+  against the exact v0.69.2 tree.
 - **Skipped tests:** Real Windows 10/WSL2 interaction and Squirrel
   install/update require the external build-19045 machine and remain the
   publication gate. On this Linux host the macOS-only capture integration
@@ -54,8 +58,10 @@
   all light/dark palettes, workflow/UAT/parser asset parity, one Windows todo,
   historical release preservation, package/lock resolution, secret-like text,
   conflict markers, unstaged changes, and stash retention. Findings fixed were
-  the stale v0.62/v0.67.1 asset references and a superseded UAT path in history.
-  No production finding remains.
+  stale v0.62/v0.67.1 asset references, a superseded UAT path in history, and
+  the post-fetch version collision with concurrent v0.68.0-v0.69.1 releases;
+  the candidate was retargeted to v0.69.2 without dropping their source,
+  release notes, or tests. No production finding remains.
 - **Residual risk:** Thirty-four development-only npm findings remain nested in
   Electron Forge/Squirrel with no compatible automatic fix; `npm audit fix
   --force` proposes an unsafe Forge downgrade and was rejected, while the
