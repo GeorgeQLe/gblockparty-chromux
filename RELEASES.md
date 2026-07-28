@@ -1,5 +1,15 @@
 # Release Notes
 
+## GBlockParty Chromux v0.69.1
+
+Tag: `chromux-v0.69.1`
+
+- Keep scripted Electron E2E windows hidden so automated test runs do not
+  steal focus, while preserving DOM layout, webviews, synthetic input, and
+  screenshot capture.
+- Keep production launches and manual `npm run smoke` windows visible, with
+  `CHROMUX_E2E_SHOW_WINDOW=1` available to watch a scripted E2E run.
+
 ## GBlockParty Chromux v0.69.0
 
 Tag: `chromux-v0.69.0`

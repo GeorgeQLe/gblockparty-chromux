@@ -54,6 +54,14 @@ const {
 } = require('./shortcut-input');
 
 const SMOKE = process.argv.includes('--smoke');
+function isBackgroundE2E({ smoke, e2ePath, showE2EWindow }) {
+  return smoke && Boolean(e2ePath) && showE2EWindow !== '1';
+}
+const BACKGROUND_E2E = isBackgroundE2E({
+  smoke: SMOKE,
+  e2ePath: process.env.CHROMUX_E2E,
+  showE2EWindow: process.env.CHROMUX_E2E_SHOW_WINDOW,
+});
 let squirrelStartup = false;
 if (process.platform === 'win32') {
   try { squirrelStartup = require('electron-squirrel-startup'); } catch { squirrelStartup = false; }
@@ -1764,6 +1772,7 @@ function createWindow() {
     minWidth: 1100,
     minHeight: 640,
     title: 'Chromux',
+    show: !BACKGROUND_E2E,
     acceptFirstMouse: true,
     backgroundColor: '#0b0e11',
     ...windowOptions(process.platform),

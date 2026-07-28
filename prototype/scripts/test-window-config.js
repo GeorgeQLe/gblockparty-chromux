@@ -10,6 +10,30 @@ const preloadSource = fs.readFileSync(preloadPath, 'utf8');
 const windowOptions = source.match(/new BrowserWindow\(\{([\s\S]*?)\n  \}\);/);
 
 if (!windowOptions) throw new Error('Could not locate Chromux BrowserWindow options');
+const backgroundE2EHelper = source.match(
+  /function isBackgroundE2E\(\{ smoke, e2ePath, showE2EWindow \}\) \{[\s\S]*?\n\}/,
+);
+if (!backgroundE2EHelper) throw new Error('Could not locate background E2E visibility helper');
+const isBackgroundE2E = Function(`${backgroundE2EHelper[0]}; return isBackgroundE2E;`)();
+if (!isBackgroundE2E({ smoke: true, e2ePath: '/tmp/e2e.js' })) {
+  throw new Error('Scripted smoke E2E windows must start hidden');
+}
+if (isBackgroundE2E({ smoke: true, e2ePath: '' })) {
+  throw new Error('Manual smoke windows must remain visible');
+}
+if (isBackgroundE2E({ smoke: false, e2ePath: '/tmp/e2e.js' })) {
+  throw new Error('Production windows must remain visible');
+}
+if (isBackgroundE2E({
+  smoke: true,
+  e2ePath: '/tmp/e2e.js',
+  showE2EWindow: '1',
+})) {
+  throw new Error('CHROMUX_E2E_SHOW_WINDOW=1 must show scripted E2E windows');
+}
+if (!/\bshow:\s*!BACKGROUND_E2E\b/.test(windowOptions[1])) {
+  throw new Error('Chromux BrowserWindow visibility must follow the background E2E flag');
+}
 if (!/\bacceptFirstMouse:\s*true\b/.test(windowOptions[1])) {
   throw new Error('Chromux must accept the first click while its macOS window is inactive');
 }
@@ -63,4 +87,9 @@ for (const invalid of [
   }
 }
 
-console.log(JSON.stringify({ ok: true, acceptFirstMouse: true, trafficLightPosition: true }));
+console.log(JSON.stringify({
+  ok: true,
+  backgroundE2E: true,
+  acceptFirstMouse: true,
+  trafficLightPosition: true,
+}));
