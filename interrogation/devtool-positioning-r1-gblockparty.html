@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="en"
+      data-visual-tier="visual"
+      data-interrogation-status="review"
+      data-interrogation-round="1"
+      data-interrogation-gate="continue">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GBlock Party Positioning — Interrogation Round 1</title>
+  <style>
+    :root {
+      --bg: #0d1117; --surface: #161b22; --surface-2: #1c2333;
+      --border: #30363d; --text: #c9d1d9; --text-muted: #8b949e;
+      --accent: #58a6ff; --green: #3fb950; --red: #f85149;
+      --orange: #d29922; --purple: #bc8cff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+    main {
+      width: min(1080px, calc(100% - 2rem)); max-width: 100%;
+      margin: 0 auto; padding: 2rem 0 5rem; overflow-wrap: break-word;
+    }
+    h1, h2, h3 { color: #fff; line-height: 1.2; }
+    h1 { margin-bottom: .45rem; }
+    h2 { color: var(--accent); margin-top: 0; }
+    h3 { color: var(--purple); }
+    a { color: var(--accent); }
+    code {
+      padding: .08rem .35rem; border: 1px solid var(--border);
+      border-radius: .35rem; background: #0b1018; color: #f0f6fc;
+    }
+    .muted { color: var(--text-muted); }
+    .eyebrow {
+      color: var(--purple); font-weight: 800; letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .card, .toc, .question, .assumption, .compile {
+      margin: 1rem 0; padding: 1rem; border: 1px solid var(--border);
+      border-radius: .7rem; background: var(--surface);
+    }
+    .toc { background: #111824; }
+    .question { border-left: .3rem solid var(--purple); background: var(--surface-2); }
+    .assumption { border-left: .3rem solid var(--accent); }
+    .scope-evidence { border-left: .3rem solid var(--orange); }
+    .source, .badge {
+      display: inline-block; margin-right: .45rem; padding: .15rem .5rem;
+      border: 1px solid var(--border); border-radius: 999px;
+      color: var(--text-muted); font-size: .82rem; font-weight: 700;
+    }
+    .badge.medium { color: var(--orange); border-color: var(--orange); }
+    .badge.high { color: var(--green); border-color: var(--green); }
+    .badge.low { color: var(--red); border-color: var(--red); }
+    .choices, .snapshot {
+      display: grid; grid-template-columns: repeat(3, minmax(min(210px, 100%), 1fr));
+      gap: .65rem; margin-top: .8rem;
+    }
+    .snapshot article {
+      padding: .8rem; border: 1px solid var(--border);
+      border-radius: .6rem; background: #111824;
+    }
+    .snapshot strong { display: block; color: #fff; }
+    .snapshot .state { color: var(--orange); font-weight: 750; }
+    label.choice {
+      display: flex; align-items: center; min-height: 44px; padding: 10px 16px;
+      border: 1px solid var(--border); border-radius: .55rem;
+      background: #111824; cursor: pointer;
+    }
+    label.choice input { margin-right: .55rem; }
+    textarea, input[type="text"] {
+      width: 100%; min-height: 44px; margin-top: .65rem; padding: 10px 16px;
+      border: 1px solid var(--border); border-radius: .55rem;
+      background: #0b1018; color: var(--text); font: inherit;
+    }
+    textarea { min-height: 8rem; resize: vertical; }
+    button {
+      min-height: 44px; padding: 10px 16px; border: 1px solid #388bfd;
+      border-radius: .55rem; background: #1f6feb; color: #fff;
+      font: inherit; font-weight: 750; cursor: pointer;
+    }
+    button.secondary { border-color: var(--border); background: #21262d; color: var(--text); }
+    .actions {
+      display: flex; flex-wrap: wrap; gap: .6rem; align-items: center;
+      margin-top: .75rem;
+    }
+    .recommendation {
+      margin: .75rem 0; padding: .75rem; border: 1px dashed var(--border);
+      border-radius: .55rem; background: #111824;
+    }
+    .status-line { color: var(--text-muted); min-height: 1.5rem; }
+    .correction[hidden], .yaml-output[hidden] { display: none; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td {
+      padding: .65rem; border: 1px solid var(--border);
+      text-align: left; vertical-align: top;
+    }
+    th { background: #111824; color: #fff; }
+    .gate { border-left: .3rem solid var(--orange); }
+    @media (max-width: 860px) {
+      .choices, .snapshot { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 560px) {
+      main { width: min(100% - 1rem, 1080px); padding-top: 1rem; }
+      .card, .toc, .question, .assumption, .compile { padding: .8rem; }
+      .actions { align-items: stretch; }
+      .actions button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="eyebrow">Stage 0 · Interrogation round 1</div>
+    <h1>Place Chromux inside the overall GBlock Party competitive frame</h1>
+    <p class="muted">Confirm the repo-grounded starting point, then define the portfolio, audience, comparison set, and category choices the positioning research should serve. This round contains scope evidence only—no new competitor ranking or positioning recommendation.</p>
+  </header>
+
+  <nav class="toc" aria-label="Table of contents">
+    <h2>Table of Contents</h2>
+    <ol>
+      <li><a href="#why-now">Why this is a new research fork</a></li>
+      <li><a href="#snapshot">Available scope evidence</a></li>
+      <li><a href="#assumptions">Assumptions manifest</a></li>
+      <li><a href="#decisions">Open positioning decisions</a></li>
+      <li><a href="#round-gate">Round gate</a></li>
+      <li><a href="#compile">Compile responses</a></li>
+    </ol>
+  </nav>
+
+  <section id="why-now" class="card scope-evidence">
+    <h2>Why this is a new research fork</h2>
+    <p>The canonical Chromux positioning report is product-local. It frames Chromux against terminal-plus-browser workflows, AI coding surfaces, and browser automation tools. The repository now also describes Chromux as a front end for optional GBlockParty-managed workspaces, but the GBlockParty control plane is explicitly architectural—not yet an implemented service in this checkout.</p>
+    <p><strong>Scope evidence, not a finding:</strong> the requested “overall GBlock Party competitive analysis” changes the unit of competition from one desktop app to a possible product system. Before researching, the skill needs the intended GBlock Party portfolio boundary and the strategic role Chromux should play within it.</p>
+  </section>
+
+  <section id="snapshot" class="card">
+    <h2>Available scope evidence</h2>
+    <div class="snapshot" aria-label="Evidence-readiness snapshot">
+      <article><strong>Chromux product</strong><span class="state">Implemented and released</span><p>The repo contains a working local cockpit, packaging, update flows, tests, and current developer documentation.</p></article>
+      <article><strong>GBlock Party integration</strong><span class="state">Documented architecture</span><p>The repo defines control-plane, host, workspace, event, persistence, and attachment boundaries, but labels the service unimplemented here.</p></article>
+      <article><strong>Portfolio market evidence</strong><span class="state">Not supplied</span><p>No canonical overall GBlock Party competitor set, buyer-language corpus, pricing study, win/loss record, or product portfolio source is present in this checkout.</p></article>
+    </div>
+    <div class="table-wrap" data-tts-narrative="The repository strongly supports current Chromux product facts, partially supports a future GBlock Party integration architecture, and does not yet establish an overall GBlock Party competitive frame.">
+      <table>
+        <thead><tr><th>Source category</th><th>Available context</th><th>Permitted Stage 0 use</th></tr></thead>
+        <tbody>
+          <tr><td>Current product and code</td><td><code>README.md</code>, prototype app, tests, release metadata</td><td>Establish current Chromux capabilities and maturity.</td></tr>
+          <tr><td>Approved Chromux research</td><td>Positioning, monetization, integration, DX, adoption, and docs artifacts</td><td>Carry forward approved local-product boundaries with confidence labels.</td></tr>
+          <tr><td>GBlock Party integration design</td><td><code>docs/gblockparty-iaas-integration.md</code></td><td>Identify proposed ownership boundaries and open portfolio questions.</td></tr>
+          <tr><td>Overall company or portfolio evidence</td><td>Not found in this checkout</td><td>Ask for its location and provenance; do not invent a portfolio.</td></tr>
+          <tr><td>External market sources</td><td>Potential official product docs, repos, pricing, security, and architecture sources</td><td>Propose categories in Stage 1; synthesize only after scope approval.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="assumptions">
+    <h2>Assumptions manifest</h2>
+    <p class="muted">Choose confirm, correct, or flag for every assumption. Correct and flag reveal a note field.</p>
+
+    <article class="assumption" data-assumption-id="product-system" data-source="[from repo]">
+      <h3>1. Product-system boundary</h3>
+      <p><span class="source">[from repo]</span> For this run, GBlock Party is provisionally treated as a developer-workspace system: Chromux owns the local cockpit and attachment experience, while a future GBlockParty control plane owns managed workspace lifecycle, persistence, events, access, and optional hosted execution.</p>
+      <div class="choices">
+        <label class="choice"><input type="radio" name="assumption-product-system" value="confirm">Confirm</label>
+        <label class="choice"><input type="radio" name="assumption-product-system" value="correct">Correct</label>
+        <label class="choice"><input type="radio" name="assumption-product-system" value="flag">Flag</label>
+      </div>
+      <textarea class="correction" hidden aria-label="Correction for product-system boundary"></textarea>
+    </article>
+
+    <article class="assumption" data-assumption-id="chromux-role" data-source="[from repo]">
+      <h3>2. Chromux’s strategic role</h3>
+      <p><span class="source">[from repo]</span> Chromux should be evaluated both as a standalone local-first product and as the user-facing wedge into optional GBlockParty-managed infrastructure; connecting an account should extend the same workspace model rather than replace the local workflow.</p>
+      <div class="choices">
+        <label class="choice"><input type="radio" name="assumption-chromux-role" value="confirm">Confirm</label>
+        <label class="choice"><input type="radio" name="assumption-chromux-role" value="correct">Correct</label>
+        <label class="choice"><input type="radio" name="assumption-chromux-role" value="flag">Flag</label>
+      </div>
+      <textarea class="correction" hidden aria-label="Correction for Chromux strategic role"></textarea>
+    </article>
+
+    <article class="assumption" data-assumption-id="audience-sequence" data-source="[from research]">
+      <h3>3. Audience sequence</h3>
+      <p><span class="source">[from research]</span> The starting user is still an agent-driven developer who values local control. Teams, platform owners, security stakeholders, and managed-infrastructure buyers are secondary audiences whose needs matter to the portfolio frame but should not overwrite the current individual workflow.</p>
+      <div class="choices">
+        <label class="choice"><input type="radio" name="assumption-audience-sequence" value="confirm">Confirm</label>
+        <label class="choice"><input type="radio" name="assumption-audience-sequence" value="correct">Correct</label>
+        <label class="choice"><input type="radio" name="assumption-audience-sequence" value="flag">Flag</label>
+      </div>
+      <textarea class="correction" hidden aria-label="Correction for audience sequence"></textarea>
+    </article>
+
+    <article class="assumption" data-assumption-id="maturity" data-source="[from repo]">
+      <h3>4. Uneven maturity must remain visible</h3>
+      <p><span class="source">[from repo]</span> The analysis must distinguish shipped Chromux capabilities from proposed GBlockParty services. It should not use the future control-plane design as proof of current market capability or make trust, scale, collaboration, or hosted-execution claims without evidence.</p>
+      <div class="choices">
+        <label class="choice"><input type="radio" name="assumption-maturity" value="confirm">Confirm</label>
+        <label class="choice"><input type="radio" name="assumption-maturity" value="correct">Correct</label>
+        <label class="choice"><input type="radio" name="assumption-maturity" value="flag">Flag</label>
+      </div>
+      <textarea class="correction" hidden aria-label="Correction for maturity boundary"></textarea>
+    </article>
+
+    <article class="assumption" data-assumption-id="comparison-lanes" data-source="[inferred]">
+      <h3>5. Competitive analysis needs layered alternatives</h3>
+      <p><span class="source">[inferred]</span> A useful overall analysis should compare workflows and substitutes across at least four lanes: local AI development environments, cloud/remote developer workspaces, autonomous agent platforms, and browser/runtime infrastructure—plus doing nothing or assembling the stack in-house.</p>
+      <div class="choices">
+        <label class="choice"><input type="radio" name="assumption-comparison-lanes" value="confirm">Confirm</label>
+        <label class="choice"><input type="radio" name="assumption-comparison-lanes" value="correct">Correct</label>
+        <label class="choice"><input type="radio" name="assumption-comparison-lanes" value="flag">Flag</label>
+      </div>
+      <textarea class="correction" hidden aria-label="Correction for comparison lanes"></textarea>
+    </article>
+
+    <article class="assumption" data-assumption-id="riskiest-assumption" data-source="[inferred]">
+      <h3>6. Riskiest positioning assumption</h3>
+      <p><span class="source">[inferred]</span> The riskiest assumption is that “local cockpit plus optional managed workspace continuity” forms a coherent category wedge rather than reading as two loosely connected products with stronger specialists on each side.</p>
+      <div class="choices">
+        <label class="choice"><input type="radio" name="assumption-riskiest-assumption" value="confirm">Confirm</label>
+        <label class="choice"><input type="radio" name="assumption-riskiest-assumption" value="correct">Correct</label>
+        <label class="choice"><input type="radio" name="assumption-riskiest-assumption" value="flag">Flag</label>
+      </div>
+      <textarea class="correction" hidden aria-label="Correction for riskiest positioning assumption"></textarea>
+    </article>
+  </section>
+
+  <section id="decisions">
+    <h2>Open positioning decisions</h2>
+    <p class="muted">These choices belong to you or require evidence outside this checkout. Use “Apply recommended” as a starting point, then edit freely.</p>
+
+    <article class="question" data-open-question data-question-id="portfolio-scope">
+      <h3>1. What exactly belongs inside the “overall GBlock Party” competitive analysis?</h3>
+      <span class="badge low" data-agent-confidence="low">Agent confidence: low</span>
+      <div class="recommendation" data-recommended-answer><strong>Recommended starting scope:</strong> Chromux plus the proposed managed-workspace/control-plane layer described in this repo. Name any additional GBlock Party products, services, repositories, or company-level theses that must be included, with source paths or URLs where possible.</div>
+      <span data-agent-recommended-answer hidden>Scope the initial overall analysis to Chromux and the proposed GBlockParty managed-workspace/control-plane layer documented in this repository. No additional GBlock Party products or services are assumed unless their names and authoritative source paths or URLs are supplied.</span>
+      <textarea data-open-input aria-label="Portfolio scope answer" placeholder="List products/services in scope, authoritative sources, and anything explicitly out of scope."></textarea>
+      <div class="actions">
+        <button type="button" data-apply-recommended>Apply recommended</button>
+        <button type="button" class="secondary" data-clarify-copy data-question-text="What exactly belongs inside the overall GBlock Party competitive analysis?">Need clarification (copy)</button>
+        <span class="status-line" data-apply-recommended-status data-clarify-status></span>
+      </div>
+    </article>
+
+    <article class="question" data-open-question data-question-id="decision-audience">
+      <h3>2. Which strategic decision and audience should the analysis optimize for?</h3>
+      <span class="badge medium" data-agent-confidence="medium">Agent confidence: medium</span>
+      <div class="recommendation" data-recommended-answer><strong>Recommended:</strong> support product and messaging decisions for technical founders and agent-heavy developers first, while adding a separate future-buyer lens for engineering/platform leaders evaluating managed workspace infrastructure.</div>
+      <span data-agent-recommended-answer hidden>Use the analysis primarily to guide product priority and category messaging for technical founders and agent-heavy developers. Add a clearly separated secondary lens for engineering and platform leaders who may later buy managed workspace infrastructure; do not collapse the two audiences into one persona.</span>
+      <textarea data-open-input aria-label="Decision and audience answer" placeholder="State the decision, primary audience, buyer/champion roles, and time horizon."></textarea>
+      <div class="actions">
+        <button type="button" data-apply-recommended>Apply recommended</button>
+        <button type="button" class="secondary" data-clarify-copy data-question-text="Which strategic decision and audience should the analysis optimize for?">Need clarification (copy)</button>
+        <span class="status-line" data-apply-recommended-status data-clarify-status></span>
+      </div>
+    </article>
+
+    <article class="question" data-open-question data-question-id="alternatives">
+      <h3>3. Which alternatives do real prospects or users compare GBlock Party against?</h3>
+      <span class="badge low" data-agent-confidence="low">Agent confidence: low</span>
+      <div class="recommendation" data-recommended-answer><strong>Recommended seed lanes, not a finding:</strong> Cursor/Codex/Claude developer surfaces; GitHub Codespaces/Gitpod/Coder-style workspaces; Devin/OpenHands-style agent platforms; Browserbase/Playwright/Chrome DevTools-style browser infrastructure; manual terminal + browser; and in-house orchestration. Correct this with observed names and real comparison language.</div>
+      <span data-agent-recommended-answer hidden>Use six provisional alternative lanes for scope planning: AI coding environments and vendor agent surfaces; remote development workspaces; autonomous software-agent platforms; managed browser and browser-automation infrastructure; manual terminal-plus-browser workflows; and in-house workspace orchestration. Treat named vendors as research candidates, not validated competitors, until evidence is gathered.</span>
+      <textarea data-open-input aria-label="Alternative set answer" placeholder="Name direct competitors, substitutes, in-house options, and the source of any real comparison language."></textarea>
+      <div class="actions">
+        <button type="button" data-apply-recommended>Apply recommended</button>
+        <button type="button" class="secondary" data-clarify-copy data-question-text="Which alternatives do real prospects or users compare GBlock Party against?">Need clarification (copy)</button>
+        <span class="status-line" data-apply-recommended-status data-clarify-status></span>
+      </div>
+    </article>
+
+    <article class="question" data-open-question data-question-id="category-wedge">
+      <h3>4. What category frame and workflow wedge should the research test?</h3>
+      <span class="badge medium" data-agent-confidence="medium">Agent confidence: medium</span>
+      <div class="recommendation" data-recommended-answer><strong>Recommended hypothesis to test:</strong> “local-first agent workspace that can attach to managed execution,” with the workflow wedge being continuity of the same terminal/browser workspace across local, customer-hosted, and GBlockParty-hosted environments. Override this if GBlock Party should lead as infrastructure, an agent platform, a developer cockpit, or another category.</div>
+      <span data-agent-recommended-answer hidden>Test a category hypothesis of “local-first agent workspace with optional managed execution.” Test the workflow wedge as continuity of the same agent/browser workspace and evidence trail across local, customer-hosted, and GBlockParty-hosted environments. Keep this as a hypothesis until competitor and user evidence supports or rejects it.</span>
+      <textarea data-open-input aria-label="Category and wedge answer" placeholder="State the category you want to own, the workflow moment that creates value, and language to avoid."></textarea>
+      <div class="actions">
+        <button type="button" data-apply-recommended>Apply recommended</button>
+        <button type="button" class="secondary" data-clarify-copy data-question-text="What category frame and workflow wedge should the research test?">Need clarification (copy)</button>
+        <span class="status-line" data-apply-recommended-status data-clarify-status></span>
+      </div>
+    </article>
+
+    <article class="question" data-open-question data-question-id="evidence-and-constraints">
+      <h3>5. What company evidence, customer language, constraints, and non-goals should govern the run?</h3>
+      <span class="badge low" data-agent-confidence="low">Agent confidence: low</span>
+      <div class="recommendation" data-recommended-answer><strong>Recommended:</strong> supply authoritative GBlock Party pages/repos, dated customer or prospect quotes, win/loss notes, pricing or architecture material, geographic/platform constraints, and claims that must not be made. If none exists, say so; founder phrasing will be treated as a hypothesis, not buyer language.</div>
+      <span data-agent-recommended-answer hidden>No additional customer, prospect, pricing, win/loss, or portfolio evidence is assumed for this run. Use the current repository as product evidence, treat founder-provided wording without provenance as a positioning hypothesis, and keep pricing recommendations, implementation scheduling, and unsupported scale, security, or enterprise claims out of scope.</span>
+      <textarea data-open-input aria-label="Evidence and constraints answer" placeholder="List sources, quotes, known constraints, claims to avoid, non-goals, or explicitly say none."></textarea>
+      <div class="actions">
+        <button type="button" data-apply-recommended>Apply recommended</button>
+        <button type="button" class="secondary" data-clarify-copy data-question-text="What company evidence, customer language, constraints, and non-goals should govern the run?">Need clarification (copy)</button>
+        <span class="status-line" data-apply-recommended-status data-clarify-status></span>
+      </div>
+    </article>
+  </section>
+
+  <section id="round-gate" class="card gate">
+    <h2>Round gate</h2>
+    <p>This round does not approve research scope or positioning artifacts. It returns your assumptions and open answers so the parent skill can validate them, decide whether follow-up interrogation is needed, and eventually issue the coverage checkpoint.</p>
+    <div class="choices">
+      <label class="choice"><input type="radio" name="round-gate" value="submit">Submit this round for confidence-gate review</label>
+      <label class="choice"><input type="radio" name="round-gate" value="more-depth">I want another, deeper interrogation round</label>
+      <label class="choice"><input type="radio" name="round-gate" value="needs-clarification">I need clarification before this round is complete</label>
+    </div>
+    <textarea id="round-gate-notes" aria-label="Round gate notes" placeholder="Optional: name gaps, contradictions, or areas that need deeper questioning."></textarea>
+  </section>
+
+  <section id="compile"
+           class="compile"
+           data-answer-sidecar="research/_working/interrogation-devtool-positioning-r1.yaml">
+    <h2>Compile Responses</h2>
+    <p>Compile partial answers at any time. For a complete round, decide every assumption, answer every open question, and select a round-gate option.</p>
+    <div class="actions">
+      <button type="button" id="compile-responses">Compile Responses</button>
+      <button type="button" class="secondary" id="copy-yaml">Copy YAML</button>
+      <span id="compile-status" class="status-line" role="status"></span>
+    </div>
+    <textarea id="compiled-yaml" class="yaml-output" hidden readonly aria-label="Compiled YAML"></textarea>
+  </section>
+</main>
+
+<script>
+(() => {
+  const PAGE = "interrogation/devtool-positioning-r1-gblockparty.html";
+  const SIDECAR = "research/_working/interrogation-devtool-positioning-r1.yaml";
+  const COMMAND = "$devtool-positioning";
+  const quote = (value) => JSON.stringify(String(value ?? ""));
+
+  async function copyText(text, fallback, status) {
+    try {
+      await navigator.clipboard.writeText(text);
+      status.textContent = "Copied";
+    } catch {
+      fallback.hidden = false;
+      fallback.focus();
+      fallback.select();
+      status.textContent = "Select text to copy";
+    }
+  }
+
+  document.querySelectorAll(".assumption").forEach((block) => {
+    const correction = block.querySelector(".correction");
+    block.querySelectorAll('input[type="radio"]').forEach((radio) => {
+      radio.addEventListener("change", () => {
+        correction.hidden = radio.value === "confirm";
+        if (correction.hidden) correction.value = "";
+      });
+    });
+  });
+
+  document.addEventListener("click", async (event) => {
+    const applyButton = event.target.closest("[data-apply-recommended]");
+    if (applyButton) {
+      const block = applyButton.closest("[data-open-question]");
+      const source = block?.querySelector("[data-agent-recommended-answer]") ??
+        block?.querySelector("[data-recommended-answer]");
+      const recommended = source
+        ? ("value" in source && source.value.trim() ? source.value.trim() : source.textContent.trim())
+        : "";
+      const input = block?.querySelector(
+        'textarea[data-open-input], input[type="text"][data-open-input], input:not([type])[data-open-input]',
+      );
+      if (!input || !recommended) return;
+      if (input.value.trim() && !window.confirm("Replace your current answer with the recommended answer?")) return;
+      input.value = recommended;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      const status = block.querySelector("[data-apply-recommended-status]");
+      if (status) status.textContent = "Recommended answer applied.";
+      return;
+    }
+
+    const clarifyButton = event.target.closest("[data-clarify-copy]");
+    if (clarifyButton) {
+      const block = clarifyButton.closest("[data-open-question]");
+      const question = clarifyButton.dataset.questionText;
+      const payload = `Question: "${question}"\nI need clarification on what this is asking before I can answer.`;
+      const input = block.querySelector("[data-open-input]");
+      const status = block.querySelector("[data-clarify-status]");
+      await copyText(payload, input, status);
+    }
+  });
+
+  function compileYaml() {
+    const assumptions = [...document.querySelectorAll(".assumption")].map((block) => {
+      const checked = block.querySelector('input[type="radio"]:checked');
+      return {
+        id: block.dataset.assumptionId,
+        source: block.dataset.source,
+        statement: block.querySelector("p").textContent.trim(),
+        decision: checked?.value ?? "",
+        correction: block.querySelector(".correction").value.trim(),
+      };
+    });
+    const openAnswers = [...document.querySelectorAll("[data-open-question]")].map((block) => ({
+      id: block.dataset.questionId,
+      question: block.querySelector("h3").textContent.replace(/^\d+\.\s*/, "").trim(),
+      answer: block.querySelector("[data-open-input]").value.trim(),
+      recommended: block.querySelector("[data-recommended-answer]").textContent.trim(),
+      agentRecommended: block.querySelector("[data-agent-recommended-answer]").textContent.trim(),
+      confidence: block.querySelector("[data-agent-confidence]").dataset.agentConfidence,
+    }));
+    const gate = document.querySelector('input[name="round-gate"]:checked');
+    const gateNotes = document.getElementById("round-gate-notes").value.trim();
+    const complete = assumptions.every((item) =>
+      item.decision && (item.decision === "confirm" || item.correction)
+    ) && openAnswers.every((item) => item.answer) && Boolean(gate);
+    const lines = [
+      `# Invoke with: ${COMMAND}`,
+      `command: ${quote(COMMAND)}`,
+      `interrogation_page: ${quote(PAGE)}`,
+      "round: 1",
+      `round_status: ${complete ? "complete" : "partial"}`,
+      "gate_state: continue",
+      `answer_sidecar: ${quote(SIDECAR)}`,
+      "assumptions:",
+    ];
+    assumptions.forEach((item) => {
+      lines.push(
+        `  - id: ${quote(item.id)}`,
+        `    source: ${quote(item.source)}`,
+        `    statement: ${quote(item.statement)}`,
+        `    decision: ${quote(item.decision)}`,
+        `    correction: ${quote(item.correction)}`,
+      );
+    });
+    lines.push("open_answers:");
+    openAnswers.forEach((item) => {
+      lines.push(
+        `  - id: ${quote(item.id)}`,
+        `    question: ${quote(item.question)}`,
+        `    answer: ${quote(item.answer)}`,
+        `    recommended_answer: ${quote(item.recommended)}`,
+        `    agent_recommended_answer: ${quote(item.agentRecommended)}`,
+        `    agent_confidence: ${quote(item.confidence)}`,
+      );
+    });
+    lines.push(
+      "gate_answers:",
+      '  - gate: "round-confidence-review"',
+      `    answer: ${quote(gate?.value ?? "")}`,
+      `    notes: ${quote(gateNotes)}`,
+      "agent_routing:",
+      "  workflow: interrogation-loop",
+      "  parent_skill: devtool-positioning",
+      `  command: ${quote(COMMAND)}`,
+      "  gate_owner: parent-orchestrator",
+      "  gate_type: interrogation-round",
+      "  round: 1",
+      `  answer_sidecar: ${quote(SIDECAR)}`,
+      "  next_resolution: parent-resolves-from-yaml-and-filesystem",
+    );
+    return { yaml: lines.join("\n") + "\n", complete };
+  }
+
+  const output = document.getElementById("compiled-yaml");
+  const status = document.getElementById("compile-status");
+  document.getElementById("compile-responses").addEventListener("click", async () => {
+    const result = compileYaml();
+    output.value = result.yaml;
+    output.hidden = false;
+    status.textContent = result.complete
+      ? "Complete round compiled; copying YAML."
+      : "Partial round compiled; copying YAML.";
+    await copyText(result.yaml, output, status);
+  });
+  document.getElementById("copy-yaml").addEventListener("click", async () => {
+    if (!output.value) {
+      const result = compileYaml();
+      output.value = result.yaml;
+      output.hidden = false;
+    }
+    await copyText(output.value, output, status);
+  });
+})();
+</script>
+<script src="../scripts/alignment-tts-kokoro.js"></script>
+<script src="../scripts/alignment-question-nav.js"></script>
+</body>
+</html>

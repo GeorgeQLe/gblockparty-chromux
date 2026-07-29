@@ -2,4 +2,4 @@
 
 ## Adoption Reviews
 
-- [ ] Monthly adoption-readiness review after a runnable app exists. _(owner/agent: `$devtool-adoption` or current devtool workflow; next due: after runnable app exists; evidence path: `research/devtool-adoption.md`, GitHub traffic, issue labels, examples, and local adoption notes; escalation: docs lag implementation or first-success failures repeat)_
+- [ ] Review adoption readiness at day 30 (2026-08-26) or immediately before any external invitation, whichever comes first; review again at day 60 (2026-09-25) if the verdict remains on hold. _(cadence: day 30 and conditional day 60; owner/agent: `$devtool-adoption` or current devtool workflow; next due: 2026-08-26 or before invitation; evidence path: `research/devtool-adoption.md`, daily-driver rollup, clean-install packet, localhost proof, recovery transcript, first-success report, release state, and issue categories; escalation: docs/candidate drift, any critical pairing/data-loss event, required synchronous rescue, or repeated first-success failure)_

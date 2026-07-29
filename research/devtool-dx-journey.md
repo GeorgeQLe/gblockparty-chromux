@@ -1,224 +1,252 @@
-# Chromux - Devtool DX Journey
+# Chromux — Developer DX Journey
 
-_Producing skill: `$devtool-dx-journey` · Status: canonical · Date: 2026-07-05 · Concept slug: `chromux`_
+_Producing skill: `$devtool-dx-journey` · Status: canonical · Evidence snapshot: 2026-07-18 · Confirmed: 2026-07-25 · Concept slug: `chromux`_
 
+Decision horizon: 30–60 days
+Evidence boundary: repository-only; no external research, telemetry collection, interviews, or support outreach
 ## Executive Journey Stance
 
-Chromux's developer experience should be judged by one daily-driver loop: start terminal-native Codex or Claude Code sessions, let each session surface its own `localhost` or `file://` preview, inspect the page without leaving the cockpit, and send a bounded browser evidence payload back to the correct agent.
+Chromux now has a runnable and documented developer journey. The canonical report's pre-implementation baseline is obsolete: the repository contains an Electron prototype at `prototype/package.json` version 0.30.2, source and packaged-app quickstarts, paired terminal/browser sessions, approval-gated preview routing, browser evidence capture, local-first persistence, recovery documentation, scripted proof artifacts, targeted regression suites, and a release history through `chromux-v0.30.2`.
 
-Because the repo is still pre-implementation, the current DX journey is an acceptance map rather than public onboarding copy. It should drive the first stack spike, README quickstart, capture payload contract, troubleshooting guide, and proof artifacts. The product should not optimize for broad installation, team rollout, or monetization until the builder can repeatedly complete the local loop faster than manual terminal plus Chrome copy/paste.
+The current route is credible for its intended primary user—a technical solo builder on Apple Silicon macOS—but it is not yet reproducible evidence for a fresh developer. The repository proves that the configured development machine can complete the loop. It does not prove that a clean Mac can satisfy the prerequisites, build `node-pty`, launch the unsigned app, preserve CLI PATH/auth, complete delivery, and recover using only the published docs.
 
-The main DX principle is explicitness: Chromux should preserve existing CLI habits, make preview routing legible, show what was captured, store payloads locally with visible paths, and fail in ways the developer can retry manually.
+The next 30–60 days should therefore optimize proof rather than add breadth. The critical path is: make clean-machine setup observable, package one repeatable first-success verification path, state the one-off `claude -p` delivery boundary unmistakably, and record real daily-driver outcomes. Managed cloud execution, Windows/Linux support, team administration, and collaboration remain non-goals for the primary current-state journey.
 
-## 2026-07-06 Implementation Update - Reinstall And Restore
+## Journey Readiness Snapshot
 
-Chromux now treats reinstall and app-close recovery as part of the daily-driver loop rather than a manual Detect-only fallback. Before update install or window close, live PTY sessions trigger a blocking confirmation that explains the stop, writes a workspace snapshot, and proceeds only after user confirmation. On the next launch, Chromux auto-restores the saved workspace snapshot with session tabs, browser URLs, queued previews, and Claude/Codex resume commands where a saved CLI session can be matched. If resume metadata is missing, the session opens fresh and a dismissible red warning names the affected workspaces. The backup snapshot remains available in Detect as a secondary recovery surface and is marked restored instead of deleted.
+| Journey | Readiness | Repository-backed conclusion |
+| --- | ---: | --- |
+| Source install and first launch | 3/5 | Commands and prerequisites exist; no clean-machine run or preflight proves them. |
+| Quickstart to first success | 4/5 | The complete paired loop is documented and a scripted real-app transcript proves preview, capture, screenshot, and file-drop on the configured machine. |
+| Error recovery and debugging | 4/5 | Troubleshooting and UI fallbacks cover ordinary failures; recovery has targeted regression coverage but no fresh-user observation. |
+| Production adoption for the solo builder | 3/5 | Packaging, restore, saved projects, favorites, updates, attention signals, and repeated-session affordances exist; sustained daily-driver evidence is absent. |
+| Team rollout | 1/5 | Explicitly out of scope and unsupported by current controls or evidence. |
+| Retention and repeated use | 3/5 | Product hooks exist, but the planned adoption metrics have not been recorded. |
 
-## Journey 1 - Install And First Launch
+These scores are comparative decision aids, not externally benchmarked measurements.
 
-### Target User
+## Journey 1 — Source Install And First Launch
 
-The initial user is the builder running Chromux on a macOS laptop. A later user is an OSS developer already using terminal-native coding agents and local preview apps.
+### Current route
 
-### Desired Path
+1. Use Apple Silicon macOS with Node 22.12+ and Xcode command-line tools.
+2. Clone or open the repository and enter `prototype/`.
+3. Run `npm install`; `postinstall` rebuilds `node-pty` against Electron.
+4. Run `npm start` for development, or `npm run install-app` to build an arm64 unsigned `Chromux.app` and replace `/Applications/Chromux.app`.
+5. Launch Chromux and create, detect, resume, or adopt a Claude Code, Codex, Grok Build, or shell session.
 
-1. Read the project status and understand that Chromux is a local macOS cockpit, not a new agent runtime.
-2. Confirm prerequisites: macOS, chosen Electron/cmux stack, Codex CLI, Claude Code CLI, and authenticated CLI state.
-3. Install or run from source with a small number of commands.
-4. Launch Chromux and see an empty session workspace with a clear way to add a Codex or Claude command.
-5. Start a terminal session without re-authenticating or changing shell habits.
-6. See a paired browser pane reserved for that session.
+### What is strong
 
-### Current Gaps
+- `README.md` gives a three-command source quickstart and links to the full prototype guide.
+- `prototype/README.md` names macOS, Node 22.12+, Xcode command-line tools, and the Claude CLI delivery dependency.
+- `prototype/package.json` declares `engines.node >=22.12.0`, rebuilds `node-pty` after install, and exposes start, package, install, rebuild, smoke, capture, and targeted test scripts.
+- `npm run install-app` packages an arm64 app and records its local update source. The full guide explains that the bundle is unsigned and that login-shell behavior is intended to preserve PATH and CLI auth when launched from Finder.
+- Session creation is not limited to a blank start: DETECT, RESUME, FRESH, OPEN SHELL, saved projects, and restore snapshots reduce repeated setup.
 
-- No `README.md`, package manifest, app source, install command, or launch command exists in the active checkout.
-- `cmux` fork feasibility is still unproven.
-- There is no documented handling for CLI auth, PATH, shell startup files, macOS permissions, browser profile state, or local capture directories.
+### Verified friction and risk
 
-### Acceptance Criteria
+- Fresh-machine reproducibility is unproven. There is no clean macOS run log covering prerequisite detection, native module build, first launch, permissions, and delivery.
+- The root quickstart omits prerequisites and the unsigned/arm64 constraint before the commands. It links to the full guide, but a developer can begin `npm install` before learning why the native build may fail.
+- `engines.node` documents the version requirement but does not itself provide a purpose-built preflight or remediation flow.
+- `install-app` is source-based, Apple Silicon-only, unsigned, and replaces an existing `/Applications/Chromux.app`. That is acceptable for the named personal-tool audience, but it is not a general public installer.
+- Automation permission for Terminal/iTerm2 tab titles is discovered only when DETECT lacks titles. Process detection still works, but the degraded state is a first-run surprise.
 
-- A developer can launch Chromux from the repo after following one quickstart.
-- A missing Codex or Claude Code CLI produces a clear fix, not a silent terminal failure.
-- Existing CLI auth state is reused or a precise remediation is shown.
-- The first session visibly owns both a terminal pane and a browser pane.
+### Acceptance criteria for the next proof
 
-## Journey 2 - Quickstart To First Success
+- A clean Apple Silicon Mac can follow the public docs without repository-author intervention.
+- Missing Node, an old Node version, missing Xcode tools, a failed `node-pty` rebuild, unavailable agent CLI, and Automation denial each produce a visible diagnosis and exact next action.
+- The proof records elapsed time, failed steps, remediation, and whether Finder launch preserves the expected login-shell CLI environment.
 
-### First Success Definition
+## Journey 2 — Quickstart To First Success
 
-First success is not "the app opens." First success is completing the session-paired review loop once:
+### Definition of first success
 
-1. Start one agent session.
-2. Have it emit a `localhost` URL or local HTML path.
-3. See Chromux route that preview to the session's paired browser pane or queue.
-4. Inspect the preview.
-5. Capture browser evidence.
-6. Verify the generated YAML and screenshot path.
-7. Deliver or manually retry the payload.
+First success is not merely opening the app. It is completing one session-paired browser evidence loop:
 
-### Happy Path
+1. Start, adopt, or resume a session.
+2. Produce a localhost/loopback URL or local HTML path.
+3. See the preview enter that session's approval queue without automatic navigation.
+4. Approve and open it in the paired browser.
+5. Inspect the page and capture page-level or selected-element evidence.
+6. Review the bounded YAML payload and screenshot state.
+7. Save it through FILE-DROP ONLY or send it through the one-off `claude -p` adapter.
+8. Confirm the payload path and delivery outcome.
 
-1. The developer starts a Codex or Claude Code session inside Chromux.
-2. The agent starts a simple local app, for example a Vite preview on `http://localhost:5173`.
-3. Chromux detects the URL from terminal output and associates it with the originating session.
-4. If the paired pane is idle, Chromux loads the URL there. If the developer is actively reviewing another page, Chromux badges the pending preview instead of hot-swapping.
-5. The developer selects the relevant page state or element.
-6. Chromux generates a bounded payload containing schema version, timestamp, originating session ID, project path, URL, page title, selected selector, selected HTML excerpt, console tail, screenshot path, delivery target, and optional notes.
-7. The developer reviews the payload path or summary.
-8. Chromux sends the payload through the configured v1 adapter, likely `claude -p`, or leaves an inspectable file-drop fallback.
+### Repository proof
 
-### Current Gaps
+- `prototype/examples/transcripts/first-local-loop.md` records a scripted real-app run through the actual PTY and live webview: session creation, terminal output, `file://` preview queueing, explicit OPEN, three console messages with one error, a second localhost preview queued without auto-open, YAML capture preview, screenshot capture, and persisted file-drop all pass.
+- The same transcript separately verifies the login-shell `claude -p` adapter and preserves a sample payload and screenshot fixture.
+- `prototype/docs/capture-payload.md` defines the bounded YAML v1 contract and manual retry command.
+- `prototype/scripts/test-preview-queue-renderer.js` and `prototype/scripts/test-capture-records-renderer.js` pass on 2026-07-18.
+- Terminal links, saved projects, favorites, and browser restoration reduce the number of steps after the first loop.
 
-- No runnable app exists to demonstrate preview detection.
-- No capture payload schema or sample YAML exists.
-- No delivery adapter has been proven end to end.
-- No review queue UI exists.
+### Remaining friction and risk
 
-### Acceptance Criteria
+- The proof is scripted on the configured machine, not a clean-user install.
+- Delivery is a new one-off `claude -p` process in the target project directory; it is not injection into the paired live Claude, Codex, or Grok conversation. The UI and docs call it one-off, but the session-paired product framing can still create a stronger continuity expectation than the adapter provides.
+- Codex and Grok can be first-class terminal sessions, but direct send remains named and implemented as `claude -p`; their reliable fallback is the inspectable file drop/manual handoff.
+- DETECT resume selects the latest saved conversation for a project directory. Two live agents in the same directory cannot be distinguished by saved-session lookup.
 
-- The first quickstart can be completed in under 10 minutes on the builder's machine after prerequisites are met.
-- The developer can tell which session owns the preview.
-- The payload can be inspected before or immediately after delivery.
-- A failed delivery leaves enough evidence for a manual retry.
+### Near-term acceptance criteria
 
-## Journey 3 - Error Recovery And Debugging
+- One documented verification command or checklist exercises the same first-success contract and produces a pass/fail summary without requiring knowledge of internal smoke-driver setup.
+- The capture modal states before send that `SEND — claude -p` creates a separate one-off Claude invocation and does not append to the paired live session.
+- Codex/Grok routes explicitly present file-drop/manual handoff as the supported current path rather than implying live-context delivery.
 
-### Failure Modes That Need First-Class Recovery
+## Journey 3 — Error Recovery And Debugging
 
-| Failure | User-visible symptom | Required recovery |
+### Current recovery map
+
+| Failure | Visible or documented recovery | Evidence |
 | --- | --- | --- |
-| CLI missing | Session command fails immediately | Show missing executable and suggested install/auth check. |
-| CLI auth unavailable | Agent opens but cannot operate | Preserve original CLI output and link to auth remediation docs. |
-| Preview not detected | Terminal prints a URL but pane stays empty | Show detection log and allow manual paste/open tied to the session. |
-| Multiple previews detected | Wrong port or file opens | Present a picker and remember the chosen route for that session. |
-| Active review interrupted | Pane changes while user is inspecting | Queue and badge background previews instead of replacing the page. |
-| `file://` cannot load | Local HTML preview is blank or blocked | Explain file permission/profile limitation and provide manual open path. |
-| Screenshot fails | Capture produces no image | Keep payload without screenshot, log the failure, and allow retry. |
-| Console tail too large | Payload becomes noisy or expensive | Bound logs and show truncation metadata. |
-| Selected DOM too large | Prompt becomes unwieldy | Store excerpt plus selector, not unbounded DOM. |
-| Payload sent to wrong target | Agent receives irrelevant evidence | Require originating session ID in every payload and delivery log. |
-| `claude -p` fails | Delivery exits non-zero | Show exit status, payload path, command target, and manual retry command. |
+| `node-pty` build failure | Install Xcode CLT, then run `npm run rebuild`. | `prototype/README.md`; `prototype/docs/troubleshooting.md` |
+| Preview not detected | Reprint one complete URL, include port/path, check QUEUE, or paste into URL bar. | Troubleshooting; preview-queue test |
+| Local file not detected | Use an existing absolute `.html`/`.htm` path or a supported clickable relative path. | Troubleshooting; first-loop transcript |
+| Browser shut or stale | Opening an approved, typed, clicked, or favorited URL restores the pane; repeated same URL refreshes. | README; browser/queue behavior tests |
+| Screenshot failure | Persist payload with `screenshot.mode: unavailable`; retry after page load. | README; troubleshooting; capture implementation |
+| Missing console context | Reproduce after pane open, inspect counters, capture within the last-50 window, add a note. | Troubleshooting; payload bounds |
+| `claude -p` failure | Keep payload, show exact retry command, use FILE-DROP ONLY, inspect delivery log. | `main.js`; `renderer.js`; troubleshooting; capture-record test |
+| Wrong-session delivery | Review target and cwd; understand DETECT's project-based latest-session limitation. | Troubleshooting |
+| Resume exits immediately | Show retry command with RETRY RESUME and dismiss controls. | `renderer.js`; resume-retry test |
+| Malformed favorites/projects | Treat invalid records safely; reset documented local files. | implementation; favorites/projects tests |
+| Update failure or blocker | Preserve staged state, show retry/release path, and require explicit confirmation. | releases; update tests |
 
-### Debugging Surfaces
+### Assessment
 
-- Session event log: agent command, preview detections, queue events, active URL changes, and capture events.
-- Payload log: payload path, screenshot path, delivery adapter, target session, exit status, and timestamp.
-- Storage map: where payloads, screenshots, browser profiles, console tails, and local history live.
-- Troubleshooting docs for preview detection, file previews, screenshots, console capture, CLI auth, and cleanup.
+Ordinary recovery is a current strength. The app generally preserves inspectable artifacts and provides manual fallback rather than losing work. Nine targeted suites run in this research pass all succeeded: preview queue, capture records, resume retry, projects, favorites, GitHub update check, update queue, shell adoption, and turn signals.
 
-### Acceptance Criteria
+The evidence remains implementation-centric. It shows that recovery logic exists and regression tests pass, not that a first-time developer notices, understands, and successfully uses each recovery path. The missing next layer is a clean-user failure rehearsal.
 
-- Every failed first-success step has a visible next action.
-- The developer can recover without restarting Chromux for ordinary preview and capture failures.
-- No privacy or security claim is made until local data handling is documented.
+## Journey 4 — Production Adoption For The Solo Builder
 
-## Journey 4 - Production Adoption
+### Current meaning of production
 
-### What "Production" Means For This Tool
+For the approved scope, production means that a solo builder can use Chromux across real coding-agent sessions for several days without routinely returning to a separate terminal/browser workflow. It does not mean enterprise deployment.
 
-For Chromux v1, production adoption means the builder uses it during real coding-agent work across multiple sessions for several days, not that a company deploys it organization-wide. The product should be considered production-ready for the builder only after it handles repeated localhost/file preview loops, capture retries, and session switching without creating more friction than terminal plus Chrome.
+### Adoption capabilities already present
 
-### Adoption Milestones
+- Source packaging into a local macOS app and managed updates based on the recorded source plus GitHub Release metadata.
+- Session restore snapshots and retry behavior.
+- External terminal/agent detection plus project-based resume/fresh adoption.
+- Saved project start configurations derived from validated `package.json` scripts.
+- Global favorites and per-session paired browser state.
+- Attention signals, queueing, activity indicators, dynamic titles, and multi-session tabs.
+- Four themes with independent light/dark modes and persistent selection.
+- Local-data inventory, troubleshooting, delivery logs, and explicit capture artifacts.
 
-| Milestone | Proof Needed | Blocking Unknown |
-| --- | --- | --- |
-| Stack feasible | `cmux` or chosen host can embed browser pane and capture hooks | `cmux` source/extensibility is unverified. |
-| First loop works | Demo transcript for URL detection, pane routing, payload generation, and delivery | `claude -p` may fragment context. |
-| Daily-driver candidate | Builder completes multiple real review/capture loops without reverting to Chrome | Focus discipline, screen real estate, and reliability. |
-| OSS preview | README quickstart, payload schema, troubleshooting, sample payload, screenshot fixture | Support burden and setup tolerance unvalidated. |
-| Public trust claims | Storage, retention, deletion, browser profile, and command invocation docs | Capture data can include sensitive local evidence. |
+### Adoption blockers and unknowns
 
-### Adoption Risks
+- No sustained daily-driver record shows sessions launched, previews reviewed in Chromux, useful captures, manual retries, wrong-session incidents, or reasons for leaving Chromux.
+- `tasks/record-todo.md` already defines these metrics, and its original condition—“runnable Chromux app exists”—is now satisfied. The record has not been executed.
+- The repository has a controlled-preview first-success issue form but no repository evidence of external submissions or support outcomes.
+- A source-built unsigned arm64 app is appropriate for the current builder route but remains a distribution and trust boundary for broader OSS use.
+- Capture storage and delivery logs never expire automatically; the browser profile has no in-app reset. These are documented but create maintenance burden over repeated use.
 
-- Browser co-location alone will not beat existing IDE or browser tools.
-- If capture delivery does not reach the right agent context, the wedge collapses into a file generator.
-- If Chromux steals focus or hot-swaps previews, it will feel worse than a separate browser.
-- If local storage is opaque, "local-first" will not be credible.
+### 30–60 day production gate
 
-## Journey 5 - Team Rollout
+Treat the current prototype as a daily-driver candidate, not as broadly validated production DX, until at least five real workdays are recorded and repeated friction is promoted from observation into actionable fixes.
 
-Team rollout is explicitly out of scope for v1. Treat it as a future signal, not a roadmap commitment.
+## Journey 5 — Team Rollout
 
-### Possible Team Triggers
+Team rollout remains explicitly out of scope. Current evidence does not support shared workspaces, access controls, audit exports, managed retention, policy enforcement, signed deployment, administrator controls, or collaborative capture history.
 
-- More than one developer wants to review the same agent-generated preview or capture history.
-- A team wants shared capture evidence, replayable bug context, or durable review queues.
-- A security or platform owner asks for policy around screenshots, DOM capture, logs, browser profiles, or agent delivery.
-- A managed GBlockParty surface emerges with hosted sessions, capture history, or controlled sandboxes.
+Do not add team onboarding work during this horizon. Revisit only when more than one developer repeatedly completes the solo route and requests shared evidence or managed policy.
 
-### Team DX Requirements If Triggered Later
+## Journey 6 — Retention And Repeated Use
 
-- Installable signed builds and update controls.
-- Shared workspace model and access controls.
-- Audit logs for captures and deliveries.
-- Retention policies for screenshots, DOM excerpts, logs, and prompts.
-- Admin controls for allowed projects, agents, browser profiles, and delivery adapters.
+### Retention hypothesis
 
-### Why To Defer
+Chromux will retain the primary user if session pairing, approval-gated previews, attention state, capture artifacts, and recovery make parallel agent work easier to resume and supervise than separate terminal and browser windows.
 
-The current evidence base is the builder's personal workflow. Team features would increase setup, privacy, support, and policy complexity before the local loop is proven.
+### Product hooks already present
 
-## Journey 6 - Retention And Repeated Use
+- Saved projects, favorites, session restore, external detection, resume/fresh actions, and terminal links reduce re-entry cost.
+- Approval queues preserve attention and prevent unexpected browser replacement.
+- Activity indicators and authenticated attention signals make background sessions legible.
+- Capture files and delivery logs make evidence inspectable and retryable.
+- Managed updates and persistent themes reduce maintenance and personalization cost.
 
-### Retention Hypothesis
+### Missing retention evidence
 
-Chromux retains users only if it becomes the default place to supervise parallel agent sessions. The repeat-use hook is not novelty; it is lower cognitive load when moving between terminal output, page inspection, and browser evidence capture.
+- No recorded daily usage baseline.
+- No measured time-to-first-success on a clean machine.
+- No observed useful-capture rate, manual retry rate, wrong-session incident rate, or abandonment reason.
+- No external first-success reports.
 
-### Retention Drivers
+The repository therefore supports a retention mechanism hypothesis, not a retention conclusion.
 
-- Reliable session-to-preview pairing.
-- Review queue that preserves attention.
-- Capture payloads that are faster and cleaner than manual copying.
-- Transparent local storage and easy cleanup.
-- Low-friction recovery when detection or delivery fails.
-- Compatibility with existing Codex and Claude Code habits.
+## Prioritized 30–60 Day DX Backlog
 
-### Retention Metrics For The Builder
-
-- Number of real coding sessions launched through Chromux per day.
-- Percentage of agent-generated previews reviewed in Chromux instead of external Chrome.
-- Number of capture payloads sent or file-dropped per day.
-- Manual retry rate for preview detection and payload delivery.
-- Number of times the builder leaves Chromux because the layout, browser pane, or delivery path gets in the way.
-
-These are local observation metrics, not telemetry requirements. If tracked, store them as opt-in local notes or manual records until productization is justified.
-
-## Prioritized DX Backlog
-
-1. Run a `cmux` stack spike to validate embedded Chromium pane feasibility and capture hooks.
-2. Prototype preview detection for `localhost`, loopback URLs, and local HTML paths from terminal output.
-3. Define `docs/capture-payload.md` with a versioned YAML schema, field bounds, retention notes, and one sample payload.
-4. Build an end-to-end capture-to-delivery proof using `claude -p` plus file-drop fallback.
-5. Write `README.md` with the "first local loop" quickstart after runnable commands exist.
-6. Write `docs/troubleshooting.md` for preview detection, file previews, screenshots, console logs, CLI auth, wrong-session routing, and storage cleanup.
-7. Write `docs/privacy-and-local-data.md` before making public privacy or local-first claims.
-8. Add proof artifacts under `examples/`: sample payload, sample screenshot path, and demo transcript.
+1. **P0 — Run and archive a clean-machine install/first-success rehearsal.** Use a fresh Apple Silicon macOS account or machine; capture prerequisites, commands, elapsed time, permission prompts, native-build failures, Finder launch behavior, preview approval, capture, file-drop, `claude -p`, and recovery. This is the highest-value missing evidence.
+2. **P0 — Put prerequisite and distribution boundaries before the root quickstart commands.** State Apple Silicon macOS, Node 22.12+, Xcode CLT, unsigned source build, and `claude`-only direct delivery before `npm install` so failures are not discovered out of sequence.
+3. **P1 — Provide one supported first-success verification entry point.** Wrap or document the existing smoke/E2E route so a contributor can obtain an explicit result for session creation, preview queue, approved open, console capture, screenshot, file-drop, and optional delivery.
+4. **P1 — Make delivery continuity explicit at the decision point.** State in the capture modal that `SEND — claude -p` starts a separate one-off Claude process; show file-drop/manual handoff as the current Codex/Grok-safe route.
+5. **P1 — Execute the existing daily-driver measurement record.** Record at least five workdays using the fields already defined in `tasks/record-todo.md`; promote only repeated friction into implementation or documentation tasks.
+6. **P2 — Add first-run diagnostics if the rehearsal shows repeated setup failures.** Prefer a small preflight for Node, Xcode tools, agent CLI availability, PATH, Automation permission status, and writable local storage rather than speculative onboarding UI.
+7. **P2 — Defer signed/universal distribution and automatic retention controls until controlled-preview evidence proves they block adoption.** Both are real broader-OSS concerns but are not yet verified blockers for the current solo-builder route.
 
 ## Evidence Matrix
 
-| Claim | Evidence | Inference | Confidence | Decision impact |
-| --- | --- | --- | --- | --- |
-| The first-success loop is session-paired preview plus capture | `research/idea-brief.md`, `research/devtool-positioning.md`, and `research/devtool-integration-map.md` all name 1:1 pairing, preview detection, review queue, and browser evidence capture as the wedge. | Quickstart and acceptance tests should center on the full loop, not app launch alone. | High | Prioritize preview routing and payload delivery over broad browser features. |
-| Current repo cannot support public install docs yet | `research/devtool-docs-audit.md` found no README, package manifest, runnable source, active docs, or implementation commands. | DX work must first define proof paths and acceptance criteria. | High | Do not write fake install commands; create quickstart only after stack proof. |
-| Error recovery is a core DX requirement | Existing research warns about CLI auth, preview detection, wrong routing, screenshots, `file://`, payload size, delivery failure, and local storage. | The tool must expose logs and retry paths for the first loop. | High | Add troubleshooting docs and event logs early. |
-| Production adoption is personal daily-driver proof first | `research/idea-brief.md` identifies the builder as the primary beneficiary, and `research/devtool-monetization.md` defers productization until daily-driver proof. | Production readiness should be measured by repeated builder use before OSS/team rollout. | High | Defer team and monetization UX. |
-| Future OSS users remain unvalidated | Existing artifacts repeatedly note no external interviews, installs, issues, or support data. | Team and public onboarding should stay provisional. | Medium-high | Focus on proof artifacts before adoption programs. |
-| Local capture data can be sensitive | Capture design includes screenshots, DOM snippets, console logs, URLs, file paths, browser profile decisions, and command delivery logs. | Trust docs must precede public privacy claims. | High | Document storage, retention, deletion, and captured fields. |
+| Claim | Evidence | Inference | Confidence | Assumption status | Decision impact |
+| --- | --- | --- | --- | --- | --- |
+| Chromux now has a runnable source and packaged-app journey. | `README.md`; `prototype/README.md`; `prototype/package.json`; `prototype/main.js`; `prototype/renderer/`; tag list through `chromux-v0.30.2`. | The canonical pre-implementation claim is obsolete. | High | Evidence-backed | Replace the old acceptance-map framing in the eventual canonical artifact. |
+| The paired preview/capture loop works on the configured machine. | `prototype/examples/transcripts/first-local-loop.md`; sample payload/screenshot; preview-queue and capture-record tests passing 2026-07-18. | The core first-success route is technically feasible and exercised. | High | Evidence-backed, environment-bounded | Shift from feasibility work to reproducibility and user-comprehension proof. |
+| A clean developer can reproduce the install path from docs alone. | Commands and prerequisites exist, but no clean-machine run log or external report exists. | Repository completeness is insufficient to claim fresh-user reproducibility. | Low | Unproven | Make a clean-machine rehearsal the top priority. |
+| Ordinary preview/capture/delivery failures preserve a next action. | Troubleshooting guide; disk-first capture; manual retry command; delivery log; targeted tests. | Recovery architecture is strong and inspectable. | High | Evidence-backed for implementation; unproven for novice comprehension | Validate recovery with a first-time-user rehearsal rather than redesigning it speculatively. |
+| Direct capture delivery preserves the paired live agent conversation. | `deliver-claude` starts a one-off `claude -p`; docs call it one-off; file drop is the fallback. | Project-directory targeting is not live-session context injection. | High | Evidence-backed | Clarify continuity before send and avoid implying cross-agent live delivery. |
+| Chromux is a daily-driver candidate. | Restore, projects, favorites, attention, queue, capture, updates, themes, and tests exist. | The product has the mechanics required for repeated use. | Medium-high | Evidence-backed capability; usage unproven | Begin a bounded five-day usage record. |
+| Chromux currently improves daily productivity or retention. | No completed metrics, telemetry, user reports, or multi-day observation in the repository. | Capability breadth cannot establish benefit or retention. | Low | Unproven | Do not claim productivity or retention; collect local observation first. |
+| Team rollout should remain deferred. | Approved scope; privacy doc lists absent enterprise controls; no multi-user evidence. | Team work adds unsupported policy and distribution scope. | High | Evidence-backed boundary | Keep the 30–60 day backlog focused on the solo route. |
 
 ## Assumptions And Confidence Register
 
-| Assumption | Current confidence | Why | What would change it |
-| --- | --- | --- | --- |
-| The builder will tolerate a macOS-first desktop app if it speeds daily work | Medium | Matches the idea brief and personal-tool scope. | Electron/browser footprint or screen real-estate problems make external Chrome faster. |
-| `cmux` can remain the fork base | Low-medium | It is the intended base, but source has not been inspected in this checkout. | Stack spike proves or rejects embedded browser feasibility. |
-| `claude -p` is acceptable for v1 delivery | Medium | It is transparent and composable, but may not preserve active session context. | End-to-end testing shows context fragmentation is too costly. |
-| File-drop fallback is enough for early recovery | Medium | It keeps payloads inspectable and manually retryable. | Manual retry frequency remains high after daily use. |
-| Future OSS users will accept setup once docs exist | Low | No external adoption evidence exists. | External installs or interviews show the problem is shared. |
+| Assumption | Confidence | What is known | What remains unknown | Evidence that would change it |
+| --- | --- | --- | --- | --- |
+| Apple Silicon source install is tolerable for the primary builder. | Medium | The configured repo builds and documents the route. | Clean-machine time, failure rate, and remediation burden. | Archived clean-machine rehearsal. |
+| Explicit preview approval is less disruptive than auto-open. | Medium-high | The behavior is implemented, documented, and tested; it preserves queue state. | Whether users perceive approval as safety or extra friction. | Daily-driver observations or first-success reports. |
+| One-off `claude -p` plus file drop is sufficient for current capture delivery. | Medium | Delivery and retry are implemented and proven on the configured machine. | Context fragmentation and Codex/Grok handoff cost in real work. | Useful-capture and manual-handoff observations. |
+| Saved projects, restore, favorites, and attention signals improve retention. | Medium | The mechanisms exist with regression coverage. | Frequency of use and reduction in re-entry/cognitive cost. | Five-day usage record and abandonment reasons. |
+| Broader OSS users will accept unsigned arm64 source distribution. | Low | A controlled-preview form and install docs exist. | External setup tolerance, Gatekeeper expectations, Intel needs. | External first-success reports. |
+| Automatic cleanup is not yet a primary blocker. | Medium-low | Manual cleanup is documented; artifacts never expire. | Real storage growth and user maintenance burden. | Multi-day capture volume and cleanup incidents. |
+
+## Alternatives Considered
+
+### Expand the primary route to managed GBlockParty workspaces
+
+Rejected for this pass. `docs/gblockparty-iaas-integration.md` describes a proposed boundary, but the approved scope is the current local cockpit. Managed execution would mix future architecture with current DX evidence.
+
+### Prioritize signed/notarized distribution now
+
+Deferred. Signing is likely necessary for broader public distribution, but no external install evidence shows it is the current 30–60 day bottleneck. Clean-machine proof comes first.
+
+### Add telemetry to answer retention questions
+
+Rejected for now. The project explicitly has no product telemetry, and the primary-user scope can be evaluated through the existing opt-in local observation record without creating a new data surface.
+
+### Auto-open detected previews to reduce clicks
+
+Rejected. Approval-gated previews are an intentional, tested attention and safety boundary. Measure whether the click causes material friction before reversing it.
+
+### Build direct live-session injection for every agent immediately
+
+Deferred. The current adapter boundary should be made explicit first. Promote live injection only if repeated manual handoff or context fragmentation is observed.
+
+## Rejected Or Lower-Confidence Findings
+
+- **Rejected:** “No runnable app exists.” This is contradicted by the prototype, package scripts, docs, proof artifacts, tests, and releases.
+- **Rejected:** “Install and launch are verified for a fresh developer.” The evidence proves one configured environment, not reproducibility.
+- **Rejected:** “Capture delivery returns evidence to the paired live agent session.” Current direct delivery starts a separate `claude -p` process; pairing identifies project/session metadata but not live conversational continuity.
+- **Lower confidence:** “Approval gating improves productivity.” It is an intentional and coherent design choice, but no usage evidence compares it with auto-open or external-browser habits.
+- **Lower confidence:** “Themes and activity indicators improve retention.” These features plausibly reduce friction and increase legibility, but no retention observation exists.
+- **Rejected:** “Team rollout is the next maturity step.” The approved route and evidence support a solo-builder proof phase first.
 
 ## Source Coverage Gaps
 
-- No `cmux` source inspection was performed in this pass.
-- No runnable Chromux app exists in the active checkout.
-- No install, launch, preview detection, capture, or delivery command has been verified.
-- No end-to-end payload-to-agent proof exists.
-- No external user feedback or OSS support data exists.
+- No clean-machine or clean-user macOS install log.
+- No verified Intel Mac, Windows, or Linux route; these are outside the approved primary scope.
+- No external first-success issue, interview, support conversation, or usability observation supplied in the repository.
+- No completed five-day daily-driver record despite the runnable-app condition now being met.
+- No comparative measurement against separate Terminal plus Chrome.
+- No evidence that the current `claude -p` delivery preserves or should preserve live-session context.
+- No direct verification in this pass that GitHub `/releases/latest` exposes `chromux-v0.30.2`; the evidence boundary was repository-only.
+- No storage-growth measurement for captures, logs, browser profile, or favorites during repeated use.

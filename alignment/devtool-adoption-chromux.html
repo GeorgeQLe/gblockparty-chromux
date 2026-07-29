@@ -1,381 +1,736 @@
 <!DOCTYPE html>
-<html lang="en" data-alignment-category="research" data-visual-tier="visual" data-alignment-status="review" data-alignment-stage="stage-2">
+<html lang="en" data-alignment-category="research" data-visual-tier="visual" data-alignment-status="confirmed">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Chromux - Devtool Adoption · Artifact Review</title>
+<title>Chromux — Devtool Adoption · Confirmed</title>
 <style>
-  :root{--bg:#0d1117;--panel:#161b22;--panel2:#111824;--line:#30363d;--text:#c9d1d9;--muted:#8b949e;--ink:#f0f6fc;--blue:#58a6ff;--green:#3fb950;--orange:#d29922;--red:#f85149;--purple:#bc8cff;--cyan:#39c5cf}
-  *{box-sizing:border-box} html,body{margin:0;padding:0}
-  body{background:var(--bg);color:var(--text);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;padding-bottom:5rem}
-  .wrap{max-width:1180px;margin:0 auto;padding:2rem 1rem}
-  h1{color:var(--ink);font-size:2rem;line-height:1.15;margin:.35rem 0 .55rem}
-  h2{color:var(--blue);font-size:1.22rem;margin:0 0 .75rem;scroll-margin-top:1rem}
-  h3{color:var(--ink);font-size:1rem;margin:1rem 0 .35rem}
-  p{margin:.45rem 0} a{color:var(--blue)}
-  code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.88em;background:#1c2333;border:1px solid var(--line);border-radius:5px;padding:.08em .34em}
-  table{border-collapse:collapse;width:100%;font-size:.91rem}
-  th,td{border:1px solid var(--line);padding:.52rem .62rem;text-align:left;vertical-align:top}
-  th{background:#1a2230;color:var(--ink)}
-  ul,ol{margin:.35rem 0 .6rem 1.15rem;padding:0} li{margin:.24rem 0}
-  textarea{width:100%;min-height:5.5rem;background:#0b1018;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:.75rem;font:14px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-  button{background:#238636;color:white;border:1px solid #2ea043;border-radius:7px;padding:.55rem .8rem;font-weight:700;cursor:pointer}
-  button.secondary{background:#21262d;border-color:var(--line);color:var(--text)}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:1rem 1.15rem;margin:1rem 0}
-  .status{border-left:4px solid var(--orange)} .changed{border-left:4px solid var(--purple)} .proof{border-left:4px solid var(--green)}
-  .sub,.muted{color:var(--muted)}
-  .pill{display:inline-block;font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:.18em .56em;border-radius:999px;border:1px solid var(--line);color:var(--muted);margin:.1rem .24rem .1rem 0}
-  .review{color:var(--orange);border-color:var(--orange)} .stage{color:var(--purple);border-color:var(--purple)} .visual{color:var(--green);border-color:var(--green)} .verified{color:var(--cyan);border-color:var(--cyan)}
-  .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.7rem}
-  .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.7rem}
-  .mini{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:.8rem}
-  .mini strong{display:block;color:var(--ink);margin-bottom:.2rem}
-  .scroll{overflow-x:auto}.kv{display:grid;grid-template-columns:max-content 1fr;gap:.28rem .8rem}.kv dt{color:var(--muted)}.kv dd{margin:0}
-  .notice{border:1px solid #6b5216;background:#17140a;border-radius:8px;padding:.75rem;margin:.75rem 0;color:#f2cc60}
-  .ok{color:var(--green)} .warn{color:var(--orange)} .bad{color:var(--red)}
-  .tag{font-family:ui-monospace,monospace;font-size:.75rem;padding:.05em .42em;border-radius:5px;border:1px solid var(--line);white-space:nowrap;color:var(--muted)}
-  .gate{background:#0f1623;border:1px solid var(--line);border-radius:8px;padding:1rem;margin:.9rem 0}.gate legend{color:var(--ink);font-weight:800;margin-bottom:.35rem}
-  .option{display:block;margin:.45rem 0;padding:.55rem .65rem;border:1px solid var(--line);border-radius:7px;background:#111824}.option input{margin-right:.45rem}
-  .output{white-space:pre-wrap;background:#0b1018;border:1px solid var(--line);border-radius:8px;padding:.85rem;min-height:8rem;overflow:auto}
-  .bar{display:grid;grid-template-columns:160px 1fr max-content;align-items:center;gap:.65rem;margin:.45rem 0}.track{height:16px;background:#0b1018;border:1px solid var(--line);border-radius:999px;overflow:hidden}.fill{height:100%;background:var(--blue)}
-  .flow{display:grid;grid-template-columns:repeat(4,1fr);gap:.65rem}.node{border:1px solid var(--line);background:var(--panel2);border-radius:8px;padding:.75rem;min-height:92px}.node b{display:block;color:var(--ink)}
-  .hidden{display:none}
-  @media(max-width:900px){.grid,.grid2,.flow{grid-template-columns:1fr}.kv{grid-template-columns:1fr}.bar{grid-template-columns:1fr}.wrap{padding:1.2rem .85rem}}
+  :root {
+    color-scheme: dark;
+    --bg:#0d1117; --surface:#161b22; --surface-2:#111824; --border:#30363d;
+    --text:#c9d1d9; --text-muted:#8b949e; --accent:#58a6ff; --green:#3fb950;
+    --red:#f85149; --orange:#d29922; --purple:#bc8cff; --white:#f0f6fc;
+    --chart-1:#58a6ff; --chart-2:#3fb950; --chart-3:#d29922; --chart-4:#bc8cff;
+    --chart-5:#f85149; --chart-6:#79c0ff; --chart-7:#f0883e; --chart-8:#a5d6ff;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; line-height:1.55; }
+  main { width:min(1180px,calc(100% - 32px)); max-width:100%; overflow-wrap:break-word; margin:0 auto; padding:42px 0 90px; }
+  h1,h2,h3,h4 { color:var(--white); line-height:1.2; }
+  h1 { margin:.35rem 0 .65rem; font-size:clamp(2rem,5vw,3.5rem); letter-spacing:-.04em; }
+  h2 { color:var(--accent); margin:0 0 .8rem; font-size:1.45rem; }
+  h3 { margin:1.2rem 0 .55rem; font-size:1.08rem; }
+  h4 { margin:1rem 0 .45rem; }
+  p { margin:.55rem 0; }
+  a { color:var(--accent); }
+  code,pre { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+  code { background:#1c2333; border:1px solid var(--border); border-radius:5px; padding:.08em .35em; }
+  pre { white-space:pre-wrap; background:#0b1018; border:1px solid var(--border); border-radius:9px; padding:1rem; overflow:auto; }
+  section,nav { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:1.15rem 1.25rem; margin:1rem 0; }
+  nav { background:var(--surface-2); }
+  nav ol { columns:2; column-gap:2rem; }
+  nav li { break-inside:avoid; }
+  ul,ol { padding-left:1.35rem; }
+  li { margin:.28rem 0; }
+  .eyebrow { color:var(--purple); font-weight:800; letter-spacing:.1em; text-transform:uppercase; font-size:.78rem; }
+  .lede { color:var(--text-muted); font-size:1.05rem; max-width:920px; }
+  .meta-grid,.cards,.flow { display:grid; grid-template-columns:repeat(3,minmax(min(210px,100%),1fr)); gap:.75rem; margin:.9rem 0; }
+  .flow { grid-template-columns:repeat(5,minmax(min(170px,100%),1fr)); }
+  .meta-card,.card,.flow-step { background:var(--surface-2); border:1px solid var(--border); border-radius:9px; padding:.85rem; }
+  .meta-card strong,.card strong,.flow-step strong { color:var(--white); display:block; }
+  .meta-card span,.muted { color:var(--text-muted); }
+  .section-head,.toolbar { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
+  .badge { display:inline-flex; align-items:center; border:1px solid var(--border); color:var(--text-muted); border-radius:999px; padding:.2rem .55rem; font-size:.74rem; font-weight:800; text-transform:uppercase; letter-spacing:.05em; }
+  .badge.good { color:var(--green); border-color:rgba(63,185,80,.6); }
+  .badge.warn { color:var(--orange); border-color:rgba(210,153,34,.65); }
+  .badge.bad { color:var(--red); border-color:rgba(248,81,73,.65); }
+  .badge.review { color:var(--purple); border-color:rgba(188,140,255,.65); }
+  .callout { border-left:4px solid var(--accent); background:#111a28; padding:.8rem 1rem; border-radius:0 8px 8px 0; margin:.85rem 0; }
+  .callout.warn { border-color:var(--orange); background:#1b170d; }
+  .callout.good { border-color:var(--green); background:#0e1a13; }
+  .callout.bad { border-color:var(--red); background:#211216; }
+  .updated { border-color:rgba(188,140,255,.7); box-shadow:inset 4px 0 0 var(--purple); }
+  .updated-mark { color:var(--purple); font-weight:800; font-size:.76rem; letter-spacing:.06em; text-transform:uppercase; }
+  .table-wrap { max-width:100%; }
+  table { width:100%; border-collapse:collapse; font-size:.92rem; }
+  th,td { border:1px solid var(--border); padding:.62rem .7rem; text-align:left; vertical-align:top; }
+  th { background:var(--surface-2); color:var(--white); }
+  .status-go { color:var(--green); font-weight:800; }
+  .status-hold { color:var(--orange); font-weight:800; }
+  .status-missing { color:var(--red); font-weight:800; }
+  .chart-container { background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:1rem; margin:1rem 0; }
+  svg { display:block; width:100%; height:auto; max-width:100%; }
+  button { min-height:44px; }
+  button { border:1px solid #2ea043; border-radius:8px; background:#238636; color:#fff; font:inherit; font-weight:800; padding:10px 16px; cursor:pointer; }
+  button.secondary { background:#21262d; border-color:var(--border); color:var(--text); }
+  .gate { border-color:rgba(188,140,255,.6); background:linear-gradient(180deg,rgba(188,140,255,.07),rgba(22,27,34,.98) 28%); }
+  .gate h2 { color:var(--purple); }
+  details { border:1px solid var(--border); border-radius:8px; padding:.75rem; margin:.7rem 0; background:var(--surface-2); }
+  summary { cursor:pointer; color:var(--white); font-weight:800; }
+  .source-list li { margin:.4rem 0; }
+  [hidden] { display:none !important; }
+  @media (max-width:860px) {
+    .meta-grid,.cards,.flow { grid-template-columns:1fr 1fr; }
+    nav ol { columns:1; }
+  }
+  @media (max-width:560px) {
+    main { width:min(100% - 20px,1180px); padding-top:24px; }
+    section,nav { padding:1rem; }
+    .meta-grid,.cards,.flow { grid-template-columns:1fr; }
+    th,td { padding:.5rem; }
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div>
-    <span class="pill review">review</span>
-    <span class="pill stage">stage-2 · artifact review</span>
-    <span class="pill visual">visual tier</span>
-    <span class="pill verified">smoke verified</span>
-  </div>
-  <h1>Chromux - Devtool Adoption Artifact Review</h1>
-  <p class="sub">Stage 2 review page for <code>$devtool-adoption</code>. The non-canonical working packet has been written to <code>research/_working/preliminary-devtool-adoption-research.md</code>. Canonical files are unchanged until artifact approval.</p>
+<main>
+  <header>
+    <div class="eyebrow">Stage 3 · Confirmed 2026-07-27</div>
+    <h1>Chromux Adoption Proof Plan</h1>
+    <p class="lede">The 30–60 day proof-led adoption strategy is approved and canonical. This page is the read-only record for the completed alignment cycle; later research may amend it only after archiving this confirmed version and highlighting the amendment.</p>
+    <div class="meta-grid">
+      <div class="meta-card"><span>Alignment date</span><strong>2026-07-27</strong><span>Evidence snapshot</span></div>
+      <div class="meta-card"><span>Current state</span><strong>Confirmed</strong><span>Canonical artifacts written</span></div>
+      <div class="meta-card"><span>Canonical artifact</span><strong>research/devtool-adoption.md</strong><span>Working packet archived</span></div>
+    </div>
+    <div class="callout warn"><strong>Headline verdict:</strong> continue founder daily-driver and reproducibility proof now; hold an actively supported controlled OSS preview until clean-install, repeated-use, durable localhost, observed recovery, and one self-serve non-builder gates close.</div>
+  </header>
 
-  <section class="card status" id="status">
-    <h2>Alignment Status</h2>
-    <dl class="kv">
-      <dt>alignment_status</dt><dd><strong>review</strong></dd>
-      <dt>alignment_stage</dt><dd>stage-2 - research and artifact review</dd>
-      <dt>alignment date</dt><dd>2026-07-06</dd>
-      <dt>producing skill</dt><dd><code>$devtool-adoption</code></dd>
-      <dt>concept slug</dt><dd><code>chromux</code></dd>
-      <dt>working packet</dt><dd><code>research/_working/preliminary-devtool-adoption-research.md</code></dd>
-      <dt>proposed canonical artifact</dt><dd><code>research/devtool-adoption.md</code></dd>
-      <dt>verification</dt><dd><code>npm run smoke</code> in <code>prototype/</code> returned <strong>SMOKE_OK</strong></dd>
-    </dl>
-    <div class="notice">Review required: approve this artifact, request Stage 2 revisions, or block canonicalization. This page does not perform Stage 3.</div>
-  </section>
-
-  <section class="card" id="toc">
-    <h2>Table Of Contents</h2>
+  <nav aria-label="Table of contents">
+    <h2>Table of Contents</h2>
     <ol>
-      <li><a href="#verdict">Verdict</a></li>
-      <li><a href="#checks">Source And Code Checks</a></li>
-      <li><a href="#loops">Adoption Loops</a></li>
-      <li><a href="#examples">Examples And Templates</a></li>
-      <li><a href="#community">Community Channels</a></li>
-      <li><a href="#proof">Proof Artifacts</a></li>
-      <li><a href="#metrics">Metrics</a></li>
-      <li><a href="#changes">Proposed Canonical And Task Changes</a></li>
-      <li><a href="#evidence">Evidence Matrix</a></li>
-      <li><a href="#assumptions">Assumptions And Gaps</a></li>
+      <li><a href="#boundary">Approval boundary and record</a></li>
+      <li><a href="#verdict">Executive verdict</a></li>
+      <li><a href="#freshness">Freshness delta and verification</a></li>
+      <li><a href="#stance">Adoption stance</a></li>
+      <li><a href="#loops">Three adoption loops</a></li>
+      <li><a href="#activation">Activation path and decision rules</a></li>
+      <li><a href="#proof">Examples, templates, and proof artifacts</a></li>
+      <li><a href="#comparables">Comparable proof patterns</a></li>
+      <li><a href="#channels">Community channels</a></li>
+      <li><a href="#distribution">Distribution and trust</a></li>
+      <li><a href="#team">Team-conversion triggers</a></li>
+      <li><a href="#metrics">Activation and retention metrics</a></li>
+      <li><a href="#plan">30–60 day proof plan</a></li>
+      <li><a href="#alternatives">Alternatives considered</a></li>
+      <li><a href="#evidence">Evidence matrix</a></li>
+      <li><a href="#confidence">Assumptions and confidence</a></li>
+      <li><a href="#lower-confidence">Rejected/lower-confidence findings</a></li>
+      <li><a href="#gaps">Source coverage gaps</a></li>
+      <li><a href="#implications">Downstream implications</a></li>
+      <li><a href="#changes">Applied Stage 3 file changes</a></li>
       <li><a href="#sources">Sources</a></li>
-      <li><a href="#gates">Approval Gates</a></li>
+      <li><a href="#confirmation">Confirmation and approval record</a></li>
     </ol>
+  </nav>
+
+  <section id="boundary" class="updated" data-section-label="Approval boundary and record">
+    <div class="section-head"><h2>1. Approval Boundary And Record</h2><span class="badge good">Artifact confirmed</span></div>
+    <p>The final Stage 1 YAML approved the 30–60 day scope and non-goals, source plan, confidence treatment, flat artifact destinations, archive-before-replace boundary, and structured Stage 2 format.</p>
+    <ul>
+      <li>The final Stage 2 YAML approved the complete rendered artifact without requested edits or unresolved feedback.</li>
+      <li><code>research/devtool-adoption.md</code> and the three approved task files are now canonical/current.</li>
+      <li>The superseded Stage 1 page and July packet were archived before replacement under <code>docs/history/archive/2026-07-27/112331/</code>.</li>
+      <li>The Stage 2 working packet and review page were archived under <code>docs/history/archive/2026-07-27/131810/</code> before Stage 3 confirmation.</li>
+    </ul>
   </section>
 
-  <section class="card changed" id="verdict">
-    <h2>Verdict</h2>
-    <div class="grid">
-      <div class="mini"><strong>Recommended artifact action</strong><span class="warn">Amend canonical adoption research.</span> The stance remains proof-led, but the current artifact is stale about prototype proof.</div>
-      <div class="mini"><strong>What changed locally</strong><code>prototype/</code> now has a runnable Electron app, README, capture schema, examples, screenshot fixture, transcript, package scripts, and smoke check.</div>
-      <div class="mini"><strong>What did not change</strong>No evidence of sustained builder use, external installs, issue reports, community demand, or public-launch readiness exists.</div>
+  <section id="verdict" class="updated" data-section-label="Executive verdict">
+    <div class="section-head"><h2>2. Executive Verdict</h2><span class="updated-mark">Updated after approved research</span></div>
+    <p><strong>Recommendation:</strong> hold an actively supported controlled OSS preview until five proof gates close.</p>
+    <p>Chromux is no longer a feasibility prototype. The current checkout is a feature-rich Electron app with source and packaged commands, macOS and Windows/WSL2 routes, paired sessions, approval-gated previews, local capture persistence, live-session Composer routing in the current <code>0.64.0</code> candidate, troubleshooting and privacy docs, an issue-form draft, many regression fixtures, and a passing smoke check.</p>
+    <p>The missing evidence is adoption evidence: clean Apple Silicon reproduction, three voluntary sessions in seven days, a durable localhost/capture artifact, observed recovery, and one non-builder self-serve success.</p>
+    <div class="callout"><strong>Important distinction:</strong> the source repository is already public. “Controlled OSS preview” means an invited and supported cohort on a named immutable candidate—not making the code visible.</div>
+
+    <div class="table-wrap" style="overflow-x: auto" data-tts-narrative="Founder daily-driver proof and reproducibility work can proceed now. An actively supported preview and broad launch remain on hold.">
+      <table>
+        <thead><tr><th>Decision</th><th>Current result</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td>Founder daily-driver proof</td><td class="status-go">Go now</td><td>Mechanics are credible enough to measure real use.</td></tr>
+          <tr><td>Reproducibility and recovery proofs</td><td class="status-go">Go now</td><td>Exact gaps are known without widening scope.</td></tr>
+          <tr><td>Invite one non-builder</td><td class="status-hold">Hold until internal gates pass</td><td>Otherwise the test measures maintainer rescue and candidate drift.</td></tr>
+          <tr><td>Actively supported preview</td><td class="status-hold">Hold</td><td>Latest release has no assets; issue form is not on default branch; no external outcome exists.</td></tr>
+          <tr><td>Broad public launch</td><td class="status-missing">Excluded</td><td>Stage 0 non-goal and unsupported by evidence.</td></tr>
+        </tbody>
+      </table>
     </div>
-    <h3>Updated Adoption Ladder</h3>
+
+    <div class="chart-container" data-tts-narrative="Five gates stand between the present candidate and an actively supported preview. All five remain incomplete, although localhost and recovery have partial mechanism proof.">
+      <div class="toolbar"><strong>Five proof gates</strong><button type="button" class="secondary" data-chart-toggle data-target="proof-gates-table">View as table</button></div>
+      <svg viewBox="0 0 1100 250" role="img" aria-label="Five adoption proof gates: daily-driver, clean install, localhost, recovery, and self-serve preview; all remain incomplete">
+        <defs><marker id="gateArrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="var(--chart-6)"/></marker></defs>
+        <line x1="120" y1="115" x2="980" y2="115" stroke="var(--chart-6)" stroke-width="4" marker-end="url(#gateArrow)"/>
+        <g font-family="ui-sans-serif,system-ui" text-anchor="middle">
+          <g transform="translate(120 115)"><circle r="55" fill="#211216" stroke="var(--chart-5)" stroke-width="3"/><text y="-8" fill="#fff" font-weight="700">Daily-driver</text><text y="16" fill="var(--chart-5)">unproven</text></g>
+          <g transform="translate(335 115)"><circle r="55" fill="#211216" stroke="var(--chart-5)" stroke-width="3"/><text y="-8" fill="#fff" font-weight="700">Clean install</text><text y="16" fill="var(--chart-5)">unproven</text></g>
+          <g transform="translate(550 115)"><circle r="55" fill="#1b170d" stroke="var(--chart-3)" stroke-width="3"/><text y="-8" fill="#fff" font-weight="700">Localhost</text><text y="16" fill="var(--chart-3)">partial</text></g>
+          <g transform="translate(765 115)"><circle r="55" fill="#1b170d" stroke="var(--chart-3)" stroke-width="3"/><text y="-8" fill="#fff" font-weight="700">Recovery</text><text y="16" fill="var(--chart-3)">partial</text></g>
+          <g transform="translate(980 115)"><circle r="55" fill="#211216" stroke="var(--chart-5)" stroke-width="3"/><text y="-8" fill="#fff" font-weight="700">Self-serve</text><text y="16" fill="var(--chart-5)">unproven</text></g>
+        </g>
+      </svg>
+      <div id="proof-gates-table" hidden>
+        <div class="table-wrap" style="overflow-x: auto" data-tts-narrative="The fallback table lists the five proof gates, pass conditions, and current states.">
+          <table>
+            <thead><tr><th>Gate</th><th>Pass condition</th><th>Current state</th></tr></thead>
+            <tbody>
+              <tr><td>Daily-driver value</td><td>3 voluntary real sessions in 7 days, one full loop, and reasons for return/abandonment</td><td>Unproven</td></tr>
+              <tr><td>Clean install</td><td>Fresh Apple Silicon route archived with time, prompts, failures, remedies</td><td>Unproven</td></tr>
+              <tr><td>Durable localhost</td><td>Real HTTP server, approval, capture, actionable response</td><td>Partial mechanism proof</td></tr>
+              <tr><td>Recovery</td><td>Failure preserves evidence and documented recovery succeeds</td><td>Documented/tested, not observed</td></tr>
+              <tr><td>Self-serve preview</td><td>One non-builder succeeds without synchronous help</td><td>Unproven</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="freshness" data-section-label="Freshness delta and verification">
+    <div class="section-head"><h2>3. Freshness Delta And Current Product State</h2><span class="badge warn">Three states</span></div>
+    <div class="table-wrap" style="overflow-x: auto" data-tts-narrative="The public release is version 0.61.9 with no assets, committed main is version 0.62.0, and the dirty working tree is a 0.64.0 candidate.">
+      <table>
+        <thead><tr><th>State</th><th>Evidence</th><th>Adoption interpretation</th></tr></thead>
+        <tbody>
+          <tr><td>Latest public Release</td><td><code>chromux-v0.61.9</code>, published 2026-07-26, no attached assets</td><td>Source snapshot exists; no downloadable supported binary is attached.</td></tr>
+          <tr><td>Committed main/origin</td><td><code>bf9d9be</code>, package <code>0.62.0</code>, Windows/WSL2 work</td><td>Product scope has expanded beyond the approved Apple Silicon cohort.</td></tr>
+          <tr><td>Dirty working tree</td><td>Package <code>0.64.0</code>, routed Composer/evidence and profile fixes</td><td>Strong candidate capability, but not immutable or released.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>The working tree describes present candidate capability; the Release/default branch describes what an invited user can obtain reproducibly today.</p>
+    <h3>Focused current verification</h3>
+    <div class="cards">
+      <div class="card"><strong>Core smoke</strong><code>npm run smoke</code><br><span class="status-go">SMOKE_OK</span></div>
+      <div class="card"><strong>Preview/capture/projects</strong>Preview queue, capture records, and projects renderer checks passed.</div>
+      <div class="card"><strong>Update/profile</strong>GitHub update and user-data-path checks passed.</div>
+      <div class="card"><strong>Composer routing</strong>Full-browser Composer and base Composer checks passed.</div>
+      <div class="card"><strong>Restore identity</strong>Restore-session identity check passed.</div>
+      <div class="card"><strong>Evidence limit</strong>Configured-machine implementation evidence only; not adoption outcomes.</div>
+    </div>
+    <details>
+      <summary>Exact focused verification commands and results</summary>
+      <ul>
+        <li><code>npm run smoke</code> → <code>SMOKE_OK</code></li>
+        <li><code>npm run test:preview-queue-renderer</code> → <code>PREVIEW_QUEUE_RENDERER_OK</code></li>
+        <li><code>npm run test:capture-records-renderer</code> → <code>CAPTURE_RECORDS_RENDERER_OK</code></li>
+        <li><code>npm run test:projects-renderer</code> → <code>PROJECTS_RENDERER_OK</code></li>
+        <li><code>npm run test:github-update-check</code> → <code>GITHUB_UPDATE_CHECK_OK</code></li>
+        <li><code>npm run test:user-data-path</code> → <code>USER_DATA_PATH_OK</code></li>
+        <li><code>npm run test:full-browser-composer-renderer</code> → <code>FULL_BROWSER_COMPOSER_RENDERER_OK</code></li>
+        <li><code>npm run test:composer-renderer</code> → <code>COMPOSER_RENDERER_OK</code></li>
+        <li><code>npm run test:restore-session-identity</code> → <code>RESTORE_SESSION_IDENTITY_OK</code></li>
+      </ul>
+    </details>
+    <h3>Current public repository observation</h3>
+    <ul>
+      <li>Public, default branch <code>main</code>, MIT license; Issues enabled and Discussions disabled.</li>
+      <li>No issues returned; zero stars, forks, and subscribers in the 2026-07-27 API observation.</li>
+      <li>Community profile: 42%; README/license recognized, but no contributing guide, code of conduct, PR template, or issue template on default branch.</li>
+      <li>The local first-success issue form exists only in the current working tree.</li>
+      <li>These are absence-of-evidence observations, not evidence of rejection; repository traffic was not inspected.</li>
+    </ul>
+  </section>
+
+  <section id="stance" data-section-label="Adoption stance">
+    <h2>4. Adoption Stance</h2>
     <div class="flow">
-      <div class="node"><b>1. Prototype Proof</b><span class="ok">Partially complete.</span> Scripted local loop and smoke check now exist.</div>
-      <div class="node"><b>2. Daily-Driver Proof</b><span class="warn">Next gate.</span> Measure real repeated builder use and capture usefulness.</div>
-      <div class="node"><b>3. Controlled OSS Preview</b><span class="muted">Deferred.</span> Invite only after self-serve first success is credible.</div>
-      <div class="node"><b>4. Public Community</b><span class="muted">Deferred.</span> Enable broader channels after external reports and support readiness.</div>
+      <div class="flow-step"><strong>1 · Daily-driver</strong>Observe voluntary replacement of terminal-plus-browser behavior.</div>
+      <div class="flow-step"><strong>2 · Reproducibility</strong>Clean setup, complete localhost loop, and recovery artifacts.</div>
+      <div class="flow-step"><strong>3 · One-person preview</strong>One non-builder on an immutable candidate.</div>
+      <div class="flow-step"><strong>4 · Supported preview</strong>Decide whether a slightly larger cohort is warranted.</div>
+      <div class="flow-step"><strong>5 · Community growth</strong>Defer until multiple self-serve outcomes and support capacity.</div>
     </div>
+    <p>Feature count, tests, releases, repository visibility, screenshots, stars, and traffic must not substitute for activation and retention.</p>
   </section>
 
-  <section class="card proof" id="checks">
-    <h2>Source And Code Checks</h2>
-    <div class="scroll">
+  <section id="loops" data-section-label="Three adoption loops">
+    <h2>5. Three Adoption Loops</h2>
+    <h3>Loop A — Builder Daily-Driver</h3>
+    <p><strong>Trigger:</strong> a real task needs terminal-native coding agents and a localhost or local HTML review surface.</p>
+    <ol>
+      <li>Start, resume, detect, or adopt a Claude Code, Codex, Grok Build, or shell session.</li>
+      <li>Produce a loopback URL or local HTML path.</li>
+      <li>Confirm the originating queue receives the preview without stealing attention.</li>
+      <li>Approve and inspect it.</li>
+      <li>Capture or attach bounded evidence.</li>
+      <li>Route through the intended live session in the candidate or use the inspectable fallback.</li>
+      <li>Record response usefulness and voluntary return.</li>
+    </ol>
+    <p><strong>Activation:</strong> one real task completes approved preview → bounded evidence → inspectable routing → actionable response. <strong>Retention:</strong> three real sessions in seven days. <strong>Failure:</strong> returning to terminal plus external Chrome because Chromux is slower or less trustworthy.</p>
+
+    <h3>Loop B — Reproducibility And Proof</h3>
+    <ol>
+      <li>Select one immutable commit or tag.</li>
+      <li>Run clean Apple Silicon setup from public docs.</li>
+      <li>Start the durable localhost fixture.</li>
+      <li>Complete the preview/capture/response loop.</li>
+      <li>Exercise one recoverable failure.</li>
+      <li>Archive commands, timing, screenshots, payload references, errors, recovery, and result.</li>
+      <li>Fix only observed friction and rerun.</li>
+    </ol>
+    <p><strong>Activation:</strong> complete archived proof packet. <strong>Retention:</strong> later candidates preserve the verification contract. <strong>Failure:</strong> undocumented maintainer knowledge or destructive workaround is required.</p>
+
+    <h3>Loop C — Controlled OSS Preview</h3>
+    <ol>
+      <li>Invite one matching non-builder with immutable target, prerequisites, privacy boundary, and supported scenario.</li>
+      <li>Require one first-success scenario without synchronous help.</li>
+      <li>Collect the structured report and redacted recovery evidence.</li>
+      <li>Classify install, preview, capture, routing, response, docs, or trust failure.</li>
+      <li>Convert blockers into repo work without broadening acquisition.</li>
+      <li>Hold, repeat with one person, or graduate to a small cohort.</li>
+    </ol>
+    <p><strong>Activation:</strong> one non-builder self-serves. <strong>Retention:</strong> they return or provide another attributable usage report. <strong>Failure:</strong> rescue, wrong-session/data-loss, or no safe recovery path.</p>
+  </section>
+
+  <section id="activation" data-section-label="Activation path and decision rules">
+    <h2>6. Activation Path And Decision Rules</h2>
+    <h3>First-success contract</h3>
+    <ol>
+      <li>A supported candidate launches.</li>
+      <li>A real agent or shell session runs in the intended project.</li>
+      <li>A real localhost URL or local HTML path is detected or explicitly opened.</li>
+      <li>The browser opens only after approval.</li>
+      <li>Bounded evidence persists and visibly associates with the intended target.</li>
+      <li>The agent produces an actionable response, or the fallback leaves an inspectable artifact and exact retry path.</li>
+    </ol>
+    <p>Opening the app, opening a pane, running a regression, producing a screenshot, or sending a prompt alone is not activation.</p>
+    <div class="table-wrap" style="overflow-x: auto" data-tts-narrative="Advance requires three real sessions, safe pairing, clean reproduction, documented recovery, and one self-serve external first success.">
       <table>
-        <thead><tr><th>Check</th><th>Result</th><th>Adoption impact</th></tr></thead>
+        <thead><tr><th>Signal</th><th>Advance</th><th>Hold</th></tr></thead>
         <tbody>
-          <tr><td>Canonical adoption artifact</td><td><code>research/devtool-adoption.md</code> exists but still says many proof artifacts are missing.</td><td>Preserve sequence; update stale statuses.</td></tr>
-          <tr><td>Prototype README</td><td><code>prototype/README.md</code> documents quickstart, install app, first local loop, troubleshooting, and storage map.</td><td>Repo-readiness is partial, not zero.</td></tr>
-          <tr><td>Package metadata</td><td><code>prototype/package.json</code> version <code>0.5.0</code> with <code>start</code>, <code>smoke</code>, <code>package</code>, <code>install-app</code>.</td><td>Runnable/packageable prototype exists.</td></tr>
-          <tr><td>Capture contract</td><td><code>prototype/docs/capture-payload.md</code> defines YAML schema v1, bounds, retention, and versioning.</td><td>Payload contract is now a proof artifact.</td></tr>
-          <tr><td>Example fixtures</td><td><code>sample-capture.yaml</code>, <code>sample-screenshot.png</code>, and <code>first-local-loop.md</code> exist under <code>prototype/examples/</code>.</td><td>Adoption tasks need reconciliation.</td></tr>
-          <tr><td>Code surface</td><td>Code paths cover preview detection, review queue, capture persistence, popup routing, external detection, and <code>claude -p</code> delivery.</td><td>Claims can reference a real prototype with caveats.</td></tr>
-          <tr><td>Smoke check</td><td><code>npm run smoke</code> returned <strong>SMOKE_OK</strong>.</td><td>Scripted prototype health is freshly verified.</td></tr>
+          <tr><td>Daily-driver week</td><td>3 real sessions and one full loop</td><td>Fewer sessions, abandonment, or no complete loop</td></tr>
+          <tr><td>Pairing safety</td><td>No critical wrong-session/preview evidence delivery</td><td>Any unresolved critical routing incident</td></tr>
+          <tr><td>Reproducibility</td><td>Clean run from docs with all intervention recorded</td><td>Undocumented prerequisite or maintainer rescue</td></tr>
+          <tr><td>Recovery</td><td>Artifacts preserved and documented action succeeds</td><td>Loss, opacity, or undocumented rescue</td></tr>
+          <tr><td>External first success</td><td>One invited non-builder self-serves</td><td>Rescue required or report incomplete</td></tr>
         </tbody>
       </table>
     </div>
+    <div class="callout">No threshold is yet set for time-to-first-success, useful-capture rate, or retry rate. Record a baseline before defining “good.”</div>
   </section>
 
-  <section class="card" id="loops">
-    <h2>Adoption Loops</h2>
-    <div class="scroll">
+  <section id="proof" data-section-label="Examples templates and proof artifacts">
+    <h2>7. Examples, Templates, And Proof Artifacts</h2>
+    <div class="table-wrap" style="overflow-x: auto" data-tts-narrative="The clean-install record is missing; localhost and recovery have partial proof; the observation template is incomplete; the first-success issue form is ready locally but unpublished.">
       <table>
-        <thead><tr><th>Loop</th><th>Current state</th><th>Activation event</th><th>Retention event</th><th>Canonical change</th></tr></thead>
+        <thead><tr><th>Requested artifact</th><th>Current support</th><th>Verdict</th><th>Evidence needed</th></tr></thead>
         <tbody>
-          <tr><td>Builder daily-driver</td><td>Scripted proof exists; repeated real-work proof missing.</td><td>First real coding task completed with route, capture, delivery/file-drop, and agent response.</td><td>Three real sessions in one week where Chromux replaces external Chrome for review/capture.</td><td>Advance gate from feasibility to repeated-use measurement.</td></tr>
-          <tr><td>Prototype repo readiness</td><td>Prototype README, quickstart, capture schema, screenshot, sample payload, transcript exist.</td><td>Clean checkout runs or inspects first loop.</td><td>Docs stay current after feature/refactor/version changes.</td><td>Mark partial readiness and root/public docs gaps.</td></tr>
-          <tr><td>Controlled OSS preview</td><td>Not started.</td><td>One non-builder completes first local loop without synchronous help.</td><td>User returns or files actionable issue.</td><td>Keep gated by daily-driver proof.</td></tr>
-          <tr><td>Public community</td><td>Not started.</td><td>Visitor self-serves through README, examples, forms, and trust docs.</td><td>Reports turn into repeatable docs/fixes.</td><td>Keep broad channels deferred.</td></tr>
+          <tr><td>Clean Apple Silicon install / first success</td><td>Quickstarts, install command, troubleshooting, privacy, packaging</td><td class="status-missing">Missing outcome</td><td>Fresh account/machine against immutable candidate</td></tr>
+          <tr><td>Real localhost dev-server fixture</td><td>Loopback probe; projects E2E launches minimal TCP server; old transcript queues unserved URL</td><td class="status-hold">Partial mechanism</td><td>Stable HTTP page, capture, and agent-response record</td></tr>
+          <tr><td>Failure-recovery transcript</td><td>Disk-first capture, retry, delivery log, docs, failure regression</td><td class="status-hold">Partial implementation</td><td>Preserved operator transcript</td></tr>
+          <tr><td>Daily-driver observation template</td><td>Metric obligations in record todo</td><td class="status-hold">Incomplete</td><td>Per-session note and seven-day rollup</td></tr>
+          <tr><td>Controlled-preview first-success form</td><td>Comprehensive local issue form</td><td class="status-hold">Ready locally, unpublished</td><td>Commit to default branch and exercise once</td></tr>
         </tbody>
       </table>
     </div>
+
+    <details open>
+      <summary>Daily-driver session note template</summary>
+      <pre>## Session &lt;date/time&gt;
+
+- Project / task class:
+- Candidate commit or version:
+- Agent sessions used:
+- Why Chromux was chosen:
+- Preview type: localhost / local HTML / manual URL
+- Full activation loop completed: yes / no
+- Evidence action: capture / attach / file drop / live-session route / one-off delivery
+- Agent response actionable: yes / partly / no
+- Manual retry required:
+- Wrong-session or wrong-preview incident:
+- External Chrome or terminal fallback used:
+- Reason for fallback:
+- Friction worth repeating:
+- Private evidence paths or redacted references:</pre>
+      <pre>- Real Chromux sessions:
+- Sessions with complete activation:
+- Sessions using external-browser fallback:
+- Useful captures / total captures:
+- Manual retries:
+- Critical pairing incidents:
+- Voluntary return reason:
+- Abandonment reason:
+- Decision: continue / fix and repeat / ready for clean-install gate</pre>
+    </details>
+
+    <details>
+      <summary>Clean-install / first-success record template</summary>
+      <pre>## Candidate
+
+- Commit/tag:
+- macOS version and Apple Silicon model:
+- Account state:
+- Start and finish time:
+- Installation route:
+- Prerequisites already present:
+- Prerequisites installed:
+
+## Steps
+
+| Time | Command/action | Expected | Observed | Intervention | Evidence |
+
+## Result
+
+- App launched:
+- Agent session launched:
+- Preview queued and explicitly approved:
+- Evidence persisted:
+- Agent response actionable:
+- Failure exercised and recovered from docs:
+- Synchronous help used:
+- Verdict: pass / hold</pre>
+    </details>
+
+    <details>
+      <summary>Failure-recovery transcript template</summary>
+      <pre>## Failure
+
+- Candidate:
+- Class: preview / screenshot / capture / delivery / routing / update
+- Induced or natural:
+- Visible UI state:
+- Persisted artifact paths:
+- Log/event references:
+
+## Recovery
+
+1. Documented action attempted:
+2. Result:
+3. Undocumented action, if any:
+4. Data/context lost:
+5. Final state:
+
+## Decision
+
+- Recovery contract passed:
+- Documentation correction:
+- Implementation correction:
+- Promote after one critical incident or two repetitions.</pre>
+    </details>
+
+    <h3>Controlled-preview form</h3>
+    <p>The existing form already asks for macOS version, agent/version, preview result, capture result, delivery result, journey, recovery, docs gap, and privacy confirmation. Preserve it; add immutable Chromux version/commit and whether synchronous help was used. Do not broaden it into general support intake.</p>
   </section>
 
-  <section class="card" id="examples">
-    <h2>Examples And Templates</h2>
-    <div class="grid2">
-      <div class="mini"><strong>Verified now</strong>Local <code>file://</code> path example, first-loop transcript, sample capture YAML, sample screenshot, no-hot-swap queue transcript.</div>
-      <div class="mini"><strong>Still missing</strong>Real Vite/localhost fixture, capture delivery failure transcript, manual baseline comparison, GitHub issue form.</div>
-    </div>
-    <div class="scroll">
+  <section id="comparables" data-section-label="Comparable primary-source proof patterns">
+    <h2>8. Comparable Primary-Source Proof Patterns</h2>
+    <p>These are proof patterns, not popularity rankings or feature-parity claims.</p>
+    <div class="table-wrap" style="overflow-x: auto" data-tts-narrative="OpenHands suggests explicit prerequisites and stable targets; Aider suggests observable reversible first actions; Playwright suggests portable failure artifacts; Zed suggests named channels and diagnostic support.">
       <table>
-        <thead><tr><th>Artifact</th><th>Current status</th><th>Action</th><th>Rationale</th></tr></thead>
+        <thead><tr><th>Comparable</th><th>Primary-source pattern</th><th>Transferable implication</th><th>Limit</th></tr></thead>
         <tbody>
-          <tr><td>Local alignment or <code>file://</code> example</td><td>Present through scripted E2E fixture.</td><td>Keep as first verified example.</td><td>Matches this repo's alignment-page workflow.</td></tr>
-          <tr><td>Vite/localhost example</td><td>Not a full app fixture yet.</td><td>Add later.</td><td>Common public-user path still needs proof.</td></tr>
-          <tr><td>Multiple previews/no hot-swap</td><td>Transcript says second preview queued.</td><td>Promote as core proof.</td><td>Attention safety is part of the wedge.</td></tr>
-          <tr><td>Delivery failure example</td><td>Not present as fixture.</td><td>Add before preview cohort.</td><td>External users need retry confidence.</td></tr>
-          <tr><td>Manual baseline comparison</td><td>Missing.</td><td>Add after real daily use.</td><td>Needed to show Chromux beats terminal plus Chrome.</td></tr>
-          <tr><td>Issue forms</td><td>Missing.</td><td>Add only after controlled preview.</td><td>Support reports need structured details.</td></tr>
+          <tr><td>OpenHands local GUI</td><td>Platform prerequisites, one recommended launcher, stable vs main, setup after launch</td><td>Put prerequisites first and name one supported candidate</td><td>Containerized agent platform</td></tr>
+          <tr><td>Aider</td><td>One command + request, visible changes, commits, undo, test/run output</td><td>Make activation observable and reversible</td><td>Terminal pair programmer</td></tr>
+          <tr><td>Playwright Trace Viewer</td><td>Portable local trace with timeline, screenshots, DOM, logs, console, network, metadata, retain-on-failure</td><td>Preserve a proof bundle with sequence and recovery</td><td>Richer automated trace than approved bounded capture</td></tr>
+          <tr><td>Zed on macOS</td><td>Stable/preview channels, DMG/Homebrew/source, requirements, CLI install, Gatekeeper recovery, diagnostics</td><td>Name target/channel and provide install + diagnostic context</td><td>Mature signed editor distribution</td></tr>
         </tbody>
       </table>
     </div>
+    <div class="callout good">Strong proof surfaces couple a narrow first action with a durable, inspectable outcome and explicit recovery. Chromux has the ingredients; it lacks the observed proof packet and immutable preview target.</div>
   </section>
 
-  <section class="card" id="community">
-    <h2>Community Channels</h2>
-    <div class="bar"><span>Private notes</span><div class="track"><div class="fill" style="width:100%;background:var(--green)"></div></div><span>use now</span></div>
-    <div class="bar"><span>Prototype docs</span><div class="track"><div class="fill" style="width:85%;background:var(--green)"></div></div><span>use now</span></div>
-    <div class="bar"><span>Root README</span><div class="track"><div class="fill" style="width:45%;background:var(--orange)"></div></div><span>prepare</span></div>
-    <div class="bar"><span>Issue forms</span><div class="track"><div class="fill" style="width:25%;background:var(--orange)"></div></div><span>preview gate</span></div>
-    <div class="bar"><span>Discussions</span><div class="track"><div class="fill" style="width:12%;background:var(--muted)"></div></div><span>defer</span></div>
-    <div class="scroll">
+  <section id="channels" data-section-label="Community channels and support boundaries">
+    <h2>9. Community Channels And Support Boundaries</h2>
+    <div class="table-wrap" style="overflow-x: auto" data-tts-narrative="Use docs, releases, private records, and proof fixtures now. Enable a structured issue form for the one-person preview. Defer Discussions, traffic interpretation, and broad launch channels.">
       <table>
-        <thead><tr><th>Channel</th><th>Recommendation</th><th>Evidence or rationale</th></tr></thead>
+        <thead><tr><th>Channel</th><th>Decision</th><th>Entry condition</th><th>Evidence use</th><th>Boundary</th></tr></thead>
         <tbody>
-          <tr><td>Private daily-driver notes</td><td>Use now.</td><td>Next missing evidence is repeated builder retention.</td></tr>
-          <tr><td>Prototype README/examples</td><td>Use now.</td><td>Already present and directly support first local loop evidence.</td></tr>
-          <tr><td>Root public README</td><td>Prepare after prototype docs stabilize.</td><td>GitHub README docs support purpose, usefulness, getting started, help, and maintainer context.</td></tr>
-          <tr><td>GitHub Issues with forms</td><td>Defer until controlled preview.</td><td>GitHub issue forms support structured required fields; Chromux failures need OS, CLI, auth, preview, capture, and delivery details.</td></tr>
-          <tr><td>GitHub Discussions</td><td>Defer.</td><td>Discussions are for open-ended Q&A, announcements, polls, and project conversation; early Chromux feedback should be structured.</td></tr>
-          <tr><td>Broad launch channels</td><td>Defer.</td><td>Out of approved scope and premature without daily-driver/external first-success proof.</td></tr>
+          <tr><td>Root/prototype docs</td><td class="status-go">Use now</td><td>Stay aligned with target</td><td>Instructions and trust</td><td>No self-serve validation claim</td></tr>
+          <tr><td>Releases/notes</td><td class="status-go">Use now</td><td>Exact tag/title/install route</td><td>Immutable target</td><td>Latest release has no assets</td></tr>
+          <tr><td>Private daily-driver notes</td><td class="status-go">Use now</td><td>Next real session</td><td>Retention/abandonment</td><td>No forced telemetry</td></tr>
+          <tr><td>Proof fixtures/transcripts</td><td class="status-go">Use now</td><td>Stable redacted scenario</td><td>Reproducibility/recovery</td><td>Not user outcomes</td></tr>
+          <tr><td>Issues + first-success form</td><td class="status-hold">Enable for one-person preview</td><td>Form on default branch; internal gates pass</td><td>Structured feedback</td><td>No unbounded support promise</td></tr>
+          <tr><td>Discussions</td><td class="status-hold">Defer</td><td>Repeated open-ended demand</td><td>Q&amp;A/direction later</td><td>Current need is structured reports</td></tr>
+          <tr><td>GitHub traffic</td><td class="status-hold">Record after sharing</td><td>Supported preview begins</td><td>Interest only</td><td>Recent 14-day window; not activation</td></tr>
+          <tr><td>Product Hunt/HN/Reddit/Discord/social</td><td class="status-missing">Excluded/defer</td><td>Multiple outcomes + support capacity</td><td>Later acquisition learning</td><td>Outside scope</td></tr>
         </tbody>
       </table>
     </div>
+    <p>GitHub guidance supports this boundary: README for purpose/getting started/help; community files for contribution expectations; issue forms for required fields; Discussions for open-ended conversation; Releases for tag-based deployable iterations and assets.</p>
   </section>
 
-  <section class="card proof" id="proof">
-    <h2>Proof Artifacts</h2>
-    <div class="scroll">
-      <table>
-        <thead><tr><th>Proof artifact</th><th>Status</th><th>Evidence</th><th>Adoption implication</th></tr></thead>
-        <tbody>
-          <tr><td>Stack feasibility</td><td class="ok">Proven for Electron prototype; not proven for <code>cmux</code> fork.</td><td>Prototype code, smoke check, transcript.</td><td>Stop saying no runnable app exists; keep fork-base caveat.</td></tr>
-          <tr><td>Capture-to-agent handoff</td><td class="warn">Partially proven.</td><td>File-drop in smoke transcript; <code>claude -p</code> separately verified in transcript.</td><td>Next proof is real-session usefulness.</td></tr>
-          <tr><td>Sample capture YAML</td><td class="ok">Present.</td><td><code>prototype/examples/captures/sample-capture.yaml</code></td><td>Reconcile stale tasks.</td></tr>
-          <tr><td>Paired-pane screenshot</td><td class="ok">Present.</td><td><code>prototype/docs/screenshot.png</code>, <code>sample-screenshot.png</code></td><td>Prototype visual proof exists.</td></tr>
-          <tr><td>Review queue proof</td><td class="warn">Transcript present, standalone screenshot missing.</td><td><code>first-local-loop.md</code></td><td>Add annotated screenshot if needed for public proof.</td></tr>
-          <tr><td>Failure recovery transcript</td><td class="bad">Missing.</td><td>README explains retry, but no fixture.</td><td>Add before inviting external users.</td></tr>
-          <tr><td>Local data map</td><td class="warn">Partial.</td><td>Prototype README and capture payload docs.</td><td>Needs fuller privacy/local-data doc before public trust claims.</td></tr>
-          <tr><td>Manual baseline comparison</td><td class="bad">Missing.</td><td>No real-use timing or notes found.</td><td>Keep as daily-driver proof task.</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
-
-  <section class="card" id="metrics">
-    <h2>Activation And Retention Metrics</h2>
-    <p>Start with local records, not telemetry. The packet keeps traffic as an interest signal only, because GitHub traffic shows recent clones, visitors, referrers, and popular content; it does not prove activation.</p>
-    <div class="scroll">
-      <table>
-        <thead><tr><th>Metric</th><th>Current source</th><th>Target signal</th><th>Decision use</th></tr></thead>
-        <tbody>
-          <tr><td>Smoke health</td><td><code>npm run smoke</code></td><td>Scripted checks pass.</td><td>Entry gate before sharing builds.</td></tr>
-          <tr><td>Real sessions launched</td><td>Manual note or local event log</td><td>Builder chooses Chromux for work.</td><td>Habit formation.</td></tr>
-          <tr><td>Previews reviewed in Chromux vs Chrome</td><td>Manual tally</td><td>Reduced context switching.</td><td>Validates wedge.</td></tr>
-          <tr><td>Captures generated</td><td><code>~/.chromux/captures</code> plus notes</td><td>Capture becomes habitual.</td><td>Shows use of evidence channel.</td></tr>
-          <tr><td>Useful capture rate</td><td>Builder marks agent outcome</td><td>Payload is actionable.</td><td>Guides schema changes.</td></tr>
-          <tr><td>Manual retry rate</td><td>Delivery log and notes</td><td>Low retry indicates trust.</td><td>Promotes delivery fixes if high.</td></tr>
-          <tr><td>Wrong-session incidents</td><td>Manual incident log</td><td>Pairing is safe.</td><td>Blocks external preview if recurring.</td></tr>
-          <tr><td>First-success reports</td><td>Future issue form/private report</td><td>Non-builder completes wedge.</td><td>Controlled preview gate.</td></tr>
-          <tr><td>GitHub traffic</td><td>Future repository Insights</td><td>Discovery/interest after sharing.</td><td>Interest only, not activation.</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
-
-  <section class="card changed" id="changes">
-    <h2>Proposed Canonical And Task Changes</h2>
-    <h3>Canonical adoption artifact</h3>
+  <section id="distribution" data-section-label="Distribution and trust boundary">
+    <h2>10. Distribution And Trust Boundary</h2>
+    <p>The current macOS source install is unsigned. Apple says Developer ID signing lets Gatekeeper verify software distributed outside the Mac App Store, while notarization scans Developer ID-signed software and supplies a Gatekeeper ticket.</p>
     <ul>
-      <li>Preserve the proof-led adoption stance and personal-first sequence.</li>
-      <li>Replace stale missing-proof claims with current prototype evidence.</li>
-      <li>Reframe the next gate as daily-driver proof and external first-success readiness.</li>
-      <li>Mark prototype README, capture schema, sample capture, screenshot, transcript, and storage map as present.</li>
-      <li>Keep <code>cmux</code> fork feasibility caveated if the long-term plan still depends on it.</li>
-      <li>Keep broad community growth deferred.</li>
+      <li>A clean source-build record can test the approved technical cohort when the unsigned/source boundary is explicit.</li>
+      <li>If a downloaded app, DMG, PKG, or ZIP becomes the supported route, signing, hardened-runtime compatibility, notarization, and first-launch testing enter the reproducibility gate.</li>
+      <li>Signing/notarization is distribution trust evidence, not product-value evidence.</li>
+      <li>Universal binaries, cross-platform packaging, enterprise deployment, and procurement stay outside this run.</li>
     </ul>
-    <h3>Task files after approval</h3>
-    <div class="scroll">
+  </section>
+
+  <section id="team" data-section-label="Lightweight team-conversion trigger register">
+    <h2>11. Lightweight Team-Conversion Trigger Register</h2>
+    <p>Record signals; do not design packaging, pricing, procurement, or administration.</p>
+    <div class="table-wrap" style="overflow-x: auto" data-tts-narrative="No team conversion signal is currently present. Revisit only after attributable shared-workflow, deployment, policy, support, or hosted-infrastructure requests.">
       <table>
-        <thead><tr><th>File</th><th>Proposed change</th><th>Reason</th></tr></thead>
+        <thead><tr><th>Signal</th><th>Evidence</th><th>Revisit rule</th><th>State</th></tr></thead>
         <tbody>
-          <tr><td><code>tasks/todo.md</code></td><td>Replace generic proof-artifact task with narrower real localhost/Vite fixture and failure-recovery transcript tasks.</td><td>Prototype sample payload, screenshot, and transcript exist.</td></tr>
-          <tr><td><code>tasks/todo.md</code></td><td>Replace root example creation tasks with validation/promote tasks for <code>prototype/examples/...</code> if root-level examples are desired.</td><td>Existing examples live under <code>prototype/</code>.</td></tr>
-          <tr><td><code>tasks/todo.md</code></td><td>Keep root/public capture payload, troubleshooting, privacy/local-data, and README tasks, but amend wording to acknowledge prototype docs.</td><td>Prototype docs are not full public repo readiness.</td></tr>
-          <tr><td><code>tasks/record-todo.md</code></td><td>Change builder daily-driver metric condition to begin after next real work session.</td><td>Runnable prototype exists.</td></tr>
-          <tr><td><code>tasks/recurring-todo.md</code></td><td>Change monthly review trigger to after first daily-driver week or before inviting external users.</td><td>Runnable app exists; usage evidence is now the gating condition.</td></tr>
+          <tr><td>Shared workflow</td><td>Request to share sessions/captures/review state</td><td>Two independent requests or repeated multi-developer use</td><td>None</td></tr>
+          <tr><td>Managed deployment</td><td>Controlled install/update-ring request</td><td>First organization treats it as blocker</td><td>None</td></tr>
+          <tr><td>Policy/retention</td><td>Deletion, encryption, audit, retention request</td><td>First attributable policy blocker</td><td>None</td></tr>
+          <tr><td>Support</td><td>Time and repeated categories</td><td>Same friction across two users or budget exceeded</td><td>None</td></tr>
+          <tr><td>Hosted infrastructure</td><td>Local execution/persistence blocks use</td><td>Two attributable local-only blockers</td><td>None</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>The register cannot infer a buyer, price, or team package before the signal exists.</p>
+  </section>
+
+  <section id="metrics" data-section-label="Activation retention and proof metrics">
+    <h2>12. Activation, Retention, And Proof Metrics</h2>
+    <p>Start with voluntary local records, not telemetry.</p>
+    <div class="table-wrap" style="overflow-x: auto" data-tts-narrative="The only fixed quantitative threshold is three real sessions in seven days. Other metrics establish a baseline, while critical pairing incidents must be zero before invitation.">
+      <table>
+        <thead><tr><th>Metric</th><th>Source</th><th>Threshold/treatment</th><th>Use</th></tr></thead>
+        <tbody>
+          <tr><td>Complete activation loops</td><td>Daily-driver note</td><td>At least one in 7 days</td><td>Confirms wedge</td></tr>
+          <tr><td>Real sessions chosen</td><td>Daily-driver note</td><td>At least 3 in 7 days</td><td>Retention gate</td></tr>
+          <tr><td>Actionable responses</td><td>Session note</td><td>Baseline yes/partly/no</td><td>Evidence usefulness</td></tr>
+          <tr><td>External-browser fallback</td><td>Session note</td><td>Reason every time</td><td>Habit-break cause</td></tr>
+          <tr><td>Useful capture rate</td><td>Useful / total</td><td>Baseline</td><td>Payload/evidence changes</td></tr>
+          <tr><td>Manual retry rate</td><td>Delivery log + note</td><td>Baseline</td><td>Delivery trust</td></tr>
+          <tr><td>Pairing incidents</td><td>Incident note</td><td>Zero unresolved critical incidents</td><td>Safety gate</td></tr>
+          <tr><td>Clean-install time</td><td>Install record</td><td>Baseline</td><td>Setup burden</td></tr>
+          <tr><td>Undocumented intervention</td><td>Install record</td><td>Zero for pass</td><td>Reproducibility</td></tr>
+          <tr><td>Non-builder first success</td><td>Issue form</td><td>One without synchronous help</td><td>Preview gate</td></tr>
+          <tr><td>Return use</td><td>Second report/session</td><td>Signal, not first-invite gate</td><td>Early retention</td></tr>
+          <tr><td>GitHub traffic</td><td>Insights after sharing</td><td>Interest only</td><td>Discovery, never activation</td></tr>
         </tbody>
       </table>
     </div>
   </section>
 
-  <section class="card" id="evidence">
-    <h2>Evidence Matrix</h2>
-    <div class="scroll">
+  <section id="plan" data-section-label="Proposed 30 to 60 day proof plan">
+    <h2>13. Proposed 30–60 Day Proof Plan</h2>
+    <div class="cards">
+      <div class="card"><strong>Days 0–7 · Freeze + observe</strong>Select immutable target; start daily-driver record; keep this decision Apple Silicon; reconcile public docs. Exit after three attempted real sessions with fallbacks recorded.</div>
+      <div class="card"><strong>Days 7–14 · Reproduce</strong>Archive clean install, stable HTTP fixture, recovery transcript, and publish the form to the intended branch. Exit when all pass without undocumented intervention.</div>
+      <div class="card"><strong>Days 14–30 · Decide invite</strong>Review evidence; hold on critical pairing/data loss; otherwise invite one matching non-builder and collect a self-serve report.</div>
+      <div class="card"><strong>Days 31–60 · Repeat narrowly</strong>Repeat with one user only after pass; otherwise fix observed blocker and rerun the same scenario.</div>
+      <div class="card"><strong>Day 60 · Decide</strong>Supported small preview, another proof cycle, or stop adoption investment until premise changes.</div>
+      <div class="card"><strong>Explicit non-goal</strong>No broad launch work during this plan.</div>
+    </div>
+  </section>
+
+  <section id="alternatives" data-section-label="Alternatives considered">
+    <h2>14. Alternatives Considered</h2>
+    <div class="table-wrap" style="overflow-x: auto" data-tts-narrative="Immediate invitations, proxy adoption metrics, forced telemetry, early Discussions, launch research, team packaging, and the stale July packet are rejected or deferred.">
       <table>
-        <thead><tr><th>Claim</th><th>Evidence</th><th>Inference</th><th>Confidence</th><th>Decision impact</th></tr></thead>
+        <thead><tr><th>Alternative</th><th>Disposition</th><th>Reason</th></tr></thead>
         <tbody>
-          <tr><td>Canonical artifact is stale on prototype existence.</td><td>Current repo has prototype package, README, capture docs, examples; canonical artifact says these are missing.</td><td>Stage 3 should amend.</td><td>High</td><td>Update artifact and tasks.</td></tr>
-          <tr><td>Adoption wedge remains session-paired review plus evidence routing.</td><td>Local research, prototype README, and code all center on pairing, queueing, capture payloads, delivery/file-drop.</td><td>Progress validates the same wedge.</td><td>High</td><td>Keep first local loop central.</td></tr>
-          <tr><td>Prototype proof is not daily-driver proof.</td><td>Smoke/transcript are scripted; no repeated real-use metrics or external reports exist.</td><td>Public launch remains premature.</td><td>High</td><td>Start local adoption records.</td></tr>
-          <tr><td>Issue forms are the right first support surface.</td><td>GitHub docs support templates/forms with structured required fields.</td><td>Chromux failures require structured environment/workflow details.</td><td>High</td><td>Add forms only at controlled preview.</td></tr>
-          <tr><td>Discussions remain delayed.</td><td>GitHub docs position Discussions for open-ended Q&A, announcements, polls, direction.</td><td>Early feedback should be structured.</td><td>Medium-high</td><td>Do not enable before demand.</td></tr>
-          <tr><td>GitHub traffic is interest, not activation.</td><td>GitHub docs describe traffic as recent clones, visitors, referrers, popular content.</td><td>Cannot prove first success.</td><td>High</td><td>Pair with reports and usage records.</td></tr>
-          <tr><td>Trust docs still gate broad local-first claims.</td><td>Captures include screenshots, selected HTML, console tails, URLs, paths, delivery logs, browser profile state.</td><td>Local-only still needs disclosure and deletion guidance.</td><td>High</td><td>Keep privacy/local-data docs as release gate.</td></tr>
+          <tr><td>Invite because repo is public</td><td>Rejected</td><td>Visibility is not self-serve/support readiness.</td></tr>
+          <tr><td>Count tests/releases/features as adoption</td><td>Rejected</td><td>Mechanism and activity are not outcomes.</td></tr>
+          <tr><td>Require signing before any proof</td><td>Rejected universally</td><td>Technical source-build cohort can validate value; binary route changes requirement.</td></tr>
+          <tr><td>Forced telemetry</td><td>Rejected</td><td>Non-goal; local records answer this decision.</td></tr>
+          <tr><td>Discussions now</td><td>Deferred</td><td>Structured first-success/failure fields are more useful.</td></tr>
+          <tr><td>Broad launch research</td><td>Excluded</td><td>Outside approved scope.</td></tr>
+          <tr><td>Team packaging/pricing</td><td>Deferred</td><td>No demand evidence.</td></tr>
+          <tr><td>Approve July packet unchanged</td><td>Rejected</td><td>Product, docs, packaging, release, and workflow state changed materially.</td></tr>
         </tbody>
       </table>
     </div>
   </section>
 
-  <section class="card" id="assumptions">
-    <h2>Assumptions And Gaps</h2>
-    <div class="grid2">
-      <div class="mini"><strong>High confidence</strong>The Electron prototype is the current product surface to evaluate; builder remains the first audience; external users should wait until daily-driver proof.</div>
-      <div class="mini"><strong>Medium confidence</strong>Root repository is not yet public-adoption ready; <code>claude -p</code> is good enough for the next real-use test.</div>
+  <section id="evidence" data-section-label="Evidence matrix">
+    <div class="section-head"><h2>15. Evidence Matrix</h2><span class="badge warn">Outcome evidence limited</span></div>
+    <div class="table-wrap" style="overflow-x: auto" data-tts-narrative="The strongest claims concern present capability and missing proof. Recurring value, clean self-service, and external readiness remain unproven.">
+      <table>
+        <thead><tr><th>Claim</th><th>Evidence</th><th>Inference</th><th>Confidence / status</th><th>Decision impact</th></tr></thead>
+        <tbody>
+          <tr><td>Ready for daily-driver measurement</td><td>Current app/docs; 0.64 candidate; smoke + 8 focused checks</td><td>More feasibility work is not the adoption bottleneck</td><td>High; capability-backed</td><td>Start 7-day record</td></tr>
+          <tr><td>Not ready for supported preview</td><td>No clean install, daily-driver outcome, non-builder report; release has no assets; form absent from default branch</td><td>Invite would test rescue and drift</td><td>High; gap-backed</td><td>Hold invitation</td></tr>
+          <tr><td>Wedge remains paired review/evidence routing</td><td>Intake, README, candidate Composer, capture contract, adjacent research</td><td>Activation still depends on pairing, approval, bounded evidence, right response</td><td>High</td><td>Measure complete loop</td></tr>
+          <tr><td>Candidate routing reduces old continuity gap</td><td>README/source changes; Composer/restore tests</td><td>Normal terminal-input route is closer to live context</td><td>Medium-high; unreleased/outcome unproven</td><td>Test in real use</td></tr>
+          <tr><td>Clean self-service is unproven</td><td>Commands/docs but no fresh-machine record; unsigned source install</td><td>Configured success is insufficient</td><td>High; outcome unproven</td><td>First reproducibility gate</td></tr>
+          <tr><td>Localhost support real, proof incomplete</td><td>Probe/projects E2E; transcript lacks served/captured real page</td><td>Mechanics work, adopter artifact absent</td><td>High; partial</td><td>Stable HTTP fixture</td></tr>
+          <tr><td>Recovery strong, comprehension unproven</td><td>Disk-first payload, retry, log, docs, failure tests</td><td>Architecture preserves action, but no operator observation</td><td>High implementation; low comprehension</td><td>Recovery transcript</td></tr>
+          <tr><td>Public metadata gives no adoption outcome</td><td>No issues/stars/forks/subscribers; new repo; traffic not inspected</td><td>Absence is not rejection or activation</td><td>High limitation</td><td>No demand claims</td></tr>
+          <tr><td>Issue form fits initial support</td><td>GitHub docs + local structured form</td><td>Fields match Chromux failure modes</td><td>High</td><td>Publish at invite</td></tr>
+          <tr><td>Discussions should remain disabled</td><td>GitHub open-ended use cases; no demand</td><td>Structured reports are more useful</td><td>High</td><td>Revisit later</td></tr>
+          <tr><td>Proof bundle beats screenshot</td><td>Playwright pattern + local capture/logs</td><td>Sequence, metadata, outcome, recovery improve decisions</td><td>Medium-high inference</td><td>Archive packets</td></tr>
+          <tr><td>Apple trust work matters for binary route</td><td>Apple guidance + unsigned current route</td><td>Binary trust differs from source-build proof</td><td>High conditional</td><td>Conditional gate</td></tr>
+        </tbody>
+      </table>
     </div>
-    <h3>Source coverage gaps</h3>
+    <div class="callout warn"><strong>Research completeness check:</strong> this evidence is sufficient to recommend a proof plan and hold verdict. It is not sufficient to conclude that Chromux creates recurring value or that an external user can self-serve.</div>
+  </section>
+
+  <section id="confidence" data-section-label="Assumptions and confidence register">
+    <h2>16. Assumptions And Confidence Register</h2>
+    <div class="table-wrap" style="overflow-x: auto" data-tts-narrative="Audience and thresholds are high-confidence user decisions. Recurring value is low-confidence. Live-session routing, source-build tolerance, and support surface sufficiency remain medium-confidence hypotheses.">
+      <table>
+        <thead><tr><th>Statement</th><th>Status</th><th>Confidence</th><th>What changes it</th></tr></thead>
+        <tbody>
+          <tr><td>Apple Silicon technical solo builders remain target</td><td>User-owned scope</td><td>High as intent</td><td>Audience/platform change</td></tr>
+          <tr><td>3 sessions / 7 days is useful</td><td>User-owned threshold</td><td>High rule; outcome unproven</td><td>Measured behavior</td></tr>
+          <tr><td>Paired cockpit creates recurring value</td><td>Core hypothesis</td><td>Low</td><td>Chosen-use/abandonment records</td></tr>
+          <tr><td>Candidate live routing improves one-off delivery</td><td>Product hypothesis</td><td>Medium</td><td>Real routing confusion/usefulness</td></tr>
+          <tr><td>Clean source build is enough for first invite</td><td>Conditional method</td><td>Medium</td><td>Participant/binary friction</td></tr>
+          <tr><td>One self-serve user guides small-preview decision</td><td>Approved threshold</td><td>Medium-high</td><td>Atypical/incomplete result</td></tr>
+          <tr><td>Issues can contain initial support</td><td>Method assumption</td><td>Medium</td><td>Private/synchronous support need</td></tr>
+          <tr><td>No decision-critical Stage 0 context missing</td><td>User-confirmed</td><td>High</td><td>New scope/threshold evidence</td></tr>
+          <tr><td>Adjacent research is directional, not current authority</td><td>Observed</td><td>High</td><td>Artifacts refreshed</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="lower-confidence" data-section-label="Rejected or lower-confidence findings">
+    <h2>17. Rejected Or Lower-Confidence Findings</h2>
     <ul>
-      <li>No broad launch-channel research was performed; it was out of scope and remains premature.</li>
-      <li>No external Chromux users, interviews, installs, issues, or first-success reports were available.</li>
-      <li>No hands-on public GitHub traffic data was available.</li>
-      <li>The smoke check verifies a scripted path, not sustained use across real projects.</li>
-      <li>The <code>cmux</code> fork base was not inspected; verified stack evidence is for this Electron prototype.</li>
-      <li>Official source checks were limited to GitHub docs for README/community files, issue templates/forms, Discussions, and repository traffic.</li>
+      <li><strong>Rejected:</strong> release count proves retention; it proves maintainer activity.</li>
+      <li><strong>Rejected:</strong> zero stars/issues means no demand; repo is new, traffic uninspected, and counts do not measure activation.</li>
+      <li><strong>Rejected:</strong> issue form proves readiness; it proves support-field design and is unpublished/unused.</li>
+      <li><strong>Rejected:</strong> localhost fixture is complete; tests prove listeners/detection/readiness/queueing, not a preserved page/capture/response artifact.</li>
+      <li><strong>Rejected:</strong> signing must precede founder proof; it matters for downloaded binary trust.</li>
+      <li><strong>Lower confidence:</strong> live-session Composer materially improves retention; it is fresh candidate behavior.</li>
+      <li><strong>Lower confidence:</strong> one participant represents broader OSS; it is a directional gate, not a market estimate.</li>
+      <li><strong>Lower confidence:</strong> first cohort should stay macOS-only after Windows/WSL2 support; this is approved scope, not a market conclusion.</li>
     </ul>
   </section>
 
-  <section class="card" id="sources">
-    <h2>Sources</h2>
-    <div class="scroll">
+  <section id="gaps" data-section-label="Source coverage gaps">
+    <h2>18. Source Coverage Gaps</h2>
+    <ul>
+      <li>No daily-driver notes, clean-install record, first-success report, support transcript, user quote, or interview.</li>
+      <li>No GitHub traffic snapshot; passive counts are not a substitute.</li>
+      <li>No downloaded macOS binary, Developer ID signature, notarization ticket, or Gatekeeper first-launch run.</li>
+      <li>No clean Apple Silicon account/machine and no participant contact.</li>
+      <li>No broad launch, social, trend, pricing, procurement, or enterprise research.</li>
+      <li>Windows/WSL2 adoption intentionally not researched.</li>
+      <li>Comparable tools reviewed through primary docs, not hands-on trials.</li>
+      <li>Adjacent canonical research contains stale versions/claims; only reverified principles were reused.</li>
+      <li>The current candidate is dirty; passing checks do not make it an immutable target.</li>
+    </ul>
+  </section>
+
+  <section id="implications" data-section-label="Downstream implications">
+    <h2>19. Downstream Implications</h2>
+    <div class="cards">
+      <div class="card"><strong>Product/docs</strong>Freeze a candidate; measure the complete loop; preserve approval, pairing safety, inspectable evidence, and recovery; keep Windows outside this proof; add binary trust gate only if binary is distributed.</div>
+      <div class="card"><strong>Adoption operations</strong>Start next-session record; use one target for install/recovery/external proof; publish form only at invite; keep Discussions and broad channels off.</div>
+      <div class="card"><strong>Team conversion</strong>Record only attributable signals; do not create pricing, packaging, procurement, SSO, audit, or managed-retention work.</div>
+    </div>
+    <p>Add first-run diagnostics only if the clean-install record reveals repeated setup failures; avoid speculative onboarding.</p>
+  </section>
+
+  <section id="changes" data-section-label="Applied Stage 3 canonical and task changes">
+    <div class="section-head"><h2>20. Applied Stage 3 Canonical And Task Changes</h2><span class="badge good">Applied</span></div>
+    <div class="table-wrap" style="overflow-x: auto" data-tts-narrative="Stage 3 updated the canonical report and three task files only. Application, release, specs, issue-form content, and manual todo remain unchanged.">
       <table>
-        <thead><tr><th>Type</th><th>Source</th><th>Use</th></tr></thead>
+        <thead><tr><th>File</th><th>Applied mutation</th></tr></thead>
         <tbody>
-          <tr><td>Local research</td><td><code>research/devtool-adoption.md</code>, <code>devtool-positioning.md</code>, <code>devtool-dx-journey.md</code>, <code>devtool-integration-map.md</code>, <code>devtool-docs-audit.md</code>, <code>devtool-monetization.md</code></td><td>Baseline adoption stance and neighboring constraints.</td></tr>
-          <tr><td>Local tasks</td><td><code>tasks/todo.md</code>, <code>tasks/record-todo.md</code>, <code>tasks/recurring-todo.md</code></td><td>Follow-up reconciliation.</td></tr>
-          <tr><td>Prototype docs</td><td><code>prototype/README.md</code>, <code>prototype/docs/capture-payload.md</code>, <code>prototype/examples/...</code></td><td>Current proof artifacts and quickstart.</td></tr>
-          <tr><td>Prototype code</td><td><code>prototype/main.js</code>, <code>renderer/renderer.js</code>, <code>preload.js</code>, <code>webview-preload.js</code></td><td>Feature evidence for detection, queueing, capture, delivery.</td></tr>
-          <tr><td>Verification</td><td><code>npm run smoke</code> in <code>prototype/</code></td><td>Returned <code>SMOKE_OK</code>.</td></tr>
-          <tr><td>Official docs</td><td>GitHub README docs, issue/PR template docs, Discussions docs, repository traffic docs.</td><td>Community surface and metric support.</td></tr>
+          <tr><td><code>research/devtool-adoption.md</code></td><td>Replaced stale state with the freshness distinction, hold verdict, five gates, three loops, templates, channels, distribution boundary, team triggers, metrics, plan, evidence, alternatives, gaps, and confidence.</td></tr>
+          <tr><td><code>tasks/todo.md</code></td><td>Added only a durable real-HTTP first-success fixture/transcript and one induced failure-recovery transcript. No broad launch, Discussions, pricing, team rollout, cross-platform adoption, or speculative onboarding was added.</td></tr>
+          <tr><td><code>tasks/record-todo.md</code></td><td>Added the next-session 7-day record, clean Apple Silicon baseline after immutable target selection, and condition-gated external report with immediate critical pairing/data-loss promotion.</td></tr>
+          <tr><td><code>tasks/recurring-todo.md</code></td><td>Set review for 2026-08-26 or before invitation and again on 2026-09-25 if held, with the approved evidence paths and escalation conditions.</td></tr>
         </tbody>
       </table>
     </div>
+    <h3>Intentionally unchanged</h3>
+    <p>App source/package metadata; <code>RELEASES.md</code>, tags, and GitHub Releases; specs; issue-form content unless feedback approves a cohort/version field amendment; <code>tasks/manual-todo.md</code>.</p>
   </section>
 
-  <section class="card" id="gates">
-    <h2>Artifact Approval Gates</h2>
-    <form id="reviewForm">
-      <fieldset class="gate" data-gate-name="artifact_decision">
-        <legend>Gate 1 - Artifact Decision</legend>
-        <label class="option"><input type="radio" name="artifact_decision" value="approve_packet" data-approval-effect="approve"> Approve the Stage 2 packet and proceed to Stage 3 canonicalization on the next compiled YAML.</label>
-        <label class="option"><input type="radio" name="artifact_decision" value="revise_packet" data-approval-effect="clarify"> Request Stage 2 revisions before canonicalization.</label>
-        <label class="option"><input type="radio" name="artifact_decision" value="block_packet" data-approval-effect="block"> Block canonicalization; the packet does not support the intended adoption artifact.</label>
-      </fieldset>
-      <fieldset class="gate" data-gate-name="canonical_changes">
-        <legend>Gate 2 - Canonical File Changes</legend>
-        <label class="option"><input type="radio" name="canonical_changes" value="approve_canonical_scope" data-approval-effect="approve"> Approve the proposed canonical adoption-artifact amendments.</label>
-        <label class="option"><input type="radio" name="canonical_changes" value="revise_canonical_scope" data-approval-effect="clarify"> Request changes to the canonical amendment scope.</label>
-        <label class="option"><input type="radio" name="canonical_changes" value="block_canonical_scope" data-approval-effect="block"> Do not update the canonical adoption artifact from this packet.</label>
-      </fieldset>
-      <fieldset class="gate" data-gate-name="task_changes">
-        <legend>Gate 3 - Task File Changes</legend>
-        <label class="option"><input type="radio" name="task_changes" value="approve_task_reconciliation" data-approval-effect="approve"> Approve the proposed task-file reconciliation during Stage 3.</label>
-        <label class="option"><input type="radio" name="task_changes" value="canonical_only" data-approval-effect="approve"> Approve canonical artifact changes only; do not edit task files during Stage 3.</label>
-        <label class="option"><input type="radio" name="task_changes" value="revise_tasks" data-approval-effect="clarify"> Request changes to the proposed task-file updates.</label>
-      </fieldset>
-      <fieldset class="gate" data-gate-name="reviewer_notes">
-        <legend>Optional Reviewer Notes</legend>
-        <p class="muted">Use this for factual corrections, scope edits, preferred task handling, or canonical wording requests.</p>
-        <textarea id="reviewerNotes" placeholder="Optional notes for the agent..."></textarea>
-      </fieldset>
-    </form>
+  <section id="sources" data-section-label="Sources">
+    <h2>21. Sources</h2>
+    <details open>
+      <summary>Approved intake and local evidence</summary>
+      <ul class="source-list">
+        <li><code>research/_working/interrogation-devtool-adoption-r1.yaml</code></li>
+        <li><code>interrogation/devtool-adoption-r2-chromux.html</code></li>
+        <li>Stage 1 page archived at <code>docs/history/archive/2026-07-27/112331/alignment/devtool-adoption-chromux.html</code></li>
+        <li><code>README.md</code>; <code>prototype/README.md</code>; <code>prototype/package.json</code></li>
+        <li><code>prototype/main.js</code>; <code>prototype/preload.js</code>; <code>prototype/renderer/renderer.js</code></li>
+        <li><code>prototype/docs/capture-payload.md</code>; <code>prototype/docs/privacy-and-local-data.md</code>; <code>prototype/docs/troubleshooting.md</code></li>
+        <li><code>prototype/examples/transcripts/first-local-loop.md</code></li>
+        <li><code>prototype/examples/captures/sample-capture.yaml</code>; <code>prototype/examples/captures/sample-screenshot.png</code></li>
+        <li><code>.github/ISSUE_TEMPLATE/first-success-report.yml</code></li>
+        <li><code>tasks/todo.md</code>; <code>tasks/record-todo.md</code>; <code>tasks/recurring-todo.md</code></li>
+        <li><code>research/devtool-positioning.md</code>; <code>research/devtool-dx-journey.md</code>; <code>research/devtool-docs-audit.md</code></li>
+        <li><code>research/devtool-integration-map.md</code>; <code>research/devtool-monetization.md</code></li>
+        <li><code>RELEASES.md</code>; git history and tags through 2026-07-27</li>
+        <li>Focused verification commands listed in Section 3</li>
+        <li>GitHub CLI/API observations of the public repository, community profile, issues, and Releases on 2026-07-27</li>
+      </ul>
+    </details>
+    <details>
+      <summary>Official GitHub sources</summary>
+      <ul class="source-list">
+        <li><a href="https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes">About the repository README file</a></li>
+        <li><a href="https://docs.github.com/en/communities/setting-up-your-project-for-healthy-contributions/about-community-profiles-for-public-repositories">Community profiles</a></li>
+        <li><a href="https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/about-issue-and-pull-request-templates">Issue and PR templates</a></li>
+        <li><a href="https://docs.github.com/en/discussions/collaborating-with-your-community-using-discussions/about-discussions">About Discussions</a></li>
+        <li><a href="https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases">About Releases</a></li>
+        <li><a href="https://docs.github.com/en/repositories/viewing-activity-and-data-for-your-repository/viewing-traffic-to-a-repository">Viewing repository traffic</a></li>
+        <li><a href="https://github.com/GeorgeQLe/gblockparty-chromux/releases/tag/chromux-v0.61.9">Chromux v0.61.9</a></li>
+      </ul>
+    </details>
+    <details>
+      <summary>Official Apple and comparable primary sources</summary>
+      <ul class="source-list">
+        <li><a href="https://developer.apple.com/developer-id/">Signing Mac Software with Developer ID</a></li>
+        <li><a href="https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution">Notarizing macOS software</a></li>
+        <li><a href="https://docs.openhands.dev/openhands/usage/run-openhands/local-setup">OpenHands local setup</a></li>
+        <li><a href="https://aider.chat/docs/usage.html">Aider usage</a> and <a href="https://aider.chat/docs/usage/lint-test.html">linting/testing</a></li>
+        <li><a href="https://playwright.dev/docs/trace-viewer">Playwright Trace Viewer</a></li>
+        <li><a href="https://zed.dev/docs/macos">Zed on macOS</a> and <a href="https://zed.dev/docs/troubleshooting">troubleshooting</a></li>
+      </ul>
+    </details>
   </section>
 
-  <section class="card" id="compile">
-    <h2>Compile Responses</h2>
-    <p>Compile final YAML when the required gates are answered. Approval requires approving options and no unresolved negative feedback.</p>
-    <button type="button" onclick="compileYaml()">Compile Responses</button>
-    <button type="button" class="secondary" onclick="copyYaml()">Copy YAML</button>
-    <h3>Compiled YAML</h3>
-    <div class="output" id="yamlOutput">Select gate responses, then compile.</div>
+  <section id="confirmation" class="gate updated" data-section-label="Confirmation and approval record">
+    <div class="section-head"><h2>22. Confirmation And Approval Record</h2><span class="badge good">Confirmed</span></div>
+    <div class="callout good">
+      <strong>alignment_status: confirmed</strong><br>
+      Confirmation date: 2026-07-27<br>
+      Approval source: final compiled Stage 2 response YAML supplied for <code>$devtool-adoption</code>, with <code>response_status: complete</code>, <code>approval_status: ready-for-agent-review</code>, <code>required_gate_status: complete</code>, no unanswered required questions, and no section feedback.
+    </div>
+    <h3>Confirmed artifact paths</h3>
+    <ul>
+      <li><code>research/devtool-adoption.md</code></li>
+      <li><code>tasks/todo.md</code></li>
+      <li><code>tasks/record-todo.md</code></li>
+      <li><code>tasks/recurring-todo.md</code></li>
+      <li><code>docs/history/archive/2026-07-27/131810/research/_working/preliminary-devtool-adoption-research.md</code></li>
+    </ul>
+    <h3>Read-only gate decisions</h3>
+    <div class="table-wrap" style="overflow-x: auto" data-tts-narrative="All six Stage 2 approval gates were answered affirmatively. The verdict, evidence sufficiency, confidence treatment, canonical destination, four-file mutation boundary, and review format were approved without edits.">
+      <table>
+        <thead><tr><th>Gate</th><th>Approved decision</th></tr></thead>
+        <tbody>
+          <tr><td>Final artifact verdict</td><td>Approve the Stage 2 adoption verdict, proof gates, and 30–60 day plan.</td></tr>
+          <tr><td>Research completeness</td><td>Evidence is sufficient for the hold verdict and proof plan; outcome gaps remain explicit.</td></tr>
+          <tr><td>Assumptions and confidence</td><td>Approve the assumptions, confidence levels, and outcome-evidence limitations.</td></tr>
+          <tr><td>Canonical artifact destination</td><td>Approve <code>research/devtool-adoption.md</code> as the Stage 3 canonical destination.</td></tr>
+          <tr><td>Proposed file changes</td><td>Approve the proposed canonical and three task-file changes: <code>research/devtool-adoption.md</code>, <code>tasks/todo.md</code>, <code>tasks/record-todo.md</code>, and <code>tasks/recurring-todo.md</code>.</td></tr>
+          <tr><td>User format preferences</td><td>Approve the Stage 2 review format and evidence density.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>What changed during confirmation</h3>
+    <ul>
+      <li>The non-canonical working packet was archived and removed from the active working path.</li>
+      <li>The approved research substance replaced the stale canonical adoption report.</li>
+      <li>Two immediate proof-construction tasks, three condition-gated records, and the day-30/day-60 review cadence were recorded.</li>
+      <li>Interactive gates, section feedback, response compilation, copy controls, and pending-review state were removed from this page.</li>
+    </ul>
+    <p><strong>Finished but amendable:</strong> this page is current for the completed alignment cycle. It is not a claim that the research is permanently true; outcome gaps and caveats remain visible, and later evidence may amend the conclusions only through archive-first revision.</p>
   </section>
-</div>
+</main>
 
 <script>
-function esc(s){return String(s||'').replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/"/g,'\\"')}
-function selected(name){const el=document.querySelector(`input[name="${name}"]:checked`);return el?{value:el.value,effect:el.dataset.approvalEffect||'unknown',label:el.parentElement.textContent.trim()}:null}
-function compileYaml(){
-  const gates=['artifact_decision','canonical_changes','task_changes'];
-  const responses=gates.map(g=>({gate:g,selected:selected(g)}));
-  const unanswered=responses.filter(r=>!r.selected).map(r=>r.gate);
-  const negative=responses.filter(r=>r.selected&&r.selected.effect!=='approve').map(r=>r.gate);
-  const notes=document.getElementById('reviewerNotes').value.trim();
-  const complete=unanswered.length===0;
-  const approve=complete&&negative.length===0;
-  const lines=[
-    'response_type: "alignment-stage-2-artifact-approval"',
-    'alignment_page: "alignment/devtool-adoption-chromux.html"',
-    'alignment_status: "review"',
-    'alignment_stage: "stage-2"',
-    'producing_skill: "devtool-adoption"',
-    'concept_slug: "chromux"',
-    `response_status: "${complete?'complete':'incomplete'}"`,
-    `required_gate_status: "${complete?'complete':'incomplete'}"`,
-    `approval_status: "${approve?'ready-for-stage-3':'feedback-or-revision-required'}"`,
-    'working_packet: "research/_working/preliminary-devtool-adoption-research.md"',
-    'proposed_canonical_artifact: "research/devtool-adoption.md"',
-    'unanswered_required_questions:',
-    ...(unanswered.length?unanswered.map(x=>`  - "${x}"`):['  []']),
-    'gate_responses:'
-  ];
-  for(const r of responses){
-    if(!r.selected){lines.push(`  - gate: "${r.gate}"`,`    value: null`,`    approval_effect: "unanswered"`,`    response: ""`)}
-    else{lines.push(`  - gate: "${r.gate}"`,`    value: "${r.selected.value}"`,`    approval_effect: "${r.selected.effect}"`,`    response: "${esc(r.selected.label)}"`)}
-  }
-  lines.push('negative_or_clarifying_gates:');
-  lines.push(...(negative.length?negative.map(x=>`  - "${x}"`):['  []']));
-  lines.push('reviewer_notes: |');
-  lines.push(notes?notes.split('\n').map(l=>'  '+l).join('\n'):'  ');
-  lines.push('agent_instructions: |');
-  lines.push(approve?'  Proceed to Stage 3. Apply any approved notes, archive/remove the working packet, update approved canonical/task files, and convert this alignment page to confirmed.':'  Remain in Stage 2. Address feedback in the working packet and review page, then stop again for artifact approval.');
-  document.getElementById('yamlOutput').textContent=lines.join('\n');
-}
-async function copyYaml(){compileYaml();const text=document.getElementById('yamlOutput').textContent;try{await navigator.clipboard.writeText(text)}catch(e){}}
+document.querySelectorAll("[data-chart-toggle]").forEach(button => {
+  button.addEventListener("click", () => {
+    const table = document.getElementById(button.dataset.target);
+    const chart = button.closest(".chart-container").querySelector("svg");
+    const showTable = table.hidden;
+    table.hidden = !showTable;
+    chart.hidden = showTable;
+    button.textContent = showTable ? "View as chart" : "View as table";
+  });
+});
 </script>
+<script src="../scripts/alignment-tts-kokoro.js"></script>
 </body>
 </html>

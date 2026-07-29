@@ -1,0 +1,598 @@
+<!doctype html>
+<html lang="en"
+      data-visual-tier="visual"
+      data-interrogation-status="confirmed"
+      data-interrogation-round="1"
+      data-interrogation-gate="continue">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chromux Devtool Adoption — Interrogation Round 1</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface-2: #1c2333;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --orange: #d29922;
+      --purple: #bc8cff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+    main {
+      width: min(1080px, calc(100% - 2rem));
+      max-width: 100%;
+      margin: 0 auto;
+      padding: 2rem 0 5rem;
+      overflow-wrap: break-word;
+    }
+    h1, h2, h3 { color: #fff; line-height: 1.2; }
+    h1 { margin-bottom: .45rem; }
+    h2 { color: var(--accent); margin-top: 0; }
+    h3 { color: var(--purple); }
+    a { color: var(--accent); }
+    code {
+      padding: .08rem .35rem;
+      border: 1px solid var(--border);
+      border-radius: .35rem;
+      background: #0b1018;
+      color: #f0f6fc;
+    }
+    .muted { color: var(--text-muted); }
+    .eyebrow {
+      color: var(--purple);
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .card, .toc, .question, .assumption, .compile {
+      margin: 1rem 0;
+      padding: 1rem;
+      border: 1px solid var(--border);
+      border-radius: .7rem;
+      background: var(--surface);
+    }
+    .toc { background: #111824; }
+    .question {
+      border-left: .3rem solid var(--purple);
+      background: var(--surface-2);
+    }
+    .assumption { border-left: .3rem solid var(--accent); }
+    .source, .badge {
+      display: inline-block;
+      margin-right: .45rem;
+      padding: .15rem .5rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      color: var(--text-muted);
+      font-size: .82rem;
+      font-weight: 700;
+    }
+    .badge.medium { color: var(--orange); border-color: var(--orange); }
+    .badge.high { color: var(--green); border-color: var(--green); }
+    .badge.low { color: var(--red); border-color: var(--red); }
+    .scope-evidence {
+      border-left: .3rem solid var(--orange);
+    }
+    .choices {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(min(210px, 100%), 1fr));
+      gap: .65rem;
+      margin-top: .8rem;
+    }
+    label.choice {
+      display: flex;
+      align-items: center;
+      min-height: 44px;
+      padding: 10px 16px;
+      border: 1px solid var(--border);
+      border-radius: .55rem;
+      background: #111824;
+      cursor: pointer;
+    }
+    label.choice input { margin-right: .55rem; }
+    textarea, input[type="text"] {
+      width: 100%;
+      min-height: 44px;
+      margin-top: .65rem;
+      padding: 10px 16px;
+      border: 1px solid var(--border);
+      border-radius: .55rem;
+      background: #0b1018;
+      color: var(--text);
+      font: inherit;
+    }
+    textarea { min-height: 8rem; resize: vertical; }
+    button {
+      min-height: 44px;
+      padding: 10px 16px;
+      border: 1px solid #388bfd;
+      border-radius: .55rem;
+      background: #1f6feb;
+      color: #fff;
+      font: inherit;
+      font-weight: 750;
+      cursor: pointer;
+    }
+    button.secondary {
+      border-color: var(--border);
+      background: #21262d;
+      color: var(--text);
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .6rem;
+      align-items: center;
+      margin-top: .75rem;
+    }
+    .recommendation {
+      margin: .75rem 0;
+      padding: .75rem;
+      border: 1px dashed var(--border);
+      border-radius: .55rem;
+      background: #111824;
+    }
+    .status-line { color: var(--text-muted); min-height: 1.5rem; }
+    .correction[hidden], .yaml-output[hidden] { display: none; }
+    .readiness {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(min(210px, 100%), 1fr));
+      gap: .7rem;
+    }
+    .readiness article {
+      padding: .8rem;
+      border: 1px solid var(--border);
+      border-radius: .6rem;
+      background: #111824;
+    }
+    .readiness strong { display: block; color: #fff; }
+    .readiness .state { color: var(--orange); font-weight: 750; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td {
+      padding: .65rem;
+      border: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #111824; color: #fff; }
+    .gate { border-left: .3rem solid var(--orange); }
+    @media (max-width: 860px) {
+      .choices, .readiness { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 560px) {
+      main { width: min(100% - 1rem, 1080px); padding-top: 1rem; }
+      .card, .toc, .question, .assumption, .compile { padding: .8rem; }
+      .actions { align-items: stretch; }
+      .actions button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="eyebrow">Stage 0 · Interrogation round 1</div>
+    <h1>Chromux adoption assumptions manifest</h1>
+    <p class="muted">Confirm or correct the repo-grounded starting point, then define the adoption decisions and evidence this research should serve. No new adoption findings or recommendations are being produced in this round.</p>
+  </header>
+
+  <nav class="toc" aria-label="Table of contents">
+    <h2>Table of Contents</h2>
+    <ol>
+      <li><a href="#why-now">Why this round is needed</a></li>
+      <li><a href="#snapshot">Scope-evidence snapshot</a></li>
+      <li><a href="#assumptions">Assumptions manifest</a></li>
+      <li><a href="#decisions">Open adoption decisions</a></li>
+      <li><a href="#round-gate">Round gate</a></li>
+      <li><a href="#compile">Compile responses</a></li>
+    </ol>
+  </nav>
+
+  <section id="why-now" class="card scope-evidence">
+    <h2>Why this round is needed</h2>
+    <p>An older Stage 2 adoption page and working packet remain in <code>review</code> from 2026-07-06. They refer to prototype version <code>0.5.0</code>, while current packaging metadata reports <code>0.61.8</code>; the current root README also calls Chromux OSS. Newer canonical DX work still records missing clean-machine and sustained-use evidence.</p>
+    <p><strong>Scope evidence, not a finding:</strong> the older packet may be useful background, but approving it unchanged would mix obsolete product facts with current adoption decisions. This interrogation establishes whether the run should refresh, narrow, or retire that pending amendment.</p>
+  </section>
+
+  <section id="snapshot" class="card">
+    <h2>Scope-evidence snapshot</h2>
+    <div class="readiness" aria-label="Three-part evidence-readiness snapshot">
+      <article><strong>Product implementation</strong><span class="state">Substantial repo evidence</span><p>Runnable Electron app, source quickstart, package metadata, regression scripts, releases, and local-first workflow surfaces are present.</p></article>
+      <article><strong>Developer journey</strong><span class="state">Configured-machine evidence</span><p>Canonical DX research documents a full local loop, but no clean-machine reproduction record.</p></article>
+      <article><strong>Adoption outcomes</strong><span class="state">Evidence gap</span><p>Record tasks for repeated use, useful capture rate, retry rate, wrong-session incidents, and external first success remain unchecked.</p></article>
+    </div>
+    <div class="table-wrap" data-tts-narrative="Repository scope evidence is strong for implemented product capability, partial for reproducible developer journey, and weak for measured adoption outcomes.">
+      <table>
+        <thead><tr><th>Available source category</th><th>Examples</th><th>Permitted Stage 0 use</th></tr></thead>
+        <tbody>
+          <tr><td>Current repository</td><td><code>README.md</code>, <code>prototype/package.json</code>, app docs, tests, releases</td><td>Infer product identity, maturity, and testable workflow assumptions.</td></tr>
+          <tr><td>Approved neighboring research</td><td>DX, monetization, positioning, integration, and docs audit artifacts</td><td>Carry approved boundaries forward with confidence labels.</td></tr>
+          <tr><td>Existing adoption artifacts</td><td>Canonical report plus the unfinished July working packet/review page</td><td>Expose conflicts and ask how to disposition the old run.</td></tr>
+          <tr><td>Outcome evidence</td><td>Daily-driver records, user reports, issue history, interviews, traffic</td><td>Identify availability only; do not infer results that are absent.</td></tr>
+          <tr><td>External sources</td><td>Official platform/community guidance and public comparison evidence</td><td>Require explicit scope approval before synthesized research.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="assumptions">
+    <h2>Assumptions manifest</h2>
+    <p class="muted">Choose confirm, correct, or flag for every assumption. Correct and flag reveal a note field.</p>
+
+    <article class="assumption" data-assumption-id="product-identity" data-source="[from repo]">
+      <h3>1. Product identity and wedge</h3>
+      <p><span class="source">[from repo]</span> Chromux is an OSS macOS Electron/Chromium desktop cockpit for local and optionally GBlockParty-managed agent/browser workspaces; its adoption wedge is parallel terminal-native coding sessions paired with inspectable browser previews and bounded evidence capture.</p>
+      <div class="choices">
+        <label class="choice"><input type="radio" name="assumption-product-identity" value="confirm">Confirm</label>
+        <label class="choice"><input type="radio" name="assumption-product-identity" value="correct">Correct</label>
+        <label class="choice"><input type="radio" name="assumption-product-identity" value="flag">Flag</label>
+      </div>
+      <textarea class="correction" hidden aria-label="Correction for product identity"></textarea>
+    </article>
+
+    <article class="assumption" data-assumption-id="primary-audience" data-source="[from research]">
+      <h3>2. Primary audience and buying context</h3>
+      <p><span class="source">[from research]</span> The current priority audience is a technical solo builder already using Claude Code, Codex, or Grok Build on Apple Silicon macOS. Team buyers, procurement, and enterprise administration are later conversion contexts, not the current activation target.</p>
+      <div class="choices">
+        <label class="choice"><input type="radio" name="assumption-primary-audience" value="confirm">Confirm</label>
+        <label class="choice"><input type="radio" name="assumption-primary-audience" value="correct">Correct</label>
+        <label class="choice"><input type="radio" name="assumption-primary-audience" value="flag">Flag</label>
+      </div>
+      <textarea class="correction" hidden aria-label="Correction for primary audience"></textarea>
+    </article>
+
+    <article class="assumption" data-assumption-id="maturity" data-source="[from repo]">
+      <h3>3. Product maturity</h3>
+      <p><span class="source">[from repo]</span> Chromux is beyond prototype feasibility: current metadata is version <code>0.61.8</code>, the repository has a source quickstart and release/update path, and numerous workflow regressions are scripted. Adoption evidence should therefore focus on reproducibility, real repeated use, and external first success—not whether an app exists.</p>
+      <div class="choices">
+        <label class="choice"><input type="radio" name="assumption-maturity" value="confirm">Confirm</label>
+        <label class="choice"><input type="radio" name="assumption-maturity" value="correct">Correct</label>
+        <label class="choice"><input type="radio" name="assumption-maturity" value="flag">Flag</label>
+      </div>
+      <textarea class="correction" hidden aria-label="Correction for maturity"></textarea>
+    </article>
+
+    <article class="assumption" data-assumption-id="evidence-base" data-source="[from repo]">
+      <h3>4. Available outcome evidence</h3>
+      <p><span class="source">[from repo]</span> The repository proves mechanisms and configured-machine workflows, but it does not currently contain completed daily-driver metrics, clean-machine observation, attributable external user reports, or measured retention outcomes.</p>
+      <div class="choices">
+        <label class="choice"><input type="radio" name="assumption-evidence-base" value="confirm">Confirm</label>
+        <label class="choice"><input type="radio" name="assumption-evidence-base" value="correct">Correct</label>
+        <label class="choice"><input type="radio" name="assumption-evidence-base" value="flag">Flag</label>
+      </div>
+      <textarea class="correction" hidden aria-label="Correction for evidence base"></textarea>
+    </article>
+
+    <article class="assumption" data-assumption-id="non-goals" data-source="[from research]">
+      <h3>5. Near-term constraints and non-goals</h3>
+      <p><span class="source">[from research]</span> The near-term adoption plan should not optimize broad launch, paid packaging, team rollout, cross-platform support, or forced telemetry before the solo-builder journey is reproducible and repeated-use evidence exists.</p>
+      <div class="choices">
+        <label class="choice"><input type="radio" name="assumption-non-goals" value="confirm">Confirm</label>
+        <label class="choice"><input type="radio" name="assumption-non-goals" value="correct">Correct</label>
+        <label class="choice"><input type="radio" name="assumption-non-goals" value="flag">Flag</label>
+      </div>
+      <textarea class="correction" hidden aria-label="Correction for non-goals"></textarea>
+    </article>
+
+    <article class="assumption" data-assumption-id="riskiest-assumption" data-source="[inferred]">
+      <h3>6. Riskiest adoption assumption</h3>
+      <p><span class="source">[inferred]</span> The riskiest current assumption is that the session-paired cockpit and evidence-capture loop create enough recurring value to make a developer choose Chromux over their existing terminal-plus-browser workflow after novelty wears off.</p>
+      <div class="choices">
+        <label class="choice"><input type="radio" name="assumption-riskiest-assumption" value="confirm">Confirm</label>
+        <label class="choice"><input type="radio" name="assumption-riskiest-assumption" value="correct">Correct</label>
+        <label class="choice"><input type="radio" name="assumption-riskiest-assumption" value="flag">Flag</label>
+      </div>
+      <textarea class="correction" hidden aria-label="Correction for riskiest adoption assumption"></textarea>
+    </article>
+
+    <article class="assumption" data-assumption-id="old-packet" data-source="[from repo]">
+      <h3>7. Disposition of the unfinished July packet</h3>
+      <p><span class="source">[from repo]</span> The 2026-07-06 Stage 2 packet should be treated as historical background and reconciled into this new run only after current scope approval; it should not be approved unchanged.</p>
+      <div class="choices">
+        <label class="choice"><input type="radio" name="assumption-old-packet" value="confirm">Confirm</label>
+        <label class="choice"><input type="radio" name="assumption-old-packet" value="correct">Correct</label>
+        <label class="choice"><input type="radio" name="assumption-old-packet" value="flag">Flag</label>
+      </div>
+      <textarea class="correction" hidden aria-label="Correction for old packet disposition"></textarea>
+    </article>
+  </section>
+
+  <section id="decisions">
+    <h2>Open adoption decisions</h2>
+    <p class="muted">These are user-owned choices or evidence inputs that the repository cannot settle. Use “Apply recommended” as a starting point, then edit freely.</p>
+
+    <article class="question" data-open-question data-question-id="decision-horizon">
+      <h3>1. What decision should this adoption research make possible, and over what time horizon?</h3>
+      <span class="badge medium" data-agent-confidence="medium">Agent confidence: medium</span>
+      <div class="recommendation" data-recommended-answer><strong>Recommended:</strong> produce a 30–60 day proof-led adoption plan that decides what must be demonstrated before a controlled OSS preview, while keeping broad launch out of scope.</div>
+      <span data-agent-recommended-answer hidden>Use a 30–60 day decision horizon. The report should define the evidence and artifacts required to move from the current solo-builder daily-driver stage to a controlled OSS preview, while keeping broad public launch outside this run.</span>
+      <textarea data-open-input aria-label="Decision horizon answer" placeholder="State the decision, time horizon, and any deadline or launch constraint."></textarea>
+      <div class="actions">
+        <button type="button" data-apply-recommended>Apply recommended</button>
+        <button type="button" class="secondary" data-clarify-copy data-question-text="What decision should this adoption research make possible, and over what time horizon?">Need clarification (copy)</button>
+        <span class="status-line" data-apply-recommended-status data-clarify-status></span>
+      </div>
+    </article>
+
+    <article class="question" data-open-question data-question-id="activation-retention">
+      <h3>2. What should count as activation, first success, and retention for this run?</h3>
+      <span class="badge medium" data-agent-confidence="medium">Agent confidence: medium</span>
+      <div class="recommendation" data-recommended-answer><strong>Recommended:</strong> activation is completing one real session-paired preview/capture/handoff loop; retention is choosing Chromux for at least three real sessions in a week; preview readiness additionally requires one non-builder to complete first success without synchronous help.</div>
+      <span data-agent-recommended-answer hidden>Activation: complete one real coding task with a paired agent session, approved browser preview, bounded evidence capture, inspectable handoff, and an actionable agent response. Retention: choose Chromux for at least three real sessions in seven days. Controlled-preview readiness: one non-builder completes the documented first-success loop without synchronous help.</span>
+      <textarea data-open-input aria-label="Activation and retention answer" placeholder="Define the observable events and thresholds that should matter."></textarea>
+      <div class="actions">
+        <button type="button" data-apply-recommended>Apply recommended</button>
+        <button type="button" class="secondary" data-clarify-copy data-question-text="What should count as activation, first success, and retention for this run?">Need clarification (copy)</button>
+        <span class="status-line" data-apply-recommended-status data-clarify-status></span>
+      </div>
+    </article>
+
+    <article class="question" data-open-question data-question-id="proof-artifacts">
+      <h3>3. Which examples, templates, and proof artifacts must the report prioritize?</h3>
+      <span class="badge medium" data-agent-confidence="medium">Agent confidence: medium</span>
+      <div class="recommendation" data-recommended-answer><strong>Recommended:</strong> prioritize a clean-machine install record, a real localhost first-success fixture, a failure-recovery transcript, a daily-driver observation template, and a controlled-preview first-success form. Add or remove proof requirements based on what would change your decision.</div>
+      <span data-agent-recommended-answer hidden>Prioritize five proof artifacts: a clean Apple Silicon install/first-success record; a real localhost development-server fixture; a capture or delivery failure-recovery transcript; a lightweight daily-driver observation template; and a controlled-preview first-success report template. Treat marketing screenshots as secondary until these proofs exist.</span>
+      <textarea data-open-input aria-label="Proof artifacts answer" placeholder="List must-have examples, templates, demonstrations, or trust artifacts."></textarea>
+      <div class="actions">
+        <button type="button" data-apply-recommended>Apply recommended</button>
+        <button type="button" class="secondary" data-clarify-copy data-question-text="Which examples, templates, and proof artifacts must the report prioritize?">Need clarification (copy)</button>
+        <span class="status-line" data-apply-recommended-status data-clarify-status></span>
+      </div>
+    </article>
+
+    <article class="question" data-open-question data-question-id="channels">
+      <h3>4. Which distribution or community channels should be in scope now, deferred, or explicitly excluded?</h3>
+      <span class="badge medium" data-agent-confidence="medium">Agent confidence: medium</span>
+      <div class="recommendation" data-recommended-answer><strong>Recommended:</strong> use repo docs, releases, private daily-driver notes, and invited-user reports now; evaluate GitHub Issues/Discussions for controlled preview; defer Product Hunt, Hacker News, Reddit, Discord, and broad social launch.</div>
+      <span data-agent-recommended-answer hidden>In scope now: repository quickstarts and examples, release notes, private daily-driver notes, and invited-user first-success reports. Evaluate GitHub Issues and Discussions only for controlled preview support. Defer Product Hunt, Hacker News, Reddit, Discord, and broad social launch until self-serve first success and support readiness are evidenced.</span>
+      <textarea data-open-input aria-label="Channel scope answer" placeholder="Adjust the channel list, sequencing, audience, or exclusions."></textarea>
+      <div class="actions">
+        <button type="button" data-apply-recommended>Apply recommended</button>
+        <button type="button" class="secondary" data-clarify-copy data-question-text="Which distribution or community channels should be in scope now, deferred, or explicitly excluded?">Need clarification (copy)</button>
+        <span class="status-line" data-apply-recommended-status data-clarify-status></span>
+      </div>
+    </article>
+
+    <article class="question" data-open-question data-question-id="team-conversion">
+      <h3>5. How much team conversion and buying-context analysis belongs in this run?</h3>
+      <span class="badge high" data-agent-confidence="high">Agent confidence: high</span>
+      <div class="recommendation" data-recommended-answer><strong>Recommended:</strong> keep it to a lightweight trigger register—shared workflow demand, managed deployment, policy/retention, support, and hosted infrastructure—and do not design team packaging or pricing.</div>
+      <span data-agent-recommended-answer hidden>Include only a lightweight team-conversion trigger register covering repeated shared-workflow demand, managed deployment and updates, retention/policy controls, support expectations, and hosted infrastructure. Do not design team packaging, pricing, procurement, or enterprise administration in this run.</span>
+      <textarea data-open-input aria-label="Team conversion answer" placeholder="Confirm, waive, or expand the team and buying-context boundary."></textarea>
+      <div class="actions">
+        <button type="button" data-apply-recommended>Apply recommended</button>
+        <button type="button" class="secondary" data-clarify-copy data-question-text="How much team conversion and buying-context analysis belongs in this run?">Need clarification (copy)</button>
+        <span class="status-line" data-apply-recommended-status data-clarify-status></span>
+      </div>
+    </article>
+
+    <article class="question" data-open-question data-question-id="available-evidence">
+      <h3>6. What adoption evidence exists outside the repository, and what provenance can be supplied?</h3>
+      <span class="badge low" data-agent-confidence="low">Agent confidence: low</span>
+      <div class="recommendation" data-recommended-answer><strong>Recommended:</strong> explicitly say “none” if there are no usage notes, quotes, user reports, support messages, traffic snapshots, or observation logs. Founder recollection without a source will be treated as a hunch, not customer evidence.</div>
+      <span data-agent-recommended-answer hidden>No additional adoption evidence is available outside the repository for this run. Treat founder recollection as a hunch unless it can be tied to dated usage notes, verbatim user feedback, issue or support text, traffic snapshots, or observation logs.</span>
+      <textarea data-open-input aria-label="Available adoption evidence answer" placeholder="Name dated notes, metrics, quotes, issue links, user reports, traffic snapshots, or say none."></textarea>
+      <div class="actions">
+        <button type="button" data-apply-recommended>Apply recommended</button>
+        <button type="button" class="secondary" data-clarify-copy data-question-text="What adoption evidence exists outside the repository, and what provenance can be supplied?">Need clarification (copy)</button>
+        <span class="status-line" data-apply-recommended-status data-clarify-status></span>
+      </div>
+    </article>
+
+    <article class="question" data-open-question data-question-id="external-research">
+      <h3>7. What external research, if any, may Stage 1 propose for later approval?</h3>
+      <span class="badge medium" data-agent-confidence="medium">Agent confidence: medium</span>
+      <div class="recommendation" data-recommended-answer><strong>Recommended:</strong> allow a narrow source plan covering official GitHub community/repository guidance, current official distribution rules relevant to macOS OSS delivery, and a small set of primary-source proof patterns from comparable developer tools; exclude generic launch-channel trend research.</div>
+      <span data-agent-recommended-answer hidden>Stage 1 may propose a narrow external source plan for later approval: official GitHub repository and community guidance; official macOS distribution requirements relevant to an OSS Electron app; and primary-source documentation from a small set of comparable developer tools showing activation, examples, templates, and proof practices. Exclude generic launch-channel trend research and broad social-media research.</span>
+      <textarea data-open-input aria-label="External research permission answer" placeholder="State allowed source categories, exclusions, named comparisons, or repository-only."></textarea>
+      <div class="actions">
+        <button type="button" data-apply-recommended>Apply recommended</button>
+        <button type="button" class="secondary" data-clarify-copy data-question-text="What external research, if any, may Stage 1 propose for later approval?">Need clarification (copy)</button>
+        <span class="status-line" data-apply-recommended-status data-clarify-status></span>
+      </div>
+    </article>
+  </section>
+
+  <section id="round-gate" class="card gate">
+    <h2>Round gate</h2>
+    <p>This round does not approve research scope or artifacts. It only returns your assumptions and open answers so the parent skill can validate them and decide whether to ask follow-ups or issue a coverage checkpoint.</p>
+    <div class="choices">
+      <label class="choice"><input type="radio" name="round-gate" value="submit">Submit this round for confidence-gate review</label>
+      <label class="choice"><input type="radio" name="round-gate" value="more-depth">I want another, deeper interrogation round</label>
+      <label class="choice"><input type="radio" name="round-gate" value="needs-clarification">I need clarification before this round is complete</label>
+    </div>
+    <textarea id="round-gate-notes" aria-label="Round gate notes" placeholder="Optional: name gaps, contradictions, or areas that need deeper questioning."></textarea>
+  </section>
+
+  <section id="compile"
+           class="compile"
+           data-answer-sidecar="research/_working/interrogation-devtool-adoption-r1.yaml">
+    <h2>Compile Responses</h2>
+    <p>Compile partial answers at any time. For a complete round, decide every assumption, answer every open question, and select a round-gate option.</p>
+    <div class="actions">
+      <button type="button" id="compile-responses">Compile Responses</button>
+      <button type="button" class="secondary" id="copy-yaml">Copy YAML</button>
+      <span id="compile-status" class="status-line" role="status"></span>
+    </div>
+    <textarea id="compiled-yaml" class="yaml-output" hidden readonly aria-label="Compiled YAML"></textarea>
+  </section>
+</main>
+
+<script>
+(() => {
+  const PAGE = "interrogation/devtool-adoption-r1-chromux.html";
+  const SIDECAR = "research/_working/interrogation-devtool-adoption-r1.yaml";
+  const COMMAND = "$devtool-adoption";
+
+  const quote = (value) => JSON.stringify(String(value ?? ""));
+
+  async function copyText(text, fallback, status) {
+    try {
+      await navigator.clipboard.writeText(text);
+      status.textContent = "Copied";
+    } catch {
+      fallback.hidden = false;
+      fallback.focus();
+      fallback.select();
+      status.textContent = "Select text to copy";
+    }
+  }
+
+  document.querySelectorAll(".assumption").forEach((block) => {
+    const correction = block.querySelector(".correction");
+    block.querySelectorAll('input[type="radio"]').forEach((radio) => {
+      radio.addEventListener("change", () => {
+        correction.hidden = radio.value === "confirm";
+        if (correction.hidden) correction.value = "";
+      });
+    });
+  });
+
+  document.addEventListener("click", async (event) => {
+    const applyButton = event.target.closest("[data-apply-recommended]");
+    if (applyButton) {
+      const block = applyButton.closest("[data-open-question]");
+      const source = block?.querySelector("[data-agent-recommended-answer]") ??
+        block?.querySelector("[data-recommended-answer]");
+      const recommended = source
+        ? ("value" in source && source.value.trim() ? source.value.trim() : source.textContent.trim())
+        : "";
+      const input = block?.querySelector(
+        'textarea[data-open-input], input[type="text"][data-open-input], input:not([type])[data-open-input]',
+      );
+      if (!input || !recommended) return;
+      if (input.value.trim() && !window.confirm("Replace your current answer with the recommended answer?")) return;
+      input.value = recommended;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      const status = block.querySelector("[data-apply-recommended-status]");
+      if (status) status.textContent = "Recommended answer applied.";
+      return;
+    }
+
+    const clarifyButton = event.target.closest("[data-clarify-copy]");
+    if (clarifyButton) {
+      const block = clarifyButton.closest("[data-open-question]");
+      const question = clarifyButton.dataset.questionText;
+      const payload = `Question: "${question}"\nI need clarification on what this is asking before I can answer.`;
+      const input = block.querySelector("[data-open-input]");
+      const status = block.querySelector("[data-clarify-status]");
+      await copyText(payload, input, status);
+    }
+  });
+
+  function compileYaml() {
+    const assumptions = [...document.querySelectorAll(".assumption")].map((block) => {
+      const checked = block.querySelector('input[type="radio"]:checked');
+      return {
+        id: block.dataset.assumptionId,
+        source: block.dataset.source,
+        statement: block.querySelector("p").textContent.trim(),
+        decision: checked?.value ?? "",
+        correction: block.querySelector(".correction").value.trim(),
+      };
+    });
+
+    const openAnswers = [...document.querySelectorAll("[data-open-question]")].map((block) => ({
+      id: block.dataset.questionId,
+      question: block.querySelector("h3").textContent.replace(/^\d+\.\s*/, "").trim(),
+      answer: block.querySelector("[data-open-input]").value.trim(),
+      recommended: block.querySelector("[data-recommended-answer]").textContent.trim(),
+      agentRecommended: block.querySelector("[data-agent-recommended-answer]").textContent.trim(),
+      confidence: block.querySelector("[data-agent-confidence]").dataset.agentConfidence,
+    }));
+
+    const gate = document.querySelector('input[name="round-gate"]:checked');
+    const gateNotes = document.getElementById("round-gate-notes").value.trim();
+    const complete = assumptions.every((item) =>
+      item.decision && (item.decision === "confirm" || item.correction)
+    ) && openAnswers.every((item) => item.answer) && Boolean(gate);
+
+    const lines = [
+      `# Invoke with: ${COMMAND}`,
+      `command: ${quote(COMMAND)}`,
+      `interrogation_page: ${quote(PAGE)}`,
+      "round: 1",
+      `round_status: ${complete ? "complete" : "partial"}`,
+      "gate_state: continue",
+      `answer_sidecar: ${quote(SIDECAR)}`,
+      "assumptions:",
+    ];
+
+    assumptions.forEach((item) => {
+      lines.push(
+        `  - id: ${quote(item.id)}`,
+        `    source: ${quote(item.source)}`,
+        `    statement: ${quote(item.statement)}`,
+        `    decision: ${quote(item.decision)}`,
+        `    correction: ${quote(item.correction)}`,
+      );
+    });
+
+    lines.push("open_answers:");
+    openAnswers.forEach((item) => {
+      lines.push(
+        `  - id: ${quote(item.id)}`,
+        `    question: ${quote(item.question)}`,
+        `    answer: ${quote(item.answer)}`,
+        `    recommended_answer: ${quote(item.recommended)}`,
+        `    agent_recommended_answer: ${quote(item.agentRecommended)}`,
+        `    agent_confidence: ${quote(item.confidence)}`,
+      );
+    });
+
+    lines.push(
+      "gate_answers:",
+      `  - gate: "round-confidence-review"`,
+      `    answer: ${quote(gate?.value ?? "")}`,
+      `    notes: ${quote(gateNotes)}`,
+      "agent_routing:",
+      "  workflow: interrogation-loop",
+      "  parent_skill: devtool-adoption",
+      `  command: ${quote(COMMAND)}`,
+      "  gate_owner: parent-orchestrator",
+      "  gate_type: interrogation-round",
+      "  round: 1",
+      `  answer_sidecar: ${quote(SIDECAR)}`,
+      "  next_resolution: parent-resolves-from-yaml-and-filesystem",
+    );
+    return { yaml: lines.join("\n") + "\n", complete };
+  }
+
+  const output = document.getElementById("compiled-yaml");
+  const status = document.getElementById("compile-status");
+  document.getElementById("compile-responses").addEventListener("click", async () => {
+    const result = compileYaml();
+    output.value = result.yaml;
+    output.hidden = false;
+    status.textContent = result.complete
+      ? "Complete round compiled; copying YAML."
+      : "Partial round compiled; copying YAML.";
+    await copyText(result.yaml, output, status);
+  });
+  document.getElementById("copy-yaml").addEventListener("click", async () => {
+    if (!output.value) {
+      const result = compileYaml();
+      output.value = result.yaml;
+      output.hidden = false;
+    }
+    await copyText(output.value, output, status);
+  });
+})();
+</script>
+<script src="../scripts/alignment-tts-kokoro.js"></script>
+<script src="../scripts/alignment-question-nav.js"></script>
+</body>
+</html>

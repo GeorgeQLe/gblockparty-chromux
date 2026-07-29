@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="en"
+      data-visual-tier="visual"
+      data-interrogation-status="review"
+      data-interrogation-round="2"
+      data-interrogation-gate="coverage-checkpoint">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chromux Devtool Adoption — Coverage Checkpoint</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface-2: #1c2333;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --orange: #d29922;
+      --purple: #bc8cff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+    main {
+      width: min(1080px, calc(100% - 2rem));
+      max-width: 100%;
+      margin: 0 auto;
+      padding: 2rem 0 5rem;
+      overflow-wrap: break-word;
+    }
+    h1, h2, h3 { color: #fff; line-height: 1.2; }
+    h1 { margin-bottom: .45rem; }
+    h2 { color: var(--accent); margin-top: 0; }
+    h3 { color: var(--purple); }
+    a { color: var(--accent); }
+    code {
+      padding: .08rem .35rem;
+      border: 1px solid var(--border);
+      border-radius: .35rem;
+      background: #0b1018;
+      color: #f0f6fc;
+    }
+    .muted { color: var(--text-muted); }
+    .eyebrow {
+      color: var(--purple);
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .card, .toc, .question, .compile {
+      margin: 1rem 0;
+      padding: 1rem;
+      border: 1px solid var(--border);
+      border-radius: .7rem;
+      background: var(--surface);
+    }
+    .toc { background: #111824; }
+    .status-card { border-left: .3rem solid var(--green); }
+    .scope-card { border-left: .3rem solid var(--accent); }
+    .risk-card { border-left: .3rem solid var(--orange); }
+    .question {
+      border-left: .3rem solid var(--purple);
+      background: var(--surface-2);
+    }
+    .badge {
+      display: inline-block;
+      margin-right: .45rem;
+      padding: .15rem .5rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      color: var(--text-muted);
+      font-size: .82rem;
+      font-weight: 700;
+    }
+    .badge.high { color: var(--green); border-color: var(--green); }
+    .badge.supported { color: var(--green); border-color: var(--green); }
+    .badge.preference { color: var(--accent); border-color: var(--accent); }
+    .badge.research { color: var(--orange); border-color: var(--orange); }
+    .coverage-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(min(210px, 100%), 1fr));
+      gap: .7rem;
+      margin-top: 1rem;
+    }
+    .coverage-grid article {
+      padding: .9rem;
+      border: 1px solid var(--border);
+      border-radius: .6rem;
+      background: #111824;
+    }
+    .coverage-grid strong { display: block; color: #fff; }
+    .coverage-grid .state { color: var(--green); font-weight: 750; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td {
+      padding: .65rem;
+      border: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #111824; color: #fff; }
+    textarea {
+      width: 100%;
+      min-height: 8rem;
+      margin-top: .65rem;
+      padding: 10px 16px;
+      border: 1px solid var(--border);
+      border-radius: .55rem;
+      background: #0b1018;
+      color: var(--text);
+      font: inherit;
+      resize: vertical;
+    }
+    .gate-choices {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(min(210px, 100%), 1fr));
+      gap: .65rem;
+      margin: .8rem 0;
+    }
+    label.choice {
+      display: flex;
+      align-items: center;
+      min-height: 44px;
+      padding: 10px 16px;
+      border: 1px solid var(--border);
+      border-radius: .55rem;
+      background: #111824;
+      cursor: pointer;
+    }
+    label.choice input { margin-right: .55rem; }
+    button {
+      min-height: 44px;
+      padding: 10px 16px;
+      border: 1px solid #388bfd;
+      border-radius: .55rem;
+      background: #1f6feb;
+      color: #fff;
+      font: inherit;
+      font-weight: 750;
+      cursor: pointer;
+    }
+    button.secondary {
+      border-color: var(--border);
+      background: #21262d;
+      color: var(--text);
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .6rem;
+      align-items: center;
+      margin-top: .75rem;
+    }
+    .recommendation {
+      margin: .75rem 0;
+      padding: .75rem;
+      border: 1px dashed var(--border);
+      border-radius: .55rem;
+      background: #111824;
+    }
+    .status-line { color: var(--text-muted); min-height: 1.5rem; }
+    .yaml-output[hidden] { display: none; }
+    @media (max-width: 860px) {
+      .coverage-grid, .gate-choices { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 560px) {
+      main { width: min(100% - 1rem, 1080px); padding-top: 1rem; }
+      .card, .toc, .question, .compile { padding: .8rem; }
+      .actions { align-items: stretch; }
+      .actions button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="eyebrow">Stage 0 · Round 2 · Coverage checkpoint</div>
+    <h1>Chromux adoption confidence gate</h1>
+    <p class="muted">Round 1 is compiled and consumed. The agent confidence judgment passes; this exit gate asks you to confirm that the full adoption context is complete before Stage 1 proposes a research scope.</p>
+  </header>
+
+  <nav class="toc" aria-label="Table of contents">
+    <h2>Table of Contents</h2>
+    <ol>
+      <li><a href="#gate-result">Confidence-gate result</a></li>
+      <li><a href="#validation">Evidence validation</a></li>
+      <li><a href="#coverage">Coverage map</a></li>
+      <li><a href="#boundaries">Established boundaries</a></li>
+      <li><a href="#next">What approval unlocks</a></li>
+      <li><a href="#checkpoint">Coverage checkpoint</a></li>
+      <li><a href="#compile">Compile responses</a></li>
+    </ol>
+  </nav>
+
+  <section id="gate-result" class="card status-card">
+    <h2>Confidence-gate result</h2>
+    <p><strong>Agent judgment: pass, pending your coverage confirmation.</strong> At least one round is complete; every required adoption interview area is covered; and the answers are specific enough to prevent generic Stage 1 scope work.</p>
+    <div class="coverage-grid" aria-label="Confidence gate readiness">
+      <article><strong>Round completion</strong><span class="state">Passed</span><p>Round 1 answers are preserved in the required sidecar.</p></article>
+      <article><strong>Interview coverage</strong><span class="state">Passed</span><p>Activation, retention, proof, channels, audience, evidence, constraints, and risk are covered.</p></article>
+      <article><strong>Decision depth</strong><span class="state">Passed</span><p>Thresholds, time horizon, proof artifacts, and channel boundaries are concrete.</p></article>
+    </div>
+  </section>
+
+  <section id="validation" class="card">
+    <h2>Evidence validation</h2>
+    <p>Round 1 answers were checked only against available repository and already-approved context, as Stage 0 permits. This is validation of intake—not synthesized adoption research.</p>
+    <div class="table-wrap" data-tts-narrative="Product identity and current maturity are directly supported by repository files. Audience, timing, thresholds, channels, and non-goals are approved preferences. External adoption outcomes remain absent or unproven and must be treated as research gaps rather than positive evidence.">
+      <table>
+        <thead><tr><th>Intake area</th><th>Classification</th><th>Basis and consequence</th></tr></thead>
+        <tbody>
+          <tr><td>Product identity and wedge</td><td><span class="badge supported">supported</span></td><td><code>README.md</code> describes the OSS Electron/Chromium front-end, parallel agent sessions, paired browser panes, preview detection, and browser-evidence payloads.</td></tr>
+          <tr><td>Current maturity</td><td><span class="badge supported">supported</span></td><td><code>prototype/package.json</code> reports <code>0.61.8</code> and exposes run, packaging, update, and many regression-test scripts.</td></tr>
+          <tr><td>Audience, horizon, metrics, channels, and non-goals</td><td><span class="badge preference">user-owned</span></td><td>These are explicit product and risk choices. Stage 1 should preserve them as approved boundaries, not mislabel them as market facts.</td></tr>
+          <tr><td>No external adoption evidence available</td><td><span class="badge research">supplied absence</span></td><td>The repository has unchecked adoption record tasks, but it cannot prove what exists outside the repository. The user's “none” answer governs this run; unsourced recollection remains a hunch.</td></tr>
+          <tr><td>Recurring value versus novelty</td><td><span class="badge research">unproven risk</span></td><td>The risk is coherent with missing retention records, but it remains a hypothesis to test rather than a finding.</td></tr>
+          <tr><td>2026-07-06 packet disposition</td><td><span class="badge supported">supported</span></td><td>The active old Stage 2 page and working packet still cite version <code>0.5.0</code>. They may supply historical context but cannot be approved unchanged.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="coverage" class="card">
+    <h2>Coverage map</h2>
+    <p class="muted">Every interview area required by <code>$devtool-adoption</code> is represented below. Flag the checkpoint if any row is incomplete, inaccurate, or too shallow.</p>
+    <div class="table-wrap" data-tts-narrative="All required adoption interview areas are covered. The run targets a 30 to 60 day proof-led path from solo-builder daily use to a controlled OSS preview, with concrete activation and retention thresholds, five proof artifacts, narrow channels, deferred team design, no claimed external evidence, and recurring value as the central risk.">
+      <table>
+        <thead><tr><th>Required interview area</th><th>What Round 1 established</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Adoption loop and decision horizon</td><td>A 30–60 day proof-led progression from solo-builder daily driver to controlled OSS preview; broad public launch is outside this run.</td><td><span class="badge supported">covered</span></td></tr>
+          <tr><td>Activation and first success</td><td>One real coding task completes the paired agent session → approved preview → bounded capture → inspectable handoff → actionable agent response loop.</td><td><span class="badge supported">covered</span></td></tr>
+          <tr><td>Retention signals</td><td>The builder chooses Chromux for at least three real sessions in seven days; preview readiness also requires one non-builder to complete first success without synchronous help.</td><td><span class="badge supported">covered</span></td></tr>
+          <tr><td>Examples, templates, and proof artifacts</td><td>Prioritize clean Apple Silicon install/first success, a real localhost fixture, failure recovery, a daily-driver observation template, and a controlled-preview first-success report.</td><td><span class="badge supported">covered</span></td></tr>
+          <tr><td>Community and distribution channels</td><td>Use repo docs/examples, releases, private notes, and invited-user reports now; evaluate GitHub Issues/Discussions for preview support; defer broad launch channels.</td><td><span class="badge supported">covered</span></td></tr>
+          <tr><td>Team conversion triggers</td><td>Keep only a lightweight register for shared-workflow demand, managed deployment/updates, policy/retention, support, and hosted infrastructure; no packaging or pricing design.</td><td><span class="badge supported">covered</span></td></tr>
+          <tr><td>Developer audience and buying context</td><td>Technical solo builders already using Claude Code, Codex, or Grok Build on Apple Silicon macOS are the activation target; organizational buyers are later.</td><td><span class="badge supported">covered</span></td></tr>
+          <tr><td>Available adoption evidence</td><td>No additional external evidence is available for this run. Unsourced founder recollection is a hunch; dated notes, quotes, issues, traffic, or observations would change the evidence state.</td><td><span class="badge supported">covered</span></td></tr>
+          <tr><td>Constraints and non-goals</td><td>No broad launch, paid packaging, team rollout, cross-platform support, forced telemetry, procurement design, or enterprise administration before reproducible solo use.</td><td><span class="badge supported">covered</span></td></tr>
+          <tr><td>Riskiest growth or activation assumption</td><td>The paired cockpit and evidence-capture loop must create recurring value strong enough to replace the existing terminal-plus-browser habit after novelty wears off.</td><td><span class="badge research">covered as risk</span></td></tr>
+          <tr><td>External-source permission</td><td>Stage 1 may propose a narrow later-approved plan using official GitHub guidance, official macOS distribution requirements, and primary-source proof patterns from a small comparable-tool set.</td><td><span class="badge supported">covered</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="boundaries" class="card scope-card">
+    <h2>Established boundaries</h2>
+    <h3>In scope for the proposed research run</h3>
+    <ul>
+      <li>Define evidence and artifacts needed for a controlled OSS preview within a 30–60 day decision horizon.</li>
+      <li>Evaluate the solo-builder activation and repeated-use loop against explicit thresholds.</li>
+      <li>Prioritize reproducible proof and recovery artifacts before promotional screenshots.</li>
+      <li>Carry a small team-conversion trigger register without designing a business package.</li>
+      <li>Reconcile the old adoption material only as historical input after new scope approval.</li>
+    </ul>
+    <h3>Out of scope</h3>
+    <ul>
+      <li>Broad public launch and generic launch-channel trend research.</li>
+      <li>Paid packaging, pricing, procurement, enterprise administration, or cross-platform expansion.</li>
+      <li>Forced telemetry or claims of customer/retention evidence that lack provenance.</li>
+      <li>Approving the 2026-07-06 working packet or canonical report unchanged.</li>
+    </ul>
+  </section>
+
+  <section id="next" class="card risk-card">
+    <h2>What checkpoint approval unlocks</h2>
+    <p>Approval ends Stage 0 only. The next turn may create a <code>review</code> Stage 1 alignment page that proposes the exact research scope, source categories, assumptions/confidence register, working-packet path <code>research/_working/preliminary-devtool-adoption-research.md</code>, canonical destination <code>research/devtool-adoption.md</code>, and file-change boundaries.</p>
+    <p><strong>No synthesized research, candidate ranking, recommendation, working-packet rewrite, canonical update, task mutation, or downstream routing is authorized by this checkpoint.</strong> Those remain behind the later Stage 1 scope-approval gate.</p>
+  </section>
+
+  <section id="checkpoint" class="card">
+    <h2>Coverage checkpoint</h2>
+    <p>Choose whether Stage 0 is complete. If you flag a gap, the parent skill will keep the interrogation loop open and produce a targeted follow-up round.</p>
+    <div class="gate-choices" data-coverage-gate>
+      <label class="choice"><input type="radio" name="coverage-gate" value="confirm-complete">Confirm complete — advance to Stage 1 scope review</label>
+      <label class="choice"><input type="radio" name="coverage-gate" value="flag-gaps">Flag one or more gaps — continue interrogation</label>
+    </div>
+
+    <article class="question" data-open-question data-question-id="coverage-completeness">
+      <h3>What, if anything, is missing, inaccurate, or too shallow before Stage 1?</h3>
+      <span class="badge high" data-agent-confidence="high">Agent confidence: high</span>
+      <div class="recommendation" data-recommended-answer><strong>Recommended:</strong> coverage is complete. Advance to a Stage 1 scope-only review page using the established 30–60 day horizon, activation/retention thresholds, proof requirements, channel boundaries, evidence limitations, and non-goals.</div>
+      <span data-agent-recommended-answer hidden>Coverage is complete. No decision-critical adoption context is missing; advance to the Stage 1 scope-only alignment review.</span>
+      <textarea data-open-input aria-label="Coverage completeness answer" placeholder="Apply the recommendation, or name the exact gap or correction."></textarea>
+      <div class="actions">
+        <button type="button" data-apply-recommended>Apply recommended</button>
+        <button type="button" class="secondary" data-clarify-copy data-question-text="What, if anything, is missing, inaccurate, or too shallow before Stage 1?">Need clarification (copy)</button>
+        <span class="status-line" data-apply-recommended-status data-clarify-status></span>
+      </div>
+    </article>
+  </section>
+
+  <section id="compile" class="compile" data-answer-sidecar="research/_working/interrogation-devtool-adoption-r2.yaml">
+    <h2>Compile Responses</h2>
+    <p>Select the coverage outcome and answer the open checkpoint question. Compile and copy the YAML, then paste it into a fresh agent session.</p>
+    <div class="actions">
+      <button type="button" id="compileResponses">Compile Responses</button>
+      <button type="button" class="secondary" id="copyYaml" hidden>Copy YAML</button>
+      <span class="status-line" id="compileStatus"></span>
+    </div>
+    <textarea class="yaml-output" id="compiledYaml" readonly hidden aria-label="Compiled response YAML"></textarea>
+  </section>
+</main>
+
+<script>
+const q = (selector, root = document) => root.querySelector(selector);
+const yamlString = value => JSON.stringify(String(value ?? ""));
+
+async function copyText(value, fallback) {
+  try {
+    await navigator.clipboard.writeText(value);
+    return "Copied";
+  } catch {
+    fallback.hidden = false;
+    fallback.focus();
+    fallback.select();
+    return "Select text to copy";
+  }
+}
+
+document.addEventListener("click", async event => {
+  const apply = event.target.closest("[data-apply-recommended]");
+  if (apply) {
+    const block = apply.closest("[data-open-question]");
+    const input = q("[data-open-input]", block);
+    const source = q("[data-agent-recommended-answer]", block);
+    if (input.value.trim() && !window.confirm("Replace your current answer with the recommended answer?")) return;
+    input.value = source.textContent.trim();
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    q("[data-apply-recommended-status]", block).textContent = "Recommended answer applied.";
+    return;
+  }
+
+  const clarify = event.target.closest("[data-clarify-copy]");
+  if (clarify) {
+    const block = clarify.closest("[data-open-question]");
+    const question = clarify.dataset.questionText;
+    const payload = `Question: ${JSON.stringify(question)}\nI need clarification on what this is asking before I can answer.`;
+    const status = await copyText(payload, q("[data-open-input]", block));
+    q("[data-clarify-status]", block).textContent =
+      status === "Copied" ? "Clarification request copied." : status;
+  }
+});
+
+function compileResponses() {
+  const command = "$devtool-adoption";
+  const gate = q('input[name="coverage-gate"]:checked')?.value ?? "";
+  const block = q("[data-open-question]");
+  const answer = q("[data-open-input]", block).value.trim();
+  const recommended = q("[data-recommended-answer]", block).textContent.trim();
+  const agentRecommended = q("[data-agent-recommended-answer]", block).textContent.trim();
+  const confidence = q("[data-agent-confidence]", block).dataset.agentConfidence;
+  const complete = Boolean(gate && answer);
+  const lines = [
+    `# Invoke with: ${command}`,
+    `command: ${yamlString(command)}`,
+    `interrogation_page: ${yamlString("interrogation/devtool-adoption-r2-chromux.html")}`,
+    "round: 2",
+    `round_status: ${complete ? "complete" : "partial"}`,
+    "gate_state: coverage-checkpoint",
+    "assumptions: []",
+    "open_answers:"
+  ];
+  if (answer) {
+    lines.push(
+      `  - id: ${yamlString("coverage-completeness")}`,
+      `    question: ${yamlString("What, if anything, is missing, inaccurate, or too shallow before Stage 1?")}`,
+      `    answer: ${yamlString(answer)}`,
+      `    recommended_answer: ${yamlString(recommended)}`,
+      `    agent_recommended_answer: ${yamlString(agentRecommended)}`,
+      `    agent_confidence: ${yamlString(confidence)}`
+    );
+  } else {
+    lines.push("  []");
+  }
+  lines.push("gate_answers:");
+  if (gate) {
+    lines.push(
+      `  - gate: ${yamlString("coverage-checkpoint")}`,
+      `    answer: ${yamlString(gate)}`,
+      `    notes: ${yamlString(answer)}`
+    );
+  } else {
+    lines.push("  []");
+  }
+  lines.push(
+    "agent_routing:",
+    "  workflow: interrogation-loop",
+    "  parent_skill: devtool-adoption",
+    `  command: ${yamlString(command)}`,
+    "  gate_owner: parent-orchestrator",
+    "  gate_type: interrogation-round",
+    "  round: 2",
+    `  answer_sidecar: ${yamlString("research/_working/interrogation-devtool-adoption-r2.yaml")}`,
+    "  next_resolution: parent-resolves-from-yaml-and-filesystem"
+  );
+  const output = `${lines.join("\n")}\n`;
+  const area = q("#compiledYaml");
+  area.value = output;
+  area.hidden = false;
+  q("#copyYaml").hidden = false;
+  q("#compileStatus").textContent = complete
+    ? "Complete coverage-checkpoint YAML compiled."
+    : "Partial YAML compiled; select a coverage outcome and answer the checkpoint question.";
+  copyText(output, area).then(status => {
+    q("#compileStatus").textContent += ` ${status}.`;
+  });
+}
+
+q("#compileResponses").addEventListener("click", compileResponses);
+q("#copyYaml").addEventListener("click", async () => {
+  q("#compileStatus").textContent = await copyText(q("#compiledYaml").value, q("#compiledYaml"));
+});
+</script>
+<script src="../scripts/alignment-tts-kokoro.js"></script>
+<script src="../scripts/alignment-question-nav.js"></script>
+</body>
+</html>

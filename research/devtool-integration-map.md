@@ -261,9 +261,9 @@ Documentation should follow the docs-audit backlog once runnable commands or pro
 
 The product should avoid public claims about broad agent compatibility, privacy/security, cross-platform support, or `cmux` feasibility until the relevant proof artifacts exist.
 
-## GIGACHADD Process Integration Decision — Confirmed 2026-07-18
+## GIGACHADD Process Integration Decision — Reconfirmed 2026-07-24
 
-_Producing skill: `$devtool-integration-map gigachadd-process` · Status: confirmed · Approval source: final compiled YAML with all seven required gates approved and no section feedback · Archived working packet: `docs/history/archive/2026-07-18/125928/research/_working/preliminary-devtool-integration-map-research.md`_
+_Producing skill: `$devtool-integration-map gigachadd-process` · Status: confirmed · Approval source: final compiled YAML with all seven required gates approved and no section feedback · Current archived working packet: `docs/history/archive/2026-07-24/233055/research/_working/preliminary-devtool-integration-map-research.md` · Prior confirmed packet: `docs/history/archive/2026-07-18/125928/research/_working/preliminary-devtool-integration-map-research.md`_
 
 ### Artifact Approval Record
 
@@ -281,13 +281,39 @@ The approved scope asks whether Chromux should directly integrate GIGACHADD, sel
 
 The approved non-goals remain in force: no implementation, no product-code or task-file changes, no private GIGACHADD source or demos, no broad market ranking, no automatic debate on every prompt, no silent execution of a verdict, and no claim of compatibility beyond observed versions and official provider contracts.
 
+### Verification Delta From Prior Decision
+
+This run re-tested the July 18 verdict because its Stage 1 premise proposed that a public GIGACHADD repository could now supply mechanics evidence. That premise did not verify.
+
+- GitHub repository metadata checked on 2026-07-22 still reported `GeorgeQLe/gigachadd-v0` as private, with default branch `master`, Rust as the primary language, no public license metadata, no public issues, and a latest push timestamp of 2026-07-21. Only visibility and repository metadata were checked; private source, history, branches, files, tests, releases, and demos were not opened or inspected.
+- An owner-scoped public repository search returned no GIGACHADD repository, while a broader public name/description search returned only unrelated projects.
+- The public 6eorge scoreboard continued to label GIGACHADD `DORMANT` and described it only as a Rust CLI AI debate tool. The current LeXCorp homepage no longer exposed the earlier decision-useful command description, and the previously cited readiness route was not retrievable in this pass.
+- Because the only matching repository remained private and the approved boundary was public-only, no implementation mechanics, state transitions, protocol, tests, release artifacts, or license could be verified.
+
+**Reconfirmation verdict.** Preserve the Chromux-native Debate / Challenge recommendation. Do not integrate the GIGACHADD binary or port code. Re-open that decision only if a genuinely public or separately authorized source-and-license review exposes unique, reusable mechanics and a stable integration contract.
+
+### Verified GIGACHADD Mechanics
+
+No decision-critical implementation mechanics were verified from approved public sources in this run.
+
+| Mechanics category | Publicly verified | What is known | Integration consequence |
+| --- | --- | --- | --- |
+| Product identity | Partial | A matching private Rust repository exists; the public scoreboard calls GIGACHADD a dormant Rust CLI AI debate tool | Enough to identify the subject, not enough to depend on it |
+| CLI commands and flags | No current primary evidence | Earlier portfolio copy is not a substitute for current CLI help | Do not design an adapter against inferred commands |
+| State machine / round invariants | No | No approved public source or tests | Native process design must be labeled a Chromux recommendation, not a port |
+| Persistence / export schema | No | No approved public schema or fixtures | Chromux should own a versioned local record |
+| Non-interactive protocol | No | No approved public process or file contract | Direct binary integration remains unjustified |
+| Failure recovery / cancellation | No | No approved public tests or runtime behavior | Use provider-adapter retries and atomic phase persistence in the native design |
+| Packaging / releases | No | Repository contents and releases remain out of scope | Do not create an install dependency |
+| License / reuse rights | No | GitHub metadata exposes no public license | Binary redistribution and code reuse remain blocked |
+
 ### Executive Findings
 
 #### Finding 1 — Choose a Chromux-native Debate / Challenge workflow, not a direct GIGACHADD dependency
 
 **Claim.** Chromux should implement the approved workflow as a native, opt-in orchestration feature behind provider-specific CLI adapters. It should not require the GIGACHADD binary and should not port GIGACHADD code unless a later, explicitly authorized source-and-license review proves there is unique reusable machinery worth preserving.
 
-**Evidence.** GitHub repository search resolves `GeorgeQLe/gigachadd-v0` as private. The approved source boundary excludes private source. Public portfolio evidence describes GIGACHADD as a Rust CLI with `debate`, `duel`, `roast`, `review`, `compare`, `history`, and `export` commands, but exposes no state schema, process protocol, tests, release artifacts, or license. One public page labels it a CLI MVP; a newer personal scoreboard labels it dormant. Chromux already owns PTY/session orchestration, browser evidence, local capture persistence, review surfaces, and explicit user intervention.
+**Evidence.** GitHub repository metadata on 2026-07-22 still resolved `GeorgeQLe/gigachadd-v0` as private, while an owner-scoped public search returned no GIGACHADD repository. The approved source boundary excludes private source. The current public scoreboard describes GIGACHADD only as a dormant Rust CLI AI debate tool and exposes no state schema, process protocol, tests, release artifacts, or license. Chromux already owns PTY/session orchestration for Claude, Codex, and Grok, browser evidence, local capture persistence, review surfaces, agent turn signals, cancellation for one-off delivery, and explicit user intervention.
 
 **Inference.** A direct binary dependency would add an uninspectable process and packaging boundary without evidence that it preserves unique value. A code port is legally and technically blocked while the license and implementation remain unavailable. Recreating the user-approved process contract in Chromux preserves the desired outcome without inventing facts about GIGACHADD internals.
 
@@ -299,7 +325,7 @@ The approved non-goals remain in force: no implementation, no product-code or ta
 
 **Claim.** Chromux should own the debate state machine, evidence manifest, review UI, persistence, cancellation, and Markdown export. Each provider adapter should only translate a bounded, read-only turn request into the provider's supported non-interactive CLI contract and normalize its result.
 
-**Evidence.** Current Chromux launches unchanged CLI processes through a login-shell PTY, keeps captures as inspectable local files before delivery, and already invokes `claude -p` as a one-off delivery adapter. Official provider documentation exposes machine-oriented surfaces: `codex exec --json` emits JSONL and supports JSON Schema-constrained final output; Claude Code print mode supports JSON or streaming JSON, session IDs, turn bounds, and permission controls; Grok supports headless JSON output and, separately, ACP over stdio. The locally observed environment contains Codex CLI 0.144.5 and Claude Code 2.1.214; Grok is absent.
+**Evidence.** Current Chromux launches unchanged CLI processes through a login-shell PTY, keeps captures as inspectable local files before delivery, and already invokes `claude -p` as a one-off delivery adapter. Official provider documentation exposes machine-oriented surfaces: `codex exec --json` emits JSONL, supports JSON Schema-constrained final output, and defaults to a read-only sandbox; Claude Code print mode supports JSON or streaming JSON, `--json-schema`, session IDs, turn and budget bounds, tool restriction, and `plan` permission mode; Grok supports headless JSON output, allow/deny and sandbox flags, and ACP over stdio. The locally observed environment contained Codex CLI 0.144.6 and Claude Code 2.1.214; Grok was absent.
 
 **Inference.** Provider differences are real, but they can be isolated at the process boundary. Chromux does not need a shared model API, provider keys, or a new agent runtime to coordinate a debate.
 
@@ -342,6 +368,19 @@ The approved non-goals remain in force: no implementation, no product-code or ta
 **Confidence.** High for setup shape; medium for exact persistence and recovery rules until implemented and tested.
 
 **Decision impact.** A feature flag plus a versioned record schema is sufficient for beta rollback; removing or disabling the feature must leave existing workspaces untouched.
+
+### Chromux Integration Seams
+
+| Seam | Current Chromux surface | Proposed debate responsibility | Boundary |
+| --- | --- | --- | --- |
+| Agent process launch | Login-shell PTYs for Claude, Codex, Grok, and shell sessions | Discover provider capability and run bounded non-interactive turns | Keep normal interactive sessions separate from debate children |
+| Provider turn signals | Claude hooks, Codex notify integration, and Grok hooks feed session attention state | Report debate phase progress without presenting provider-native events as durable state | Normalize status and retain bounded diagnostics only |
+| Browser evidence | Capture modal writes inspectable YAML and screenshot paths before `claude -p` delivery | Add selected capture references and digests to the immutable evidence manifest | Do not copy cookies, storage, whole repositories, or unbounded console/DOM data |
+| Local persistence | `~/.chromux` capture, delivery, restore, and update records | Store a versioned debate record with atomic phase completion | Debate deletion and retention must be explicit and local-first |
+| Review UI | Renderer owns attention, preview queue, captures, and intervention surfaces | Render positions, challenges, revisions, verdict, dissent, confidence, failures, and approval controls | Starting, accepting, and executing remain separate user decisions |
+| Export | Existing payload files and delivery logs are inspectable | Export a human-readable Markdown debate bundle | Export is not execution authority |
+| Cancellation and recovery | One-off delivery child processes are tracked and cancellable | Cancel a running turn, persist completed phases, retry only the failed participant | Exact provider signal semantics require a spike |
+| Future remote host | GBlockParty remains optional | Reuse the provider-neutral record and adapter contract if remote execution is later approved | No cloud account or remote dependency for the local beta |
 
 ### Recommended Mechanics Map
 
@@ -551,8 +590,8 @@ Codex app server, Claude's SDK, and Grok ACP may eventually improve streaming an
 
 ### Rejected Or Lower-Confidence Findings
 
-- **Rejected:** “GIGACHADD has a publicly reusable stable engine.” Public portfolio wording says “stable Rust debate engine,” but no approved implementation, tests, releases, or license support that as an integration claim.
-- **Rejected:** “CLI MVP means active maintained dependency.” A newer public scoreboard labels the project dormant, and readiness evidence labels it stale/blocked. Status is conflicting.
+- **Rejected:** “GIGACHADD has a publicly reusable stable engine.” No approved implementation, tests, releases, or license support that as an integration claim.
+- **Rejected:** “A recent private-repository push means GIGACHADD is a supported public dependency.” Visibility remained private, the public scoreboard labeled the project dormant, and no public release or support contract existed. Private activity does not satisfy the approved evidence boundary.
 - **Rejected:** “All providers can share identical flags and result envelopes.” Official docs show materially different commands, JSON formats, permission models, and optional protocols.
 - **Lower confidence:** The proposed five-phase loop materially improves decisions enough to justify latency. This needs beta measurement.
 - **Lower confidence:** Isolated stateless calls are better than provider session continuation for every phase. A spike should compare reproducibility, context size, and failure recovery.
@@ -576,7 +615,7 @@ Codex app server, Claude's SDK, and Grok ACP may eventually improve streaming an
 
 | Category | Coverage | Sources used | Gap and consequence |
 | --- | --- | --- | --- |
-| GIGACHADD identity/status | Partial | Public LeXCorp pages, 6eorge scoreboard, public readiness page, GitHub repository metadata search | Status conflicts; enough to reject dependency confidence, not enough to describe internals |
+| GIGACHADD identity/status | Partial | Current 6eorge scoreboard, current LeXCorp homepage, GitHub repository metadata and public-search checks | Identity and dormant status are visible; current mechanics and support evidence are absent |
 | GIGACHADD architecture/state machine | Missing | No approved public source found | Cannot claim preserved mechanics, direct protocol fit, or engine value |
 | GIGACHADD CLI/help/tests/issues/releases/history | Missing | Matching repo is private and excluded | Direct integration and port remain unapproved |
 | GIGACHADD license | Missing | No public license evidence | Binary bundling and code port are blocked |
@@ -589,19 +628,19 @@ Codex app server, Claude's SDK, and Grok ACP may eventually improve streaming an
 
 #### Source list
 
-- [LeXCorp public operating ledger](https://www.thelexcorp.com/) — GIGACHADD public description and CLI command surface; accessed 2026-07-18.
-- [George Le public project scoreboard](https://www.6eorge.com/) — GIGACHADD listed as a dormant Rust CLI AI debate tool; accessed 2026-07-18.
-- [LeXCorp launch readiness](https://www.thelexcorp.com/ops/readiness) — public repository identity and stale/blocked readiness signals; accessed 2026-07-18.
+- [LeXCorp public operating ledger](https://www.thelexcorp.com/) — current rendered content did not expose the earlier decision-useful GIGACHADD command description; checked 2026-07-22.
+- [George Le public project scoreboard](https://www.6eorge.com/) — GIGACHADD listed as a dormant Rust CLI AI debate tool; checked 2026-07-22.
+- GitHub repository metadata for `GeorgeQLe/gigachadd-v0` and owner-scoped public repository search — matching repository remained private and no public owner-scoped GIGACHADD repository was found; checked 2026-07-22.
 - [OpenAI Codex non-interactive mode](https://learn.chatgpt.com/docs/non-interactive-mode) — `codex exec`, JSONL, output schema, sandbox, auth, resume; accessed 2026-07-18.
 - [OpenAI Codex developer commands](https://learn.chatgpt.com/docs/developer-commands?surface=cli) — CLI maturity and flag reference; accessed 2026-07-18.
 - [Anthropic Claude Code CLI reference](https://docs.anthropic.com/en/docs/claude-code/cli-usage) — print mode, JSON formats, permissions, turns, sessions; accessed 2026-07-18.
 - [xAI Grok headless and scripting](https://docs.x.ai/build/cli/headless-scripting) — headless commands, JSON output, sessions, update control; accessed 2026-07-18.
 - [xAI Grok CLI reference](https://docs.x.ai/build/cli/reference) — CLI/ACP surface; accessed 2026-07-18.
-- Repository evidence: `prototype/main.js`, `prototype/renderer/renderer.js`, `prototype/package.json`, `prototype/docs/privacy-and-local-data.md`, `research/devtool-integration-map.md`, `research/_working/interrogation-devtool-integration-map-r1.yaml`, and `research/_working/interrogation-devtool-integration-map-r2.yaml`; inspected 2026-07-18.
+- Repository evidence: `prototype/main.js`, `prototype/renderer/renderer.js`, `prototype/package.json`, `prototype/docs/privacy-and-local-data.md`, `research/devtool-integration-map.md`, `research/_working/interrogation-devtool-integration-map-r1.yaml`, and `research/_working/interrogation-devtool-integration-map-r2.yaml`; inspected 2026-07-22.
 
 ### Downstream Implications
 
-If approved, the canonical integration map should receive a focused GIGACHADD Process section that:
+This confirmed integration map records a focused GIGACHADD Process decision that:
 
 1. Records native recreation as the integration stance.
 2. Adds the provider-neutral debate state and evidence boundary.
@@ -610,4 +649,4 @@ If approved, the canonical integration map should receive a focused GIGACHADD Pr
 5. Adds compatibility, migration, privacy, and failure constraints.
 6. Preserves the GIGACHADD public-source and license gaps rather than implying recovered internals.
 
-No task should be filed in Stage 2. After artifact approval, any implementation work should be classified separately and should begin with a read-only adapter/protocol spike before UI or full workflow construction.
+No implementation task was filed by this research-only finalization. Any future implementation work should be classified separately and should begin with a read-only adapter/protocol spike before UI or full workflow construction.
