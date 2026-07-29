@@ -176,6 +176,7 @@ function fixture({
     { statusCode: 302, location: '/openai/other/releases/tag/rust-v1.2.4' },
     { statusCode: 302, location: '/openai/codex/releases/latest' },
     { statusCode: 302, location: '/openai/codex/releases/tag/v1.2.4' },
+    { statusCode: 302, location: '/openai/codex/releases/tag/rust-v01.2.4' },
     { statusCode: 302, location: '/openai/codex/releases/tag/rust-v1.2.4-beta.1' },
     { statusCode: 302, location: `${VALID_REDIRECT}?from=latest` },
     { statusCode: 302, location: `${VALID_REDIRECT}#notes` },

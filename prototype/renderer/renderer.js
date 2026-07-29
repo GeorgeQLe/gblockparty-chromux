@@ -8966,6 +8966,12 @@ function codexLaunchIsReleased() {
   return state.codexUpdate.phase === 'released' || state.codexUpdate.phase === 'bypassed';
 }
 
+function sanitizeCodexUpdateError(value) {
+  return String(value || 'Codex update check failed')
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
+    .slice(0, 500);
+}
+
 function queueCodexLaunch(options, action = null) {
   return new Promise((resolve, reject) => {
     state.codexUpdate.queue.push({
@@ -9008,6 +9014,7 @@ async function releaseCodexLaunches({ bypass = false } = {}) {
 
 async function applyCodexPreflightStatus(status, { background = false } = {}) {
   const codex = state.codexUpdate;
+  if (status?.error) status = { ...status, error: sanitizeCodexUpdateError(status.error) };
   codex.status = status;
   if (background) {
     const releasedCount = codex.failOpenWarning?.releasedCount || 0;
@@ -9054,7 +9061,7 @@ async function checkCodexPreflight({ force = false } = {}) {
     state.codexUpdate.checkPromise = null;
     return applyCodexPreflightStatus(status, { background });
   }).catch((error) => {
-    const status = { error: error && error.message ? error.message : 'Codex update check failed' };
+    const status = { error: sanitizeCodexUpdateError(error && error.message) };
     state.codexUpdate.checkPromise = null;
     return applyCodexPreflightStatus(status, { background });
   });
