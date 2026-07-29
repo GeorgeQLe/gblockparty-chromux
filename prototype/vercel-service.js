@@ -357,10 +357,10 @@ function createVercelService({
     return { ok: true, kind: 'oauth-start', authorizationUrl: url.toString(), state, nonce };
   }
 
-  async function completeOAuth({ state, code, nonce } = {}) {
+  async function completeOAuth({ state, code } = {}) {
     const pending = pendingOAuth.get(state);
     pendingOAuth.delete(state);
-    if (!pending || pending.expiresAt < now() || pending.nonce !== nonce || !bounded(code, 4096)) {
+    if (!pending || pending.expiresAt < now() || !bounded(code, 4096)) {
       return error('OAUTH_STATE_MISMATCH', 'Vercel sign-in could not be verified. Start sign-in again.');
     }
     let tokens;
@@ -518,6 +518,56 @@ function createVercelService({
     return { ok: true, kind: 'project-removed', key };
   }
 
+  async function resolveProject(key) {
+    if (!bounded(key, 64)) return error('INVALID_PROJECT', 'Vercel project key is invalid.');
+    const saved = readProjects().find((project) => project.key === key);
+    if (!saved) return error('UNKNOWN_PROJECT', 'Vercel project configuration no longer exists.');
+    let repositoryRoot;
+    let deployRoot;
+    try {
+      repositoryRoot = (await canonicalize({ ...saved.location, cwd: saved.repositoryRoot })).cwd;
+      deployRoot = (await canonicalize({ ...saved.location, cwd: saved.deployRoot })).cwd;
+    } catch {
+      return error('PROJECT_UNAVAILABLE', 'The saved repository or deploy root is unavailable.');
+    }
+    const normalized = normalizeProject({
+      ...saved,
+      location: { ...saved.location, cwd: repositoryRoot },
+      repositoryRoot,
+      deployRoot,
+    });
+    if (!normalized || normalized.key !== saved.key
+      || repositoryRoot !== saved.repositoryRoot || deployRoot !== saved.deployRoot) {
+      return error('PROJECT_MOVED', 'The saved Vercel roots changed. Review project setup again.');
+    }
+    const profile = readCredentials().find((candidate) => candidate.id === saved.profileId);
+    if (!profile) return error('UNKNOWN_CONNECTION', 'The saved Vercel connection no longer exists.');
+    return { ok: true, kind: 'project-resolved', project: normalized, profile: publicProfile(profile) };
+  }
+
+  async function projectCommand(key, args, { root = 'deploy', ...options } = {}) {
+    const resolved = await resolveProject(key);
+    if (!resolved.ok) return resolved;
+    const profile = readCredentials().find((candidate) => candidate.id === resolved.project.profileId);
+    let token;
+    try { token = await tokenFor(profile); } catch (tokenError) {
+      return error('CONNECTION_EXPIRED', tokenError.message);
+    }
+    const cwd = root === 'repository'
+      ? resolved.project.repositoryRoot
+      : resolved.project.deployRoot;
+    const response = await command({ ...resolved.project.location, cwd }, args, {
+      ...options,
+      env: {
+        ...(options.env || {}),
+        VERCEL_ORG_ID: resolved.project.orgId,
+        VERCEL_PROJECT_ID: resolved.project.projectId,
+        ...(token ? { VERCEL_TOKEN: token } : {}),
+      },
+    });
+    return { ok: response.ok, kind: 'command', ...response };
+  }
+
   return {
     capability,
     connections,
@@ -531,6 +581,8 @@ function createVercelService({
     projects,
     saveProject,
     removeProject,
+    resolveProject,
+    projectCommand,
   };
 }
 

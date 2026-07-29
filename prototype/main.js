@@ -46,6 +46,8 @@ const { previewProbe } = require('./preview-probe');
 const { cleanupOrphanedStorage } = require('./storage-cleanup');
 const { createGitWorktreeService } = require('./git-worktree-service');
 const { createVercelService } = require('./vercel-service');
+const { createVercelOAuthLoopback } = require('./vercel-oauth-loopback');
+const { createVercelShippingService } = require('./vercel-shipping-service');
 const { normalizeBrowserQueueRequest } = require('./browser-queue');
 const { resolveChromuxUserDataPath } = require('./user-data-path');
 const { CaptureArtifactStore } = require('./capture/artifact-store');
@@ -106,6 +108,8 @@ const RESTORE_SESSIONS = path.join(CHROMUX_HOME, 'restore-sessions.json');
 const GIT_REPOSITORIES_FILE = path.join(CHROMUX_HOME, 'git-repositories.json');
 const VERCEL_CREDENTIALS_FILE = path.join(CHROMUX_HOME, 'vercel-credentials.json');
 const VERCEL_PROJECTS_FILE = path.join(CHROMUX_HOME, 'vercel-projects.json');
+const VERCEL_JOBS_FILE = path.join(CHROMUX_HOME, 'vercel-jobs.json');
+const VERCEL_OAUTH_CLIENT_ID = process.env.CHROMUX_VERCEL_OAUTH_CLIENT_ID || '';
 const RESTORE_ATTENTION_TYPES = new Set([
   'permission', 'authentication', 'input', 'rateLimited', 'toolFailed', 'delivery', 'completed',
 ]);
@@ -2221,6 +2225,7 @@ function gitCommandResult(location, args, options = {}) {
     return wslRuntime.run(location.distro, ['env', 'GIT_TERMINAL_PROMPT=0', 'git', '-C', location.cwd, ...args], {
       timeout,
       maxBuffer,
+      signal: options.signal,
       env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
     }).then((result) => ({
       ok: true,
@@ -2238,6 +2243,7 @@ function gitCommandResult(location, args, options = {}) {
     execFile('/usr/bin/git', ['-C', location.cwd, ...args], {
       timeout,
       maxBuffer,
+      signal: options.signal,
       env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
     }, (err, stdout, stderr) => resolve({
       ok: !err,
@@ -2300,15 +2306,18 @@ function vercelCommandResult(location, args, options = {}) {
   if (!location || !Array.isArray(args) || args.some((arg) => typeof arg !== 'string' || arg.includes('\0'))) {
     return Promise.resolve({ ok: false, stdout: '', stderr: 'Invalid Vercel request.', code: -1 });
   }
-  const timeout = Math.min(Math.max(Number(options.timeout) || 15000, 1000), 120000);
+  const timeout = Math.min(Math.max(Number(options.timeout) || 15000, 1000), 16 * 60 * 1000);
   const maxBuffer = Math.min(Math.max(Number(options.maxBuffer) || 8 * 1024 * 1024, 1024), 16 * 1024 * 1024);
-  const token = typeof options.env?.VERCEL_TOKEN === 'string' ? options.env.VERCEL_TOKEN : null;
+  const allowedVercelEnv = {};
+  for (const key of ['VERCEL_TOKEN', 'VERCEL_ORG_ID', 'VERCEL_PROJECT_ID']) {
+    if (typeof options.env?.[key] === 'string') allowedVercelEnv[key] = options.env[key];
+  }
   if (location.runtime === 'wsl') {
     const priorWslEnv = String(process.env.WSLENV || '').split(':').filter(Boolean);
     const childEnv = {
       ...process.env,
-      ...(token ? { VERCEL_TOKEN: token } : {}),
-      WSLENV: [...new Set([...priorWslEnv, ...(token ? ['VERCEL_TOKEN'] : [])])].join(':'),
+      ...allowedVercelEnv,
+      WSLENV: [...new Set([...priorWslEnv, ...Object.keys(allowedVercelEnv)])].join(':'),
     };
     return new Promise((resolve) => {
       execFile('wsl.exe', [
@@ -2320,6 +2329,7 @@ function vercelCommandResult(location, args, options = {}) {
         timeout,
         maxBuffer,
         env: childEnv,
+        signal: options.signal,
         windowsHide: true,
       }, (runError, stdout, stderr) => resolve({
         ok: !runError,
@@ -2337,7 +2347,8 @@ function vercelCommandResult(location, args, options = {}) {
       cwd: location.cwd,
       timeout,
       maxBuffer,
-      env: { ...process.env, PATH: envPath, ...(token ? { VERCEL_TOKEN: token } : {}) },
+      signal: options.signal,
+      env: { ...process.env, PATH: envPath, ...allowedVercelEnv },
     }, (runError, stdout, stderr) => resolve({
       ok: !runError,
       stdout: String(stdout || ''),
@@ -2391,6 +2402,60 @@ const vercel = createVercelService({
     const cwd = await vercelRepositoryRoot(location);
     return cwd ? { ...location, cwd } : null;
   },
+  oauthClientId: VERCEL_OAUTH_CLIENT_ID,
+  oauthRequest: VERCEL_OAUTH_CLIENT_ID ? async (kind, payload) => {
+    const endpoint = kind === 'revoke'
+      ? 'https://api.vercel.com/login/oauth/token/revoke'
+      : 'https://api.vercel.com/login/oauth/token';
+    const body = new URLSearchParams({ client_id: payload.clientId });
+    if (kind === 'exchange') {
+      body.set('grant_type', 'authorization_code');
+      body.set('code', payload.code);
+      body.set('code_verifier', payload.codeVerifier);
+      body.set('redirect_uri', payload.redirectUri);
+    } else if (kind === 'refresh') {
+      body.set('grant_type', 'refresh_token');
+      body.set('refresh_token', payload.refreshToken);
+    } else {
+      body.set('token', payload.token || payload.refreshToken);
+    }
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body,
+      signal: AbortSignal.timeout(15000),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(String(data.error_description || data.error || `Vercel OAuth HTTP ${response.status}`).slice(0, 1000));
+    return {
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+      expiresIn: data.expires_in,
+      tokenType: data.token_type,
+      account: data.user?.username || data.user?.name || null,
+    };
+  } : null,
+});
+
+const vercelShipping = createVercelShippingService({
+  jobsFile: VERCEL_JOBS_FILE,
+  resolveProject: (key) => vercel.resolveProject(key),
+  validateProject: (project) => vercel.validateConnection(
+    project.profileId,
+    { ...project.location, cwd: project.deployRoot },
+  ),
+  runGit: gitCommandResult,
+  runVercel: (key, args, options) => vercel.projectCommand(key, args, options),
+  emit: (job) => {
+    if (win && !win.isDestroyed()) win.webContents.send('vercel-job-update', job);
+  },
+});
+
+const vercelOAuth = createVercelOAuthLoopback({
+  configured: Boolean(VERCEL_OAUTH_CLIENT_ID),
+  begin: (request) => vercel.beginOAuth(request),
+  complete: (request) => vercel.completeOAuth(request),
+  openExternal: (url) => shell.openExternal(url),
 });
 
 async function gitRoot(cwd) {
@@ -3405,6 +3470,35 @@ ipcMain.handle('vercel-project-discover', (_e, location = {}) => vercel.discover
 ipcMain.handle('vercel-projects-read', () => vercel.projects());
 ipcMain.handle('vercel-project-save', (_e, request = {}) => vercel.saveProject(request));
 ipcMain.handle('vercel-project-remove', (_e, key) => vercel.removeProject(key));
+ipcMain.handle('vercel-oauth-start', (event, request = {}) => (
+  win && !win.isDestroyed() && event.sender.id === win.webContents.id
+    ? vercelOAuth.start(event.sender, request)
+    : { ok: false, error: { code: 'WINDOW_NOT_ACTIVE', message: 'Vercel sign-in must start from the active Chromux window.' } }
+));
+ipcMain.handle('vercel-oauth-cancel', (event) => {
+  if (!win || win.isDestroyed() || event.sender.id !== win.webContents.id) {
+    return { ok: false, error: { code: 'WINDOW_NOT_ACTIVE', message: 'Vercel sign-in must be canceled from the active Chromux window.' } };
+  }
+  vercelOAuth.cancel();
+  return { ok: true, kind: 'oauth-canceled' };
+});
+ipcMain.handle('vercel-ship-preview', (_event, request = {}) => vercelShipping.shipPreview(request));
+ipcMain.handle('vercel-ship-start', (event, request = {}) => (
+  win && !win.isDestroyed() && event.sender.id === win.webContents.id
+    ? vercelShipping.shipStart(request)
+    : { ok: false, error: { code: 'WINDOW_NOT_ACTIVE', message: 'Shipping must start from the active Chromux window.' } }
+));
+ipcMain.handle('vercel-jobs-read', () => vercelShipping.jobsRead());
+ipcMain.handle('vercel-job-cancel', (event, id) => (
+  win && !win.isDestroyed() && event.sender.id === win.webContents.id
+    ? vercelShipping.jobCancel(id)
+    : { ok: false, error: { code: 'WINDOW_NOT_ACTIVE', message: 'Shipping controls belong to the active Chromux window.' } }
+));
+ipcMain.handle('vercel-job-retry', (event, id) => (
+  win && !win.isDestroyed() && event.sender.id === win.webContents.id
+    ? vercelShipping.jobRetry(id)
+    : { ok: false, error: { code: 'WINDOW_NOT_ACTIVE', message: 'Shipping controls belong to the active Chromux window.' } }
+));
 
 ipcMain.handle('check-updates', (_e, opts = {}) => getUpdateStatus(opts));
 ipcMain.handle('codex-update-check', (_e, opts = {}) => {
@@ -3584,6 +3678,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', (event) => {
+  vercelOAuth.cancel();
   if (captureCoordinator?.active && !captureShutdownComplete) {
     event.preventDefault();
     if (!captureShutdownPromise) {

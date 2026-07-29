@@ -188,6 +188,9 @@ const state = {
       projects: [],
       project: null,
       profileId: '',
+      review: null,
+      jobs: [],
+      job: null,
     },
     windowsSetupStage: 'system',
   },
@@ -211,6 +214,7 @@ const state = {
     progress: '',
     checkPromise: null,
     releasePromise: null,
+    failOpenWarning: null,
   },
   lifecyclePrompt: null,
   testInstallUpdateResult: null,
@@ -4898,10 +4902,11 @@ function setVercelBusy(busy) {
   const wizard = state.ui.vercel;
   wizard.busy = busy;
   for (const id of [
-    'vercel-profile', 'vercel-use-cli', 'vercel-validate-profile', 'vercel-remove-profile',
+    'vercel-profile', 'vercel-use-cli', 'vercel-use-oauth', 'vercel-validate-profile', 'vercel-remove-profile',
     'vercel-token-label', 'vercel-token', 'vercel-connect-token', 'vercel-org-id',
     'vercel-project-id', 'vercel-trigger', 'vercel-production-branch', 'vercel-environment',
-    'vercel-save-project', 'vercel-remove-project',
+    'vercel-save-project', 'vercel-remove-project', 'vercel-ship-review-button',
+    'vercel-ship-environment', 'vercel-ship-start', 'vercel-job-cancel', 'vercel-job-retry',
   ]) {
     const element = $(`#${id}`);
     if (element) element.disabled = busy;
@@ -4964,6 +4969,7 @@ function renderVercelSetup() {
   $('#vercel-validate-profile').disabled = wizard.busy || !wizard.profileId || !cli?.available;
   $('#vercel-remove-profile').disabled = wizard.busy || !wizard.profileId;
   $('#vercel-use-cli').disabled = wizard.busy || !cli?.available;
+  $('#vercel-use-oauth').disabled = wizard.busy || !capability?.secureStorage;
   $('#vercel-connect-token').disabled = wizard.busy || !cli?.available || !capability?.secureStorage;
   $('#vercel-token-details').classList.toggle('hidden', Boolean(capability && !capability.secureStorage));
   $('#vercel-save-project').disabled = wizard.busy
@@ -4975,6 +4981,62 @@ function renderVercelSetup() {
     || !$('#vercel-project-id').value.trim();
   $('#vercel-remove-project').classList.toggle('hidden', !wizard.project);
   $('#vercel-remove-project').disabled = wizard.busy || !wizard.project;
+  $('#vercel-ship-section').classList.toggle('hidden', !wizard.project);
+  $('#vercel-ship-review-button').classList.toggle('hidden', !wizard.project);
+  $('#vercel-ship-review-button').disabled = wizard.busy || !wizard.project || !cli?.available;
+  $('#vercel-ship-environment-field').classList.toggle('hidden', wizard.project?.trigger === 'git');
+  if (wizard.project && !wizard.review) {
+    $('#vercel-ship-environment').value = wizard.project.rememberedEnvironment || 'preview';
+  }
+  renderVercelShipping();
+}
+
+const VERCEL_ACTIVE_JOB_PHASES = new Set(['preparing', 'committing', 'pushing', 'discovering', 'building']);
+
+function renderVercelShipping() {
+  const wizard = state.ui.vercel;
+  const review = wizard.review;
+  const reviewNode = $('#vercel-ship-review');
+  reviewNode.classList.toggle('hidden', !review);
+  if (review) {
+    $('#vercel-ship-summary').textContent = `${
+      review.environment.toUpperCase()
+    } · ${review.trigger.toUpperCase()} · ${review.branch || 'NO BRANCH'} · ${
+      review.clean ? 'CLEAN HEAD' : `${review.paths.length} PATH${review.paths.length === 1 ? '' : 'S'}`
+    }`;
+    const paths = $('#vercel-ship-paths');
+    paths.replaceChildren();
+    for (const entry of review.paths) {
+      const item = document.createElement('li');
+      item.textContent = `${entry.status} ${entry.path}`;
+      paths.appendChild(item);
+    }
+    if (!review.paths.length) {
+      const item = document.createElement('li');
+      item.textContent = 'No local changes. Chromux will monitor the existing HEAD deployment.';
+      paths.appendChild(item);
+    }
+    $('#vercel-commit-message-field').classList.toggle('hidden', review.trigger !== 'git' || review.clean);
+    $('#vercel-production-confirm-field').classList.toggle('hidden', !review.production);
+    $('#vercel-production-confirm').placeholder = review.productionConfirmation || '';
+    $('#vercel-ship-start').disabled = wizard.busy
+      || !$('#vercel-ship-confirm').checked
+      || (review.trigger === 'git' && !review.clean && !$('#vercel-commit-message').value.trim())
+      || (review.production && $('#vercel-production-confirm').value.trim() !== review.productionConfirmation);
+  }
+  const job = wizard.job;
+  $('#vercel-job').classList.toggle('hidden', !job);
+  if (!job) return;
+  $('#vercel-job-phase').textContent = job.phase.toUpperCase();
+  $('#vercel-job-time').textContent = job.updatedAt ? new Date(job.updatedAt).toLocaleTimeString() : '';
+  $('#vercel-job-message').textContent = job.message || '';
+  const link = $('#vercel-job-url');
+  link.classList.toggle('hidden', !job.deploymentUrl);
+  link.textContent = job.deploymentUrl || '';
+  link.href = job.deploymentUrl || '#';
+  $('#vercel-job-cancel').classList.toggle('hidden', !['discovering', 'building'].includes(job.phase));
+  $('#vercel-job-retry').classList.toggle('hidden', !job.retryAction || VERCEL_ACTIVE_JOB_PHASES.has(job.phase));
+  $('#vercel-job-retry').textContent = job.retryAction === 'push' ? 'RETRY PUSH' : 'RETRY MONITORING';
 }
 
 function fillVercelProjectFields(project, discovery) {
@@ -5006,6 +5068,9 @@ async function openVercelSetup(session) {
   wizard.profiles = [];
   wizard.project = null;
   wizard.profileId = '';
+  wizard.review = null;
+  wizard.job = null;
+  wizard.jobs = [];
   fillVercelProjectFields(null, null);
   $('#vercel-token').value = '';
   $('#modal-vercel').classList.remove('hidden');
@@ -5018,9 +5083,10 @@ async function openVercelSetup(session) {
     window.chromux.vercelConnectionsRead(),
     window.chromux.vercelProjectDiscover(location),
     window.chromux.vercelProjectsRead(),
+    window.chromux.vercelJobsRead(),
   ]);
   if (generation !== wizard.generation || wizard.sessionId !== session.id) return;
-  const [capabilityResult, connectionsResult, discoveryResult, projectsResult] = results.map((result) => (
+  const [capabilityResult, connectionsResult, discoveryResult, projectsResult, jobsResult] = results.map((result) => (
     result.status === 'fulfilled' ? result.value : null
   ));
   wizard.capability = capabilityResult?.ok ? capabilityResult : {
@@ -5034,6 +5100,10 @@ async function openVercelSetup(session) {
   wizard.projects = projectsResult?.ok && Array.isArray(projectsResult.projects)
     ? projectsResult.projects : [];
   wizard.project = vercelProjectForSession(wizard.projects, session);
+  wizard.jobs = jobsResult?.ok && Array.isArray(jobsResult.jobs) ? jobsResult.jobs : [];
+  wizard.job = wizard.project
+    ? wizard.jobs.find((job) => job.mappingKey === wizard.project.key) || null
+    : null;
   wizard.profileId = wizard.project?.profileId || (wizard.profiles.length === 1 ? wizard.profiles[0].id : '');
   fillVercelProjectFields(wizard.project, wizard.discovery);
   wizard.busy = false;
@@ -5047,6 +5117,21 @@ async function openVercelSetup(session) {
     setVercelStatus('Found an existing Vercel project link. Choose a connection and save setup.', 'ready');
   } else {
     setVercelStatus('No linked Vercel project was found. Enter the organization and project IDs.', 'ready');
+  }
+}
+
+async function connectVercelOAuth() {
+  const wizard = state.ui.vercel;
+  if (wizard.busy) return;
+  setVercelBusy(true);
+  setVercelStatus('Opening Vercel sign-in. Chromux owns the loopback callback for ten minutes…');
+  const result = await window.chromux.vercelOAuthStart({
+    id: `oauth-${Date.now().toString(36)}`,
+    label: 'Sign in with Vercel',
+  }).catch((error) => ({ ok: false, message: error.message }));
+  if (!result?.ok) {
+    setVercelStatus(vercelErrorMessage(result, 'Vercel sign-in could not start.'), 'fail');
+    setVercelBusy(false);
   }
 }
 
@@ -5200,12 +5285,70 @@ async function saveVercelProject() {
   }
   if (result?.ok) {
     wizard.project = result.project;
+    wizard.review = null;
     await refreshVercelProjects();
     setVercelStatus('Vercel setup saved for this project.', 'current');
   } else {
     setVercelStatus(vercelErrorMessage(result, 'The Vercel project mapping could not be saved.'), 'fail');
   }
   setVercelBusy(false);
+}
+
+async function previewVercelShip() {
+  const wizard = state.ui.vercel;
+  if (!wizard.project || wizard.busy) return;
+  const environment = $('#vercel-ship-environment').value;
+  setVercelBusy(true);
+  setVercelStatus('Revalidating roots, connection, branch, target, and Git status…');
+  const result = await window.chromux.vercelShipPreview({
+    mappingKey: wizard.project.key,
+    environment,
+  }).catch((error) => ({ ok: false, message: error.message }));
+  wizard.review = result?.ok ? result : null;
+  $('#vercel-ship-confirm').checked = false;
+  $('#vercel-production-confirm').value = '';
+  setVercelStatus(
+    result?.ok ? 'Review the exact shipping target and file list below.' : vercelErrorMessage(result, 'Shipping review failed.'),
+    result?.ok ? 'ready' : 'fail',
+  );
+  setVercelBusy(false);
+}
+
+async function startVercelShip() {
+  const wizard = state.ui.vercel;
+  const review = wizard.review;
+  if (!review || wizard.busy) return;
+  setVercelBusy(true);
+  const result = await window.chromux.vercelShipStart({
+    mappingKey: review.mappingKey,
+    fingerprint: review.fingerprint,
+    environment: review.environment,
+    commitMessage: $('#vercel-commit-message').value.trim(),
+    confirmed: $('#vercel-ship-confirm').checked,
+    productionConfirmation: $('#vercel-production-confirm').value.trim(),
+  }).catch((error) => ({ ok: false, message: error.message }));
+  if (result?.ok) {
+    wizard.job = result.job;
+    wizard.review = null;
+    setVercelStatus('Shipping started. Closing Chromux only stops local monitoring; it never rolls back Git or Vercel.', 'current');
+  } else {
+    setVercelStatus(vercelErrorMessage(result, 'Shipping could not start.'), 'fail');
+  }
+  setVercelBusy(false);
+}
+
+async function cancelVercelJob() {
+  const wizard = state.ui.vercel;
+  if (!wizard.job) return;
+  const result = await window.chromux.vercelJobCancel(wizard.job.id).catch((error) => ({ ok: false, message: error.message }));
+  if (!result?.ok) setVercelStatus(vercelErrorMessage(result, 'Monitoring could not be canceled.'), 'fail');
+}
+
+async function retryVercelJob() {
+  const wizard = state.ui.vercel;
+  if (!wizard.job) return;
+  const result = await window.chromux.vercelJobRetry(wizard.job.id).catch((error) => ({ ok: false, message: error.message }));
+  if (!result?.ok) setVercelStatus(vercelErrorMessage(result, 'Monitoring could not be retried.'), 'fail');
 }
 
 async function removeVercelProject() {
@@ -8840,6 +8983,7 @@ async function releaseCodexLaunches({ bypass = false } = {}) {
   if (state.codexUpdate.releasePromise) return state.codexUpdate.releasePromise;
   state.codexUpdate.phase = 'releasing';
   state.codexUpdate.releasePromise = (async () => {
+    let releasedCount = 0;
     while (state.codexUpdate.queue.length > 0) {
       const queued = state.codexUpdate.queue.shift();
       try {
@@ -8849,6 +8993,7 @@ async function releaseCodexLaunches({ bypass = false } = {}) {
             ? await state.testCodexLaunchExecutor(queued.options)
             : await createSessionNow(queued.options));
         queued.resolve(session);
+        releasedCount += 1;
       } catch (error) {
         queued.reject(error);
       }
@@ -8856,31 +9001,62 @@ async function releaseCodexLaunches({ bypass = false } = {}) {
     state.codexUpdate.phase = bypass ? 'bypassed' : 'released';
     state.codexUpdate.releasePromise = null;
     renderWorkspaceWarning();
+    return releasedCount;
   })();
   return state.codexUpdate.releasePromise;
 }
 
+async function applyCodexPreflightStatus(status, { background = false } = {}) {
+  const codex = state.codexUpdate;
+  codex.status = status;
+  if (background) {
+    const releasedCount = codex.failOpenWarning?.releasedCount || 0;
+    codex.phase = 'bypassed';
+    if (status && !status.error && status.updateAvailable === false) {
+      codex.failOpenWarning = null;
+    } else if (status && !status.error && status.updateAvailable === true) {
+      codex.failOpenWarning = { kind: 'update-available', releasedCount };
+    } else {
+      codex.failOpenWarning = {
+        kind: 'check-failed',
+        releasedCount,
+        error: status?.error || 'Codex update check failed',
+      };
+    }
+    renderWorkspaceWarning();
+    return status;
+  }
+  if (status && !status.error && status.updateAvailable === false) {
+    await releaseCodexLaunches();
+  } else if (status && !status.error && status.updateAvailable === true) {
+    codex.phase = 'update-available';
+    renderWorkspaceWarning();
+  } else {
+    const releasedCount = await releaseCodexLaunches({ bypass: true });
+    codex.failOpenWarning = {
+      kind: 'check-failed',
+      releasedCount,
+      error: status?.error || 'Codex update check failed',
+    };
+    renderWorkspaceWarning();
+  }
+  return status;
+}
+
 async function checkCodexPreflight({ force = false } = {}) {
   if (state.codexUpdate.checkPromise) return state.codexUpdate.checkPromise;
-  state.codexUpdate.phase = 'checking';
+  const background = state.codexUpdate.phase === 'bypassed';
+  if (!background) state.codexUpdate.phase = 'checking';
   state.codexUpdate.progress = '';
   renderWorkspaceWarning();
-  state.codexUpdate.checkPromise = window.chromux.checkCodexUpdate({ force }).then(async (status) => {
-    state.codexUpdate.status = status;
+  const check = state.testCodexUpdateCheck || window.chromux.checkCodexUpdate;
+  state.codexUpdate.checkPromise = Promise.resolve(check({ force })).then(async (status) => {
     state.codexUpdate.checkPromise = null;
-    if (status && !status.error && status.updateAvailable === false) {
-      await releaseCodexLaunches();
-    } else {
-      state.codexUpdate.phase = status && status.error ? 'check-failed' : 'update-available';
-      renderWorkspaceWarning();
-    }
-    return status;
+    return applyCodexPreflightStatus(status, { background });
   }).catch((error) => {
-    state.codexUpdate.status = { error: error && error.message ? error.message : 'Codex update check failed' };
+    const status = { error: error && error.message ? error.message : 'Codex update check failed' };
     state.codexUpdate.checkPromise = null;
-    state.codexUpdate.phase = 'check-failed';
-    renderWorkspaceWarning();
-    return state.codexUpdate.status;
+    return applyCodexPreflightStatus(status, { background });
   });
   return state.codexUpdate.checkPromise;
 }
@@ -10740,6 +10916,51 @@ function renderWorkspaceWarning() {
     return;
   }
 
+  const failOpen = codex && codex.phase === 'bypassed' ? codex.failOpenWarning : null;
+  if (failOpen) {
+    const status = codex.status || {};
+    const released = failOpen.releasedCount || 0;
+    const main = document.createElement('div');
+    main.className = 'rw-main';
+    const title = document.createElement('div');
+    title.className = 'rw-title';
+    title.textContent = failOpen.kind === 'update-available'
+      ? 'Codex update available — restart later'
+      : `Codex update check failed — ${released} session${released === 1 ? '' : 's'} released`;
+    const detail = document.createElement('div');
+    detail.className = 'rw-detail';
+    detail.textContent = failOpen.kind === 'update-available'
+      ? `Installed ${status.currentVersion}; latest ${status.latestVersion}. Running sessions were not interrupted; update Codex during a later safe restart.`
+      : `${failOpen.error || 'Codex update check failed'}. Chromux started the saved sessions without blocking this app run.`;
+    detail.title = detail.textContent;
+    main.append(title, detail);
+
+    const actions = document.createElement('div');
+    actions.className = 'rw-actions';
+    if (failOpen.kind === 'update-available') {
+      const notes = document.createElement('button');
+      notes.className = 'rw-action';
+      notes.textContent = 'RELEASE NOTES';
+      notes.onclick = () => window.chromux.openUpdateRelease({ status }).catch(() => {});
+      actions.appendChild(notes);
+    }
+    const retryCheck = document.createElement('button');
+    retryCheck.className = 'rw-action rw-primary';
+    retryCheck.textContent = 'RETRY CHECK';
+    retryCheck.onclick = () => checkCodexPreflight({ force: true }).catch(() => {});
+    const dismiss = document.createElement('button');
+    dismiss.className = 'rw-action rw-dismiss';
+    dismiss.textContent = 'DISMISS';
+    dismiss.onclick = () => {
+      codex.failOpenWarning = null;
+      renderWorkspaceWarning();
+    };
+    actions.append(retryCheck, dismiss);
+    host.append(main, actions);
+    host.classList.remove('hidden');
+    return;
+  }
+
   const retry = state.resumeRetryWarning;
   if (retry) {
     const main = document.createElement('div');
@@ -11457,11 +11678,46 @@ for (const id of [
   $(`#${id}`).addEventListener('change', renderVercelSetup);
 }
 $('#vercel-use-cli').addEventListener('click', () => connectVercelCli());
+$('#vercel-use-oauth').addEventListener('click', () => connectVercelOAuth());
 $('#vercel-connect-token').addEventListener('click', () => connectVercelToken());
 $('#vercel-validate-profile').addEventListener('click', () => validateVercelProfile());
 $('#vercel-remove-profile').addEventListener('click', () => removeVercelProfile());
 $('#vercel-save-project').addEventListener('click', () => saveVercelProject());
 $('#vercel-remove-project').addEventListener('click', () => removeVercelProject());
+$('#vercel-ship-review-button').addEventListener('click', () => previewVercelShip());
+$('#vercel-ship-start').addEventListener('click', () => startVercelShip());
+$('#vercel-job-cancel').addEventListener('click', () => cancelVercelJob());
+$('#vercel-job-retry').addEventListener('click', () => retryVercelJob());
+for (const id of ['vercel-ship-confirm', 'vercel-production-confirm', 'vercel-commit-message']) {
+  $(`#${id}`).addEventListener('input', renderVercelShipping);
+  $(`#${id}`).addEventListener('change', renderVercelShipping);
+}
+$('#vercel-ship-environment').addEventListener('change', () => {
+  state.ui.vercel.review = null;
+  renderVercelSetup();
+});
+
+window.chromux.onVercelOAuthUpdate(async (result) => {
+  const wizard = state.ui.vercel;
+  if (result?.ok) {
+    const connections = await window.chromux.vercelConnectionsRead().catch(() => null);
+    wizard.profiles = connections?.ok ? connections.profiles : wizard.profiles;
+    wizard.profileId = result.profile.id;
+    setVercelStatus(`Vercel sign-in saved for ${result.profile.account || result.profile.label}.`, 'current');
+  } else {
+    setVercelStatus(vercelErrorMessage(result, 'Vercel sign-in did not complete.'), 'fail');
+  }
+  setVercelBusy(false);
+});
+
+window.chromux.onVercelJobUpdate((job) => {
+  const wizard = state.ui.vercel;
+  const index = wizard.jobs.findIndex((candidate) => candidate.id === job.id);
+  if (index >= 0) wizard.jobs[index] = job;
+  else wizard.jobs.unshift(job);
+  if (wizard.project?.key === job.mappingKey) wizard.job = job;
+  renderVercelShipping();
+});
 
 document.querySelectorAll('[data-close]').forEach((btn) => {
   btn.addEventListener('click', () => {
@@ -11473,6 +11729,7 @@ document.querySelectorAll('[data-close]').forEach((btn) => {
     if (btn.dataset.close === 'modal-vercel') {
       state.ui.vercel.generation += 1;
       $('#vercel-token').value = '';
+      window.chromux.vercelOAuthCancel().catch(() => {});
     }
     invalidate('shortcutDebug');
   });
@@ -11791,6 +12048,22 @@ if (window.chromuxTest) {
       await saveVercelProject();
       return this.snapshot(state.ui.vercel.sessionId);
     },
+    async reviewShip(environment = 'preview') {
+      $('#vercel-ship-environment').value = environment;
+      await previewVercelShip();
+      return this.snapshot(state.ui.vercel.sessionId);
+    },
+    confirmShip({ reviewed = true, commitMessage = '', productionConfirmation = '' } = {}) {
+      $('#vercel-ship-confirm').checked = reviewed;
+      $('#vercel-commit-message').value = commitMessage;
+      $('#vercel-production-confirm').value = productionConfirmation;
+      renderVercelShipping();
+      return this.snapshot(state.ui.vercel.sessionId);
+    },
+    async startShip() {
+      await startVercelShip();
+      return this.snapshot(state.ui.vercel.sessionId);
+    },
     snapshot(id) {
       const session = state.sessions.get(id);
       return {
@@ -11809,6 +12082,19 @@ if (window.chromuxTest) {
         orgId: $('#vercel-org-id').value,
         projectId: $('#vercel-project-id').value,
         saveDisabled: $('#vercel-save-project').disabled,
+        review: state.ui.vercel.review ? {
+          environment: state.ui.vercel.review.environment,
+          production: state.ui.vercel.review.production,
+          productionConfirmation: state.ui.vercel.review.productionConfirmation,
+          paths: state.ui.vercel.review.paths.length,
+        } : null,
+        shipDisabled: $('#vercel-ship-start').disabled,
+        job: state.ui.vercel.job ? {
+          id: state.ui.vercel.job.id,
+          phase: state.ui.vercel.job.phase,
+          deploymentUrl: state.ui.vercel.job.deploymentUrl,
+          retryAction: state.ui.vercel.job.retryAction,
+        } : null,
         tokenValue: $('#vercel-token').value,
       };
     },
@@ -11894,7 +12180,9 @@ if (window.chromuxTest) {
       state.codexUpdate.progress = '';
       state.codexUpdate.checkPromise = null;
       state.codexUpdate.releasePromise = null;
+      state.codexUpdate.failOpenWarning = null;
       state.testCodexLaunchExecutor = null;
+      state.testCodexUpdateCheck = null;
       state.testCodexLaunchTrace = [];
       renderWorkspaceWarning();
     },
@@ -11917,13 +12205,13 @@ if (window.chromuxTest) {
       return createSession({ cwd: '/tmp', ...options, agent: 'codex' });
     },
     setStatus(status) {
-      state.codexUpdate.status = { ...status };
-      state.codexUpdate.phase = status.error
-        ? 'check-failed'
-        : (status.updateAvailable ? 'update-available' : 'checking');
-      if (status.updateAvailable === false && !status.error) return releaseCodexLaunches();
-      renderWorkspaceWarning();
-      return Promise.resolve();
+      return applyCodexPreflightStatus({ ...status });
+    },
+    retryWith(status, delayMs = 0) {
+      state.testCodexUpdateCheck = () => new Promise((resolve) => {
+        setTimeout(() => resolve({ ...status }), delayMs);
+      });
+      return checkCodexPreflight({ force: true });
     },
     failUpdate(error = 'fixture update failure') {
       state.codexUpdate.status = { ...(state.codexUpdate.status || {}), error };
@@ -12204,6 +12492,10 @@ if (window.chromuxTest) {
     addSession: addRenderableTestSession,
     feed(id, chunk) {
       handlePtyData(id, chunk);
+      flushRender();
+    },
+    emit(id, event, detail = null) {
+      apply({ type: 'turn-signal', sessionId: id, signal: event, detail });
       flushRender();
     },
     emitSignal(id, event, detail = null) {

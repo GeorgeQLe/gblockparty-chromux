@@ -172,13 +172,31 @@ repository/deploy-root mapping. A configured project shows
 **VERCEL · READY**. When no link exists, enter the Vercel organization and
 project IDs explicitly.
 
-The wizard configures the project but does not deploy it yet. Guarded Git
-shipping and deployment progress are the next v0.71 implementation phase.
+Choose **SHIP** to review the current branch, upstream, target environment, and
+every tracked or untracked path before any mutation. Git-triggered mappings
+stage all reviewed repository changes, create one argument-safe commit, push or
+establish the branch upstream, correlate the Vercel deployment by commit SHA,
+and monitor it to a final preview URL. Direct mappings run from the saved deploy
+root. Production always requires a second exact project + branch/environment
+confirmation.
+
+The deployment job survives app restarts without storing credentials or raw
+command output. **CANCEL MONITORING** stops only Chromux's local wait; it never
+undoes a commit, push, or remote deployment. **RETRY MONITORING** resumes
+push-only recovery, SHA discovery, or URL inspection without recommitting or
+redeploying. Chromux never auto-pulls, force-pushes, creates empty commits, or
+rolls back a successful commit.
 
 Chromux never installs the Vercel CLI silently. Token-backed calls pass the
 credential through `VERCEL_TOKEN`, not command arguments. CLI login remains
 owned by Vercel; removing its local Chromux profile does not run
 `vercel logout`.
+
+**SIGN IN WITH VERCEL** is available in builds configured with Chromux's public
+Vercel app client ID. The app owns only
+`http://127.0.0.1:47891/vercel/oauth/callback` for up to ten minutes and uses
+PKCE with no bundled client secret. OAuth access and refresh tokens use the same
+OS-encrypted credential store as personal tokens.
 
 Drafts are capped at 64 KiB and persist independently in managed restore snapshots. **HISTORY** and
 `Option+Up` / `Option+Down` reuse prompts from sessions with the same canonical working directory.

@@ -1426,6 +1426,61 @@
   candidate was therefore advanced to the next available minor, v0.73.0,
   without rewriting the immutable v0.72.0 tag or Release.
 
+## 2026-07-28 — Guarded Vercel shipping candidate
+
+- Added the complete saved-mapping shipping path: current tracked/untracked Git
+  review with a status/configuration fingerprint, direct preview selection,
+  Git production-branch derivation, explicit normal and production
+  confirmations, stage-all argument-safe commits, upstream push, clean-HEAD
+  monitoring, push-only recovery, and refusal of conflicts, detached HEADs,
+  stale reviews, hook failures, post-commit dirt, divergence, and empty commits.
+- Added a bounded mode-`0600` non-secret job store and live update bridge.
+  Direct deployments inspect the returned URL; Git deployments discover by
+  `githubCommitSha` before inspection. Cancel is available only during local
+  discovery/inspection, never during commit/push/deploy. Safe SHA/URL jobs
+  resume after restart without repeating remote mutations.
+- Added the exact loopback OAuth owner for
+  `127.0.0.1:47891/vercel/oauth/callback`, public-client PKCE exchange,
+  refresh rotation, revocation, encrypted token storage, ten-minute timeout,
+  and completion/cancel/window/app cleanup. No client secret exists.
+- Validation: all prototype tests passed, including the new service, OAuth
+  loopback, and real-Electron production-confirmation/job-event suites; focused
+  syntax and whitespace checks passed; source smoke passed; the macOS arm64
+  package built at `0.71.0`; both plist version fields are `0.71.0`; packaged
+  smoke passed outside the command sandbox. The packager's established
+  optional `.icon` probe warning was accepted because the bundle was produced.
+- Ship manifest — User goal: complete and publish v0.71.0 with guarded
+  one-button Vercel shipping. Changed feature files:
+  `prototype/vercel-shipping-service.js`,
+  `prototype/vercel-oauth-loopback.js`, `prototype/vercel-service.js`,
+  `prototype/main.js`, `prototype/preload.js`,
+  `prototype/renderer/index.html`, `prototype/renderer/renderer.js`,
+  `prototype/renderer/styles.css`, three Vercel test scripts, package scripts,
+  README/privacy/troubleshooting/UAT docs, `RELEASES.md`, `tasks/todo.md`, and
+  this entry. Per-file purpose and user-goal mapping: services own canonical
+  mutation/monitor/OAuth state, main/preload keep credentials and state changes
+  out of the renderer, renderer files expose review/progress/recovery, tests
+  prove failure boundaries, and documentation records behavior, retention, and
+  the remaining live gate. Adversarial review traced stale mapping/status
+  races, status parsing, stage-all including untracked paths, detached/conflict
+  refusal, commit hooks and post-commit dirt, missing upstreams, unchanged-HEAD
+  push recovery, clean synchronized HEADs, production derivation/confirmation,
+  direct argv/environment construction, SHA discovery timeout, cancel/retry,
+  restart resumption, corrupt stores, event/output bounds, callback
+  host/path/state/PKCE ownership, token lifetime/redaction, and active-window
+  mutation ownership. It fixed target reset during review, controller lifetime
+  during cancellation, double-read branch/environment derivation, and
+  cancellation being exposed during Git mutations.
+- Skipped/live tests: OAuth-backed direct/Git preview UAT was not run. Vercel
+  app creation is dashboard-only and this session had no controllable signed-in
+  browser. The local CLI is authenticated and the repository has a preview
+  mapping, but identity-only CLI proof cannot substitute for the required
+  public OAuth permission proof. Residual risk: Vercel app permissions, real
+  Git integration latency/output, and live route behavior remain unproved.
+  Rollback: revert only the Vercel candidate boundary; no tag or GitHub Release
+  was created. Release is blocked until the public client ID is committed and
+  the sanitized live UAT report reaches PASS. Next command: register the public
+  app, then rerun `$exec` to complete UAT and publish `chromux-v0.71.0`.
 ## 2026-07-28 — Intentional, turn-aware browser queue links
 
 - Added authenticated MCP and OSC browser queue submissions with structured

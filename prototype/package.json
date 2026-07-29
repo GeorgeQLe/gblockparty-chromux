@@ -52,6 +52,8 @@
     "test:session-rail-renderer": "node scripts/test-session-rail-renderer.js",
     "test:git-worktree-service": "node scripts/test-git-worktree-service.js",
     "test:vercel-service": "node scripts/test-vercel-service.js",
+    "test:vercel-shipping-service": "node scripts/test-vercel-shipping-service.js",
+    "test:vercel-oauth-loopback": "node scripts/test-vercel-oauth-loopback.js",
     "test:vercel-renderer": "node scripts/test-vercel-renderer.js",
     "test:tab-titles-renderer": "node scripts/test-tab-titles-renderer.js",
     "test:session-tab-groups-renderer": "node scripts/test-session-tab-groups-renderer.js",

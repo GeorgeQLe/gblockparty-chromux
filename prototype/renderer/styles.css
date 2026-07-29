@@ -2207,6 +2207,26 @@ input[type="text"]:focus, input[type="password"]:focus, #cap-notes:focus, select
   cursor: pointer;
 }
 .vercel-token-fields { display: flex; flex-direction: column; gap: 10px; padding: 0 10px 10px; }
+.vercel-ship-review, .vercel-job {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 11px;
+  border: 1px solid var(--line);
+  background: var(--bg0);
+}
+.vercel-ship-paths {
+  max-height: 150px;
+  margin: 0;
+  padding: 8px 8px 8px 28px;
+  overflow: auto;
+  color: var(--text);
+  background: var(--bg1);
+  font: 10.5px/1.5 var(--font-mono);
+}
+.vercel-confirm { display: flex; align-items: flex-start; gap: 8px; color: var(--text); font-size: 11px; }
+.vercel-job-head { display: flex; justify-content: space-between; gap: 12px; color: var(--dim); }
+.vercel-job a { color: var(--cyan); font: 11px/1.4 var(--font-mono); overflow-wrap: anywhere; }
 .vercel-root-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

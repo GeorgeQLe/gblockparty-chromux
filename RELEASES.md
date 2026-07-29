@@ -24,6 +24,20 @@ Planned tag: `chromux-v0.73.0`
 - Retain compatibility with older Git worktree porcelain, legacy Electron
   Forge packaging dependencies, current GitHub Actions runtimes, and
   Linux-hosted Electron regression runs.
+- Add the complete OAuth-backed Vercel preview shipping workflow: public PKCE
+  sign-in, guarded direct and Git-triggered deployment creation, bounded
+  monitoring, cancellation, retry, and restart recovery with non-secret
+  mode-`0600` job persistence.
+- Recover Codex startup checks from unauthenticated GitHub REST rate limits by
+  validating the public latest-release redirect before accepting its exact
+  stable version. npm installations still require that version to exist in the
+  registry.
+- After all bounded release checks fail, start every queued restored Codex
+  session once in saved order and keep Codex launches ungated for the rest of
+  that app run.
+- Keep the failure warning non-blocking with background retry and dismiss
+  actions. A later successful check clears the warning when current, or reports
+  the available release without updating live sessions.
 
 ## GBlockParty Chromux v0.72.0
 
@@ -62,8 +76,21 @@ Planned tag: `chromux-v0.71.0`
   runtime-local CLI discovery, CLI-login or encrypted-token connections,
   linked-project discovery, explicit project IDs, connection validation, and
   canonical deploy mappings. Saved sessions show **VERCEL · READY**.
-- Guarded Git commit/push orchestration, deployment monitoring, OAuth loopback
-  ownership, and live Vercel UAT remain release blockers.
+- Add a guarded **SHIP** review for tracked and untracked Git status, exact
+  branch/environment targeting, stage-all commit and upstream push, clean-HEAD
+  monitoring, direct deploys, explicit second production confirmation, and
+  push-only recovery without pull, force push, rollback, or empty commits.
+- Persist bounded, non-secret deployment jobs with mode `0600`; correlate Git
+  deployments by commit SHA, inspect direct and Git deployments to a terminal
+  state, cancel only local monitoring, and automatically resume safe discovery
+  or inspection after restart.
+- Own the exact `127.0.0.1:47891` OAuth callback before opening Vercel, use a
+  public PKCE client without a secret, rotate and revoke encrypted tokens, and
+  close the listener on completion, cancellation, timeout, window destruction,
+  or app exit.
+- The release tag remains gated on registering the public Vercel application,
+  proving its access token can deploy the mapped preview project, and archiving
+  the live direct/Git/cancel/restart preview UAT.
 
 ## GBlockParty Chromux v0.70.0
 

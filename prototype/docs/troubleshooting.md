@@ -307,6 +307,7 @@ Chromux stores local artifacts under your home directory:
 | Delivery log | `~/.chromux/delivery-log.jsonl` |
 | Global favorites | `~/.chromux/favorites.json` |
 | Git repository catalog | `~/.chromux/git-repositories.json` |
+| Vercel credentials, mappings, and non-secret job history | `~/.chromux/vercel-credentials.json`, `~/.chromux/vercel-projects.json`, `~/.chromux/vercel-jobs.json` |
 | Restore and inbox triage state | `~/.chromux/restore-sessions.json` |
 | Hook settings and notify scripts | `~/.chromux/` |
 | Renderer settings | `Local Storage` inside the selected stable Electron app profile |
@@ -322,6 +323,30 @@ files, top-level symlinks, nonmatching signal files, captures, delivery history,
 restore snapshots, prompt history, and agent-owned directories are not removed.
 
 Chromux does not currently expire capture directories. To reclaim disk space, delete old directories under `~/.chromux/captures/`. To clear delivery history, delete `~/.chromux/delivery-log.jsonl`.
+
+## Vercel shipping stopped or needs recovery
+
+Reopen **VERCEL · READY** in any session under the mapped repository. A changed
+root, connection, project ID, trigger, branch, or Git status invalidates the old
+review; choose **SHIP** again. Detached HEADs and unresolved conflicts are
+blocked. Chromux does not pull or resolve divergence automatically.
+
+If a commit hook fails, fix the hook failure and review again. If the commit
+succeeded but push failed, Chromux keeps the commit SHA and offers a push-only
+retry only while `HEAD` still matches. It never deletes or rolls back that
+commit. If a hook left additional changes after committing, review those
+changes before any push.
+
+**CANCEL MONITORING** does not cancel a remote Vercel deployment or undo Git.
+Use **RETRY MONITORING** to resume SHA discovery or inspect the same URL. After
+restart, jobs with a verified commit SHA or deployment URL resume automatically;
+an interruption before either identity existed requires a fresh review.
+
+If **SIGN IN WITH VERCEL** reports that OAuth is not configured, use an existing
+Vercel CLI login or encrypted personal token. Public OAuth builds require the
+registered callback `http://127.0.0.1:47891/vercel/oauth/callback`; another
+process occupying port 47891 prevents sign-in and is reported without opening
+the browser.
 
 The opt-in localhost first-success UAT is an exception to normal retention: it
 uses an isolated temporary `CHROMUX_HOME_DIR`, records only sanitized artifact

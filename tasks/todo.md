@@ -18,16 +18,28 @@ No active priority documentation items.
   runtime discovery, encrypted CLI/token/OAuth profile primitives, canonical
   linked-root/project persistence, narrow IPC, security documentation, and
   deterministic service coverage are implemented, along with the
-  terminal-header button, project setup wizard, and real-Electron preload
-  integration coverage; loopback OAuth ownership, guarded stage-all
-  commit/push recovery, direct/Git-triggered deployment monitoring, live
-  preview UAT, and release publication remain. _(source: user-supplied
-  One-Button Vercel Shipping plan; next step: implement the guarded shipping
-  engine and deployment monitor against the saved project mapping)_
+  terminal-header button, project setup wizard, guarded stage-all commit/push
+  recovery, direct/Git-triggered deployment monitoring, mode-`0600` restart
+  recovery, owned loopback OAuth, two-step production confirmation, and
+  deterministic service/real-Electron coverage are implemented. Complete the
+  dashboard-only public OAuth app registration, commit its public client ID,
+  prove the OAuth credential can deploy the mapped preview project, archive the
+  direct/Git/cancel/restart live UAT, then publish the release. _(source:
+  user-supplied One-Button Vercel Shipping plan; blocker evidence:
+  `prototype/docs/testing/vercel-shipping-uat-0.71.0.md`; no controllable
+  signed-in browser was available for Vercel dashboard app creation)_
 
 - [x] Redesign Threads as an Action Required / Ready to Finish / Working / All Sessions hybrid inbox with persisted Done/Snooze triage, and replace flat Git changes with a bounded repository catalog, ranked linked-worktree inventory, validated review/commit/sync actions, schema v10, documentation, and the v0.70.0 release. _(source: user-supplied implementation plan; evidence: `prototype/git-worktree-service.js`, main/preload discriminated IPC, renderer inbox/review drawer, parser/temp-repository/real-Electron coverage, package metadata, docs, and `RELEASES.md`)_
 
 - [x] Retry the complete Codex startup update check up to three times, keep restored Codex tabs queued without exposing intermediate errors, release them in saved order on retry success, preserve manual retry and install behavior, and ship v0.69.3. _(source: user-supplied implementation plan; evidence: `prototype/codex-update-service.js`, focused service/renderer-gate coverage, complete prototype suite, package metadata, and `RELEASES.md`)_
+
+- [x] Recover Codex startup update checks from GitHub API 403s with a validated
+  public release redirect, then fail open after bounded discovery failure,
+  release every queued restore in order, keep the app-run gate bypassed, and
+  make retry informational for live sessions; ship v0.72.1. _(source:
+  user-supplied Fix Codex 403 Restart Recovery plan; evidence:
+  `prototype/codex-update-service.js`, renderer gate recovery, focused and full
+  prototype coverage, package metadata, and `RELEASES.md`)_
 
 - [x] Add an isolated Codex Activity Indicator Lab with paired interactive PTY and structured JSONL lanes, explicit model-usage gates, five live scenarios, sanitized evidence export, fake-CLI and Electron coverage, v0.67.0 metadata, and a live Codex 0.145.0 UAT report without changing production attention inference. _(source: user-supplied implementation plan; evidence: `prototype/activity-lab/`, activity-lab scripts/tests/docs, `docs/testing/activity-lab-uat-0.67.0.md`, and `RELEASES.md`)_
 

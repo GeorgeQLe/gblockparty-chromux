@@ -3,7 +3,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { spawn } = require('child_process');
+const { execFileSync, spawn } = require('child_process');
 
 const appDir = path.resolve(__dirname, '..');
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'chromux-vercel-renderer-'));
@@ -20,6 +20,12 @@ fs.writeFileSync(path.join(project, '.vercel', 'project.json'), JSON.stringify({
   orgId: 'team_fixture',
   projectId: 'prj_fixture',
 }));
+execFileSync('/usr/bin/git', ['init', '-b', 'main'], { cwd: project });
+execFileSync('/usr/bin/git', ['config', 'user.name', 'Chromux Fixture'], { cwd: project });
+execFileSync('/usr/bin/git', ['config', 'user.email', 'fixture@example.invalid'], { cwd: project });
+fs.writeFileSync(path.join(project, 'README.md'), 'fixture\n');
+execFileSync('/usr/bin/git', ['add', '-A'], { cwd: project });
+execFileSync('/usr/bin/git', ['commit', '-m', 'Fixture'], { cwd: project });
 const vercelExecutable = path.join(bin, 'vercel');
 fs.writeFileSync(vercelExecutable, `#!/bin/sh
 if [ "$1" = "--version" ]; then
@@ -28,6 +34,18 @@ if [ "$1" = "--version" ]; then
 fi
 if [ "$1" = "whoami" ]; then
   echo "fixture-user"
+  exit 0
+fi
+if [ "$1" = "deploy" ]; then
+  if [ "$VERCEL_ORG_ID" != "team_fixture" ] || [ "$VERCEL_PROJECT_ID" != "prj_fixture" ]; then
+    echo "missing mapped IDs" >&2
+    exit 2
+  fi
+  echo "https://renderer-fixture.vercel.app"
+  exit 0
+fi
+if [ "$1" = "inspect" ]; then
+  echo "READY"
   exit 0
 fi
 echo "unsupported" >&2
@@ -56,7 +74,7 @@ fs.writeFileSync(e2ePath, `
   v.setProject({
     orgId: 'team_fixture',
     projectId: 'prj_fixture',
-    trigger: 'git',
+    trigger: 'direct',
     productionBranch: 'main',
     environment: 'preview',
   });
@@ -65,7 +83,30 @@ fs.writeFileSync(e2ePath, `
     'saved setup should mark the terminal-header Vercel button ready');
   expect(snapshot.status.includes('saved'), 'wizard should confirm persistence');
   expect(snapshot.tokenValue === '', 'renderer must not retain token field contents');
-  return JSON.stringify({ ok: true, header: snapshot.header, profile: snapshot.profiles[0].kind });
+  snapshot = await v.reviewShip('production');
+  expect(snapshot.review && snapshot.review.production,
+    'production review should name the protected target: ' + JSON.stringify(snapshot));
+  v.confirmShip({ reviewed: true, productionConfirmation: 'wrong target' });
+  snapshot = v.snapshot(id);
+  expect(snapshot.shipDisabled, 'wrong production phrase must keep shipping disabled');
+  v.confirmShip({ reviewed: true, productionConfirmation: snapshot.review.productionConfirmation });
+  snapshot = v.snapshot(id);
+  expect(!snapshot.shipDisabled, 'exact production phrase should unlock the second confirmation');
+  snapshot = await v.startShip();
+  const deadline = Date.now() + 5000;
+  while ((!snapshot.job || snapshot.job.phase !== 'ready') && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    snapshot = v.snapshot(id);
+  }
+  expect(snapshot.job && snapshot.job.phase === 'ready', 'live job updates should reach READY: ' + JSON.stringify(snapshot));
+  expect(snapshot.job.deploymentUrl === 'https://renderer-fixture.vercel.app',
+    'final Vercel preview URL should be presented');
+  return JSON.stringify({
+    ok: true,
+    header: snapshot.header,
+    profile: snapshot.profiles[0].kind,
+    deploymentUrl: snapshot.job.deploymentUrl,
+  });
 })()
 `);
 
@@ -93,7 +134,8 @@ child.on('close', (code, signal) => {
   const output = fs.existsSync(outPath) ? fs.readFileSync(outPath, 'utf8') : '';
   let result = null;
   try { result = output ? JSON.parse(output) : null; } catch { /* reported below */ }
-  if (code !== 0 || signal || !result?.ok || result.header !== 'VERCEL · READY' || result.profile !== 'cli') {
+  if (code !== 0 || signal || !result?.ok || result.header !== 'VERCEL · READY'
+    || result.profile !== 'cli' || result.deploymentUrl !== 'https://renderer-fixture.vercel.app') {
     console.error('VERCEL_RENDERER_FAIL');
     console.error('exit:', code, 'signal:', signal || '');
     console.error('e2e:', output || 'missing');

@@ -395,6 +395,7 @@
           </label>
           <div class="field-row vercel-connection-actions">
             <button id="vercel-use-cli" type="button" class="btn">USE CLI LOGIN</button>
+            <button id="vercel-use-oauth" type="button" class="btn">SIGN IN WITH VERCEL</button>
             <button id="vercel-validate-profile" type="button" class="btn" disabled>VALIDATE</button>
             <button id="vercel-remove-profile" type="button" class="btn btn-red" disabled>REMOVE</button>
           </div>
@@ -458,6 +459,51 @@
           </label>
         </section>
 
+        <section id="vercel-ship-section" class="vercel-section hidden" aria-labelledby="vercel-ship-heading">
+          <div class="settings-section-head">
+            <div>
+              <div id="vercel-ship-heading" class="microlabel">3 · GUARDED SHIP</div>
+              <div class="settings-section-copy">Review the live Git state and target before Chromux changes Git or creates a deployment.</div>
+            </div>
+          </div>
+          <label id="vercel-ship-environment-field" class="field">
+            <span class="microlabel">TARGET ENVIRONMENT</span>
+            <select id="vercel-ship-environment">
+              <option value="preview">PREVIEW</option>
+              <option value="production">PRODUCTION</option>
+            </select>
+          </label>
+          <div id="vercel-ship-review" class="vercel-ship-review hidden">
+            <div id="vercel-ship-summary" class="settings-status"></div>
+            <ul id="vercel-ship-paths" class="vercel-ship-paths"></ul>
+            <label id="vercel-commit-message-field" class="field">
+              <span class="microlabel">COMMIT MESSAGE</span>
+              <input id="vercel-commit-message" type="text" maxlength="500" spellcheck="false" placeholder="Ship preview" />
+            </label>
+            <label class="vercel-confirm">
+              <input id="vercel-ship-confirm" type="checkbox" />
+              <span>I reviewed this exact branch, target, and file list.</span>
+            </label>
+            <label id="vercel-production-confirm-field" class="field hidden">
+              <span class="microlabel">TYPE THE EXACT PROJECT + BRANCH/ENVIRONMENT</span>
+              <input id="vercel-production-confirm" type="text" maxlength="500" spellcheck="false" />
+            </label>
+            <button id="vercel-ship-start" type="button" class="btn btn-amber">CONFIRM &amp; SHIP</button>
+          </div>
+          <div id="vercel-job" class="vercel-job hidden" aria-live="polite">
+            <div class="vercel-job-head">
+              <span id="vercel-job-phase" class="microlabel"></span>
+              <span id="vercel-job-time"></span>
+            </div>
+            <div id="vercel-job-message"></div>
+            <a id="vercel-job-url" class="hidden" target="_blank" rel="noopener noreferrer"></a>
+            <div class="field-row">
+              <button id="vercel-job-cancel" type="button" class="btn btn-red hidden">CANCEL MONITORING</button>
+              <button id="vercel-job-retry" type="button" class="btn hidden">RETRY MONITORING</button>
+            </div>
+          </div>
+        </section>
+
         <div id="vercel-status" class="settings-status" role="status" aria-live="polite">
           Complete the connection and project mapping.
         </div>
@@ -465,6 +511,7 @@
       <div class="modal-foot">
         <button class="btn" data-close="modal-vercel">CANCEL</button>
         <button id="vercel-remove-project" class="btn btn-red hidden" type="button">REMOVE MAPPING</button>
+        <button id="vercel-ship-review-button" class="btn hidden" type="button">SHIP</button>
         <button id="vercel-save-project" class="btn btn-amber" type="button" disabled>SAVE SETUP</button>
       </div>
     </div>
