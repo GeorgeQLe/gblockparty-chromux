@@ -45,11 +45,11 @@ No active priority documentation items.
 - [x] Recover Codex startup update checks from GitHub API 403s with a validated
   public release redirect, then fail open after bounded discovery failure,
   release every queued restore in order, keep the app-run gate bypassed, and
-  make retry informational for live sessions; absorb the unpublished v0.72.1
-  candidate into v0.73.0. _(source:
+  make retry informational for live sessions; preserve the published v0.72.1
+  hotfix and forward-integrate it into v0.74.0. _(source:
   user-supplied Fix Codex 403 Restart Recovery plan; evidence:
   `prototype/codex-update-service.js`, renderer gate recovery, focused and full
-  prototype coverage, package metadata, and `RELEASES.md`)_
+  prototype coverage, `chromux-v0.72.1`, and `RELEASES.md`)_
 
 - [x] Add an isolated Codex Activity Indicator Lab with paired interactive PTY and structured JSONL lanes, explicit model-usage gates, five live scenarios, sanitized evidence export, fake-CLI and Electron coverage, v0.67.0 metadata, and a live Codex 0.145.0 UAT report without changing production attention inference. _(source: user-supplied implementation plan; evidence: `prototype/activity-lab/`, activity-lab scripts/tests/docs, `docs/testing/activity-lab-uat-0.67.0.md`, and `RELEASES.md`)_
 

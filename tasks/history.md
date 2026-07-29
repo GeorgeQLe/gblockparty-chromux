@@ -6,7 +6,8 @@
   side, then implement and publish the accepted plan that restores Threads as
   a session-first inbox and replaces the embedded Git mutation drawer with
   reusable dedicated worktree sessions.
-- **Changed files:** `RELEASES.md`, `prototype/README.md`,
+- **Changed files:** `.github/workflows/windows-release.yml`,
+  `.github/workflows/windows.yml`, `RELEASES.md`, `prototype/README.md`,
   `prototype/git-worktree-service.js`, `prototype/main.js`,
   `prototype/package.json`, `prototype/package-lock.json`,
   `prototype/preload.js`, `prototype/renderer/index.html`,
@@ -16,12 +17,16 @@
   `prototype/scripts/test-git-worktree-service.js`,
   `prototype/scripts/test-restore-session-identity.js`,
   `prototype/scripts/test-session-rail-renderer.js`, `tasks/todo.md`, and this
-  history entry. The preceding conflict-resolution commit also reconciles the
-  user-owned `RELEASES.md`, `tasks/history.md`, and `tasks/todo.md` records
-  while preserving both source lines.
+  history entry. The workflow files are the already-reviewed Node 24 action
+  updates integrated from current `origin/main`. The preceding
+  conflict-resolution commit also reconciles the user-owned `RELEASES.md`,
+  `tasks/history.md`, and `tasks/todo.md` records while preserving both source
+  lines.
 - **Per-file purpose:** Renderer markup, styles, and logic own the exclusive
   Threads ranking, accurate counts, searchable Git navigator, dedicated
-  worktree-session lifecycle, and bounded unsent Composer inserts. Main and
+  worktree-session lifecycle, and bounded unsent Composer inserts. The
+  integrated workflows retain the primary branch's current artifact runtimes.
+  Main and
   preload retain only read-only Git observation/catalog/forget bridges and add
   schema-v11 restore sanitation; the Git service removes mutation methods.
   Renderer/service/restore tests prove the changed behavior, while the two
