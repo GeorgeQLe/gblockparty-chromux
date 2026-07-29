@@ -59,7 +59,7 @@ Tag: `chromux-v0.72.0`
 
 ## GBlockParty Chromux v0.71.0
 
-Planned tag: `chromux-v0.71.0`
+Unpublished candidate; superseded by `chromux-v0.73.0`.
 
 - Add the main-process Vercel integration foundation for runtime-local CLI
   discovery, CLI-login and encrypted-token connection profiles, OAuth
@@ -88,9 +88,9 @@ Planned tag: `chromux-v0.71.0`
   public PKCE client without a secret, rotate and revoke encrypted tokens, and
   close the listener on completion, cancellation, timeout, window destruction,
   or app exit.
-- The release tag remains gated on registering the public Vercel application,
-  proving its access token can deploy the mapped preview project, and archiving
-  the live direct/Git/cancel/restart preview UAT.
+- This candidate was never published. Its completed implementation is absorbed
+  into v0.73.0, which remains gated on a deployment-capable public Vercel
+  application and the live direct/Git/cancel/restart preview UAT.
 
 ## GBlockParty Chromux v0.70.0
 

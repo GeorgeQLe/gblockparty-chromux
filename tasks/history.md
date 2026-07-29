@@ -1524,3 +1524,57 @@
   was accepted because the bundle was produced and smoked. Rollback: revert the
   v0.72.0 feature commit and release/tag; queue restore remains backward
   compatible because legacy records default to attention visibility.
+
+## 2026-07-28 — v0.73.0 Vercel release integration blocked at OAuth permission gate
+
+- Preserved the complete dirty Vercel/Codex candidate on
+  `codex/vercel-oauth-v0.73.0-integration`, dropped the patch-equivalent local
+  browser-queue commit during rebase, and integrated onto current
+  `origin/main` while retaining the v0.73.0 Windows setup/signing candidate and
+  packaging dependency fixes.
+- Ship manifest — User goal: register a deployment-capable public Vercel OAuth
+  app, prove direct and Git preview shipping with cancel/retry/restart recovery,
+  and publish the combined source release as v0.73.0. Changed files:
+  the Vercel services/main/preload/renderer/tests and supporting docs already
+  recorded by the guarded candidate; Codex update service/renderer/tests;
+  package scripts and 0.73.0 metadata; `RELEASES.md`; the renamed
+  `prototype/docs/testing/vercel-shipping-uat-0.73.0.md`; and task records.
+  Per-file purpose and user-goal mapping: the Vercel boundaries own encrypted
+  public-client OAuth, guarded mutation, bounded non-secret persistence,
+  cancellation, retry, and restart recovery; Codex files absorb the unpublished
+  0.72.1 recovery candidate; metadata/release/task files combine all completed
+  work under the upstream 0.73.0 candidate while leaving signed Windows assets
+  as a separate blocked task.
+- Executable verification: changed JavaScript syntax passed; focused Vercel
+  service, OAuth loopback, shipping service, renderer, Codex update service,
+  and Codex gate suites passed; the complete prototype matrix passed; the
+  website build and route regression passed; source Electron smoke passed; the
+  macOS arm64 package built; both plist version fields and packaged ASAR report
+  0.73.0; packaged smoke passed; package/lock consistency and `git diff
+  --check` passed. The complete matrix used its existing one-retry policy for
+  one native Streak pointer-geometry timing failure, which passed unchanged on
+  retry. The packager's established optional `.icon` probe warning was accepted
+  because the bundle was produced and executed.
+- Adversarial review: traced upstream conflict resolutions, host/WSL environment
+  allowlists, token redaction and OS encryption, public/non-secret renderer and
+  job surfaces, callback address/path/state/PKCE ownership, refresh rotation and
+  access-token revocation, stage/commit/push production guards, stale review and
+  post-hook dirt, direct-deploy creation, discovery/inspection cancellation,
+  push/SHA/URL retry identities, automatic restart recovery, bounded mode-0600
+  schema-v1 persistence, and absence of committed token-format values. No local
+  implementation blocker was found.
+- Live gate and residual risk: read-only CLI checks verified Vercel CLI 50.40.0,
+  the sanitized account label `george-9471`, and the non-production
+  `George Le's projects/chromux-landing` target. No preview was created.
+  Browser automation exposed no connected browser, so the dashboard-only app
+  could not be registered. Vercel's current official scopes/permissions
+  documentation says API/team resource permissions are private beta; therefore
+  an identity-only app cannot satisfy the mandatory OAuth deployment proof.
+  The public client ID is not yet available, direct/Git live URLs and terminal
+  phases are unproved, and no main push, tag, or GitHub Release was created.
+  The authoritative current latest Release remains v0.72.0 with no assets.
+- Rollback: discard the local integration branch to return to untouched
+  `origin/main`; no remote branch, deployment, credential profile, tag, or
+  Release needs cleanup. Next command: make a signed-in browser available or
+  create the public app manually, confirm deployment write permission is
+  exposed, provide only its public client ID, then rerun `$exec`.

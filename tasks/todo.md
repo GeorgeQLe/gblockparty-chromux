@@ -14,7 +14,7 @@ No active priority documentation items.
   evidence: `prototype/browser-queue.js`, MCP/control/renderer integration,
   preview/MCP/turn/restore coverage, package metadata, docs, and `RELEASES.md`)_
 
-- [ ] Complete the v0.71.0 one-button Vercel shipping workflow. Main-process
+- [ ] Complete the v0.73.0 OAuth-backed Vercel shipping release. Main-process
   runtime discovery, encrypted CLI/token/OAuth profile primitives, canonical
   linked-root/project persistence, narrow IPC, security documentation, and
   deterministic service coverage are implemented, along with the
@@ -26,8 +26,9 @@ No active priority documentation items.
   prove the OAuth credential can deploy the mapped preview project, archive the
   direct/Git/cancel/restart live UAT, then publish the release. _(source:
   user-supplied One-Button Vercel Shipping plan; blocker evidence:
-  `prototype/docs/testing/vercel-shipping-uat-0.71.0.md`; no controllable
-  signed-in browser was available for Vercel dashboard app creation)_
+  `prototype/docs/testing/vercel-shipping-uat-0.73.0.md`; no controllable
+  signed-in browser is available, and Vercel documents API/team resource
+  permissions as private beta)_
 
 - [x] Redesign Threads as an Action Required / Ready to Finish / Working / All Sessions hybrid inbox with persisted Done/Snooze triage, and replace flat Git changes with a bounded repository catalog, ranked linked-worktree inventory, validated review/commit/sync actions, schema v10, documentation, and the v0.70.0 release. _(source: user-supplied implementation plan; evidence: `prototype/git-worktree-service.js`, main/preload discriminated IPC, renderer inbox/review drawer, parser/temp-repository/real-Electron coverage, package metadata, docs, and `RELEASES.md`)_
 
@@ -36,7 +37,8 @@ No active priority documentation items.
 - [x] Recover Codex startup update checks from GitHub API 403s with a validated
   public release redirect, then fail open after bounded discovery failure,
   release every queued restore in order, keep the app-run gate bypassed, and
-  make retry informational for live sessions; ship v0.72.1. _(source:
+  make retry informational for live sessions; absorb the unpublished v0.72.1
+  candidate into v0.73.0. _(source:
   user-supplied Fix Codex 403 Restart Recovery plan; evidence:
   `prototype/codex-update-service.js`, renderer gate recovery, focused and full
   prototype coverage, package metadata, and `RELEASES.md`)_
@@ -53,7 +55,7 @@ No active priority documentation items.
 
 - [x] Add macOS-only, one-time-approved local MCP browser/window screenshots and bounded Chromux-window recording with system-audio fallback, private artifacts/resources, contact sheets, caller ownership, disconnect/deadline cleanup, tests, docs, and the v0.65.0 release. _(source: user-supplied implementation plan; evidence: `prototype/capture/`, main/preload/renderer capture flow, MCP contract, capture integration/renderer tests, packaging privacy metadata, capture/privacy/resource docs, `RELEASES.md`)_
 
-- [ ] Run the protected v0.73.0 signed-candidate workflow on Windows 10 Pro 22H2 build 19045 x64 and Windows 11 with current WSL2, complete the manual setup/restore checks, publish `chromux-v0.73.0` with all five verified Squirrel assets, and verify GitHub `/releases/latest`. _(source: user-supplied signed-installer and first-run plan; implementation evidence: `.github/workflows/windows-release.yml`, `prototype/windows-setup.js`, setup renderer/main/preload integration, signing/artifact/UAT scripts, focused and complete local test coverage, and `docs/testing/windows-signed-installer-uat-0.73.0.md`; publication remains gated on completing the active v0.71.0 Vercel release blocker, provisioning the missing `windows-signing`/`windows-release` environments and Azure settings, registering the two real-machine runners, providing a prior signed installer, protected approvals, exact signed candidate hashes, and real-machine PASS)_
+- [ ] Run the separate protected v0.73.0 signed-candidate workflow on Windows 10 Pro 22H2 build 19045 x64 and Windows 11 with current WSL2, complete the manual setup/restore checks, attach all five verified Squirrel assets to the matching release, and verify the Windows update feed. _(source: user-supplied signed-installer and first-run plan; implementation evidence: `.github/workflows/windows-release.yml`, `prototype/windows-setup.js`, setup renderer/main/preload integration, signing/artifact/UAT scripts, focused and complete local test coverage, and `docs/testing/windows-signed-installer-uat-0.73.0.md`; this remains a separate blocked task requiring the missing `windows-signing`/`windows-release` environments and Azure settings, two real-machine runners, a prior signed installer, protected approvals, exact signed candidate hashes, and real-machine PASS)_
 
 - [x] Keep Codex 0.145 syntax and diff colors inside Chromux palettes by applying process-scoped `TERM=xterm-color` plus `tui.theme="ansi"` to managed new/resumed sessions and bare adopted commands, while preserving explicit shell theme opt-outs; prepare v0.64.1 without tagging or publishing before the Windows UAT and Squirrel-asset gate. _(source: user-supplied implementation plan; evidence: macOS/WSL command quoting, shell-adoption, ANSI xterm theme, restore, update-gate, notifier, and complete prototype regressions)_
 
