@@ -13,6 +13,7 @@ const {
   clipboard,
   powerSaveBlocker,
   autoUpdater,
+  safeStorage,
 } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -24,7 +25,11 @@ const pty = require('node-pty');
 const yaml = require('js-yaml');
 const { checkForUpdates } = require('./update-checker');
 const { createCodexDetectMetadata } = require('./codex-detect-metadata');
-const { createCodexUpdateService } = require('./codex-update-service');
+const {
+  codexSearchPath,
+  createCodexUpdateService,
+  resolveOnPath,
+} = require('./codex-update-service');
 const { createDevModeRestart, resolveDevMode, restartArgs } = require('./dev-mode');
 const { BrokerClient } = require('./resource-broker/client');
 const { createPreventSleepController } = require('./prevent-sleep');
@@ -40,6 +45,7 @@ const { MAX_DRAFT_BYTES, createPromptHistoryStore } = require('./prompt-history'
 const { previewProbe } = require('./preview-probe');
 const { cleanupOrphanedStorage } = require('./storage-cleanup');
 const { createGitWorktreeService } = require('./git-worktree-service');
+const { createVercelService } = require('./vercel-service');
 const { resolveChromuxUserDataPath } = require('./user-data-path');
 const { CaptureArtifactStore } = require('./capture/artifact-store');
 const { CaptureCoordinator } = require('./capture/coordinator');
@@ -90,6 +96,8 @@ const UPDATE_SOURCE = path.join(CHROMUX_HOME, 'update-source.json');
 const UPDATE_INSTALL_LOG = path.join(CHROMUX_HOME, 'update-install.log');
 const RESTORE_SESSIONS = path.join(CHROMUX_HOME, 'restore-sessions.json');
 const GIT_REPOSITORIES_FILE = path.join(CHROMUX_HOME, 'git-repositories.json');
+const VERCEL_CREDENTIALS_FILE = path.join(CHROMUX_HOME, 'vercel-credentials.json');
+const VERCEL_PROJECTS_FILE = path.join(CHROMUX_HOME, 'vercel-projects.json');
 const RESTORE_ATTENTION_TYPES = new Set([
   'permission', 'authentication', 'input', 'rateLimited', 'toolFailed', 'delivery', 'completed',
 ]);
@@ -2186,6 +2194,103 @@ const gitWorktrees = createGitWorktreeService({
   statMtime: gitFileMtime,
 });
 
+function vercelCommandResult(location, args, options = {}) {
+  if (!location || !Array.isArray(args) || args.some((arg) => typeof arg !== 'string' || arg.includes('\0'))) {
+    return Promise.resolve({ ok: false, stdout: '', stderr: 'Invalid Vercel request.', code: -1 });
+  }
+  const timeout = Math.min(Math.max(Number(options.timeout) || 15000, 1000), 120000);
+  const maxBuffer = Math.min(Math.max(Number(options.maxBuffer) || 8 * 1024 * 1024, 1024), 16 * 1024 * 1024);
+  const token = typeof options.env?.VERCEL_TOKEN === 'string' ? options.env.VERCEL_TOKEN : null;
+  if (location.runtime === 'wsl') {
+    const priorWslEnv = String(process.env.WSLENV || '').split(':').filter(Boolean);
+    const childEnv = {
+      ...process.env,
+      ...(token ? { VERCEL_TOKEN: token } : {}),
+      WSLENV: [...new Set([...priorWslEnv, ...(token ? ['VERCEL_TOKEN'] : [])])].join(':'),
+    };
+    return new Promise((resolve) => {
+      execFile('wsl.exe', [
+        '--distribution', location.distro,
+        '--cd', location.cwd,
+        '--exec', 'vercel',
+        ...args,
+      ], {
+        timeout,
+        maxBuffer,
+        env: childEnv,
+        windowsHide: true,
+      }, (runError, stdout, stderr) => resolve({
+        ok: !runError,
+        stdout: String(stdout || '').replace(/\r/g, ''),
+        stderr: String(stderr || '').replace(/\r/g, ''),
+        code: runError && Number.isInteger(runError.code) ? runError.code : (runError ? 1 : 0),
+      }));
+    });
+  }
+  const envPath = codexSearchPath();
+  const executable = resolveOnPath('vercel', envPath);
+  if (!executable) return Promise.resolve({ ok: false, stdout: '', stderr: 'Vercel CLI was not found in this runtime.', code: 127 });
+  return new Promise((resolve) => {
+    execFile(executable, args, {
+      cwd: location.cwd,
+      timeout,
+      maxBuffer,
+      env: { ...process.env, PATH: envPath, ...(token ? { VERCEL_TOKEN: token } : {}) },
+    }, (runError, stdout, stderr) => resolve({
+      ok: !runError,
+      stdout: String(stdout || ''),
+      stderr: String(stderr || ''),
+      code: runError && Number.isInteger(runError.code) ? runError.code : (runError ? 1 : 0),
+    }));
+  });
+}
+
+async function readVercelProjectLink(location) {
+  if (location.runtime === 'wsl') {
+    try {
+      const result = await wslRuntime.run(location.distro, [
+        'cat', '--', path.posix.join(location.cwd, '.vercel', 'project.json'),
+      ], { timeout: 3000, maxBuffer: 64 * 1024 });
+      return JSON.parse(result.stdout);
+    } catch {
+      return null;
+    }
+  }
+  try {
+    return JSON.parse(fs.readFileSync(path.join(location.cwd, '.vercel', 'project.json'), 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+async function vercelRepositoryRoot(location) {
+  const response = await gitCommandResult(location, ['rev-parse', '--show-toplevel'], { timeout: 4000 });
+  if (!response.ok || !response.stdout.trim()) return null;
+  try {
+    return canonicalGitPath({ ...location, cwd: response.stdout.trim() });
+  } catch {
+    return null;
+  }
+}
+
+const vercel = createVercelService({
+  credentialFile: VERCEL_CREDENTIALS_FILE,
+  projectsFile: VERCEL_PROJECTS_FILE,
+  // Renderer fixtures use isolated HOME directories that intentionally have
+  // no macOS login keychain. Avoid probing Keychain in that explicit smoke
+  // mode; production always uses Electron's OS-backed safeStorage object.
+  safeStorage: SMOKE && process.env.CHROMUX_E2E_DISABLE_SAFE_STORAGE === '1'
+    ? { isEncryptionAvailable: () => false }
+    : safeStorage,
+  run: vercelCommandResult,
+  canonicalize: async (location) => ({ ...location, cwd: await canonicalGitPath(location) }),
+  readProjectLink: readVercelProjectLink,
+  gitRoot: async (location) => {
+    const cwd = await vercelRepositoryRoot(location);
+    return cwd ? { ...location, cwd } : null;
+  },
+});
+
 async function gitRoot(cwd) {
   if (process.platform === 'win32') {
     let location;
@@ -3071,6 +3176,18 @@ ipcMain.handle('git-worktree-commit', (_e, request = {}) => gitWorktrees.commit(
 for (const action of ['fetch', 'pull', 'publish', 'push', 'sync']) {
   ipcMain.handle(`git-worktree-${action}`, (_e, request = {}) => gitWorktrees[action](request));
 }
+ipcMain.handle('vercel-capability', (_e, location = {}) => vercel.capability(location));
+ipcMain.handle('vercel-connections-read', () => vercel.connections());
+ipcMain.handle('vercel-connect-cli', (_e, request = {}) => vercel.connectCli(request));
+ipcMain.handle('vercel-connect-token', (_e, request = {}) => vercel.connectToken(request));
+ipcMain.handle('vercel-connection-validate', (_e, request = {}) => (
+  vercel.validateConnection(request.profileId, request.location)
+));
+ipcMain.handle('vercel-connection-remove', (_e, profileId) => vercel.removeConnection(profileId));
+ipcMain.handle('vercel-project-discover', (_e, location = {}) => vercel.discoverProject(location));
+ipcMain.handle('vercel-projects-read', () => vercel.projects());
+ipcMain.handle('vercel-project-save', (_e, request = {}) => vercel.saveProject(request));
+ipcMain.handle('vercel-project-remove', (_e, key) => vercel.removeProject(key));
 
 ipcMain.handle('check-updates', (_e, opts = {}) => getUpdateStatus(opts));
 ipcMain.handle('codex-update-check', (_e, opts = {}) => {

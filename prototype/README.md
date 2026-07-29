@@ -157,6 +157,24 @@ the editor but leaves it open and focused. Shell-only sessions show a confirmati
 text is sent; canceling keeps the draft untouched. Closing the composer returns focus to raw xterm,
 which remains the escape hatch for interactive terminal input.
 
+### Vercel integration status
+
+Chromux v0.71 adds a **VERCEL** button to every terminal header. Open it to
+check for the Vercel CLI inside the same macOS or WSL runtime as the project,
+connect an existing CLI login or an OS-encrypted personal token, discover the
+nearest upward `.vercel/project.json`, and save the canonical
+repository/deploy-root mapping. A configured project shows
+**VERCEL · READY**. When no link exists, enter the Vercel organization and
+project IDs explicitly.
+
+The wizard configures the project but does not deploy it yet. Guarded Git
+shipping and deployment progress are the next v0.71 implementation phase.
+
+Chromux never installs the Vercel CLI silently. Token-backed calls pass the
+credential through `VERCEL_TOKEN`, not command arguments. CLI login remains
+owned by Vercel; removing its local Chromux profile does not run
+`vercel logout`.
+
 Drafts are capped at 64 KiB and persist independently in managed restore snapshots. **HISTORY** and
 `Option+Up` / `Option+Down` reuse prompts from sessions with the same canonical working directory.
 History is local plaintext, searchable, individually deletable, clearable per project with confirmation,

@@ -1,5 +1,27 @@
 # Release Notes
 
+## GBlockParty Chromux v0.71.0
+
+Planned tag: `chromux-v0.71.0`
+
+- Add the main-process Vercel integration foundation for runtime-local CLI
+  discovery, CLI-login and encrypted-token connection profiles, OAuth
+  PKCE/state/refresh/revocation primitives, linked deploy-root discovery, and
+  per-runtime project configuration.
+- Keep Vercel tokens out of renderer results, command arguments, and status
+  text. Token-backed CLI calls receive credentials only through
+  `VERCEL_TOKEN`; stored records use Electron OS-backed encryption and fail
+  closed when it is unavailable.
+- Persist non-secret Vercel project mappings separately with mode `0600`,
+  recover safely from corrupt records, and retain Vercel CLI-owned login state
+  when a Chromux connection is removed.
+- Add a project-scoped **VERCEL** terminal-header button and setup wizard for
+  runtime-local CLI discovery, CLI-login or encrypted-token connections,
+  linked-project discovery, explicit project IDs, connection validation, and
+  canonical deploy mappings. Saved sessions show **VERCEL · READY**.
+- Guarded Git commit/push orchestration, deployment monitoring, OAuth loopback
+  ownership, and live Vercel UAT remain release blockers.
+
 ## GBlockParty Chromux v0.70.0
 
 Tag: `chromux-v0.70.0`

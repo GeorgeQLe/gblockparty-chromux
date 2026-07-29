@@ -6,6 +6,17 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [ ] Complete the v0.71.0 one-button Vercel shipping workflow. Main-process
+  runtime discovery, encrypted CLI/token/OAuth profile primitives, canonical
+  linked-root/project persistence, narrow IPC, security documentation, and
+  deterministic service coverage are implemented, along with the
+  terminal-header button, project setup wizard, and real-Electron preload
+  integration coverage; loopback OAuth ownership, guarded stage-all
+  commit/push recovery, direct/Git-triggered deployment monitoring, live
+  preview UAT, and release publication remain. _(source: user-supplied
+  One-Button Vercel Shipping plan; next step: implement the guarded shipping
+  engine and deployment monitor against the saved project mapping)_
+
 - [x] Redesign Threads as an Action Required / Ready to Finish / Working / All Sessions hybrid inbox with persisted Done/Snooze triage, and replace flat Git changes with a bounded repository catalog, ranked linked-worktree inventory, validated review/commit/sync actions, schema v10, documentation, and the v0.70.0 release. _(source: user-supplied implementation plan; evidence: `prototype/git-worktree-service.js`, main/preload discriminated IPC, renderer inbox/review drawer, parser/temp-repository/real-Electron coverage, package metadata, docs, and `RELEASES.md`)_
 
 - [x] Retry the complete Codex startup update check up to three times, keep restored Codex tabs queued without exposing intermediate errors, release them in saved order on retry success, preserve manual retry and install behavior, and ship v0.69.3. _(source: user-supplied implementation plan; evidence: `prototype/codex-update-service.js`, focused service/renderer-gate coverage, complete prototype suite, package metadata, and `RELEASES.md`)_

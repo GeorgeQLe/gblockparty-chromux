@@ -2067,7 +2067,7 @@ body[data-theme="streak"] .developer-diagnostics { border-top: 2px solid var(--l
 .settings-projects-root-control input { min-width: 0; }
 .field-row input { flex: 1; }
 
-input[type="text"], #cap-notes, select {
+input[type="text"], input[type="password"], #cap-notes, select {
   border: 1px solid var(--line);
   background: var(--bg0);
   color: var(--text);
@@ -2076,7 +2076,7 @@ input[type="text"], #cap-notes, select {
   outline: none;
   resize: vertical;
 }
-input[type="text"]:focus, #cap-notes:focus, select:focus { border-color: var(--amber); box-shadow: var(--glow-amber); }
+input[type="text"]:focus, input[type="password"]:focus, #cap-notes:focus, select:focus { border-color: var(--amber); box-shadow: var(--glow-amber); }
 
 .xterm .xterm-helper-textarea,
 .xterm .xterm-helper-textarea:focus {
@@ -2183,6 +2183,53 @@ input[type="text"]:focus, #cap-notes:focus, select:focus { border-color: var(--a
 .btn-amber:hover { background: var(--amber-hot); box-shadow: var(--glow-amber); }
 .btn-red { border-color: var(--red); color: var(--red); background: none; }
 .btn-lg { font-size: 12px; padding: 11px 26px; }
+
+.vercel-toggle { flex: none; }
+.vercel-toggle.ready { color: var(--green); border-color: color-mix(in srgb, var(--green) 45%, var(--line)); }
+.modal-vercel { width: min(680px, calc(100vw - 40px)); }
+.vercel-project-context {
+  color: var(--dim);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.vercel-section { display: flex; flex-direction: column; gap: 12px; padding-top: 2px; }
+.vercel-section + .vercel-section { border-top: 1px solid var(--line); padding-top: 14px; }
+.vercel-connection-actions { flex-wrap: wrap; }
+.vercel-token-details { border: 1px solid var(--line); background: var(--bg0); }
+.vercel-token-details summary {
+  padding: 9px 10px;
+  color: var(--dim);
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  cursor: pointer;
+}
+.vercel-token-fields { display: flex; flex-direction: column; gap: 10px; padding: 0 10px 10px; }
+.vercel-root-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.vercel-root-grid > div {
+  min-width: 0;
+  padding: 8px 9px;
+  border: 1px solid var(--line);
+  background: var(--bg0);
+}
+.vercel-root-grid span, .vercel-root-grid code { display: block; }
+.vercel-root-grid code {
+  margin-top: 5px;
+  color: var(--cyan);
+  font-size: 10.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 620px) {
+  .vercel-root-grid, .modal-vercel .launcher-create-grid { grid-template-columns: 1fr; }
+}
 
 /* settings */
 .settings-block {

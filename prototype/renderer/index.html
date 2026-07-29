@@ -367,6 +367,108 @@
     </div>
   </div>
 
+  <!-- ══ Vercel project setup ══ -->
+  <div id="modal-vercel" class="overlay hidden">
+    <div class="modal modal-vercel" role="dialog" aria-modal="true" aria-labelledby="vercel-title">
+      <div class="modal-head">
+        <span id="vercel-title" class="microlabel">VERCEL PROJECT SETUP</span>
+        <button class="modal-x" data-close="modal-vercel" aria-label="Close Vercel setup">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="vercel-project-context" class="vercel-project-context"></div>
+        <div id="vercel-capability-status" class="settings-status" role="status" aria-live="polite">
+          CHECKING THIS PROJECT RUNTIME…
+        </div>
+        <div id="vercel-install-command" class="settings-command hidden"></div>
+
+        <section id="vercel-connection-section" class="vercel-section" aria-labelledby="vercel-connection-heading">
+          <div class="settings-section-head">
+            <div>
+              <div id="vercel-connection-heading" class="microlabel">1 · CONNECTION</div>
+              <div class="settings-section-copy">Use Vercel CLI login from this project runtime, or store a personal token with OS-backed encryption.</div>
+            </div>
+          </div>
+          <label class="field">
+            <span class="microlabel">SAVED CONNECTION</span>
+            <select id="vercel-profile"><option value="">NO SAVED CONNECTIONS</option></select>
+          </label>
+          <div class="field-row vercel-connection-actions">
+            <button id="vercel-use-cli" type="button" class="btn">USE CLI LOGIN</button>
+            <button id="vercel-validate-profile" type="button" class="btn" disabled>VALIDATE</button>
+            <button id="vercel-remove-profile" type="button" class="btn btn-red" disabled>REMOVE</button>
+          </div>
+          <details id="vercel-token-details" class="vercel-token-details">
+            <summary>CONNECT WITH PERSONAL ACCESS TOKEN</summary>
+            <div class="vercel-token-fields">
+              <label class="field">
+                <span class="microlabel">CONNECTION NAME</span>
+                <input id="vercel-token-label" type="text" maxlength="120" spellcheck="false" placeholder="Personal account" />
+              </label>
+              <label class="field">
+                <span class="microlabel">VERCEL TOKEN — NEVER RETURNED TO THIS PAGE</span>
+                <input id="vercel-token" type="password" maxlength="8192" autocomplete="off" spellcheck="false" />
+              </label>
+              <button id="vercel-connect-token" type="button" class="btn">SAVE &amp; VALIDATE TOKEN</button>
+            </div>
+          </details>
+        </section>
+
+        <section id="vercel-project-section" class="vercel-section" aria-labelledby="vercel-project-heading">
+          <div class="settings-section-head">
+            <div>
+              <div id="vercel-project-heading" class="microlabel">2 · PROJECT MAPPING</div>
+              <div class="settings-section-copy">Chromux searches upward for an existing <code>.vercel/project.json</code>. IDs can also be entered explicitly.</div>
+            </div>
+          </div>
+          <div class="vercel-root-grid">
+            <div><span class="microlabel">REPOSITORY ROOT</span><code id="vercel-repository-root">—</code></div>
+            <div><span class="microlabel">DEPLOY ROOT</span><code id="vercel-deploy-root">—</code></div>
+          </div>
+          <div class="launcher-create-grid">
+            <label class="field">
+              <span class="microlabel">VERCEL ORGANIZATION ID</span>
+              <input id="vercel-org-id" type="text" maxlength="160" spellcheck="false" placeholder="team_…" />
+            </label>
+            <label class="field">
+              <span class="microlabel">VERCEL PROJECT ID</span>
+              <input id="vercel-project-id" type="text" maxlength="160" spellcheck="false" placeholder="prj_…" />
+            </label>
+          </div>
+          <div class="launcher-create-grid">
+            <label class="field">
+              <span class="microlabel">SHIP MODE</span>
+              <select id="vercel-trigger">
+                <option value="direct">DIRECT DEPLOY</option>
+                <option value="git">GIT-TRIGGERED DEPLOY</option>
+              </select>
+            </label>
+            <label class="field">
+              <span class="microlabel">PRODUCTION BRANCH — OPTIONAL</span>
+              <input id="vercel-production-branch" type="text" maxlength="250" spellcheck="false" placeholder="main" />
+            </label>
+          </div>
+          <label class="field">
+            <span class="microlabel">REMEMBER ENVIRONMENT</span>
+            <select id="vercel-environment">
+              <option value="">ASK EVERY TIME</option>
+              <option value="preview">PREVIEW</option>
+              <option value="production">PRODUCTION</option>
+            </select>
+          </label>
+        </section>
+
+        <div id="vercel-status" class="settings-status" role="status" aria-live="polite">
+          Complete the connection and project mapping.
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" data-close="modal-vercel">CANCEL</button>
+        <button id="vercel-remove-project" class="btn btn-red hidden" type="button">REMOVE MAPPING</button>
+        <button id="vercel-save-project" class="btn btn-amber" type="button" disabled>SAVE SETUP</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ══ unified project launcher ══ -->
   <div id="modal-new" class="overlay hidden">
     <div class="modal modal-launcher">

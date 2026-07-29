@@ -177,6 +177,17 @@ const state = {
     diagnosticSessionId: null,
     launcherMode: 'open',
     projectCreationPending: false,
+    vercel: {
+      sessionId: null,
+      generation: 0,
+      busy: false,
+      capability: null,
+      discovery: null,
+      profiles: [],
+      projects: [],
+      project: null,
+      profileId: '',
+    },
   },
   lastCwd: null,
   contextMenu: null,
@@ -4693,6 +4704,405 @@ function openSessionContextMenu(session, x, y) {
   menu.style.top = `${Math.min(y, window.innerHeight - rect.height - 8)}px`;
 }
 
+function vercelLocation(session) {
+  return {
+    runtime: session.runtime === 'wsl' ? 'wsl' : 'host',
+    distro: session.runtime === 'wsl' ? session.distro : null,
+    cwd: session.cwd,
+  };
+}
+
+function vercelPathContains(root, candidate, runtime) {
+  if (typeof root !== 'string' || typeof candidate !== 'string') return false;
+  const separator = runtime === 'wsl' ? '/' : (root.includes('\\') ? '\\' : '/');
+  const macCanonicalAlias = (value) => {
+    if (runtime !== 'host' || state.env?.hostPlatform === 'win32') return value;
+    if (value === '/var' || value.startsWith('/var/')) return `/private${value}`;
+    if (value === '/tmp' || value.startsWith('/tmp/')) return `/private${value}`;
+    return value;
+  };
+  const cleanRoot = macCanonicalAlias(root).replace(/[\\/]+$/, '');
+  candidate = macCanonicalAlias(candidate);
+  const foldedRoot = separator === '\\' ? cleanRoot.toLocaleLowerCase() : cleanRoot;
+  const foldedCandidate = separator === '\\' ? candidate.toLocaleLowerCase() : candidate;
+  return foldedCandidate === foldedRoot || foldedCandidate.startsWith(`${foldedRoot}${separator}`);
+}
+
+function vercelProjectForSession(projects, session) {
+  if (!session) return null;
+  const runtimeMatches = (projects || []).filter((project) => (
+    project?.location?.runtime === (session.runtime === 'wsl' ? 'wsl' : 'host')
+    && (project.location.runtime !== 'wsl' || project.location.distro === session.distro)
+  ));
+  const deployMatches = runtimeMatches
+    .filter((project) => vercelPathContains(project.deployRoot, session.cwd, project.location.runtime))
+    .sort((left, right) => right.deployRoot.length - left.deployRoot.length);
+  if (deployMatches.length) return deployMatches[0];
+  const repositoryMatches = runtimeMatches.filter((project) => (
+    vercelPathContains(project.repositoryRoot, session.cwd, project.location.runtime)
+  ));
+  return repositoryMatches.length === 1 ? repositoryMatches[0] : null;
+}
+
+function updateVercelButtons() {
+  for (const session of state.sessions.values()) {
+    const button = session.els?.vercelBtn;
+    if (!button) continue;
+    const configured = vercelProjectForSession(state.ui.vercel.projects, session);
+    button.classList.toggle('ready', Boolean(configured));
+    button.textContent = configured ? 'VERCEL · READY' : 'VERCEL';
+    button.title = configured
+      ? 'Review Vercel setup for this project'
+      : 'Configure Vercel for this project';
+    button.setAttribute('aria-label', button.title);
+  }
+}
+
+function vercelErrorMessage(result, fallback) {
+  return result?.error?.message || result?.message || fallback;
+}
+
+function setVercelStatus(message, kind = '') {
+  const status = $('#vercel-status');
+  status.textContent = message;
+  status.classList.toggle('fail', kind === 'fail');
+  status.classList.toggle('current', kind === 'current');
+  status.classList.toggle('ready', kind === 'ready');
+}
+
+function setVercelBusy(busy) {
+  const wizard = state.ui.vercel;
+  wizard.busy = busy;
+  for (const id of [
+    'vercel-profile', 'vercel-use-cli', 'vercel-validate-profile', 'vercel-remove-profile',
+    'vercel-token-label', 'vercel-token', 'vercel-connect-token', 'vercel-org-id',
+    'vercel-project-id', 'vercel-trigger', 'vercel-production-branch', 'vercel-environment',
+    'vercel-save-project', 'vercel-remove-project',
+  ]) {
+    const element = $(`#${id}`);
+    if (element) element.disabled = busy;
+  }
+  renderVercelSetup();
+}
+
+function renderVercelSetup() {
+  const wizard = state.ui.vercel;
+  const session = state.sessions.get(wizard.sessionId);
+  if (!session) return;
+  const capability = wizard.capability;
+  const cli = capability?.cli;
+  $('#vercel-project-context').textContent = `${session.name} · ${session.cwd} · ${
+    session.runtime === 'wsl' ? `WSL ${session.distro || ''}` : 'HOST'
+  }`;
+  const capabilityStatus = $('#vercel-capability-status');
+  capabilityStatus.classList.toggle('fail', Boolean(capability && !cli?.available));
+  capabilityStatus.classList.toggle('current', Boolean(cli?.available));
+  capabilityStatus.textContent = !capability
+    ? 'CHECKING THIS PROJECT RUNTIME…'
+    : (cli?.available
+      ? `VERCEL CLI ${cli.version || 'DETECTED'} · CREDENTIAL ENCRYPTION ${
+        capability.secureStorage ? 'AVAILABLE' : 'UNAVAILABLE'
+      }`
+      : 'VERCEL CLI WAS NOT FOUND IN THIS PROJECT RUNTIME.');
+  $('#vercel-install-command').classList.toggle('hidden', !capability || cli?.available);
+  $('#vercel-install-command').textContent = cli?.setupCommand || '';
+
+  const select = $('#vercel-profile');
+  const preferred = wizard.profileId || wizard.project?.profileId || '';
+  select.replaceChildren();
+  const empty = document.createElement('option');
+  empty.value = '';
+  empty.textContent = wizard.profiles.length ? 'SELECT A CONNECTION' : 'NO SAVED CONNECTIONS';
+  select.appendChild(empty);
+  for (const profile of wizard.profiles) {
+    const option = document.createElement('option');
+    option.value = profile.id;
+    option.textContent = `${profile.label} · ${profile.kind.toUpperCase()}${
+      profile.account ? ` · ${profile.account}` : ''
+    }`;
+    select.appendChild(option);
+  }
+  if (wizard.profiles.some((profile) => profile.id === preferred)) {
+    wizard.profileId = preferred;
+    select.value = preferred;
+  } else {
+    wizard.profileId = '';
+    select.value = '';
+  }
+
+  const discovery = wizard.discovery;
+  const deployRoot = wizard.project?.deployRoot || discovery?.deployRoot?.cwd || '';
+  const repositoryRoot = wizard.project?.repositoryRoot || discovery?.repositoryRoot?.cwd || deployRoot;
+  $('#vercel-repository-root').textContent = repositoryRoot || '—';
+  $('#vercel-repository-root').title = repositoryRoot;
+  $('#vercel-deploy-root').textContent = deployRoot || '—';
+  $('#vercel-deploy-root').title = deployRoot;
+  $('#vercel-validate-profile').disabled = wizard.busy || !wizard.profileId || !cli?.available;
+  $('#vercel-remove-profile').disabled = wizard.busy || !wizard.profileId;
+  $('#vercel-use-cli').disabled = wizard.busy || !cli?.available;
+  $('#vercel-connect-token').disabled = wizard.busy || !cli?.available || !capability?.secureStorage;
+  $('#vercel-token-details').classList.toggle('hidden', Boolean(capability && !capability.secureStorage));
+  $('#vercel-save-project').disabled = wizard.busy
+    || !cli?.available
+    || !wizard.profileId
+    || !repositoryRoot
+    || !deployRoot
+    || !$('#vercel-org-id').value.trim()
+    || !$('#vercel-project-id').value.trim();
+  $('#vercel-remove-project').classList.toggle('hidden', !wizard.project);
+  $('#vercel-remove-project').disabled = wizard.busy || !wizard.project;
+}
+
+function fillVercelProjectFields(project, discovery) {
+  $('#vercel-org-id').value = project?.orgId || discovery?.link?.orgId || '';
+  $('#vercel-project-id').value = project?.projectId || discovery?.link?.projectId || '';
+  $('#vercel-trigger').value = project?.trigger || 'direct';
+  $('#vercel-production-branch').value = project?.productionBranch || '';
+  $('#vercel-environment').value = project?.rememberedEnvironment || '';
+}
+
+async function refreshVercelProjects() {
+  try {
+    const result = await window.chromux.vercelProjectsRead();
+    state.ui.vercel.projects = result?.ok && Array.isArray(result.projects) ? result.projects : [];
+  } catch {
+    state.ui.vercel.projects = [];
+  }
+  updateVercelButtons();
+  return state.ui.vercel.projects;
+}
+
+async function openVercelSetup(session) {
+  const wizard = state.ui.vercel;
+  const generation = ++wizard.generation;
+  wizard.sessionId = session.id;
+  wizard.busy = true;
+  wizard.capability = null;
+  wizard.discovery = null;
+  wizard.profiles = [];
+  wizard.project = null;
+  wizard.profileId = '';
+  fillVercelProjectFields(null, null);
+  $('#vercel-token').value = '';
+  $('#modal-vercel').classList.remove('hidden');
+  setVercelStatus('Inspecting this project and its Vercel setup…');
+  renderVercelSetup();
+
+  const location = vercelLocation(session);
+  const results = await Promise.allSettled([
+    window.chromux.vercelCapability(location),
+    window.chromux.vercelConnectionsRead(),
+    window.chromux.vercelProjectDiscover(location),
+    window.chromux.vercelProjectsRead(),
+  ]);
+  if (generation !== wizard.generation || wizard.sessionId !== session.id) return;
+  const [capabilityResult, connectionsResult, discoveryResult, projectsResult] = results.map((result) => (
+    result.status === 'fulfilled' ? result.value : null
+  ));
+  wizard.capability = capabilityResult?.ok ? capabilityResult : {
+    ok: false,
+    cli: { available: false, setupCommand: 'npm install --global vercel' },
+    secureStorage: false,
+  };
+  wizard.profiles = connectionsResult?.ok && Array.isArray(connectionsResult.profiles)
+    ? connectionsResult.profiles : [];
+  wizard.discovery = discoveryResult?.ok ? discoveryResult : null;
+  wizard.projects = projectsResult?.ok && Array.isArray(projectsResult.projects)
+    ? projectsResult.projects : [];
+  wizard.project = vercelProjectForSession(wizard.projects, session);
+  wizard.profileId = wizard.project?.profileId || (wizard.profiles.length === 1 ? wizard.profiles[0].id : '');
+  fillVercelProjectFields(wizard.project, wizard.discovery);
+  wizard.busy = false;
+  updateVercelButtons();
+  renderVercelSetup();
+  if (!wizard.capability.cli?.available) {
+    setVercelStatus('Install the Vercel CLI in this runtime, then reopen setup.', 'fail');
+  } else if (wizard.project) {
+    setVercelStatus('This project has a saved Vercel mapping. Review or update it below.', 'current');
+  } else if (wizard.discovery?.link) {
+    setVercelStatus('Found an existing Vercel project link. Choose a connection and save setup.', 'ready');
+  } else {
+    setVercelStatus('No linked Vercel project was found. Enter the organization and project IDs.', 'ready');
+  }
+}
+
+async function connectVercelCli() {
+  const wizard = state.ui.vercel;
+  const session = state.sessions.get(wizard.sessionId);
+  if (!session || wizard.busy) return;
+  setVercelBusy(true);
+  setVercelStatus('Validating Vercel CLI login in this project runtime…');
+  const runtimeSlug = session.runtime === 'wsl'
+    ? `wsl-${String(session.distro || 'default').toLocaleLowerCase().replace(/[^a-z0-9._-]+/g, '-')}`
+    : 'host';
+  let result;
+  try {
+    result = await window.chromux.vercelConnectCli({
+      id: `cli-${runtimeSlug}`.slice(0, 64),
+      label: session.runtime === 'wsl' ? `Vercel CLI · ${session.distro}` : 'Vercel CLI · Host',
+      location: vercelLocation(session),
+    });
+  } catch (error) {
+    result = { ok: false, message: error.message };
+  }
+  if (result?.ok) {
+    const connections = await window.chromux.vercelConnectionsRead().catch(() => null);
+    wizard.profiles = connections?.ok ? connections.profiles : wizard.profiles;
+    wizard.profileId = result.profile.id;
+    setVercelStatus(`Connected as ${result.profile.account || result.profile.label}.`, 'current');
+  } else {
+    setVercelStatus(vercelErrorMessage(result, 'Vercel CLI login could not be validated.'), 'fail');
+  }
+  setVercelBusy(false);
+}
+
+async function connectVercelToken() {
+  const wizard = state.ui.vercel;
+  const session = state.sessions.get(wizard.sessionId);
+  const label = $('#vercel-token-label').value.trim();
+  const token = $('#vercel-token').value;
+  if (!session || wizard.busy) return;
+  if (!label || !token) {
+    setVercelStatus('Enter a connection name and Vercel token.', 'fail');
+    return;
+  }
+  setVercelBusy(true);
+  setVercelStatus('Validating the token with Vercel…');
+  let result;
+  try {
+    result = await window.chromux.vercelConnectToken({
+      id: `token-${Date.now().toString(36)}`,
+      label,
+      token,
+      location: vercelLocation(session),
+    });
+  } catch (error) {
+    result = { ok: false, message: error.message };
+  } finally {
+    $('#vercel-token').value = '';
+  }
+  if (result?.ok) {
+    const connections = await window.chromux.vercelConnectionsRead().catch(() => null);
+    wizard.profiles = connections?.ok ? connections.profiles : wizard.profiles;
+    wizard.profileId = result.profile.id;
+    $('#vercel-token-label').value = '';
+    $('#vercel-token-details').open = false;
+    setVercelStatus(`Encrypted connection saved for ${result.profile.account || result.profile.label}.`, 'current');
+  } else {
+    setVercelStatus(vercelErrorMessage(result, 'Vercel rejected this token.'), 'fail');
+  }
+  setVercelBusy(false);
+}
+
+async function validateVercelProfile() {
+  const wizard = state.ui.vercel;
+  const session = state.sessions.get(wizard.sessionId);
+  if (!session || !wizard.profileId || wizard.busy) return false;
+  setVercelBusy(true);
+  setVercelStatus('Validating the selected connection…');
+  let result;
+  try {
+    result = await window.chromux.vercelConnectionValidate({
+      profileId: wizard.profileId,
+      location: vercelLocation(session),
+    });
+  } catch (error) {
+    result = { ok: false, message: error.message };
+  }
+  setVercelStatus(
+    result?.ok
+      ? `Connection validated${result.profile?.account ? ` as ${result.profile.account}` : ''}.`
+      : vercelErrorMessage(result, 'The selected connection could not be validated.'),
+    result?.ok ? 'current' : 'fail',
+  );
+  setVercelBusy(false);
+  return Boolean(result?.ok);
+}
+
+async function removeVercelProfile() {
+  const wizard = state.ui.vercel;
+  if (!wizard.profileId || wizard.busy) return;
+  const profile = wizard.profiles.find((candidate) => candidate.id === wizard.profileId);
+  if (!window.confirm(`Remove the Chromux connection “${profile?.label || wizard.profileId}”? Vercel CLI login is not changed.`)) return;
+  setVercelBusy(true);
+  let result;
+  try { result = await window.chromux.vercelConnectionRemove(wizard.profileId); } catch (error) {
+    result = { ok: false, message: error.message };
+  }
+  if (result?.ok) {
+    wizard.profiles = wizard.profiles.filter((candidate) => candidate.id !== wizard.profileId);
+    wizard.profileId = '';
+    setVercelStatus('Chromux connection removed. Vercel CLI login was left unchanged.', 'current');
+  } else {
+    setVercelStatus(vercelErrorMessage(result, 'The connection could not be removed.'), 'fail');
+  }
+  setVercelBusy(false);
+}
+
+async function saveVercelProject() {
+  const wizard = state.ui.vercel;
+  const session = state.sessions.get(wizard.sessionId);
+  if (!session || !wizard.profileId || wizard.busy) return;
+  const deployRoot = wizard.project?.deployRoot || wizard.discovery?.deployRoot?.cwd;
+  const repositoryRoot = wizard.project?.repositoryRoot || wizard.discovery?.repositoryRoot?.cwd || deployRoot;
+  if (!deployRoot || !repositoryRoot) {
+    setVercelStatus('Chromux could not resolve this project directory.', 'fail');
+    return;
+  }
+  const orgId = $('#vercel-org-id').value.trim();
+  const projectId = $('#vercel-project-id').value.trim();
+  if (!orgId || !projectId) {
+    setVercelStatus('Enter both Vercel organization and project IDs.', 'fail');
+    return;
+  }
+  if (!await validateVercelProfile()) return;
+  setVercelBusy(true);
+  setVercelStatus('Saving the canonical Vercel project mapping…');
+  let result;
+  try {
+    result = await window.chromux.vercelProjectSave({
+      location: vercelLocation(session),
+      repositoryRoot,
+      deployRoot,
+      profileId: wizard.profileId,
+      orgId,
+      projectId,
+      trigger: $('#vercel-trigger').value,
+      productionBranch: $('#vercel-production-branch').value.trim(),
+      rememberedEnvironment: $('#vercel-environment').value || null,
+    });
+  } catch (error) {
+    result = { ok: false, message: error.message };
+  }
+  if (result?.ok) {
+    wizard.project = result.project;
+    await refreshVercelProjects();
+    setVercelStatus('Vercel setup saved for this project.', 'current');
+  } else {
+    setVercelStatus(vercelErrorMessage(result, 'The Vercel project mapping could not be saved.'), 'fail');
+  }
+  setVercelBusy(false);
+}
+
+async function removeVercelProject() {
+  const wizard = state.ui.vercel;
+  if (!wizard.project || wizard.busy) return;
+  if (!window.confirm('Remove this project’s Vercel mapping from Chromux? The Vercel project is not changed.')) return;
+  setVercelBusy(true);
+  let result;
+  try { result = await window.chromux.vercelProjectRemove(wizard.project.key); } catch (error) {
+    result = { ok: false, message: error.message };
+  }
+  if (result?.ok) {
+    wizard.project = null;
+    await refreshVercelProjects();
+    setVercelStatus('Project mapping removed. The Vercel project was left unchanged.', 'current');
+  } else {
+    setVercelStatus(vercelErrorMessage(result, 'The project mapping could not be removed.'), 'fail');
+  }
+  setVercelBusy(false);
+}
+
 function buildSessionView(session) {
   const view = document.createElement('section');
   view.className = 'session-view offstage';
@@ -4709,10 +5119,13 @@ function buildSessionView(session) {
   const termCwd = document.createElement('span');
   termCwd.className = 'term-head-cwd';
   termCwd.textContent = session.cwd;
+  const vercelBtn = document.createElement('button');
+  vercelBtn.type = 'button'; vercelBtn.className = 'head-btn vercel-toggle'; vercelBtn.textContent = 'VERCEL';
+  vercelBtn.title = 'Configure Vercel for this project'; vercelBtn.setAttribute('aria-label', 'Configure Vercel for this project');
   const composeBtn = document.createElement('button');
   composeBtn.type = 'button'; composeBtn.className = 'head-btn compose-toggle'; composeBtn.textContent = 'COMPOSE';
   composeBtn.title = 'Open multiline composer (⌘⇧Enter)'; composeBtn.setAttribute('aria-label', 'Open multiline composer');
-  termHead.append(termLabel, termCwd, composeBtn);
+  termHead.append(termLabel, termCwd, vercelBtn, composeBtn);
   const termHost = document.createElement('div');
   termHost.className = 'term-host';
   const scrollToBottom = document.createElement('button');
@@ -4951,6 +5364,7 @@ function buildSessionView(session) {
     favoritesPanel.classList.toggle('hidden');
   };
   favoriteBtn.onclick = () => toggleFavorite(session, activePageTab(session)?.currentUrl || urlBar.value);
+  vercelBtn.onclick = () => openVercelSetup(session);
   composeBtn.onclick = () => openComposer(session);
   closeComposerBtn.onclick = () => closeComposer(session);
   historyBtn.onclick = () => toggleComposerHistory(session);
@@ -5014,7 +5428,7 @@ function buildSessionView(session) {
   });
 
   return {
-    view, termPane, termLabel, termHost, scrollToBottom, composeBtn, composer, composerTextarea, composerStatus, composerCount,
+    view, termPane, termLabel, termHost, scrollToBottom, vercelBtn, composeBtn, composer, composerTextarea, composerStatus, composerCount,
     submitComposerBtn, historyBtn, expandComposerBtn, closeComposerBtn, composerInputChoice, composerInputChoiceActions,
     composerContext, contextChips, contextTarget, contextAgent, attachPageBtn, contextError, switchRouteTargetBtn,
     historyDrawer, historySearch, historyList, clearHistoryBtn,
@@ -8410,6 +8824,7 @@ async function createSessionNow({
   const viewEls = buildSessionView(session);
   const tabEls = buildSessionTab(session);
   session.els = { ...viewEls, ...tabEls };
+  updateVercelButtons();
   if (Array.isArray(initialBrowserTabs)) {
     for (const saved of initialBrowserTabs.slice(0, 50)) {
       if (!saved || typeof saved !== 'object') continue;
@@ -10620,6 +11035,23 @@ async function createScaffoldedProject({ launch }) {
 
 $('#pc-create-only').addEventListener('click', () => createScaffoldedProject({ launch: false }));
 $('#pc-create-launch').addEventListener('click', () => createScaffoldedProject({ launch: true }));
+$('#vercel-profile').addEventListener('change', () => {
+  state.ui.vercel.profileId = $('#vercel-profile').value;
+  renderVercelSetup();
+});
+for (const id of [
+  'vercel-org-id', 'vercel-project-id', 'vercel-trigger',
+  'vercel-production-branch', 'vercel-environment',
+]) {
+  $(`#${id}`).addEventListener('input', renderVercelSetup);
+  $(`#${id}`).addEventListener('change', renderVercelSetup);
+}
+$('#vercel-use-cli').addEventListener('click', () => connectVercelCli());
+$('#vercel-connect-token').addEventListener('click', () => connectVercelToken());
+$('#vercel-validate-profile').addEventListener('click', () => validateVercelProfile());
+$('#vercel-remove-profile').addEventListener('click', () => removeVercelProfile());
+$('#vercel-save-project').addEventListener('click', () => saveVercelProject());
+$('#vercel-remove-project').addEventListener('click', () => removeVercelProject());
 
 document.querySelectorAll('[data-close]').forEach((btn) => {
   btn.addEventListener('click', () => {
@@ -10628,6 +11060,10 @@ document.querySelectorAll('[data-close]').forEach((btn) => {
     // survives, so in-flight deliveries still resolve and stay attributable.
     if (btn.dataset.close === 'modal-capture') state.ui.captureModal = null;
     if (btn.dataset.close === 'modal-grok-advisory') closeGrokContextAdvisory();
+    if (btn.dataset.close === 'modal-vercel') {
+      state.ui.vercel.generation += 1;
+      $('#vercel-token').value = '';
+    }
     invalidate('shortcutDebug');
   });
 });
@@ -10912,6 +11348,62 @@ function handleRendererShortcutKeydown(e) {
 }
 
 if (window.chromuxTest) {
+  window.chromuxTestVercel = {
+    addSession(opts = {}) {
+      return window.chromuxTestBrowser.addSession({
+        name: 'vercel-project',
+        agent: 'codex',
+        cwd: '/tmp',
+        ...opts,
+      });
+    },
+    async open(id) {
+      await openVercelSetup(testSession(id));
+      return this.snapshot(id);
+    },
+    async connectCli() {
+      await connectVercelCli();
+      return this.snapshot(state.ui.vercel.sessionId);
+    },
+    selectProfile(profileId) {
+      state.ui.vercel.profileId = profileId;
+      renderVercelSetup();
+    },
+    setProject({ orgId, projectId, trigger = 'direct', productionBranch = '', environment = '' } = {}) {
+      $('#vercel-org-id').value = orgId || '';
+      $('#vercel-project-id').value = projectId || '';
+      $('#vercel-trigger').value = trigger;
+      $('#vercel-production-branch').value = productionBranch;
+      $('#vercel-environment').value = environment;
+      renderVercelSetup();
+    },
+    async save() {
+      await saveVercelProject();
+      return this.snapshot(state.ui.vercel.sessionId);
+    },
+    snapshot(id) {
+      const session = state.sessions.get(id);
+      return {
+        open: !$('#modal-vercel').classList.contains('hidden'),
+        header: session?.els?.vercelBtn?.textContent || '',
+        headerReady: Boolean(session?.els?.vercelBtn?.classList.contains('ready')),
+        capability: $('#vercel-capability-status').textContent,
+        installCommand: $('#vercel-install-command').textContent,
+        status: $('#vercel-status').textContent,
+        profiles: state.ui.vercel.profiles.map((profile) => ({
+          id: profile.id, label: profile.label, kind: profile.kind, account: profile.account,
+        })),
+        profileId: state.ui.vercel.profileId,
+        repositoryRoot: $('#vercel-repository-root').textContent,
+        deployRoot: $('#vercel-deploy-root').textContent,
+        orgId: $('#vercel-org-id').value,
+        projectId: $('#vercel-project-id').value,
+        saveDisabled: $('#vercel-save-project').disabled,
+        tokenValue: $('#vercel-token').value,
+      };
+    },
+  };
+
   window.chromuxTestCaptureControl = {
     targets: () => browserCaptureTargets(),
     requestApproval: (payload, timeoutMs) => requestCaptureApproval(payload, timeoutMs),
@@ -13841,6 +14333,11 @@ document.addEventListener('keydown', (e) => {
     $('#modal-settings').classList.add('hidden');
     $('#modal-resources').classList.add('hidden');
     $('#modal-new').classList.add('hidden');
+    if (!$('#modal-vercel').classList.contains('hidden')) {
+      $('#modal-vercel').classList.add('hidden');
+      state.ui.vercel.generation += 1;
+      $('#vercel-token').value = '';
+    }
     $('#modal-detect').classList.add('hidden');
     $('#drawer-log').classList.add('hidden');
     closeSessionSearch({ restoreFocus: true });
@@ -13947,6 +14444,7 @@ setInterval(() => {
   $('#settings-developer-mode').checked = Boolean(state.env.devMode);
   renderPreventSleepStatus();
   renderDeveloperDiagnostics();
+  await refreshVercelProjects();
   checkCodexPreflight().catch(() => {});
   await autoRestoreWorkspace().catch((err) => {
     renderRestoreWarning([{ name: 'restore failed', cwd: err.message, agent: 'chromux' }]);

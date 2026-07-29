@@ -1070,3 +1070,144 @@
   GitHub tag and latest Release. Next command: commit the scoped boundary,
   integrate it onto current `origin/main`, push, publish the release, and verify
   `/releases/latest`.
+
+## 2026-07-28 — Vercel integration foundation
+
+- Added a dependency-injected main-process Vercel service with host/WSL CLI
+  discovery, CLI-login and encrypted token profiles, OAuth PKCE/state/token
+  rotation/revocation primitives, upward linked-root discovery, and canonical
+  project configuration. Exposed only bounded profile/configuration results
+  through preload IPC; token-backed CLI calls use `VERCEL_TOKEN` and redact
+  returned output.
+- Preserved CLI-owned authentication when OS encryption is unavailable by
+  storing only its non-secret label/account metadata in plaintext. Token and
+  OAuth profiles still fail closed unless Electron `safeStorage` is available.
+- Ship manifest — User goal: implement the supplied one-button Vercel shipping
+  plan. This execution completed only its independently shippable main-process
+  foundation; the visible setup/shipping workflow remains explicitly open in
+  `tasks/todo.md`. Changed files: `prototype/vercel-service.js`,
+  `prototype/main.js`, `prototype/preload.js`,
+  `prototype/scripts/test-vercel-service.js`, package metadata, prototype
+  README/privacy docs, `RELEASES.md`, `tasks/todo.md`, and this history entry.
+  Per-file purpose: isolate credentials and configuration in main, route CLI
+  execution to the project runtime, expose narrow IPC, prove security and
+  recovery behavior, and record the incomplete v0.71 boundary. User-goal
+  mapping: covers runtime-local discovery, CLI/token/OAuth connection
+  primitives, encrypted persistence, secret redaction, deploy-root discovery,
+  and per-project configuration; does not claim the button, setup wizard,
+  guarded Git ship engine, deployment monitoring, or live UAT. Tests run:
+  JavaScript syntax checks, focused Vercel service coverage, and the complete
+  prototype test matrix; all passed. The service test was rerun after the
+  adversarial fix. Skipped tests: live Vercel CLI/account/OAuth and real WSL
+  UAT require external credentials or a Windows machine and are deferred with
+  the visible workflow. Adversarial review: checked argv/environment secret
+  boundaries, corrupt stores, POSIX modes, safeStorage unavailability, OAuth
+  state/PKCE/refresh/revoke, canonical path containment, WSL token forwarding,
+  and renderer result redaction. The review fixed CLI-profile persistence when
+  encryption is unavailable and canonicalized both saved roots. Residual risk:
+  the OAuth loopback owner and Vercel API request adapter are not wired, and
+  Vercel API resource permissions must be validated against the registered
+  public app before OAuth can drive deployments. Rollback: revert only the
+  listed Vercel foundation files; no credential or project file exists until a
+  connection/configuration action runs. Deploy: skipped because no explicit
+  manual deploy contract exists. Shipping is intentionally held: local `main`
+  is independently dirty and diverged from `origin/main`, and v0.71.0 must not
+  be tagged or published until the complete user-visible workflow and live
+  preview UAT pass. Next command: implement the terminal-header button and
+  setup wizard against the existing preload surface.
+
+## 2026-07-28 — Vercel terminal-header setup workflow
+
+- Added a project-scoped **VERCEL** terminal-header action and accessible setup
+  wizard over the existing narrow preload surface. The wizard reports the
+  runtime-local CLI capability, connects CLI-owned login or an encrypted
+  personal token, validates and removes profiles, discovers linked project
+  IDs, accepts explicit IDs, configures direct/Git trigger preferences, and
+  saves or removes canonical project mappings. Matching sessions display
+  **VERCEL · READY** without reading credentials into the renderer.
+- Extended project discovery with the canonical repository root needed by the
+  setup form, retained deploy-root containment in main, cleared token inputs
+  after every attempt, handled macOS `/var` aliases, and added a smoke-only
+  no-Keychain seam for isolated renderer fixtures. Production continues to use
+  Electron `safeStorage`; the seam is gated by both smoke mode and an explicit
+  E2E environment flag.
+- Added deterministic service assertions and a real-Electron renderer fixture
+  with a fake runtime-local Vercel CLI. Focused service and renderer tests,
+  JavaScript syntax checks, scoped diff checks, and the complete prototype
+  matrix passed; one native-pointer Streak fixture failed twice during the
+  sequential run, then passed in isolation after the Electron fixtures shut
+  down, while every subsequent matrix test also passed. No live Vercel account,
+  token, OAuth callback, deployment, or WSL runtime was exercised. v0.71.0
+  remains an unpublished aggregate candidate; the guarded shipping engine,
+  deployment monitor, live preview UAT, tag, and GitHub Release remain open.
+  Next command: implement guarded shipping and deployment monitoring against
+  the saved mapping.
+
+## 2026-07-28 — Session wrap-up: research refresh and Vercel candidate
+
+- Prepared two coherent direct-to-`main` shipping groups: the refreshed
+  adoption/DX/integration/positioning research and review pages, followed by
+  the v0.71.0 Vercel main-process foundation and terminal-header setup
+  workflow. The existing seven local commits are also part of the integration
+  boundary; five have patch-equivalent upstream commits, while the localhost
+  first-success proof and Codex update retry remain locally patch-unique.
+- Ship manifest — User goal: wrap up and push the current session while
+  preserving the still-incomplete one-button Vercel plan. Changed files:
+  `research/devtool-adoption.md`, `research/devtool-dx-journey.md`,
+  `research/devtool-integration-map.md`,
+  `alignment/devtool-adoption-chromux.html`,
+  `alignment/devtool-dx-journey-chromux.html`,
+  `alignment/devtool-integration-map-gigachadd-process.html`,
+  `alignment/devtool-positioning-gblockparty.html`, `alignment/index.html`,
+  `interrogation/devtool-adoption-r1-chromux.html`,
+  `interrogation/devtool-adoption-r2-chromux.html`,
+  `interrogation/devtool-positioning-r1-gblockparty.html`,
+  `tasks/record-todo.md`, `tasks/recurring-todo.md`, `RELEASES.md`,
+  `prototype/README.md`, `prototype/docs/privacy-and-local-data.md`,
+  `prototype/main.js`, `prototype/package.json`,
+  `prototype/package-lock.json`, `prototype/preload.js`,
+  `prototype/vercel-service.js`, `prototype/renderer/index.html`,
+  `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`,
+  `prototype/scripts/test-vercel-service.js`,
+  `prototype/scripts/test-vercel-renderer.js`, `tasks/todo.md`, and this
+  history file. Per-file purpose: the research, alignment, interrogation, and
+  advisory-task files capture the current adoption and integration evidence;
+  the prototype service/main/preload files own runtime-local Vercel discovery,
+  encrypted profiles, and narrow IPC; renderer files provide the setup
+  workflow; tests prove the security and Electron integration contracts; app
+  metadata, docs, release notes, and current tasks identify the v0.71.0
+  candidate and its remaining blockers. User-goal mapping: the research group
+  preserves the session's product evidence, while the prototype group delivers
+  the independently usable setup slice without claiming that deployment
+  shipping is complete.
+- Tests run: `node --check main.js`, `node --check preload.js`,
+  `node --check renderer/renderer.js`, `node --check vercel-service.js`,
+  `node scripts/test-vercel-service.js`, and `git diff --check` passed;
+  `node scripts/test-vercel-renderer.js` aborted inside the command sandbox,
+  then passed in the approved outside-sandbox Electron context; `npm test`
+  passed the complete prototype matrix outside the sandbox with no warnings.
+  The repository has no `scripts/audit-task-docs.mjs`, so no task-doc audit
+  command applies.
+- Skipped tests: no live Vercel CLI account/token/OAuth/deployment or WSL
+  runtime was exercised because those require external credentials or a
+  Windows environment; deterministic service and real-Electron fixtures cover
+  the local contract. Static research/alignment pages received diff and link
+  boundary review but no screenshot comparison because this shipping pass did
+  not originate their design and no approved visual baseline exists.
+- Adversarial review: performed a changed-file failure review focused on
+  credential exposure, argv/environment boundaries, callback state/PKCE,
+  canonical root containment, corrupt persistence, renderer token lifetime,
+  stale async wizard results, and explicit project input validation. It found
+  and fixed overly permissive explicit Vercel organization/project IDs, added
+  a regression assertion, and removed the only whitespace warnings.
+- Residual risk: real Vercel authentication, WSL discovery, OAuth loopback
+  ownership, guarded Git shipping, deployment monitoring, and preview UAT
+  remain unproved. A removed connection can leave a non-secret mapping visible
+  as ready until setup is reopened and another valid profile is selected; the
+  next shipping-engine phase should define whether removal blocks or cascades
+  mappings. Rollback: revert the two new feature commits after the upstream
+  integration merge; no credential/project store is created until a user
+  explicitly connects or saves setup. Deploy: skipped because neither
+  `deploy.md` nor `tasks/deploy.md` exists. Release publication remains blocked
+  by the active v0.71.0 task and must not be tagged until the guarded shipping
+  engine, monitoring, and live preview UAT pass. Next command: `$exec`.
