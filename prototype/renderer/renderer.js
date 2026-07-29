@@ -140,6 +140,7 @@ const state = {
   projects: [],
   projectConfig: null,
   scaffolderConfig: null,
+  windowsSetup: null,
   events: [], // ring buffer of applied events (diagnostics), max EVENT_RING_MAX
   ui: {
     theme: storedTheme(),
@@ -188,6 +189,7 @@ const state = {
       project: null,
       profileId: '',
     },
+    windowsSetupStage: 'system',
   },
   lastCwd: null,
   contextMenu: null,
@@ -8905,6 +8907,7 @@ async function createSessionNow({
   try {
     ptyInfo = await window.chromux.ptyCreate({
       id, cwd, location: { runtime: session.runtime, distro: session.distro, cwd },
+      agent,
       command: command !== undefined ? command : agentCommand(agent),
       cols: term.cols, rows: term.rows,
     });
@@ -9441,6 +9444,175 @@ function openSettings() {
   });
   invalidate('shortcutDebug');
   checkUpdates(false).catch(() => {});
+}
+
+const WINDOWS_SETUP_STAGE_CHECKS = Object.freeze({
+  system: ['windows-build', 'windows-architecture'],
+  wsl: ['wsl2-distro'],
+  tools: ['bash', 'git', 'node', 'agent-claude', 'agent-codex', 'agent-grok', 'resource-integration'],
+  root: ['projects-root'],
+});
+
+function selectWindowsSetupStage(stage, { focus = false } = {}) {
+  if (!['system', 'wsl', 'tools', 'root', 'ready'].includes(stage)) return;
+  state.ui.windowsSetupStage = stage;
+  for (const button of document.querySelectorAll('[data-setup-stage]')) {
+    const selected = button.dataset.setupStage === stage;
+    button.classList.toggle('on', selected);
+    button.setAttribute('aria-current', selected ? 'step' : 'false');
+    if (selected && focus) button.focus();
+  }
+  for (const panel of document.querySelectorAll('[data-setup-panel]')) {
+    panel.classList.toggle('hidden', panel.dataset.setupPanel !== stage);
+  }
+}
+
+function windowsSetupCheckRow(item) {
+  const row = document.createElement('div');
+  row.className = `windows-setup-check ${item.required ? 'required' : 'optional'} ${item.ok ? 'ok' : ''}`;
+  row.dataset.checkId = item.id;
+  const badge = document.createElement('span');
+  badge.className = 'windows-setup-badge';
+  badge.textContent = item.ok ? 'Ready' : (item.required ? 'Action Required' : 'Optional');
+  const copy = document.createElement('div');
+  const title = document.createElement('strong');
+  title.textContent = item.label;
+  const detail = document.createElement('small');
+  detail.textContent = item.detail || '';
+  copy.append(title, detail);
+  row.append(badge, copy);
+  const actions = document.createElement('div');
+  actions.className = 'windows-setup-check-actions';
+  if (!item.ok && item.remediation?.command) {
+    const command = document.createElement('button');
+    command.className = 'windows-setup-copy';
+    command.type = 'button';
+    command.textContent = 'COPY COMMAND';
+    command.title = item.remediation.command;
+    command.onclick = async () => {
+      await window.chromux.clipboardWriteText(item.remediation.command);
+      command.textContent = 'COPIED';
+      setTimeout(() => { command.textContent = 'COPY COMMAND'; }, 1200);
+    };
+    actions.append(command);
+  }
+  if (!item.ok && item.remediation?.documentationKey) {
+    const guide = document.createElement('button');
+    guide.className = 'windows-setup-copy';
+    guide.type = 'button';
+    guide.textContent = 'OPEN GUIDE';
+    guide.onclick = () => {
+      window.chromux.windowsSetupOpenDocumentation(item.remediation.documentationKey).catch(() => {});
+    };
+    actions.append(guide);
+  }
+  if (actions.childElementCount > 0) row.append(actions);
+  return row;
+}
+
+function updateWindowsLaunchCapabilities() {
+  if (state.env?.hostPlatform !== 'win32' || !state.windowsSetup) return;
+  const capabilities = state.windowsSetup.capabilities || {};
+  $('#launcher-tab-create').disabled = !capabilities.canCreateProject;
+  $('#launcher-tab-create').title = capabilities.canCreateProject
+    ? ''
+    : 'Complete Windows Setup and choose a writable Projects Root to create projects.';
+  for (const button of $('#ns-agent').children) {
+    const agent = button.dataset.agent || 'shell';
+    const available = capabilities.agents?.[agent] !== false;
+    button.disabled = !available;
+    button.title = available ? '' : `${agent} is unavailable in the selected WSL2 distribution.`;
+  }
+  const selectedAgent = $('#ns-agent .on');
+  if (selectedAgent?.disabled) {
+    for (const button of $('#ns-agent').children) button.classList.toggle('on', (button.dataset.agent || '') === '');
+  }
+}
+
+function renderWindowsSetup(status) {
+  if (!status) return;
+  state.windowsSetup = status;
+  if (state.env?.runtime) state.env.runtime.setupStatus = status;
+  const byId = new Map(status.checks.map((item) => [item.id, item]));
+  const hosts = {
+    system: $('#windows-setup-system-checks'),
+    wsl: $('#windows-setup-wsl-checks'),
+    tools: $('#windows-setup-tool-checks'),
+    root: $('#windows-setup-root-checks'),
+  };
+  for (const [stage, ids] of Object.entries(WINDOWS_SETUP_STAGE_CHECKS)) {
+    hosts[stage].replaceChildren(...ids.map((id) => byId.get(id)).filter(Boolean).map(windowsSetupCheckRow));
+  }
+  const distro = $('#windows-setup-distro');
+  const previousDistro = distro.value;
+  distro.replaceChildren(...status.distros.map((item) => {
+    const option = document.createElement('option');
+    option.value = item.name;
+    option.textContent = `${item.name}${item.version === 2 ? '' : ' (WSL1 unsupported)'}`;
+    option.disabled = item.version !== 2;
+    option.selected = item.name === status.selectedDistro;
+    return option;
+  }));
+  if (!status.selectedDistro && status.distros.some((item) => item.name === previousDistro && item.version === 2)) {
+    distro.value = previousDistro;
+  }
+  const rootInput = $('#windows-setup-root');
+  if (document.activeElement !== rootInput) {
+    rootInput.value = status.projectsRoot || status.defaultProjectsRoot || '';
+  }
+  const missing = status.checks.filter((item) => item.required && !item.ok);
+  const optional = status.checks.filter((item) => !item.required && !item.ok);
+  $('#windows-setup-summary').textContent = status.setupReady
+    ? `Required setup is ready. ${optional.length} optional integration${optional.length === 1 ? '' : 's'} remain unavailable.`
+    : `${missing.length} required check${missing.length === 1 ? '' : 's'} need attention before setup can finish.`;
+  $('#windows-setup-finish').disabled = !status.setupReady;
+  $('#windows-setup-self-test').disabled = !status.capabilities.canCreateProject;
+  updateWindowsLaunchCapabilities();
+}
+
+function windowsSetupFirstIncompleteStage(status) {
+  for (const stage of ['system', 'wsl', 'tools', 'root']) {
+    if (WINDOWS_SETUP_STAGE_CHECKS[stage]
+      .some((id) => status.checks.find((item) => item.id === id && item.required && !item.ok))) return stage;
+  }
+  return 'ready';
+}
+
+async function openWindowsSetup({ firstRun = false } = {}) {
+  const error = $('#windows-setup-error');
+  error.classList.add('hidden');
+  try {
+    const status = await window.chromux.windowsSetupStatus();
+    if (!status) return;
+    renderWindowsSetup(status);
+    $('#windows-setup-overlay').classList.remove('hidden');
+    selectWindowsSetupStage(firstRun ? windowsSetupFirstIncompleteStage(status) : state.ui.windowsSetupStage);
+    requestAnimationFrame(() => {
+      document.querySelector(`[data-setup-stage="${state.ui.windowsSetupStage}"]`)?.focus();
+    });
+  } catch (failure) {
+    error.textContent = failure.message || 'Windows Setup status is unavailable.';
+    error.classList.remove('hidden');
+    $('#windows-setup-overlay').classList.remove('hidden');
+  }
+}
+
+async function runWindowsSetupAction(action) {
+  const error = $('#windows-setup-error');
+  error.classList.add('hidden');
+  const wasBlocked = state.windowsSetup && !state.windowsSetup.capabilities?.canOpenSession;
+  try {
+    const status = await action();
+    if (status) renderWindowsSetup(status);
+    if (wasBlocked && status?.capabilities?.canOpenSession) {
+      await autoRestoreWorkspace();
+    }
+    return status;
+  } catch (failure) {
+    error.textContent = failure.message || 'Windows Setup action failed.';
+    error.classList.remove('hidden');
+    return null;
+  }
 }
 
 async function changeDeveloperMode(enabled) {
@@ -10499,6 +10671,7 @@ async function autoRestoreWorkspace() {
   const snapshot = await window.chromux.getRestoreSnapshot();
   state.restoreSessions = snapshot || null;
   renderRestoreSessions();
+  if (state.env?.hostPlatform === 'win32' && !state.windowsSetup?.capabilities?.canOpenSession) return;
   if (!snapshot || snapshot.consumed || !Array.isArray(snapshot.sessions) || snapshot.sessions.length === 0) return;
   if (!['update-install', 'app-close'].includes(snapshot.reason)) return;
 
@@ -10700,6 +10873,14 @@ function selectLauncherMode(mode) {
 }
 
 function openNewSessionModal(mode = 'open') {
+  if (state.env?.hostPlatform === 'win32') {
+    const capabilities = state.windowsSetup?.capabilities;
+    if (!capabilities?.canOpenSession || (mode === 'create' && !capabilities.canCreateProject)) {
+      state.ui.windowsSetupStage = capabilities?.canOpenSession ? 'root' : 'system';
+      openWindowsSetup().catch(() => {});
+      return;
+    }
+  }
   $('#ns-name').value = `session-${state.counter + 1}`;
   $('#ns-cwd').value = state.lastCwd || (state.env ? state.env.home : '');
   $('#pc-name').value = '';
@@ -10820,6 +11001,7 @@ $('#settings-wsl-distro').addEventListener('change', async (event) => {
   const result = await window.chromux.wslSelectDistro(event.target.value);
   state.env.runtime.selectedDistro = result.selectedDistro;
   state.env.runtime.readiness = result.readiness;
+  if (result.setupStatus) renderWindowsSetup(result.setupStatus);
   const ready = result.readiness && result.readiness.ready;
   $('#settings-wsl-status').textContent = ready
     ? (result.readiness.warning || 'READY')
@@ -10827,6 +11009,77 @@ $('#settings-wsl-distro').addEventListener('change', async (event) => {
   $('#settings-wsl-status').classList.toggle('fail', !ready);
   state.scaffolderConfig = await window.chromux.projectScaffolderConfig().catch(() => null);
   renderProjectsRootSetting();
+});
+$('#settings-windows-setup').addEventListener('click', () => {
+  $('#modal-settings').classList.add('hidden');
+  openWindowsSetup().catch(() => {});
+});
+$('#windows-setup-stages').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-setup-stage]');
+  if (button) selectWindowsSetupStage(button.dataset.setupStage);
+});
+$('#windows-setup-stages').addEventListener('keydown', (event) => {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+  const stages = [...document.querySelectorAll('[data-setup-stage]')];
+  const current = stages.indexOf(event.target.closest('[data-setup-stage]'));
+  if (current < 0) return;
+  event.preventDefault();
+  const index = event.key === 'Home' ? 0
+    : event.key === 'End' ? stages.length - 1
+      : (current + (event.key === 'ArrowRight' ? 1 : -1) + stages.length) % stages.length;
+  selectWindowsSetupStage(stages[index].dataset.setupStage, { focus: true });
+});
+$('#windows-setup-distro').addEventListener('change', (event) => {
+  runWindowsSetupAction(() => window.chromux.windowsSetupSelectDistro(event.target.value));
+});
+$('#windows-setup-create-confirm').addEventListener('change', (event) => {
+  $('#windows-setup-create-root').disabled = !event.target.checked;
+});
+$('#windows-setup-save-root').addEventListener('click', () => {
+  runWindowsSetupAction(() => window.chromux.windowsSetupSaveRoot($('#windows-setup-root').value.trim(), false));
+});
+$('#windows-setup-create-root').addEventListener('click', async () => {
+  if (!$('#windows-setup-create-confirm').checked) return;
+  const status = await runWindowsSetupAction(
+    () => window.chromux.windowsSetupSaveRoot($('#windows-setup-root').value.trim(), true),
+  );
+  if (status) {
+    $('#windows-setup-create-confirm').checked = false;
+    $('#windows-setup-create-root').disabled = true;
+  }
+});
+$('#windows-setup-refresh').addEventListener('click', () => {
+  runWindowsSetupAction(() => window.chromux.windowsSetupRefresh());
+});
+$('#windows-setup-finish').addEventListener('click', async () => {
+  const status = await runWindowsSetupAction(() => window.chromux.windowsSetupComplete());
+  if (status?.completion) $('#windows-setup-overlay').classList.add('hidden');
+});
+$('#windows-setup-self-test').addEventListener('click', async () => {
+  const diagnostics = $('#windows-setup-diagnostics');
+  diagnostics.classList.remove('hidden');
+  diagnostics.textContent = 'Running a local WSL PTY self-test…';
+  try {
+    const result = await window.chromux.windowsSetupSelfTest();
+    diagnostics.textContent = [
+      `Result: ${result.ok ? 'PASS' : 'FAIL'}`,
+      `Distribution: ${result.distro}`,
+      `Projects Root: ${result.projectsRoot}`,
+      result.detail || '',
+    ].join('\n');
+  } catch (failure) {
+    diagnostics.textContent = `Result: FAIL\n${failure.message || 'Self-test failed.'}`;
+  }
+});
+$('#windows-setup-settings').addEventListener('click', () => {
+  $('#windows-setup-overlay').classList.add('hidden');
+  openSettings();
+});
+$('#windows-setup-docs').addEventListener('click', () => {
+  window.chromux.windowsSetupOpenDocumentation('chromux').catch(() => {});
+});
+$('#windows-setup-exit').addEventListener('click', () => {
+  window.chromux.windowsSetupExit().catch(() => {});
 });
 function renderProjectsRootSetting() {
   if (!state.scaffolderConfig) return;
@@ -10840,6 +11093,8 @@ $('#settings-projects-root-save').addEventListener('click', async () => {
   try {
     state.scaffolderConfig = await window.chromux.projectScaffolderSetRoot($('#settings-projects-root').value.trim());
     renderProjectsRootSetting();
+    const setupStatus = await window.chromux.windowsSetupStatus().catch(() => null);
+    if (setupStatus) renderWindowsSetup(setupStatus);
     status.textContent = `SAVED FOR ${state.scaffolderConfig.distro || 'THIS MAC'}`;
     status.classList.remove('fail');
   } catch (error) {
@@ -11408,6 +11663,50 @@ if (window.chromuxTest) {
     },
   };
 
+  window.chromuxTestWindowsSetup = {
+    render(status) {
+      state.env = state.env || {};
+      state.env.hostPlatform = 'win32';
+      renderWindowsSetup(status);
+      $('#windows-setup-overlay').classList.remove('hidden');
+      selectWindowsSetupStage(windowsSetupFirstIncompleteStage(status));
+    },
+    stage: () => state.ui.windowsSetupStage,
+    visible: () => !$('#windows-setup-overlay').classList.contains('hidden'),
+    summary: () => $('#windows-setup-summary').textContent,
+    checks: () => [...document.querySelectorAll('.windows-setup-check')].map((row) => ({
+      id: row.dataset.checkId,
+      badge: row.querySelector('.windows-setup-badge')?.textContent || '',
+    })),
+    capabilityState: () => ({
+      createTabDisabled: $('#launcher-tab-create').disabled,
+      agents: Object.fromEntries([...$('#ns-agent').children].map((button) => [
+        button.dataset.agent || 'shell',
+        !button.disabled,
+      ])),
+      finishDisabled: $('#windows-setup-finish').disabled,
+      selfTestDisabled: $('#windows-setup-self-test').disabled,
+    }),
+    selectStage(stage) { selectWindowsSetupStage(stage); },
+    rootValue: () => $('#windows-setup-root').value,
+    confirmCreate(enabled) {
+      $('#windows-setup-create-confirm').checked = Boolean(enabled);
+      $('#windows-setup-create-confirm').dispatchEvent(new Event('change', { bubbles: true }));
+      return $('#windows-setup-create-root').disabled;
+    },
+    focusTrap() {
+      selectWindowsSetupStage('ready');
+      $('#windows-setup-refresh').focus();
+      $('#windows-setup-refresh').dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+      return document.activeElement?.id || '';
+    },
+    arrowFrom(stage, key) {
+      const button = document.querySelector(`[data-setup-stage="${stage}"]`);
+      button.focus();
+      button.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+      return { stage: state.ui.windowsSetupStage, focused: document.activeElement?.dataset?.setupStage || '' };
+    },
+  };
   window.chromuxTestCaptureControl = {
     targets: () => browserCaptureTargets(),
     requestApproval: (payload, timeoutMs) => requestCaptureApproval(payload, timeoutMs),
@@ -14324,6 +14623,22 @@ function fakeSessionEls() {
 }
 
 document.addEventListener('keydown', (e) => {
+  if (e.key === 'Tab' && !$('#windows-setup-overlay').classList.contains('hidden')) {
+    const focusable = [...$('#windows-setup-overlay').querySelectorAll(
+      'button:not([disabled]), select:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+    )].filter((element) => !element.closest('.hidden'));
+    if (focusable.length > 0) {
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  }
   handleInboxQueueKeydown(e);
   handleRendererShortcutKeydown(e);
   if (e.key === 'Escape') {
@@ -14410,6 +14725,7 @@ setInterval(() => {
   await state.favoritesReady;
   state.projects = await window.chromux.projectsRead().catch(() => []);
   state.env = await window.chromux.getEnv();
+  state.windowsSetup = state.env?.runtime?.setupStatus || null;
   state.scaffolderConfig = await window.chromux.projectScaffolderConfig().catch(() => null);
   document.body.classList.toggle('host-win32', state.env.hostPlatform === 'win32');
   if (state.env.hostPlatform === 'win32') {
@@ -14433,6 +14749,7 @@ setInterval(() => {
     const readiness = state.env.runtime.readiness || {};
     $('#settings-wsl-status').textContent = readiness.ready ? (readiness.warning || 'READY') : (readiness.error || 'NOT READY');
     $('#settings-wsl-status').classList.toggle('fail', !readiness.ready);
+    if (state.windowsSetup) renderWindowsSetup(state.windowsSetup);
   }
   if (!state.env.capabilities || !state.env.capabilities.iosSimulator) {
     $('#resource-simulator-capacity').parentElement.classList.add('hidden');
@@ -14455,6 +14772,9 @@ setInterval(() => {
   renderDeveloperDiagnostics();
   await refreshVercelProjects();
   checkCodexPreflight().catch(() => {});
+  if (state.env.hostPlatform === 'win32' && state.env.isPackaged && state.windowsSetup?.needsSetup) {
+    await openWindowsSetup({ firstRun: true });
+  }
   await autoRestoreWorkspace().catch((err) => {
     renderRestoreWarning([{ name: 'restore failed', cwd: err.message, agent: 'chromux' }]);
   });

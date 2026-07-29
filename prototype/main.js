@@ -53,6 +53,13 @@ const { CaptureControlServer } = require('./capture/control');
 const { WslRuntime, linuxPathToWindows, windowsPathToLinux, workspaceLocation } = require('./platform/runtime');
 const { capabilities, windowOptions, windowsSupport } = require('./platform/host');
 const {
+  SETUP_SCHEMA_VERSION,
+  buildSetupStatus,
+  createRoot: createWindowsProjectsRoot,
+  inspectRoot: inspectWindowsProjectsRoot,
+  DOCUMENTATION_URLS: WINDOWS_SETUP_DOCUMENTATION_URLS,
+} = require('./windows-setup');
+const {
   CHROMUX_SHORTCUT_ACTIONS,
   chromuxShortcutAction,
   classifyShortcutFocusContext,
@@ -147,6 +154,14 @@ const HTML_INDEX_EXCLUDED_DIRS = new Set([
   'vendor', '.venv', 'venv', 'Pods',
 ]);
 
+function boundedSetupDiagnostic(value) {
+  return String(value || '')
+    .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '')
+    .replace(/[^\x20-\x7e\r\n\t]/g, '')
+    .trim()
+    .slice(-2000);
+}
+
 let win = null;
 const ptys = new Map(); // sessionId -> IPty
 const deliveries = new Map(); // deliveryId -> ChildProcess
@@ -167,6 +182,8 @@ let runtimeState = {
   readiness: { ready: process.platform !== 'win32', checks: [], error: null },
   home: process.platform === 'win32' ? '/home' : os.homedir(),
 };
+let windowsSetupStatus = null;
+let windowsHookWarning = null;
 const shortcutFocusContexts = new Map(); // webContentsId -> { focusKind }
 const shortcutRouteLog = [];
 const resourceClient = new BrokerClient({ client: {
@@ -341,6 +358,35 @@ async function initializeRuntime() {
     };
   }
   return runtimeState;
+}
+
+async function refreshWindowsSetupStatus({ migrateExisting = false } = {}) {
+  if (process.platform !== 'win32') {
+    windowsSetupStatus = null;
+    return null;
+  }
+  const preferences = readPreferences();
+  const selected = runtimeState.selectedDistro;
+  const root = selected ? persistedProjectsRoot('wsl', selected) : null;
+  windowsSetupStatus = await buildSetupStatus({
+    platform: process.platform,
+    arch: process.arch,
+    release: os.release(),
+    runtime: wslRuntime,
+    distros: runtimeState.distros,
+    selectedDistro: selected,
+    root,
+    home: runtimeState.home,
+    completion: preferences.windowsSetup,
+    hookWarning: windowsHookWarning,
+    migrateExisting: migrateExisting
+      && Boolean(selected)
+      && Boolean(root),
+  });
+  if (!preferences.windowsSetup && windowsSetupStatus?.completion) {
+    writePreference('windowsSetup', windowsSetupStatus.completion);
+  }
+  return windowsSetupStatus;
 }
 
 function selectedWorkspace(input) {
@@ -1915,7 +1961,16 @@ app.on('web-contents-created', (_event, contents) => {
 // PTY sessions
 // ---------------------------------------------------------------------------
 
-ipcMain.handle('pty-create', (_e, { id, cwd, location, command, cols, rows }) => {
+ipcMain.handle('pty-create', (_e, { id, cwd, location, command, agent = '', cols, rows }) => {
+  if (process.platform === 'win32') {
+    if (!windowsSetupStatus?.capabilities?.canOpenSession) {
+      throw new Error('Windows Setup requires a ready WSL2 distribution with Bash, Git, and Node 22.12+.');
+    }
+    const agentId = KNOWN_AGENTS.includes(agent) ? agent : '';
+    if (agentId && !windowsSetupStatus.capabilities.agents[agentId]) {
+      throw new Error(`${agentId} is not installed in the selected WSL2 distribution.`);
+    }
+  }
   const workspace = selectedWorkspace(location || cwd || (process.platform === 'win32' ? runtimeState.home : os.homedir()));
   const signalToken = crypto.randomBytes(32).toString('base64url');
   const sessionEnv = { ...process.env, TERM: 'xterm-256color', CHROMUX: '1', CHROMUX_SESSION_ID: id,
@@ -3014,6 +3069,7 @@ ipcMain.handle('wsl-list-distros', async () => {
 ipcMain.handle('wsl-refresh-readiness', async () => {
   if (process.platform !== 'win32' || !runtimeState.selectedDistro) return runtimeState.readiness;
   runtimeState.readiness = await wslRuntime.readiness(runtimeState.selectedDistro);
+  await refreshWindowsSetupStatus();
   return runtimeState.readiness;
 });
 ipcMain.handle('wsl-select-distro', async (_e, distro) => {
@@ -3027,9 +3083,107 @@ ipcMain.handle('wsl-select-distro', async (_e, distro) => {
     if (result.stdout.trim().startsWith('/')) runtimeState.home = result.stdout.trim();
   } catch { /* readiness reports the runtime problem */ }
   try { await installWslHooks(); } catch (error) {
-    runtimeState.readiness.warning = `Agent hooks are unavailable; sessions will run uninstrumented: ${error.message}`;
+    windowsHookWarning = `Agent hooks are unavailable; sessions will run uninstrumented: ${error.message}`;
+    runtimeState.readiness.warning = windowsHookWarning;
   }
-  return { selectedDistro: distro, readiness: runtimeState.readiness };
+  await refreshWindowsSetupStatus();
+  return { selectedDistro: distro, readiness: runtimeState.readiness, setupStatus: windowsSetupStatus };
+});
+ipcMain.handle('windows-setup-status', async () => {
+  if (process.platform !== 'win32') return null;
+  return refreshWindowsSetupStatus();
+});
+ipcMain.handle('windows-setup-refresh', async () => {
+  if (process.platform !== 'win32') return null;
+  await initializeRuntime();
+  return refreshWindowsSetupStatus();
+});
+ipcMain.handle('windows-setup-select-distro', async (_event, distro) => {
+  if (process.platform !== 'win32') throw new Error('Windows Setup is only available on Windows.');
+  wslRuntime.select(distro);
+  writePreference('wslDistro', distro);
+  runtimeState.selectedDistro = distro;
+  runtimeState.readiness = await wslRuntime.readiness(distro);
+  const homeResult = await wslRuntime.run(distro, ['bash', '-lc', 'printf %s "$HOME"']);
+  if (homeResult.stdout.trim().startsWith('/')) runtimeState.home = homeResult.stdout.trim();
+  return refreshWindowsSetupStatus();
+});
+ipcMain.handle('windows-setup-save-root', async (_event, { root, create = false } = {}) => {
+  if (process.platform !== 'win32' || !runtimeState.selectedDistro) {
+    throw new Error('Choose a ready WSL2 distribution first.');
+  }
+  const normalized = validateAbsoluteRoot(root, path.posix);
+  const result = create
+    ? await createWindowsProjectsRoot(wslRuntime, runtimeState.selectedDistro, normalized)
+    : await inspectWindowsProjectsRoot(wslRuntime, runtimeState.selectedDistro, normalized);
+  if (!result.ok) throw new Error(result.detail || 'Projects Root must be an existing writable directory.');
+  persistProjectsRoot('wsl', runtimeState.selectedDistro, normalized);
+  return refreshWindowsSetupStatus();
+});
+ipcMain.handle('windows-setup-complete', async () => {
+  if (process.platform !== 'win32') return null;
+  const status = await refreshWindowsSetupStatus();
+  if (!status?.setupReady) throw new Error('Complete every required Windows Setup check first.');
+  writePreference('windowsSetup', {
+    schemaVersion: SETUP_SCHEMA_VERSION,
+    completedAt: new Date().toISOString(),
+  });
+  return refreshWindowsSetupStatus();
+});
+ipcMain.handle('windows-setup-open-documentation', async (_event, key) => {
+  if (process.platform !== 'win32' || !Object.hasOwn(WINDOWS_SETUP_DOCUMENTATION_URLS, key)) return false;
+  await shell.openExternal(WINDOWS_SETUP_DOCUMENTATION_URLS[key]);
+  return true;
+});
+ipcMain.handle('windows-setup-exit', () => {
+  if (process.platform !== 'win32') return false;
+  app.quit();
+  return true;
+});
+ipcMain.handle('windows-setup-self-test', async () => {
+  if (process.platform !== 'win32') throw new Error('Windows Setup self-test is only available on Windows.');
+  const status = await refreshWindowsSetupStatus();
+  if (!status?.capabilities?.canOpenSession || !status.projectsRoot) {
+    throw new Error('A ready WSL2 runtime and Projects Root are required for the self-test.');
+  }
+  const spec = wslRuntime.ptySpec({
+    runtime: 'wsl',
+    distro: status.selectedDistro,
+    cwd: status.projectsRoot,
+  }, { ...process.env, CHROMUX: '1' });
+  return new Promise((resolve, reject) => {
+    const testPty = pty.spawn(spec.file, spec.args, {
+      name: 'xterm-256color',
+      cols: 80,
+      rows: 24,
+      cwd: spec.cwd,
+      env: spec.env,
+    });
+    let output = '';
+    let finished = false;
+    const finish = (error = null) => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      try { testPty.kill(); } catch { /* already exited */ }
+      if (error) reject(error);
+      else resolve({
+        ok: true,
+        distro: status.selectedDistro,
+        projectsRoot: status.projectsRoot,
+        detail: boundedSetupDiagnostic(output),
+      });
+    };
+    const timer = setTimeout(() => finish(new Error('WSL PTY self-test timed out.')), 10000);
+    testPty.onData((data) => {
+      output += data;
+      if (output.includes('__CHROMUX_SELF_TEST_OK__')) finish();
+    });
+    testPty.onExit(({ exitCode }) => {
+      if (!finished) finish(new Error(`WSL PTY self-test exited with code ${exitCode}.`));
+    });
+    testPty.write(`test -d ${shellQuote(status.projectsRoot)} && test -w ${shellQuote(status.projectsRoot)} && printf '__CHROMUX_SELF_TEST_OK__\\n'\r`);
+  });
 });
 ipcMain.handle('path-to-runtime', (_e, { path: input, distro } = {}) => ({
   ...(process.platform === 'win32'
@@ -3070,12 +3224,14 @@ ipcMain.handle('get-env', () => ({
   version: currentVersion(),
   devMode: DEV_MODE,
   hostPlatform: process.platform,
+  isPackaged: app.isPackaged,
   primaryModifier: process.platform === 'win32' ? 'control' : 'meta',
   runtime: {
     kind: runtimeState.kind,
     selectedDistro: runtimeState.selectedDistro,
     distros: runtimeState.distros,
     readiness: runtimeState.readiness,
+    setupStatus: windowsSetupStatus,
   },
   capabilities: capabilities(process.platform),
   preventSleep: preventSleepController ? preventSleepController.status() : {
@@ -3134,10 +3290,18 @@ ipcMain.handle('project-scaffolder-preview', async (_e, request = {}) => {
 ipcMain.handle('project-scaffolder-root-set', async (_e, root) => {
   const adapter = await projectScaffolderAdapter();
   const normalized = validateAbsoluteRoot(root, adapter.path);
+  if (process.platform === 'win32') {
+    const result = await inspectWindowsProjectsRoot(wslRuntime, adapter.distro, normalized);
+    if (!result.ok) throw new Error(result.detail || 'Projects Root must be an existing writable directory.');
+  }
   persistProjectsRoot(adapter.kind, adapter.distro, normalized);
+  if (process.platform === 'win32') await refreshWindowsSetupStatus();
   return (await projectScaffolderContext()).config;
 });
 ipcMain.handle('project-scaffolder-create', async (_e, request = {}) => {
+  if (process.platform === 'win32' && !windowsSetupStatus?.capabilities?.canCreateProject) {
+    throw new Error('Windows Setup requires a writable Projects Root before creating projects.');
+  }
   const { adapter, config } = await projectScaffolderContext();
   return scaffoldProject({ adapter, config, request });
 });
@@ -3274,7 +3438,7 @@ ipcMain.handle('install-update', async (_e, opts = {}) => {
       };
     }
     try {
-      autoUpdater.setFeedURL({ url: status.windows.releasesUrl });
+      autoUpdater.setFeedURL({ url: status.windows.feedUrl });
       autoUpdater.once('update-downloaded', () => {
         closeConfirmed = true;
         for (const p of ptys.values()) p.kill();
@@ -3343,9 +3507,11 @@ app.whenReady().then(async () => {
     try { writeGrokHooks(); hookInstall.grok = true; } catch (err) { console.error('grok hooks write failed:', err.message); }
   } else if (process.platform === 'win32') {
     try { await installWslHooks(); } catch (err) {
-      runtimeState.readiness.warning = `Agent hooks are unavailable; sessions will run uninstrumented: ${err.message}`;
+      windowsHookWarning = `Agent hooks are unavailable; sessions will run uninstrumented: ${err.message}`;
+      runtimeState.readiness.warning = windowsHookWarning;
       console.error('WSL hook install failed:', err.message);
     }
+    await refreshWindowsSetupStatus({ migrateExisting: true });
   }
   createWindow();
   if (!SMOKE || process.env.CHROMUX_CAPTURE_CONTROL_SMOKE === '1') {

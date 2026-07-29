@@ -1,0 +1,255 @@
+name: Signed Windows release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Exact tag derived from prototype/package.json (chromux-vX.Y.Z)
+        required: true
+        type: string
+      previous_installer_url:
+        description: HTTPS URL for the prior signed Setup executable used by Windows 10 upgrade UAT
+        required: true
+        type: string
+
+concurrency:
+  group: signed-windows-release-${{ inputs.release_tag }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: windows-2022
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+      title: ${{ steps.meta.outputs.title }}
+      setup: ${{ steps.meta.outputs.setup }}
+      package: ${{ steps.meta.outputs.package }}
+      candidate: GBlockParty-Chromux-${{ steps.meta.outputs.version }}-signed-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+    defaults:
+      run:
+        working-directory: prototype
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: npm
+          cache-dependency-path: prototype/package-lock.json
+      - run: npm ci
+      - name: Derive and validate release metadata
+        id: meta
+        shell: pwsh
+        env:
+          REQUESTED_RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          node scripts/windows-artifacts.js names
+          $metadata = node scripts/windows-artifacts.js names | ConvertFrom-Json
+          if ($metadata.tag -ne $env:REQUESTED_RELEASE_TAG) {
+            throw "Requested tag $env:REQUESTED_RELEASE_TAG does not match package.json tag $($metadata.tag)"
+          }
+      - run: npm run test:ci:windows
+
+  build-sign-candidate:
+    needs: validate
+    runs-on: windows-2022
+    environment: windows-signing
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: prototype
+    env:
+      ARTIFACT_SIGNING_ENDPOINT: ${{ vars.ARTIFACT_SIGNING_ENDPOINT }}
+      ARTIFACT_SIGNING_ACCOUNT: ${{ vars.ARTIFACT_SIGNING_ACCOUNT }}
+      ARTIFACT_SIGNING_PROFILE: ${{ vars.ARTIFACT_SIGNING_PROFILE }}
+      ARTIFACT_SIGNING_CLIENT_VERSION: ${{ vars.ARTIFACT_SIGNING_CLIENT_VERSION }}
+      WINDOWS_SIGN_PUBLISHER: ${{ vars.WINDOWS_SIGN_PUBLISHER }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: npm
+          cache-dependency-path: prototype/package-lock.json
+      - name: Azure OIDC login for Artifact Signing
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - run: npm ci
+      - name: Install pinned Artifact Signing client
+        shell: pwsh
+        run: |
+          if (-not $env:ARTIFACT_SIGNING_CLIENT_VERSION) { throw 'ARTIFACT_SIGNING_CLIENT_VERSION is required' }
+          nuget install Microsoft.ArtifactSigning.Client `
+            -Version $env:ARTIFACT_SIGNING_CLIENT_VERSION `
+            -OutputDirectory "$env:RUNNER_TEMP\artifact-signing" `
+            -ExcludeVersion `
+            -NonInteractive
+          $dlib = Get-ChildItem "$env:RUNNER_TEMP\artifact-signing" -Recurse -Filter Azure.CodeSigning.Dlib.dll |
+            Where-Object { $_.FullName -match '\\x64\\' } |
+            Select-Object -First 1
+          if (-not $dlib) { throw 'Azure.CodeSigning.Dlib.dll x64 was not found' }
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter signtool.exe |
+            Where-Object { $_.FullName -match '\\x64\\signtool.exe$' } |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+          if (-not $signtool) { throw 'Windows SDK x64 signtool.exe was not found' }
+          "AZURE_CODE_SIGNING_DLIB=$($dlib.FullName)" | Out-File $env:GITHUB_ENV -Append
+          "SIGNTOOL_PATH=$($signtool.FullName)" | Out-File $env:GITHUB_ENV -Append
+      - name: Create bounded Artifact Signing metadata
+        shell: pwsh
+        run: |
+          foreach ($name in @('ARTIFACT_SIGNING_ENDPOINT', 'ARTIFACT_SIGNING_ACCOUNT', 'ARTIFACT_SIGNING_PROFILE', 'WINDOWS_SIGN_PUBLISHER')) {
+            if (-not [Environment]::GetEnvironmentVariable($name)) { throw "$name is required" }
+          }
+          $metadata = @{
+            Endpoint = $env:ARTIFACT_SIGNING_ENDPOINT
+            CodeSigningAccountName = $env:ARTIFACT_SIGNING_ACCOUNT
+            CertificateProfileName = $env:ARTIFACT_SIGNING_PROFILE
+            CorrelationId = "${{ github.repository }}:${{ github.run_id }}:${{ github.run_attempt }}"
+            ExcludeCredentials = @(
+              'EnvironmentCredential', 'WorkloadIdentityCredential', 'ManagedIdentityCredential',
+              'SharedTokenCacheCredential', 'VisualStudioCredential', 'VisualStudioCodeCredential',
+              'AzurePowerShellCredential', 'AzureDeveloperCliCredential', 'InteractiveBrowserCredential'
+            )
+          }
+          $metadataPath = "$env:RUNNER_TEMP\artifact-signing-metadata.json"
+          $metadata | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $metadataPath -Encoding utf8
+          "AZURE_CODE_SIGNING_METADATA=$metadataPath" | Out-File $env:GITHUB_ENV -Append
+      - name: Build and sign once
+        env:
+          CHROMUX_REQUIRE_WINDOWS_SIGNING: "1"
+          DEBUG: electron-windows-sign
+        run: npm run make:win
+      - name: Inspect package and signed payloads
+        shell: pwsh
+        run: |
+          $app = Get-ChildItem out -Directory -Filter 'GBlockPartyChromux-win32-x64' | Select-Object -First 1
+          if (-not $app) { throw 'Unpacked application directory is missing' }
+          $candidate = "$env:RUNNER_TEMP\chromux-signed-candidate"
+          node scripts/windows-artifacts.js prepare "out\make\squirrel.windows\x64" $candidate
+          node scripts/windows-artifacts.js verify $candidate
+          .\scripts\verify-windows-signatures.ps1 `
+            -AppDirectory $app.FullName `
+            -CandidateDirectory $candidate `
+            -ExpectedPublisher $env:WINDOWS_SIGN_PUBLISHER
+          "CHROMUX_CANDIDATE=$candidate" | Out-File $env:GITHUB_ENV -Append
+      - name: Upload immutable signed candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ needs.validate.outputs.candidate }}
+          path: ${{ env.CHROMUX_CANDIDATE }}
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+  real-machine-uat:
+    needs: [validate, build-sign-candidate]
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - machine: windows10
+            runner: chromux-windows-10-19045-x64-wsl2
+          - machine: windows11
+            runner: chromux-windows-11-x64-wsl2
+    runs-on: [self-hosted, Windows, X64, "${{ matrix.runner }}"]
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: prototype
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.validate.outputs.candidate }}
+          path: prototype/windows-candidate
+      - name: Verify exact candidate hashes and run real-machine UAT
+        shell: pwsh
+        env:
+          PREVIOUS_INSTALLER_URL: ${{ inputs.previous_installer_url }}
+        run: |
+          .\scripts\windows-release-uat.ps1 `
+            -CandidateDirectory (Resolve-Path .\windows-candidate) `
+            -Machine '${{ matrix.machine }}' `
+            -PreviousInstallerUrl $env:PREVIOUS_INSTALLER_URL
+
+  publish:
+    needs: [validate, build-sign-candidate, real-machine-uat]
+    runs-on: windows-2022
+    environment: windows-release
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: prototype
+    env:
+      GH_TOKEN: ${{ github.token }}
+      WINDOWS_SIGN_PUBLISHER: ${{ vars.WINDOWS_SIGN_PUBLISHER }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.validate.outputs.candidate }}
+          path: prototype/windows-candidate
+      - name: Verify candidate before creating draft
+        run: node scripts/windows-artifacts.js verify windows-candidate
+      - name: Create draft and upload the complete asset set
+        id: draft
+        shell: pwsh
+        run: |
+          $tag = '${{ needs.validate.outputs.tag }}'
+          if (gh release view $tag 2>$null) { throw "Release $tag already exists" }
+          gh release create $tag `
+            --target '${{ github.sha }}' `
+            --title '${{ needs.validate.outputs.title }}' `
+            --notes-file ..\RELEASES.md `
+            --draft
+          gh release upload $tag `
+            "windows-candidate\${{ needs.validate.outputs.setup }}" `
+            "windows-candidate\${{ needs.validate.outputs.package }}" `
+            "windows-candidate\RELEASES" `
+            "windows-candidate\SHA256SUMS" `
+            "windows-candidate\build-metadata.json"
+          $release = gh api "repos/${{ github.repository }}/releases/tags/$tag" | ConvertFrom-Json
+          "release_id=$($release.id)" | Out-File $env:GITHUB_OUTPUT -Append
+      - name: Re-download and verify draft assets
+        shell: pwsh
+        run: |
+          $download = "$env:RUNNER_TEMP\chromux-release-download"
+          New-Item -ItemType Directory -Path $download | Out-Null
+          gh release download '${{ needs.validate.outputs.tag }}' --dir $download
+          node scripts/windows-artifacts.js verify $download
+          .\scripts\verify-windows-signatures.ps1 `
+            -CandidateDirectory $download `
+            -ExpectedPublisher $env:WINDOWS_SIGN_PUBLISHER
+          gh api "repos/${{ github.repository }}/releases/tags/${{ needs.validate.outputs.tag }}" | Set-Content "$download\release.json"
+          node scripts/windows-artifacts.js verify-release-json "$download\release.json"
+      - name: Publish atomically and verify releases/latest
+        shell: pwsh
+        run: |
+          gh api "repos/${{ github.repository }}/releases/${{ steps.draft.outputs.release_id }}" `
+            --method PATCH `
+            -F draft=false | Out-Null
+          $latest = "$env:RUNNER_TEMP\latest-release.json"
+          $verified = $false
+          for ($attempt = 1; $attempt -le 12; $attempt++) {
+            gh api "repos/${{ github.repository }}/releases/latest" | Set-Content $latest
+            node scripts/windows-artifacts.js verify-release-json $latest
+            if ($LASTEXITCODE -eq 0) { $verified = $true; break }
+            Start-Sleep -Seconds 5
+          }
+          if (-not $verified) { throw 'GitHub /releases/latest did not resolve to the published Chromux release' }

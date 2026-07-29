@@ -22,6 +22,33 @@ function compareVersions(a, b) {
   return 0;
 }
 
+function deriveWindowsFeedUrl(windows, names) {
+  const entries = [
+    ['setupUrl', names.setup],
+    ['packageUrl', names.package],
+    ['releasesUrl', names.releases],
+  ];
+  let directory = null;
+  for (const [key, expectedName] of entries) {
+    const value = windows[key];
+    if (typeof value !== 'string' || !value) throw new Error(`Missing ${expectedName}.`);
+    let url;
+    try { url = new URL(value); } catch { throw new Error(`${expectedName} has an invalid download URL.`); }
+    if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) {
+      throw new Error(`${expectedName} must use a canonical HTTPS download URL.`);
+    }
+    if (decodeURIComponent(url.pathname.split('/').pop()) !== expectedName) {
+      throw new Error(`${expectedName} download URL does not resolve to the expected asset.`);
+    }
+    const candidate = new URL('.', url).href;
+    if (directory && candidate !== directory) {
+      throw new Error('Windows update assets do not share one release download directory.');
+    }
+    directory = candidate;
+  }
+  return directory;
+}
+
 function parseRelease(release) {
   if (!release || typeof release !== 'object') {
     return { ok: false, error: 'Latest release response was empty or invalid.' };
@@ -49,7 +76,19 @@ function parseRelease(release) {
     packageUrl: assets[windowsNames.package] || null,
     releasesUrl: assets[windowsNames.releases] || null,
   };
-  windows.complete = Boolean(windows.setupUrl && windows.packageUrl && windows.releasesUrl);
+  windows.complete = false;
+  if (windows.setupUrl && windows.packageUrl && windows.releasesUrl) {
+    try {
+      windows.feedUrl = deriveWindowsFeedUrl(windows, windowsNames);
+      windows.complete = true;
+    } catch (error) {
+      windows.feedUrl = null;
+      windows.error = error.message;
+    }
+  } else {
+    windows.feedUrl = null;
+    windows.error = 'The release is missing its Windows installer, full package, or RELEASES manifest.';
+  }
   return {
     ok: true,
     tag,
@@ -295,6 +334,7 @@ module.exports = {
   DEFAULT_RELEASES_URL,
   RELEASE_TAG_RE,
   compareVersions,
+  deriveWindowsFeedUrl,
   parseRelease,
   fetchJson,
   fetchLatestReleaseRedirect,

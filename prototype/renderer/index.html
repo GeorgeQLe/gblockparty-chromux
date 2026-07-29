@@ -295,6 +295,7 @@
             <div id="wsl-runtime-heading" class="microlabel">WSL2 RUNTIME</div>
             <div class="settings-section-copy">New sessions use this distribution. Existing projects and restore records keep their own distribution.</div>
             <div id="settings-wsl-status" class="settings-preference-status" aria-live="polite">CHECKING</div>
+            <button id="settings-windows-setup" class="btn" type="button">WINDOWS SETUP &amp; DIAGNOSTICS</button>
           </div>
           <label>
             <span class="microlabel">DEFAULT DISTRIBUTION</span>
@@ -465,6 +466,82 @@
         <button class="btn" data-close="modal-vercel">CANCEL</button>
         <button id="vercel-remove-project" class="btn btn-red hidden" type="button">REMOVE MAPPING</button>
         <button id="vercel-save-project" class="btn btn-amber" type="button" disabled>SAVE SETUP</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Windows first-run setup and diagnostics ══ -->
+  <div id="windows-setup-overlay" class="overlay hidden">
+    <div class="modal windows-setup-modal" role="dialog" aria-modal="true"
+      aria-labelledby="windows-setup-title" aria-describedby="windows-setup-intro">
+      <div class="modal-head">
+        <div>
+          <span class="microlabel">WINDOWS SETUP &amp; DIAGNOSTICS</span>
+          <h2 id="windows-setup-title">Prepare Chromux without administrator access</h2>
+        </div>
+        <button id="windows-setup-exit" class="modal-x" type="button" aria-label="Exit Chromux">✕</button>
+      </div>
+      <div class="modal-body windows-setup-body">
+        <p id="windows-setup-intro" class="settings-section-copy">
+          Chromux checks Windows and your existing WSL2 tools. It never installs WSL, changes shell
+          configuration, authenticates an agent, or runs administrator commands.
+        </p>
+        <nav id="windows-setup-stages" class="windows-setup-stages" aria-label="Setup stages">
+          <button type="button" data-setup-stage="system">1. System</button>
+          <button type="button" data-setup-stage="wsl">2. WSL2 Runtime</button>
+          <button type="button" data-setup-stage="tools">3. Tools &amp; Agents</button>
+          <button type="button" data-setup-stage="root">4. Projects Root</button>
+          <button type="button" data-setup-stage="ready">5. Ready</button>
+        </nav>
+        <section class="windows-setup-panel" data-setup-panel="system" aria-labelledby="windows-setup-system-title">
+          <h3 id="windows-setup-system-title">System</h3>
+          <div id="windows-setup-system-checks" class="windows-setup-checks"></div>
+        </section>
+        <section class="windows-setup-panel hidden" data-setup-panel="wsl" aria-labelledby="windows-setup-wsl-title">
+          <h3 id="windows-setup-wsl-title">WSL2 Runtime</h3>
+          <div id="windows-setup-wsl-checks" class="windows-setup-checks"></div>
+          <label class="windows-setup-field">
+            <span class="microlabel">SELECTED WSL2 DISTRIBUTION</span>
+            <select id="windows-setup-distro"></select>
+          </label>
+        </section>
+        <section class="windows-setup-panel hidden" data-setup-panel="tools" aria-labelledby="windows-setup-tools-title">
+          <h3 id="windows-setup-tools-title">Tools &amp; Agents</h3>
+          <div id="windows-setup-tool-checks" class="windows-setup-checks"></div>
+          <p class="settings-section-copy">Agent CLIs are optional. Shell and each installed agent remain available independently.</p>
+        </section>
+        <section class="windows-setup-panel hidden" data-setup-panel="root" aria-labelledby="windows-setup-root-title">
+          <h3 id="windows-setup-root-title">Projects Root</h3>
+          <div id="windows-setup-root-checks" class="windows-setup-checks"></div>
+          <label class="windows-setup-field">
+            <span class="microlabel">ABSOLUTE LINUX PATH</span>
+            <input id="windows-setup-root" type="text" spellcheck="false">
+          </label>
+          <label class="settings-switch windows-setup-confirm">
+            <input id="windows-setup-create-confirm" type="checkbox">
+            <span class="settings-switch-track" aria-hidden="true"><span></span></span>
+            <span>Create this directory after I click Create &amp; Verify</span>
+          </label>
+          <div class="windows-setup-actions">
+            <button id="windows-setup-save-root" class="btn" type="button">VERIFY &amp; SAVE</button>
+            <button id="windows-setup-create-root" class="btn btn-amber" type="button" disabled>CREATE &amp; VERIFY</button>
+          </div>
+        </section>
+        <section class="windows-setup-panel hidden" data-setup-panel="ready" aria-labelledby="windows-setup-ready-title">
+          <h3 id="windows-setup-ready-title">Ready</h3>
+          <div id="windows-setup-summary" class="windows-setup-summary" role="status" aria-live="polite"></div>
+          <div class="windows-setup-actions">
+            <button id="windows-setup-self-test" class="btn" type="button">RUN NO-MODEL SELF-TEST</button>
+            <button id="windows-setup-finish" class="btn btn-amber" type="button">FINISH SETUP</button>
+          </div>
+          <pre id="windows-setup-diagnostics" class="yaml-view hidden" aria-live="polite"></pre>
+        </section>
+        <div id="windows-setup-error" class="settings-preference-status fail hidden" role="alert"></div>
+      </div>
+      <div class="modal-foot">
+        <button id="windows-setup-settings" class="btn" type="button">SETTINGS</button>
+        <button id="windows-setup-docs" class="btn" type="button">WINDOWS SETUP GUIDE</button>
+        <button id="windows-setup-refresh" class="btn btn-amber" type="button">REFRESH CHECKS</button>
       </div>
     </div>
   </div>

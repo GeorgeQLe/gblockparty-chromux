@@ -2,10 +2,21 @@
 
 ## Windows / WSL2 readiness
 
-- Settings must show the chosen distribution as **READY**.
+- Open **Settings → Windows Setup & Diagnostics**, then choose **Refresh
+  Checks**. Required checks must show **Ready**.
 - `wsl.exe --list --verbose` must report version `2`; WSL1 is rejected.
-- Inside that distribution verify Bash, Git, Node 22.12+, and each
-  installed/authenticated agent CLI.
+- Inside that distribution verify Bash, Git, and Node 22.12+. Agent CLIs are
+  optional; a missing agent disables only its own launcher.
+- A missing or read-only Projects Root blocks **Create Project**, not **Open
+  Existing**. Use an absolute Linux path. **Create & Verify** requires explicit
+  confirmation and then checks that the directory is writable.
+- If every launch action is unavailable, copy the displayed remediation
+  command, run it yourself in PowerShell or WSL, and refresh. Chromux never
+  installs WSL, runs an administrator command, authenticates an agent, or edits
+  shell configuration on your behalf.
+- The no-model self-test opens a WSL login-shell PTY and checks the selected
+  root. It does not invoke an agent. Copy its sanitized result when reporting a
+  setup issue.
 - Records tied to a removed distribution remain unresolved and are never
   silently redirected. Reinstall that exact distro name or recreate the record.
 - Windows drive paths map to `/mnt/<drive>/...`; Linux-home paths are exposed
@@ -15,11 +26,19 @@
 
 ## Windows installation and updates
 
-The v0.62 installer is unsigned, so SmartScreen normally shows **Windows
-protected your PC**. Verify it is attached to the official GitHub Release, then
-use **More info → Run anyway** if policy allows. Windows updates require the
-matching installer, full `.nupkg`, and `RELEASES`; Chromux shows the release URL
-instead of attempting a macOS install when any asset is absent.
+Local developer builds are unsigned. Official Windows releases are
+Authenticode-signed through Microsoft Artifact Signing and include
+`SHA256SUMS`; verify the installer hash and publisher before launch. Signing
+does not guarantee immediate SmartScreen reputation, so a new correctly signed
+release can still show a temporary warning.
+
+Windows updates require the matching installer, full `.nupkg`, and `RELEASES`
+from one GitHub release-download directory. Chromux rejects incomplete,
+mismatched, or renamed assets instead of passing a direct `RELEASES` URL to
+Squirrel. Installation, update, and uninstall are per-user. Uninstall retains
+`%APPDATA%\chromux` and `%USERPROFILE%\.chromux`; see
+[Windows installation and first-run setup](windows-setup.md) before removing
+those directories manually.
 
 ## Settings missing after an update
 

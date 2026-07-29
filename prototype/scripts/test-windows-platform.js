@@ -15,6 +15,7 @@ const { brokerSocketPath } = require('../resource-broker/paths');
 const { chromuxShortcutAction } = require('../shortcut-input');
 const { createPreventSleepController } = require('../prevent-sleep');
 const { parseRelease } = require('../update-checker');
+const packageJson = require('../package.json');
 
 async function run() {
   const wslOutput = '  NAME          STATE     VERSION\r\n* Ubuntu        Running   2\r\n  Debian Test   Stopped   2';
@@ -80,16 +81,23 @@ async function run() {
   controller.shutdown();
   assert.strictEqual(blockers.size, 0);
 
+  const version = packageJson.version;
+  const tag = `chromux-v${version}`;
+  const releaseBase = `https://github.com/GeorgeQLe/gblockparty-chromux/releases/download/${tag}`;
   const release = parseRelease({
-    tag_name: 'chromux-v0.69.2',
-    html_url: 'https://github.com/GeorgeQLe/gblockparty-chromux/releases/tag/chromux-v0.69.2',
+    tag_name: tag,
+    html_url: `https://github.com/GeorgeQLe/gblockparty-chromux/releases/tag/${tag}`,
     assets: [
-      { name: 'GBlockParty-Chromux-Setup-0.69.2-x64.exe', browser_download_url: 'https://example/setup' },
-      { name: 'GBlockPartyChromux-0.69.2-full.nupkg', browser_download_url: 'https://example/package' },
-      { name: 'RELEASES', browser_download_url: 'https://example/releases' },
+      { name: `GBlockParty-Chromux-Setup-${version}-x64.exe`, browser_download_url: `${releaseBase}/GBlockParty-Chromux-Setup-${version}-x64.exe` },
+      { name: `GBlockPartyChromux-${version}-full.nupkg`, browser_download_url: `${releaseBase}/GBlockPartyChromux-${version}-full.nupkg` },
+      { name: 'RELEASES', browser_download_url: `${releaseBase}/RELEASES` },
     ],
   });
   assert.strictEqual(release.windows.complete, true);
+  assert.strictEqual(
+    release.windows.feedUrl,
+    `${releaseBase}/`,
+  );
   console.log('windows platform tests passed');
 }
 

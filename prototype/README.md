@@ -19,13 +19,12 @@ Requires: macOS, Node 22.12+, Xcode command-line tools (for the `node-pty` nativ
 
 On Windows, Chromux requires Windows 10 22H2+ x64 (build 19045 or newer,
 including Windows 11), an updated WSL2 installation, and an initialized WSL2
-distribution containing Bash, Git, Node 22.12+, and each desired agent CLI.
-Run `wsl --update` before setup. Older Windows builds, WSL1, ARM64, native
-PowerShell, and Git Bash sessions are not supported. Choose the default
-distribution in Settings. Changing it affects new records only; existing
-sessions/projects retain their distribution. Each runtime has its own
-**Projects Root**; Windows keeps a separate canonical Linux path for every WSL
-distribution.
+distribution containing Bash, Git, and Node 22.12+. Each desired agent CLI is
+optional. The packaged app opens a five-stage, resumable
+**Windows Setup & Diagnostics** wizard, which checks readiness without
+installing WSL, authenticating an agent, editing shell configuration, or
+running administrator commands. See
+[Windows installation and first-run setup](docs/windows-setup.md).
 
 ```sh
 cd prototype
@@ -55,12 +54,16 @@ npm ci
 npm run make:win
 ```
 
-Forge produces `GBlockParty-Chromux-Setup-0.69.2-x64.exe`,
-`GBlockPartyChromux-0.69.2-full.nupkg`, and `RELEASES` under
-`out/make/squirrel.windows/x64`. This first per-user installer is unsigned, so
-SmartScreen normally displays **Windows protected your PC**. Select **More info
-→ Run anyway** only for an installer verified against the official GitHub
-Release. Enterprise policy can prohibit unsigned apps.
+Forge derives the version from `package.json` and produces
+`GBlockParty-Chromux-Setup-X.Y.Z-x64.exe`,
+`GBlockPartyChromux-X.Y.Z-full.nupkg`, and `RELEASES` under
+`out/make/squirrel.windows/x64`. Local builds are unsigned. Official GitHub
+Releases are built once in the protected Windows release workflow and signed
+through Microsoft Artifact Signing before exact-hash real-machine UAT. The
+release also includes `SHA256SUMS` and `build-metadata.json`. Installation is
+per-user and non-elevated. Code signing proves publisher identity and
+integrity, but a new release can still receive a temporary SmartScreen
+reputation warning.
 
 Then complete the loop:
 

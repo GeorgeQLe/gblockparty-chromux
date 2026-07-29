@@ -3371,3 +3371,134 @@ body[data-theme="liquid-glass"][data-theme-mode="dark"] .thread-preview-viewport
 }
 
 body .queue-panel:has(.server-launcher-popover) { overflow: visible; }
+.windows-setup-modal {
+  width: min(920px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+}
+
+.windows-setup-modal .modal-head h2,
+.windows-setup-panel h3 {
+  margin: 6px 0 0;
+  font: 600 18px/1.25 var(--font-ui, system-ui);
+}
+
+.windows-setup-body {
+  overflow: auto;
+}
+
+.windows-setup-stages {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  margin: 18px 0;
+}
+
+.windows-setup-stages button {
+  min-height: 42px;
+  border: 1px solid var(--line, rgba(127, 127, 127, .4));
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: 600 11px/1.2 var(--font-ui, system-ui);
+}
+
+.windows-setup-stages button.on {
+  border-color: var(--amber, #f5a623);
+  box-shadow: inset 0 -2px 0 var(--amber, #f5a623);
+}
+
+.windows-setup-panel {
+  min-height: 260px;
+}
+
+.windows-setup-checks {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.windows-setup-check {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 10px 12px;
+  border: 1px solid var(--line, rgba(127, 127, 127, .35));
+  border-radius: 7px;
+}
+
+.windows-setup-check strong,
+.windows-setup-check small {
+  display: block;
+}
+
+.windows-setup-check small {
+  margin-top: 3px;
+  color: var(--dim, #7d8790);
+  overflow-wrap: anywhere;
+}
+
+.windows-setup-badge {
+  min-width: 110px;
+  font: 700 10px/1.4 var(--font-ui, system-ui);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.windows-setup-check.ok .windows-setup-badge { color: var(--green, #41b883); }
+.windows-setup-check.required:not(.ok) .windows-setup-badge { color: var(--red, #e85d75); }
+.windows-setup-check:not(.required):not(.ok) .windows-setup-badge { color: var(--amber, #f5a623); }
+
+.windows-setup-copy {
+  padding: 4px 7px;
+  border: 1px solid var(--line, rgba(127, 127, 127, .35));
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: 600 10px/1.3 var(--font-ui, system-ui);
+}
+
+.windows-setup-check-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: end;
+  gap: 6px;
+}
+
+.windows-setup-field {
+  display: grid;
+  gap: 7px;
+  margin: 14px 0;
+}
+
+.windows-setup-field input,
+.windows-setup-field select {
+  min-height: 38px;
+}
+
+.windows-setup-confirm {
+  justify-content: start;
+  margin: 12px 0;
+}
+
+.windows-setup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.windows-setup-summary {
+  padding: 16px;
+  border: 1px solid var(--line, rgba(127, 127, 127, .35));
+  border-radius: 7px;
+  line-height: 1.5;
+}
+
+@media (max-width: 760px) {
+  .windows-setup-stages { grid-template-columns: 1fr; }
+  .windows-setup-check { grid-template-columns: auto minmax(0, 1fr); }
+  .windows-setup-check-actions { grid-column: 2; justify-content: start; }
+}

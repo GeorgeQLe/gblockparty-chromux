@@ -1,5 +1,29 @@
 # Release Notes
 
+## GBlockParty Chromux v0.72.0
+
+Tag: `chromux-v0.72.0`
+
+- Add a Windows-only, keyboard-accessible, five-stage first-run setup and
+  diagnostics wizard with resumable WSL2 selection, required Bash/Git/Node
+  checks, optional per-agent readiness, explicit Projects Root creation, and a
+  sanitized no-model PTY self-test.
+- Gate sessions from live runtime readiness instead of setup completion:
+  preserve pending restore snapshots when WSL2 is blocked, disable only missing
+  agent choices, and limit an invalid Projects Root to Create Project.
+- Preserve existing profiles through versioned completion migration, canonical
+  `wslDistro` and per-distribution `projectsRoots` settings, per-user upgrades,
+  and uninstall-time local-data retention.
+- Replace hardcoded Windows artifact metadata with package-derived names and a
+  protected Microsoft Artifact Signing release pipeline that builds once,
+  signs all unpacked and nested executable payloads, uploads one immutable
+  checksummed candidate, and gates publication on exact-hash Windows 10/11 UAT.
+- Re-download and verify every draft GitHub Release asset before atomic
+  publication, then verify `/releases/latest` and Chromux's validated common
+  Squirrel feed directory.
+- Refresh vulnerable packaging transitive dependencies and retain compatibility
+  with older Git worktree porcelain plus Linux-hosted Electron regression runs.
+
 ## GBlockParty Chromux v0.71.0
 
 Planned tag: `chromux-v0.71.0`

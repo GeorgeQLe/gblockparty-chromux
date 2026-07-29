@@ -1307,3 +1307,94 @@
   `deploy.md` nor `tasks/deploy.md` exists. Release publication remains blocked
   by the active v0.71.0 task and must not be tagged until the guarded shipping
   engine, monitoring, and live preview UAT pass. Next command: `$exec`.
+
+## 2026-07-28 — Signed Windows installer and first-run setup implementation
+
+- Added the versioned Windows setup/readiness contract and a Windows-only,
+  keyboard-accessible five-stage setup overlay. Live Windows/WSL2/tool/root
+  capabilities now gate only unavailable launches, optional agents remain
+  independent, and blocked required runtime readiness leaves restore snapshots
+  unconsumed until refresh succeeds.
+- Added package-derived Squirrel artifact metadata, Microsoft Artifact Signing
+  configuration, exact checksum/build metadata, Authenticode inspection, and a
+  protected build-once workflow with Windows 10 build-19045 and Windows 11
+  candidate UAT before draft verification and publication.
+- Ship manifest — User goal: implement the supplied signed per-user Windows
+  installer, protected release pipeline, resumable first-run diagnostics, live
+  readiness gates, tests, documentation, and v0.72.0 release preparation.
+  Changed files: `.github/workflows/windows.yml`,
+  `.github/workflows/windows-release.yml`, `RELEASES.md`,
+  `docs/testing/windows-signed-installer-uat-0.72.0.md`, `prototype/README.md`,
+  `prototype/docs/privacy-and-local-data.md`,
+  `prototype/docs/troubleshooting.md`, `prototype/docs/windows-setup.md`,
+  `prototype/forge.config.js`, `prototype/main.js`, `prototype/preload.js`,
+  `prototype/update-checker.js`, `prototype/windows-setup.js`,
+  `prototype/windows-sign.js`, `prototype/renderer/index.html`,
+  `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`,
+  `prototype/package.json`, `prototype/package-lock.json`,
+  `prototype/scripts/windows-artifacts.js`,
+  `prototype/scripts/verify-windows-signatures.ps1`,
+  `prototype/scripts/windows-release-uat.ps1`,
+  `prototype/scripts/test-windows-artifacts.js`,
+  `prototype/scripts/test-windows-platform.js`,
+  `prototype/scripts/test-windows-setup.js`,
+  `prototype/scripts/test-windows-setup-renderer.js`,
+  `prototype/scripts/test-windows-sign.js`,
+  `prototype/scripts/test-github-update-check.js`,
+  `prototype/git-worktree-service.js`,
+  `prototype/scripts/test-git-worktree-service.js`, and Linux Electron
+  portability fixes in `prototype/scripts/test-capture-main-integration.js`,
+  `test-composer-renderer.js`, `test-prevent-sleep-renderer.js`,
+  `test-project-launcher-renderer.js`, `test-session-rail-renderer.js`,
+  `test-streak-attention-click-targets-renderer.js`, and
+  `test-terminal-scroll-bottom-renderer.js`, plus `tasks/todo.md` and this
+  history entry. Per-file purpose: workflows separate unsigned validation from
+  protected signing/UAT/publication; setup and renderer files own the bounded
+  status contract, narrow IPC, UX, gates, migration, and self-test; updater and
+  artifact/signing scripts derive and validate the exact Squirrel feed and
+  signed candidate; tests cover setup, updater, packaging, and host
+  compatibility; metadata/docs communicate v0.72.0 onboarding, retention,
+  troubleshooting, and release gates; the Git fallback and Electron test
+  changes resolve older-Git and Linux-host failures surfaced by the complete
+  suite. User-goal mapping: every planned readiness check, capability rule,
+  setup stage, signing boundary, immutable-candidate asset, real-machine gate,
+  release/latest assertion, compatibility promise, and documentation surface
+  maps directly to those files.
+- Tests run: `npm run test:ci:windows`; the complete `npm test` matrix in
+  alphabetical continuation chunks after each surfaced host failure;
+  focused Git worktree, composer, prevent-sleep, project-launcher,
+  session-rail, Streak native-input, terminal-scroll, and Windows setup
+  renderer reruns; JavaScript syntax checks; workflow YAML parsing with
+  `js-yaml`; `npm audit --json` (zero vulnerabilities); `git diff --check`; and
+  focused setup, signing, and artifact tests after adversarial fixes. All
+  executable checks passed without product warnings.
+- Skipped tests: real Authenticode signing, Squirrel install/upgrade/uninstall,
+  physical Windows 10/11 setup/restore UAT, and `/releases/latest`
+  verification require the protected Azure identity, protected GitHub
+  environments, signed prior installer, and self-hosted real-machine runners.
+  They are intentionally enforced by the new release workflow and remain the
+  active release blocker rather than being simulated locally. PowerShell
+  execution was unavailable on this Linux host; YAML and JavaScript contracts
+  were checked locally, while both PowerShell scripts must execute in the
+  Windows candidate jobs.
+- Adversarial review: walked every changed production, workflow, validation,
+  and documentation boundary; checked WSL1 and old-Node rejection, distro/root
+  injection, bounded diagnostics, optional-agent isolation, restore
+  non-consumption, updater feed confusion, missing/mismatched assets, workflow
+  input injection, signer/timestamp/publisher checks, and candidate hash
+  consistency. Findings fixed the `$HOME/projects` default, exposed
+  allowlisted per-check guides only when remediation is needed, moved
+  `Update.exe` verification from the `.nupkg` to the real installed tree,
+  required exact signer-subject equality, cross-checked build metadata against
+  actual sizes/hashes, and passed workflow inputs through environment
+  variables with an official prior-installer URL allowlist.
+- Residual risk: the Microsoft Artifact Signing tenant/profile, protected
+  environment approvals, exact publisher subject, prior signed installer URL,
+  and labeled Windows 10/11 WSL2 runners have not yet been observed. Any
+  missing prerequisite will stop the workflow before publication; the first
+  actionable proof is a protected `windows-release.yml` run recorded in the
+  pending v0.72.0 UAT report. Rollback: revert the scoped commits before
+  publication; after publication, revert, issue a higher corrective SemVer,
+  and never replace the immutable signed v0.72.0 assets. Next command:
+  `gh workflow run windows-release.yml -f release_tag=chromux-v0.72.0
+  -f previous_installer_url=<official-prior-signed-setup-url>`.

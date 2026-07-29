@@ -75,6 +75,43 @@ async function main() {
 
   assert.equal(parseRelease({ tag_name: 'v0.9.0' }).ok, false);
 
+  const windowsAssets = [
+    {
+      name: 'GBlockParty-Chromux-Setup-0.9.0-x64.exe',
+      browser_download_url: 'https://github.com/GeorgeQLe/gblockparty-chromux/releases/download/chromux-v0.9.0/GBlockParty-Chromux-Setup-0.9.0-x64.exe',
+    },
+    {
+      name: 'GBlockPartyChromux-0.9.0-full.nupkg',
+      browser_download_url: 'https://github.com/GeorgeQLe/gblockparty-chromux/releases/download/chromux-v0.9.0/GBlockPartyChromux-0.9.0-full.nupkg',
+    },
+    {
+      name: 'RELEASES',
+      browser_download_url: 'https://github.com/GeorgeQLe/gblockparty-chromux/releases/download/chromux-v0.9.0/RELEASES',
+    },
+  ];
+  const completeWindows = parseRelease({ ...release, assets: windowsAssets });
+  assert.equal(completeWindows.windows.complete, true);
+  assert.equal(
+    completeWindows.windows.feedUrl,
+    'https://github.com/GeorgeQLe/gblockparty-chromux/releases/download/chromux-v0.9.0/',
+  );
+  const mismatchedDirectory = parseRelease({
+    ...release,
+    assets: windowsAssets.map((asset, index) => index === 1
+      ? { ...asset, browser_download_url: asset.browser_download_url.replace('chromux-v0.9.0/', 'chromux-v0.8.0/') }
+      : asset),
+  });
+  assert.equal(mismatchedDirectory.windows.complete, false);
+  assert.match(mismatchedDirectory.windows.error, /one release download directory/);
+  const incorrectAssetResolution = parseRelease({
+    ...release,
+    assets: windowsAssets.map((asset, index) => index === 0
+      ? { ...asset, browser_download_url: asset.browser_download_url.replace('.exe', '-renamed.exe') }
+      : asset),
+  });
+  assert.equal(incorrectAssetResolution.windows.complete, false);
+  assert.match(incorrectAssetResolution.windows.error, /expected asset/);
+
   let calls = 0;
   let redirectCalls = 0;
   const success = await checkForUpdates({

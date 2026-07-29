@@ -1,6 +1,6 @@
 {
   "name": "chromux",
-  "version": "0.71.0",
+  "version": "0.72.0",
   "productName": "GBlockParty Chromux",
   "description": "OSS desktop front-end for local and GBlockParty-managed agent/browser workspaces.",
   "main": "main.js",
@@ -21,7 +21,7 @@
   "scripts": {
     "test": "node scripts/run-tests.js",
     "test:windows-platform": "node scripts/test-windows-platform.js",
-    "test:ci:windows": "node scripts/test-windows-platform.js && node scripts/test-user-data-path.js && node scripts/test-github-update-check.js && node scripts/test-codex-update-service.js && node scripts/test-codex-detect-metadata.js && node scripts/test-prevent-sleep.js && node scripts/test-resource-broker.js && node scripts/test-storage-cleanup.js && node scripts/test-window-config.js",
+    "test:ci:windows": "node scripts/test-windows-platform.js && node scripts/test-windows-setup.js && node scripts/test-windows-sign.js && node scripts/test-windows-artifacts.js && node scripts/test-user-data-path.js && node scripts/test-github-update-check.js && node scripts/test-codex-update-service.js && node scripts/test-codex-detect-metadata.js && node scripts/test-prevent-sleep.js && node scripts/test-resource-broker.js && node scripts/test-storage-cleanup.js && node scripts/test-window-config.js",
     "start": "electron .",
     "smoke": "electron . --smoke --dev-mode",
     "fixture:localhost-first-success": "node examples/localhost-first-success/server.js",
@@ -113,8 +113,14 @@
     "@electron-forge/plugin-auto-unpack-natives": "^7.8.3",
     "@electron/packager": "^20.0.2",
     "@electron/rebuild": "^4.1.0",
+    "@electron/windows-sign": "^2.0.6",
     "@resvg/resvg-js": "^2.6.2",
     "electron": "^43.0.0",
     "png-to-ico": "^2.1.8"
+  },
+  "overrides": {
+    "brace-expansion": "5.0.8",
+    "tar": "7.5.22",
+    "tmp": "0.2.7"
   }
 }
