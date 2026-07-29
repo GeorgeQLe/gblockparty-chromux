@@ -25,6 +25,7 @@ const THEME_LABELS = {
   'liquid-glass': 'Liquid Glass',
 };
 const RAIL_MODES = new Set(['threads', 'git']);
+const GIT_FILTERS = new Set(['action', 'stale', 'all']);
 const THREAD_SORT_MODES = new Set(['recent', 'az']);
 const THREAD_PREVIEW_SIZES = new Set(['compact', 'comfortable', 'large']);
 const BROWSER_FULLSCREEN_BEHAVIORS = new Set(['workspace', 'cycle', 'chromux']);
@@ -35,6 +36,17 @@ const RESTORE_ATTENTION_TYPES = new Set([
 const MAX_RESTORE_ATTENTION_RECORDS = 20;
 const MAX_CUSTOM_TAB_GROUPS = 100;
 const CUSTOM_TAB_GROUP_ID_RE = /^group-[a-z0-9-]{1,64}$/;
+const GIT_SESSION_PURPOSE = 'git-worktree';
+const GIT_REVIEW_PROMPT = 'Review the current Git status for this worktree. Summarize the branch, staged, unstaged, untracked, conflicted, ahead/behind, and stale state. Recommend the safest next actions, but do not mutate Git or submit anything until I approve.';
+const GIT_COMPOSER_INSERTS = Object.freeze([
+  ['review', 'REVIEW STATUS', GIT_REVIEW_PROMPT],
+  ['conflicts', 'RESOLVE CONFLICTS', 'Inspect the current merge or rebase conflicts in this worktree. Explain each conflict and propose a safe resolution plan. Preserve user-owned changes and do not resolve, stage, or commit until I approve.'],
+  ['commit', 'PREPARE COMMIT', 'Review the current worktree changes and prepare a commit plan: intended scope, files, validation, and a concise commit message. Do not stage or commit until I approve.'],
+  ['sync', 'SYNC / PUBLISH', 'Review the branch, upstream, ahead/behind, and remote state. Propose the safest non-force sync or publish sequence, including validation and rollback considerations. Do not fetch, pull, push, or publish until I approve.'],
+  ['github', 'REVIEW ISSUE / PR', 'Review the relevant GitHub issue or pull request for this worktree. Summarize requirements, checks, review feedback, and the safest next implementation step. Do not change GitHub state until I approve.'],
+  ['stale', 'AUDIT STALE STATE', 'Audit stale worktrees and stashes associated with this repository. Identify what is safe to retain, archive, or remove, with evidence. Do not delete or mutate anything until I approve.'],
+  ['vercel', 'PREPARE VERCEL', 'Prepare this repository for its saved Vercel deployment mapping. Verify the current worktree, branch, validation, and deployment prerequisites without deploying. Leave the reviewed VERCEL · READY action as the only shipping step.'],
+]);
 
 function storedTheme() {
   try {
@@ -160,7 +172,8 @@ const state = {
     gitInventory: null,
     gitInventoryPromise: null,
     gitInventoryError: null,
-    gitReview: null,
+    gitFilter: 'action',
+    gitSearch: '',
     inboxTriage: new Map(),
     inboxQueueIndex: 0,
     railExpanded: new Map(),
@@ -1783,7 +1796,10 @@ function flushRender() {
 // lifecycle, turn, browser-pane, and terminal state live in their own domains.
 // ───────────────────────────────────────────────────────────────────────────
 
-function newSessionShape({ id, name, cwd, agent, runtime = null, distro = null }) {
+function newSessionShape({
+  id, name, cwd, agent, runtime = null, distro = null,
+  sessionPurpose = null, worktreeIdentity = null,
+}) {
   const capabilities = {
     claude: { turnStarted: 'native', inputRequired: 'native', permissionRequired: 'native', authenticationRequired: 'native', rateLimited: 'native', toolFailed: 'native', turnCompleted: 'native' },
     codex: { turnStarted: 'inferred', inputRequired: 'unavailable', permissionRequired: 'unavailable', authenticationRequired: 'unavailable', rateLimited: 'unavailable', toolFailed: 'unavailable', turnCompleted: 'native' },
@@ -1794,6 +1810,14 @@ function newSessionShape({ id, name, cwd, agent, runtime = null, distro = null }
     id, name, cwd, agent,
     runtime: runtime || (state.env && state.env.runtime ? state.env.runtime.kind : 'host'),
     distro: distro || (state.env && state.env.runtime ? state.env.runtime.selectedDistro : null),
+    sessionPurpose: sessionPurpose === GIT_SESSION_PURPOSE ? GIT_SESSION_PURPOSE : null,
+    worktreeIdentity: sessionPurpose === GIT_SESSION_PURPOSE && worktreeIdentity
+      ? {
+        runtime: worktreeIdentity.runtime === 'wsl' ? 'wsl' : 'host',
+        distro: worktreeIdentity.runtime === 'wsl' ? (worktreeIdentity.distro || null) : null,
+        path: String(worktreeIdentity.path || cwd || ''),
+      }
+      : null,
     resumeId: null, lastActivityAt: Date.now(),
     customTabGroupId: null,
     restoredAttentionRecords: [], // historical snapshot records; separate from live turn/capture state
@@ -4883,6 +4907,7 @@ function updateVercelButtons() {
       ? 'Review Vercel setup for this project'
       : 'Configure Vercel for this project';
     button.setAttribute('aria-label', button.title);
+    renderComposer(session);
   }
 }
 
@@ -5452,6 +5477,17 @@ function buildSessionView(session) {
   switchRouteTargetBtn.textContent = 'SWITCH TO TARGET';
   contextActions.append(contextTargetLabel, contextAgentLabel, attachPageBtn);
   composerContext.append(contextChips, contextActions, contextError, switchRouteTargetBtn);
+  const gitComposerInserts = document.createElement('div');
+  gitComposerInserts.className = 'git-composer-inserts hidden';
+  gitComposerInserts.setAttribute('role', 'toolbar');
+  gitComposerInserts.setAttribute('aria-label', 'Git worktree prompt inserts');
+  for (const [id, label] of GIT_COMPOSER_INSERTS) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.gitPromptInsert = id;
+    button.textContent = label;
+    gitComposerInserts.appendChild(button);
+  }
   const composerInputChoice = document.createElement('div');
   composerInputChoice.className = 'composer-input-choice hidden'; composerInputChoice.setAttribute('role', 'alertdialog');
   composerInputChoice.setAttribute('aria-modal', 'true'); composerInputChoice.setAttribute('aria-labelledby', `composer-input-choice-${session.id}`);
@@ -5481,7 +5517,10 @@ function buildSessionView(session) {
   historyControls.append(historySearch, clearHistoryBtn);
   const historyList = document.createElement('div'); historyList.className = 'composer-history-list';
   historyDrawer.append(historyControls, historyList);
-  composer.append(composerToolbar, composerContext, composerInputChoice, composerTextarea, composerActions, historyDrawer);
+  composer.append(
+    composerToolbar, composerContext, gitComposerInserts, composerInputChoice,
+    composerTextarea, composerActions, historyDrawer,
+  );
   termPane.append(termHead, termHost, composer);
 
   // divider
@@ -5666,6 +5705,10 @@ function buildSessionView(session) {
     const targetId = session.composer.routeBlockedTargetId;
     if (targetId && state.sessions.has(targetId)) activateSession(targetId);
   };
+  gitComposerInserts.onclick = (event) => {
+    const id = event.target?.dataset?.gitPromptInsert;
+    if (id) insertGitComposerPrompt(session, id);
+  };
   collapseBtn.onclick = () => setBrowserCollapsed(session, session.browser.layoutMode !== 'terminal');
   fullscreenBtn.onclick = () => advanceBrowserLayout(session);
   fullBrowserComposerBtn.onclick = () => toggleFullBrowserComposer(session);
@@ -5698,6 +5741,7 @@ function buildSessionView(session) {
     view, termPane, termLabel, termHost, scrollToBottom, vercelBtn, composeBtn, composer, composerTextarea, composerStatus, composerCount,
     submitComposerBtn, historyBtn, expandComposerBtn, closeComposerBtn, composerInputChoice, composerInputChoiceActions,
     composerContext, contextChips, contextTarget, contextAgent, attachPageBtn, contextError, switchRouteTargetBtn,
+    gitComposerInserts,
     historyDrawer, historySearch, historyList, clearHistoryBtn,
     back, reload, searchHtmlBtn, urlBar, urlSuggestions, favoriteBtn, favoritesBtn, favoritesBadge, favoritesPanel, favoritesList, queueBtn, queueBadge, queuePanel, queueList,
     consoleChip, captureChip, pickBtn, captureBtn, webHost, placeholder, refreshFlash,
@@ -5731,6 +5775,29 @@ function truncateUtf8(value, maxBytes) {
 
 function truncateComposerDraft(value) {
   return truncateUtf8(value, BOUNDS.composerDraftBytes);
+}
+
+function insertGitComposerPrompt(session, insertId) {
+  if (!session || session.sessionPurpose !== GIT_SESSION_PURPOSE) return false;
+  const entry = GIT_COMPOSER_INSERTS.find(([id]) => id === insertId);
+  if (!entry || (insertId === 'vercel' && !vercelProjectForSession(state.ui.vercel.projects, session))) return false;
+  const textarea = session.els?.composerTextarea;
+  const start = Number.isInteger(textarea?.selectionStart) ? textarea.selectionStart : session.composer.draft.length;
+  const end = Number.isInteger(textarea?.selectionEnd) ? textarea.selectionEnd : start;
+  const before = session.composer.draft.slice(0, start);
+  const after = session.composer.draft.slice(end);
+  const prompt = entry[2];
+  const prefix = before && !before.endsWith('\n') ? '\n\n' : '';
+  const suffix = after && !after.startsWith('\n') ? '\n\n' : '';
+  const available = Math.max(0, BOUNDS.composerDraftBytes - utf8ByteLength(before + prefix + suffix + after));
+  const inserted = truncateUtf8(prompt, available);
+  setComposerDraft(session, `${before}${prefix}${inserted}${suffix}${after}`);
+  const cursor = before.length + prefix.length + inserted.length;
+  requestAnimationFrame(() => {
+    session.els.composerTextarea.focus();
+    session.els.composerTextarea.setSelectionRange(cursor, cursor);
+  });
+  return inserted.length === prompt.length;
 }
 
 function normalizeBrowserContextReference(context) {
@@ -5934,6 +6001,15 @@ function renderComposer(session) {
   const routeAvailable = routeTarget === COMPOSER_NEW_SESSION_TARGET
     || Boolean(routeTarget && routeTarget.lifecycle.alive);
   session.els.composer.classList.toggle('hidden', !composer.open);
+  if (session.els.gitComposerInserts) {
+    const isGitSession = session.sessionPurpose === GIT_SESSION_PURPOSE;
+    session.els.gitComposerInserts.classList.toggle('hidden', !isGitSession);
+    const vercelInsert = session.els.gitComposerInserts.querySelector('[data-git-prompt-insert="vercel"]');
+    if (vercelInsert) vercelInsert.classList.toggle(
+      'hidden',
+      !isGitSession || !vercelProjectForSession(state.ui.vercel.projects, session),
+    );
+  }
   session.els.termPane.classList.toggle('composer-expanded', composer.open && composer.expanded);
   session.els.composeBtn.classList.toggle('active', composer.open);
   session.els.composeBtn.classList.toggle('has-draft', Boolean(composer.draft));
@@ -7024,6 +7100,9 @@ function restoredAttentionItems(session) {
 }
 
 function attentionAction(item) {
+  if (item.type === 'conflict' && item.repositoryId && item.worktreeId) {
+    return () => focusGitWorktreeSession(item.repositoryId, item.worktreeId).catch(() => {});
+  }
   if (item.scope === 'global') {
     if (item.type === 'updateReady' || item.type === 'updateFailed') {
       const blockers = updateBlockers();
@@ -7448,23 +7527,23 @@ function openCustomSnooze(item) {
   if (Number.isFinite(target) && target > Date.now()) setInboxTriage(item, 'snoozed', target);
 }
 
-function appendInboxItem(host, rowData, { git = false } = {}) {
+function appendInboxItem(host, rowData) {
   const { session } = rowData;
   const items = rowData.items || [rowData.item];
   const item = items[0];
   const card = document.createElement('article');
-  const system = !git && !session.id;
-  card.className = `inbox-item${git ? '' : system
+  const system = !session.id;
+  card.className = `inbox-item${system
     ? ` attention-item attention-system-row ${item.cls || ''}`
     : ` attention-item attention-thread ${item.cls || ''}`}`.trim();
   if (system) card.dataset.attentionKind = item.kind;
   card.tabIndex = -1;
   card.dataset.inboxId = inboxTriageKey(item);
-  if (!git) card.dataset.sessionId = session.id;
+  if (!system) card.dataset.sessionId = session.id;
   let open;
   const snoozeButtons = [];
   let snoozeItem = item;
-  if (git || system) {
+  if (system) {
     const main = document.createElement('button');
     main.type = 'button';
     main.className = 'inbox-item-main';
@@ -7472,12 +7551,12 @@ function appendInboxItem(host, rowData, { git = false } = {}) {
     const kind = document.createElement('span'); kind.className = 'inbox-item-kind'; kind.textContent = item.kind || 'REVIEW';
     const detail = document.createElement('span'); detail.className = 'inbox-item-detail'; detail.textContent = item.detail || session.cwd || '';
     main.append(title, kind, detail);
-    open = git ? () => openGitReview(item.repositoryId, item.worktreeId) : attentionAction(item);
+    open = attentionAction(item);
     main.onclick = open;
     const actions = document.createElement('div'); actions.className = `inbox-item-actions${system ? ' attention-actions' : ''}`;
     const openButton = document.createElement('button'); openButton.type = 'button';
     if (system) openButton.className = 'qi-btn open';
-    openButton.textContent = git ? 'REVIEW GIT' : (item.primaryAction || 'OPEN'); openButton.onclick = open;
+    openButton.textContent = item.primaryAction || 'OPEN'; openButton.onclick = open;
     const done = document.createElement('button'); done.type = 'button'; done.textContent = 'DONE';
     if (system) done.className = 'qi-btn';
     done.onclick = () => setInboxTriage(item, 'done');
@@ -7534,6 +7613,7 @@ function appendInboxItem(host, rowData, { git = false } = {}) {
 }
 
 function appendInboxSection(host, { key, label, rows, css = '', renderRow = appendInboxItem }) {
+  if (rows.length === 0 && key !== 'all-sessions') return null;
   const section = document.createElement('section');
   section.className = `inbox-section ${css}${key === 'action-required' ? ' rail-group attention-thread-group' : ''}${key === 'ready-finish' ? ' rail-group ready-finish-group' : ''}${key === 'working' ? ' rail-group working-thread-group' : ''}`.trim();
   section.dataset.inboxSection = key;
@@ -7557,46 +7637,6 @@ function appendInboxSection(host, { key, label, rows, css = '', renderRow = appe
   return body;
 }
 
-function gitInboxRows() {
-  const repositories = state.ui.gitInventory?.repositories || [];
-  const sessions = orderedSessions();
-  const byId = new Map(sessions.map((session) => [session.id, session]));
-  const rows = [];
-  for (const repository of repositories) {
-    for (const worktree of repository.worktrees || []) {
-      if (!(worktree.conflicted || worktree.dirty || worktree.unpublished || worktree.ahead > 0)) continue;
-      const associated = worktree.associatedSessionIds.map((id) => byId.get(id)).filter(Boolean)
-        .sort((a, b) => sessionActivityAt(b) - sessionActivityAt(a));
-      const session = associated[0] || {
-        name: repository.label,
-        cwd: worktree.path,
-        id: `repository:${repository.id}`,
-      };
-      const obligations = [
-        worktree.conflicted ? `${worktree.totals.conflicted} conflicted` : null,
-        worktree.totals.staged ? `${worktree.totals.staged} staged` : null,
-        worktree.totals.unstaged ? `${worktree.totals.unstaged} unstaged` : null,
-        worktree.unpublished ? 'unpublished branch' : null,
-        worktree.ahead ? `${worktree.ahead} outgoing` : null,
-      ].filter(Boolean);
-      const item = {
-        id: `git:${worktree.id}`,
-        inboxId: `git:${worktree.id}`,
-        reopenToken: `${worktree.head || ''}:${worktree.latestRelevantAt || ''}:${worktree.totals.files}:${worktree.ahead}:${worktree.behind}`,
-        type: worktree.conflicted ? 'conflict' : 'git',
-        kind: worktree.conflicted ? 'CONFLICT' : (worktree.stale ? 'STALE GIT' : 'GIT REVIEW'),
-        detail: `${worktree.branch || 'detached'} · ${obligations.join(' · ')}`,
-        repositoryId: repository.id,
-        worktreeId: worktree.id,
-        createdAt: Date.parse(worktree.latestRelevantAt || repository.lastSeenAt) || 0,
-      };
-      rows.push({ session, item });
-    }
-  }
-  return rows.sort((a, b) => (a.item.type === 'conflict' ? -1 : b.item.type === 'conflict' ? 1 : 0)
-    || b.item.createdAt - a.item.createdAt);
-}
-
 function renderAttentionQueue() {
   const host = $('#thread-list');
   if (!host) return;
@@ -7605,36 +7645,84 @@ function renderAttentionQueue() {
   }
   host.innerHTML = '';
   const items = attentionItems();
-  const gitRows = gitInboxRows();
   const visibleAttention = items.filter(({ item }) => inboxItemVisible(item));
-  const visibleGit = gitRows.filter(({ item }) => inboxItemVisible(item));
   const actionTypes = new Set(['permission', 'authentication', 'input', 'rateLimited', 'toolFailed', 'delivery', 'updateFailed']);
-  const actionRequired = visibleAttention.filter(({ item }) => actionTypes.has(item.type));
-  const gitBlockers = visibleGit.filter(({ item }) => item.type === 'conflict');
-  const readyAttention = visibleAttention.filter(({ item }) => !actionTypes.has(item.type));
-  const ready = [
-    ...inboxAttentionRows(readyAttention),
-    ...visibleGit.filter(({ item }) => item.type !== 'conflict'),
+  const liveSessions = new Map(orderedSessions()
+    .filter((session) => session.lifecycle?.alive)
+    .map((session) => [session.id, session]));
+  const sessionRows = new Map();
+  const systemRows = [];
+  for (const row of visibleAttention) {
+    if (!row.item.sessionId || !liveSessions.has(row.item.sessionId)) {
+      systemRows.push(row);
+      continue;
+    }
+    if (!sessionRows.has(row.item.sessionId)) {
+      sessionRows.set(row.item.sessionId, { session: liveSessions.get(row.item.sessionId), items: [] });
+    }
+    sessionRows.get(row.item.sessionId).items.push(row.item);
+  }
+  for (const repository of state.ui.gitInventory?.repositories || []) {
+    for (const worktree of repository.worktrees || []) {
+      if (!worktree.conflicted) continue;
+      const session = (worktree.associatedSessionIds || [])
+        .map((id) => liveSessions.get(id))
+        .filter(Boolean)
+        .sort((a, b) => sessionActivityAt(b) - sessionActivityAt(a))[0];
+      if (!session) continue;
+      const conflictItem = {
+        id: `git-conflict:${worktree.id}`,
+        inboxId: `git-conflict:${worktree.id}`,
+        reopenToken: `${worktree.head || ''}:${worktree.totals?.conflicted || 0}:${worktree.latestRelevantAt || ''}`,
+        type: 'conflict',
+        kind: 'CONFLICT',
+        scope: 'session',
+        sessionId: session.id,
+        detail: `${worktree.branch || 'detached'} · ${worktree.totals?.conflicted || 0} conflicted`,
+        repositoryId: repository.id,
+        worktreeId: worktree.id,
+        primaryAction: 'OPEN GIT SESSION',
+        createdAt: Date.parse(worktree.latestRelevantAt || repository.lastSeenAt) || 0,
+        cls: 'failed',
+      };
+      if (!inboxItemVisible(conflictItem)) continue;
+      if (!sessionRows.has(session.id)) sessionRows.set(session.id, { session, items: [] });
+      sessionRows.get(session.id).items.push(conflictItem);
+    }
+  }
+  const rankedRows = [...sessionRows.values()];
+  const actionRequired = [
+    ...systemRows.filter(({ item }) => actionTypes.has(item.type)),
+    ...rankedRows.filter((row) => row.items.some((item) => actionTypes.has(item.type) || item.type === 'conflict')),
   ];
-  renderRailNavigation(actionRequired.length + gitBlockers.length + ready.length);
+  const actionSessionIds = new Set(actionRequired.map((row) => row.session?.id).filter((id) => liveSessions.has(id)));
+  const ready = [
+    ...systemRows.filter(({ item }) => !actionTypes.has(item.type)),
+    ...rankedRows.filter((row) => !actionSessionIds.has(row.session.id)),
+  ];
+  const readySessionIds = new Set(ready.map((row) => row.session?.id).filter((id) => liveSessions.has(id)));
+  const working = workingSessionRows()
+    .filter((session) => !actionSessionIds.has(session.id) && !readySessionIds.has(session.id));
+  const workingIds = new Set(working.map((session) => session.id));
+  const rankedSessionIds = new Set([...actionSessionIds, ...readySessionIds, ...workingIds]);
+  const allSessions = sortThreadSessions([...liveSessions.values()]
+    .filter((session) => !rankedSessionIds.has(session.id)));
+  renderRailNavigation(actionRequired.length + ready.length);
   if (state.ui.railMode === 'git') {
     renderGitDiffRail(host);
     return;
   }
-  const working = workingSessionRows();
   appendInboxSection(host, {
     key: 'action-required',
     label: 'ACTION REQUIRED',
     css: 'action-required',
-    rows: [...inboxAttentionRows(actionRequired), ...gitBlockers],
-    renderRow: (body, row) => appendInboxItem(body, row, { git: Boolean(row.item?.repositoryId) }),
+    rows: actionRequired,
   });
   appendInboxSection(host, {
     key: 'ready-finish',
     label: 'READY TO FINISH',
     css: 'ready-finish',
     rows: ready,
-    renderRow: (body, row) => appendInboxItem(body, row, { git: Boolean(row.item?.repositoryId) }),
   });
   appendInboxSection(host, {
     key: 'working',
@@ -7647,10 +7735,11 @@ function renderAttentionQueue() {
     key: 'all-sessions',
     label: 'ALL SESSIONS',
     css: 'all-sessions',
-    rows: [],
+    rows: allSessions,
+    renderRow: (body, session) => appendThreadSessionRow(body, session),
   });
   allBody.innerHTML = '';
-  renderGroupedSessionRail(allBody, 'threads');
+  renderGroupedSessionRail(allBody, 'threads', rankedSessionIds);
   syncInboxQueueFocus();
 }
 
@@ -7667,12 +7756,27 @@ function renderRailNavigation(attentionCount) {
     sortToggle.title = recent ? 'Sort threads A–Z' : 'Sort threads by recent activity';
     sortToggle.setAttribute('aria-pressed', String(!recent));
   }
-  $('#thread-toolbar')?.classList.toggle('hidden', mode !== 'threads');
+  $('#thread-toolbar')?.classList.remove('hidden');
+  $('#git-toolbar')?.classList.toggle('hidden', mode !== 'git');
+  document.querySelectorAll('[data-git-filter]').forEach((button) => {
+    button.setAttribute('aria-pressed', String(button.dataset.gitFilter === state.ui.gitFilter));
+  });
   const count = $('#rail-thread-count');
   if (count) {
     count.textContent = String(attentionCount);
     count.classList.toggle('zero', attentionCount === 0);
     count.setAttribute('aria-label', `${attentionCount} attention item${attentionCount === 1 ? '' : 's'}`);
+  }
+  const reviewable = (state.ui.gitInventory?.repositories || [])
+    .flatMap((repository) => repository.worktrees || [])
+    .filter(gitWorktreeNeedsAction);
+  const conflicts = reviewable.filter((worktree) => worktree.conflicted).length;
+  const gitCount = $('#rail-git-count');
+  if (gitCount) {
+    gitCount.textContent = String(reviewable.length);
+    gitCount.classList.toggle('zero', reviewable.length === 0);
+    gitCount.classList.toggle('conflict', conflicts > 0);
+    gitCount.setAttribute('aria-label', `${reviewable.length} Git worktree${reviewable.length === 1 ? '' : 's'} to review${conflicts ? `, ${conflicts} conflicted` : ''}`);
   }
   document.querySelectorAll('[data-rail-mode]').forEach((button) => {
     const selected = button.dataset.railMode === mode;
@@ -7784,9 +7888,35 @@ function refreshGitInventory({ force = false } = {}) {
   }).finally(() => {
     state.ui.gitInventoryPromise = null;
     invalidate('attention');
-    if (state.ui.gitReview) refreshOpenGitReview();
   });
   return state.ui.gitInventoryPromise;
+}
+
+function gitWorktreeNeedsAction(worktree) {
+  return Boolean(worktree && (
+    worktree.conflicted
+    || worktree.locked
+    || worktree.prunable
+    || worktree.dirty
+    || worktree.unpublished
+    || worktree.ahead > 0
+    || worktree.behind > 0
+  ));
+}
+
+function gitWorktreeMatchesFilter(repository, worktree) {
+  const filter = GIT_FILTERS.has(state.ui.gitFilter) ? state.ui.gitFilter : 'action';
+  if (filter === 'action' && !gitWorktreeNeedsAction(worktree)) return false;
+  if (filter === 'stale' && !(worktree.stale || worktree.prunable || worktree.locked)) return false;
+  const query = String(state.ui.gitSearch || '').trim().toLocaleLowerCase();
+  if (!query) return true;
+  return [
+    repository.label,
+    repository.root,
+    worktree.branch,
+    worktree.path,
+    worktree.upstream,
+  ].some((value) => String(value || '').toLocaleLowerCase().includes(query));
 }
 
 function loadGitDiff(root, { force = false } = {}) {
@@ -7827,7 +7957,12 @@ function renderGitDiffRail(host) {
     empty.textContent = state.ui.gitInventoryPromise ? 'Scanning known repositories…' : 'No known Git repositories yet.';
     host.appendChild(empty); return;
   }
+  let visibleWorktrees = 0;
   for (const repository of repositories) {
+    const filtered = (repository.worktrees || [])
+      .filter((worktree) => gitWorktreeMatchesFilter(repository, worktree));
+    if (filtered.length === 0) continue;
+    visibleWorktrees += filtered.length;
     const card = document.createElement('section'); card.className = 'git-repository-card'; card.dataset.repositoryId = repository.id;
     const head = document.createElement('div'); head.className = 'git-repository-head';
     const copy = document.createElement('div'); copy.className = 'git-repository-copy';
@@ -7846,7 +7981,7 @@ function renderGitDiffRail(host) {
       const message = document.createElement('div'); message.className = 'git-diff-empty error'; message.textContent = repository.error;
       card.appendChild(message);
     }
-    for (const worktree of repository.worktrees || []) {
+    for (const worktree of filtered) {
       const row = document.createElement('button'); row.type = 'button';
       row.className = `git-worktree-row${worktree.conflicted || worktree.locked ? ' blocked' : ''}`;
       row.dataset.worktreeId = worktree.id;
@@ -7858,14 +7993,36 @@ function renderGitDiffRail(host) {
         worktree.stale ? 'STALE' : null,
         worktree.prunable ? 'PRUNABLE' : null,
         worktree.locked ? 'LOCKED' : null,
-      ].filter(Boolean).join(' · ') || 'REVIEW';
+      ].filter(Boolean).join(' · ') || (gitWorktreeNeedsAction(worktree) ? 'ACTION' : 'CLEAN');
       const detail = document.createElement('span'); detail.className = 'git-worktree-detail';
-      detail.textContent = `${worktree.path} · ${worktree.totals?.files || 0} files · ↑${worktree.ahead || 0} ↓${worktree.behind || 0}`;
+      const associated = (worktree.associatedSessionIds || []).filter((id) => state.sessions.has(id)).length;
+      detail.textContent = [
+        worktree.path,
+        `${worktree.totals?.staged || 0} staged`,
+        `${worktree.totals?.unstaged || 0} unstaged`,
+        `${worktree.totals?.untracked || 0} untracked`,
+        `${worktree.totals?.conflicted || 0} conflicted`,
+        `↑${worktree.ahead || 0} ↓${worktree.behind || 0}`,
+        worktree.latestRelevantAt ? relativeAge(Date.parse(worktree.latestRelevantAt)) : 'age unknown',
+        `${associated} session${associated === 1 ? '' : 's'}`,
+      ].join(' · ');
       row.append(name, badges, detail);
-      row.onclick = () => openGitReview(repository.id, worktree.id);
+      row.onclick = () => focusGitWorktreeSession(repository.id, worktree.id).catch(() => {});
       card.appendChild(row);
     }
     host.appendChild(card);
+  }
+  if (visibleWorktrees === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'attention-empty';
+    empty.textContent = state.ui.gitSearch
+      ? 'No worktrees match this search and filter.'
+      : state.ui.gitFilter === 'stale'
+        ? 'No stale worktrees.'
+        : state.ui.gitFilter === 'action'
+          ? 'No worktrees need review.'
+          : 'No worktrees in the catalog.';
+    host.appendChild(empty);
   }
 }
 
@@ -7875,255 +8032,70 @@ function selectedGitWorktree(repositoryId, worktreeId) {
   return repository && worktree ? { repository, worktree } : null;
 }
 
-function closeGitReview() {
-  state.ui.gitReview = null;
-  $('#git-review-drawer')?.classList.add('hidden');
-  $('#git-review-scrim')?.classList.add('hidden');
-}
-
-function gitActionMessage(result) {
-  return result?.ok
-    ? (result.output || `${String(result.kind || 'action').toUpperCase()} completed.`)
-    : `${result?.error?.message || 'Git action failed.'}${result?.error?.details ? `\n${result.error.details}` : ''}`;
-}
-
-async function runGitFileAction(action, repositoryId, worktreeId, paths) {
-  const api = action === 'stage' ? window.chromux.gitWorktreeStage : window.chromux.gitWorktreeUnstage;
-  const result = await api({ repositoryId, worktreeId, paths });
-  if (!result?.ok) {
-    state.ui.gitReview.status = gitActionMessage(result);
-    state.ui.gitReview.error = true;
-    renderGitReview();
-    return;
-  }
-  await refreshGitInventory({ force: true });
-}
-
-async function showGitDiff(repositoryId, worktreeId, file, staged) {
-  const review = state.ui.gitReview;
-  if (!review) return;
-  review.diff = { loading: true, path: file.path, staged };
-  renderGitReview();
-  const result = await window.chromux.gitWorktreeDiff({
-    repositoryId, worktreeId, path: file.path, staged,
-  });
-  if (!state.ui.gitReview) return;
-  state.ui.gitReview.diff = result?.ok ? {
-    path: file.path,
-    staged,
-    text: result.binary ? 'Binary file — text diff unavailable.'
-      : result.truncated && !result.text ? `Diff exceeds the ${Math.round(256)} KiB review limit.`
-        : `${result.text || '(No text diff for this side.)'}${result.truncated ? '\n\n[Diff truncated]' : ''}`,
-  } : { path: file.path, text: gitActionMessage(result), error: true };
-  renderGitReview();
-}
-
-async function previewGitCommit(repositoryId, worktreeId) {
-  const review = state.ui.gitReview;
-  if (!review) return;
-  const result = await window.chromux.gitWorktreeCommitPreview({
-    repositoryId,
-    worktreeId,
-    message: review.message || '',
-  });
-  review.preview = result?.ok ? result : null;
-  review.status = result?.ok ? '' : gitActionMessage(result);
-  review.error = !result?.ok;
-  renderGitReview();
-}
-
-async function executeGitCommit(repositoryId, worktreeId) {
-  const review = state.ui.gitReview;
-  if (!review?.preview) return;
-  const preview = review.preview;
-  if (!window.confirm(
-    `Create this commit in ${preview.target}?\n\nBranch: ${preview.branch || 'detached'}\nMessage: ${preview.message}\nFiles: ${preview.files.length}\n\nRepository hooks will execute.`,
-  )) return;
-  const result = await window.chromux.gitWorktreeCommit({
-    repositoryId,
-    worktreeId,
-    message: preview.message,
-    fingerprint: preview.fingerprint,
-  });
-  review.preview = null;
-  review.status = gitActionMessage(result);
-  review.error = !result?.ok;
-  if (result?.ok) await refreshGitInventory({ force: true });
-  else renderGitReview();
-}
-
-async function executeGitRemoteAction(action, repository, worktree) {
-  const effects = {
-    fetch: `Fetch remote state for ${worktree.path}. No working files will be changed.`,
-    pull: `Fast-forward ${worktree.branch || 'this worktree'} from ${worktree.upstream || 'its upstream'} in ${worktree.path}.`,
-    publish: `Push ${worktree.branch} and set its upstream for ${worktree.path}.`,
-    push: `Push ${worktree.ahead} outgoing commit${worktree.ahead === 1 ? '' : 's'} from ${worktree.path}.`,
-    sync: `Fast-forward pull, then push ${worktree.path}. Sync stops if the pull cannot fast-forward.`,
+function gitWorktreeIdentity(repository, worktree) {
+  return {
+    runtime: repository.runtime === 'wsl' ? 'wsl' : 'host',
+    distro: repository.runtime === 'wsl' ? (repository.distro || null) : null,
+    path: worktree.path,
   };
-  if (!window.confirm(`${effects[action]}\n\nGit authentication and repository rules apply. Continue?`)) return;
-  const api = {
-    fetch: window.chromux.gitWorktreeFetch,
-    pull: window.chromux.gitWorktreePull,
-    publish: window.chromux.gitWorktreePublish,
-    push: window.chromux.gitWorktreePush,
-    sync: window.chromux.gitWorktreeSync,
-  }[action];
-  const review = state.ui.gitReview;
-  review.status = `Running ${action}…`;
-  review.error = false;
-  renderGitReview();
-  const result = await api({ repositoryId: repository.id, worktreeId: worktree.id });
-  review.status = gitActionMessage(result);
-  review.error = !result?.ok;
-  if (result?.ok) await refreshGitInventory({ force: true });
-  else renderGitReview();
 }
 
-function renderGitReview() {
-  const review = state.ui.gitReview;
-  const target = review && selectedGitWorktree(review.repositoryId, review.worktreeId);
-  if (!review || !target) {
-    if (review) closeGitReview();
-    return;
-  }
-  const { repository, worktree } = target;
-  const body = $('#git-review-body');
-  $('#git-review-title').textContent = worktree.branch || 'DETACHED HEAD';
-  body.innerHTML = '';
-  const summary = document.createElement('section'); summary.className = 'git-review-summary';
-  const summaryRows = [
-    ['REPOSITORY', repository.root],
-    ['WORKTREE', worktree.path],
-    ['BRANCH', worktree.branch || 'Detached HEAD'],
-    ['UPSTREAM', worktree.upstream || 'Not published'],
-    ['SYNC', `↑ ${worktree.ahead || 0} outgoing · ↓ ${worktree.behind || 0} incoming`],
-    ['AGE', worktree.latestRelevantAt ? `${relativeAge(Date.parse(worktree.latestRelevantAt))} since relevant activity` : 'Unknown'],
-    ['STASHES', String(worktree.stashCount || 0)],
-  ];
-  for (const [key, value] of summaryRows) {
-    const row = document.createElement('div'); row.className = 'git-review-summary-row';
-    const label = document.createElement('b'); label.textContent = key;
-    const copy = document.createElement('span'); copy.textContent = value; copy.title = value;
-    row.append(label, copy); summary.appendChild(row);
-  }
-  if (worktree.stale || worktree.prunable || worktree.locked || worktree.detached || worktree.conflicted) {
-    const warning = document.createElement('div'); warning.className = 'git-warning';
-    warning.textContent = [
-      worktree.conflicted ? 'This worktree has unresolved conflicts.' : null,
-      worktree.stale ? 'Stale: all relevant session, file, and HEAD activity is at least seven days old.' : null,
-      worktree.prunable ? `Git reports this worktree as prunable${typeof worktree.prunable === 'string' ? `: ${worktree.prunable}` : '.'}` : null,
-      worktree.locked ? `Git reports this worktree as locked: ${worktree.locked}` : null,
-      worktree.detached ? 'Detached HEAD cannot be published as a named branch.' : null,
-    ].filter(Boolean).join(' ');
-    summary.appendChild(warning);
-  }
-  body.appendChild(summary);
-
-  const files = document.createElement('section'); files.className = 'git-file-list';
-  for (const file of worktree.files || []) {
-    const row = document.createElement('div'); row.className = 'git-file-row';
-    const select = document.createElement('input'); select.type = 'checkbox'; select.value = file.path; select.setAttribute('aria-label', `Select ${file.path}`);
-    const name = document.createElement('span'); name.className = 'git-file-path'; name.textContent = file.path;
-    name.title = file.originalPath ? `${file.originalPath} → ${file.path}` : file.path;
-    const actions = document.createElement('span'); actions.className = 'git-file-actions';
-    const diff = document.createElement('button'); diff.type = 'button'; diff.className = 'git-mini-button'; diff.textContent = 'DIFF';
-    diff.onclick = () => showGitDiff(repository.id, worktree.id, file, ![' ', '?', '.'].includes(file.index));
-    const staged = ![' ', '?', '.'].includes(file.index);
-    const fileAction = file.conflicted ? 'stage' : (staged ? 'unstage' : 'stage');
-    const stage = document.createElement('button'); stage.type = 'button'; stage.className = 'git-mini-button';
-    stage.textContent = file.conflicted ? 'STAGE RESOLUTION' : (staged ? 'UNSTAGE' : 'STAGE');
-    stage.onclick = () => runGitFileAction(fileAction, repository.id, worktree.id, [file.path]);
-    actions.append(diff, stage); row.append(select, name, actions); files.appendChild(row);
-  }
-  if ((worktree.files || []).length === 0) {
-    const clean = document.createElement('div'); clean.className = 'git-diff-empty clean'; clean.textContent = 'Working tree clean';
-    files.appendChild(clean);
-  } else {
-    const bulk = document.createElement('div'); bulk.className = 'git-review-actions';
-    for (const [action, label] of [['stage', 'STAGE SELECTED'], ['unstage', 'UNSTAGE SELECTED']]) {
-      const button = document.createElement('button'); button.type = 'button'; button.className = 'git-mini-button'; button.textContent = label;
-      button.onclick = () => {
-        const paths = [...files.querySelectorAll('input[type="checkbox"]:checked')].map((input) => input.value);
-        if (paths.length) runGitFileAction(action, repository.id, worktree.id, paths);
-      };
-      bulk.appendChild(button);
-    }
-    files.appendChild(bulk);
-  }
-  body.appendChild(files);
-  if (review.diff) {
-    const diff = document.createElement('pre'); diff.className = `git-diff-view${review.diff.error ? ' error' : ''}`;
-    diff.textContent = review.diff.loading ? 'Loading bounded diff…' : review.diff.text;
-    body.appendChild(diff);
-  }
-
-  const commitPanel = document.createElement('section'); commitPanel.className = 'git-commit-panel';
-  const commitLabel = document.createElement('label'); commitLabel.className = 'microlabel'; commitLabel.textContent = 'MANUAL COMMIT MESSAGE';
-  const message = document.createElement('textarea'); message.placeholder = 'Describe the staged change'; message.maxLength = 1000; message.value = review.message || '';
-  message.oninput = () => { review.message = message.value; review.preview = null; };
-  const commitActions = document.createElement('div'); commitActions.className = 'git-review-actions';
-  const preview = document.createElement('button'); preview.type = 'button'; preview.className = 'btn'; preview.textContent = 'PREVIEW COMMIT';
-  preview.onclick = () => previewGitCommit(repository.id, worktree.id);
-  commitActions.appendChild(preview);
-  commitPanel.append(commitLabel, message, commitActions);
-  if (review.preview) {
-    const panel = document.createElement('div'); panel.className = 'git-preview-panel';
-    panel.textContent = `Target: ${review.preview.target}\nBranch: ${review.preview.branch || 'detached'}\nFiles: ${review.preview.files.join(', ')}\nMessage: ${review.preview.message}\n${review.preview.warning}`;
-    const confirm = document.createElement('button'); confirm.type = 'button'; confirm.className = 'btn btn-amber'; confirm.textContent = 'COMMIT';
-    confirm.onclick = () => executeGitCommit(repository.id, worktree.id);
-    panel.append(document.createElement('br'), confirm); commitPanel.appendChild(panel);
-  }
-  body.appendChild(commitPanel);
-
-  const actions = document.createElement('div'); actions.className = 'git-review-actions';
-  const nextAction = worktree.nextAction;
-  if (['fetch', 'pull', 'publish', 'push', 'sync'].includes(nextAction)) {
-    const next = document.createElement('button'); next.type = 'button'; next.className = 'btn btn-amber';
-    next.textContent = nextAction.toUpperCase(); next.onclick = () => executeGitRemoteAction(nextAction, repository, worktree);
-    actions.appendChild(next);
-  }
-  if (nextAction !== 'fetch') {
-    const fetch = document.createElement('button'); fetch.type = 'button'; fetch.className = 'btn'; fetch.textContent = 'FETCH';
-    fetch.onclick = () => executeGitRemoteAction('fetch', repository, worktree); actions.appendChild(fetch);
-  }
-  const associated = worktree.associatedSessionIds.map((id) => state.sessions.get(id)).filter(Boolean)
-    .sort((a, b) => sessionActivityAt(b) - sessionActivityAt(a))[0];
-  const terminal = document.createElement('button'); terminal.type = 'button'; terminal.className = 'btn';
-  terminal.textContent = associated ? 'FOCUS TERMINAL' : 'CREATE TERMINAL';
-  terminal.onclick = () => {
-    if (associated) activateSession(associated.id);
-    else createSession({ name: worktree.branch || directoryBasename(worktree.path), cwd: worktree.path, agent: '' }).catch(() => {});
-    closeGitReview();
-  };
-  actions.appendChild(terminal); body.appendChild(actions);
-  const status = document.createElement('div'); status.className = `git-action-status${review.error ? ' error' : ''}`;
-  status.textContent = review.status || ''; body.appendChild(status);
+function gitWorktreeIdentityMatches(session, identity) {
+  const candidate = session?.sessionPurpose === GIT_SESSION_PURPOSE
+    ? session.worktreeIdentity : null;
+  return Boolean(candidate
+    && candidate.runtime === identity.runtime
+    && (identity.runtime !== 'wsl' || candidate.distro === identity.distro)
+    && candidate.path === identity.path);
 }
 
-function refreshOpenGitReview() {
-  if (state.ui.gitReview) renderGitReview();
+function gitReviewDraft(repository, worktree) {
+  return truncateComposerDraft([
+    GIT_REVIEW_PROMPT,
+    '',
+    `Current selection: ${repository.label} · ${worktree.branch || 'detached HEAD'}`,
+    `Worktree: ${worktree.path}`,
+    `Observed status: ${worktree.totals?.staged || 0} staged · ${worktree.totals?.unstaged || 0} unstaged · ${worktree.totals?.untracked || 0} untracked · ${worktree.totals?.conflicted || 0} conflicted · ↑${worktree.ahead || 0} ↓${worktree.behind || 0}.`,
+  ].join('\n'));
 }
 
-function openGitReview(repositoryId, worktreeId) {
+async function focusGitWorktreeSession(repositoryId, worktreeId, { refreshed = false } = {}) {
   const target = selectedGitWorktree(repositoryId, worktreeId);
   if (!target) {
     selectRailMode('git');
-    refreshGitInventory({ force: true });
-    return;
+    if (refreshed) return null;
+    await refreshGitInventory({ force: true });
+    return focusGitWorktreeSession(repositoryId, worktreeId, { refreshed: true });
   }
-  state.ui.gitReview = {
-    repositoryId,
-    worktreeId,
-    message: '',
-    preview: null,
-    diff: null,
-    status: '',
-    error: false,
-  };
-  $('#git-review-drawer').classList.remove('hidden');
-  $('#git-review-scrim').classList.remove('hidden');
-  renderGitReview();
-  requestAnimationFrame(() => $('#git-review-close')?.focus());
+  const { repository, worktree } = target;
+  const identity = gitWorktreeIdentity(repository, worktree);
+  let session = orderedSessions()
+    .filter((candidate) => candidate.lifecycle?.alive && gitWorktreeIdentityMatches(candidate, identity))
+    .sort((a, b) => sessionActivityAt(b) - sessionActivityAt(a))[0] || null;
+  if (!session) {
+    const associated = (worktree.associatedSessionIds || [])
+      .map((id) => state.sessions.get(id))
+      .filter(Boolean)
+      .sort((a, b) => sessionActivityAt(b) - sessionActivityAt(a))[0] || null;
+    const agent = associated?.agent || 'codex';
+    session = await createSession({
+      name: `Git · ${worktree.branch || 'detached'}`,
+      cwd: worktree.path,
+      runtime: identity.runtime,
+      distro: identity.distro,
+      agent,
+      composerDraft: gitReviewDraft(repository, worktree),
+      sessionPurpose: GIT_SESSION_PURPOSE,
+      worktreeIdentity: identity,
+      activate: true,
+    });
+  } else if (!session.composer.draft) {
+    setComposerDraft(session, gitReviewDraft(repository, worktree));
+  }
+  if (!session) return null;
+  activateSession(session.id);
+  openComposer(session);
+  return session;
 }
 
 function inboxQueueCards() {
@@ -9096,12 +9068,15 @@ async function createSessionNow({
   initialBrowserLayoutMode = 'terminal', initialFullBrowserComposerOpen = false,
   initialLastActivityAt = null,
   initialCustomTabGroupId = null,
+  sessionPurpose = null, worktreeIdentity = null,
   runtime = null, distro = null,
   activate = true,
 }) {
   state.counter += 1;
   const id = 's' + state.counter;
-  const session = newSessionShape({ id, name, cwd, agent, runtime, distro });
+  const session = newSessionShape({
+    id, name, cwd, agent, runtime, distro, sessionPurpose, worktreeIdentity,
+  });
   if (state.env?.smoke) session._testCommand = command !== undefined ? command : agentCommand(agent);
   session.customTabGroupId = validCustomTabGroup(initialCustomTabGroupId) ? initialCustomTabGroupId : null;
   const restoredActivityAt = Date.parse(initialLastActivityAt || '');
@@ -9534,6 +9509,12 @@ function snapshotOpenSessions() {
     distro: session.distro,
     cwd: session.cwd,
     agent: session.agent || '',
+    ...(session.sessionPurpose === GIT_SESSION_PURPOSE && session.worktreeIdentity
+      ? {
+        sessionPurpose: GIT_SESSION_PURPOSE,
+        worktreeIdentity: { ...session.worktreeIdentity },
+      }
+      : {}),
     resumeId: session.resumeId || null,
     ...(validCustomTabGroup(session.customTabGroupId) ? { customTabGroupId: session.customTabGroupId } : {}),
     wasActive: session.id === state.activeId,
@@ -9573,6 +9554,12 @@ function snapshotOpenSessions() {
       name: options.name,
       cwd: options.cwd,
       agent: 'codex',
+      ...(options.sessionPurpose === GIT_SESSION_PURPOSE && options.worktreeIdentity
+        ? {
+          sessionPurpose: GIT_SESSION_PURPOSE,
+          worktreeIdentity: { ...options.worktreeIdentity },
+        }
+        : {}),
       resumeId: options.resumeLaunch?.resumeId || null,
       ...(validCustomTabGroup(options.initialCustomTabGroupId)
         ? { customTabGroupId: options.initialCustomTabGroupId }
@@ -11081,6 +11068,8 @@ async function autoRestoreWorkspace() {
         initialFullBrowserComposerOpen: Boolean(row.fullBrowserComposerOpen),
         initialLastActivityAt: row.lastActivityAt || snapshot.savedAt || null,
         initialCustomTabGroupId: validCustomTabGroup(row.customTabGroupId) ? row.customTabGroupId : null,
+        sessionPurpose: row.sessionPurpose || null,
+        worktreeIdentity: row.worktreeIdentity || null,
         command,
         resumeLaunch: resumeLaunchForRow(row, {
           name,
@@ -11311,6 +11300,19 @@ $('#session-search-results').addEventListener('keydown', (event) => {
 $('#btn-first-session').onclick = () => openNewSessionModal('open');
 document.querySelectorAll('[data-rail-mode]').forEach((button) => {
   button.addEventListener('click', () => selectRailMode(button.dataset.railMode));
+});
+$('#git-search').addEventListener('input', (event) => {
+  state.ui.gitSearch = event.target.value;
+  invalidate('attention');
+});
+document.querySelectorAll('[data-git-filter]').forEach((button) => {
+  button.addEventListener('click', () => {
+    state.ui.gitFilter = GIT_FILTERS.has(button.dataset.gitFilter) ? button.dataset.gitFilter : 'action';
+    document.querySelectorAll('[data-git-filter]').forEach((candidate) => {
+      candidate.setAttribute('aria-pressed', String(candidate.dataset.gitFilter === state.ui.gitFilter));
+    });
+    invalidate('attention');
+  });
 });
 $('#thread-sort-toggle').addEventListener('click', () => {
   selectThreadSort(state.ui.threadSort === 'recent' ? 'az' : 'recent');
@@ -12836,6 +12838,8 @@ if (window.chromuxTest) {
       label: button.getAttribute('aria-label'),
       title: button.title,
       pressed: button.getAttribute('aria-pressed'),
+      count: Number(button.querySelector('.rail-count')?.textContent || 0),
+      conflict: Boolean(button.querySelector('.rail-count.conflict')),
     })),
     groups: () => [...document.querySelectorAll('#thread-list .rail-group')].map((group) => ({
       key: group.dataset.groupKey,
@@ -13148,14 +13152,69 @@ if (window.chromuxTest) {
         nextAction: worktree.nextAction,
       })),
     })),
-    reviewGit(repositoryId, worktreeId) { openGitReview(repositoryId, worktreeId); flushRender(); },
-    gitReview: () => ({
-      open: !$('#git-review-drawer').classList.contains('hidden'),
-      title: $('#git-review-title').textContent,
-      body: $('#git-review-body').textContent,
-      focused: document.activeElement === $('#git-review-close'),
+    setGitInventory(inventory) {
+      state.ui.gitInventory = inventory && Array.isArray(inventory.repositories)
+        ? inventory : { ok: true, kind: 'inventory', repositories: [] };
+      state.ui.gitInventoryError = null;
+      invalidate('attention'); flushRender();
+      return this.gitRepositories();
+    },
+    async openGitSession(repositoryId, worktreeId) {
+      const session = await focusGitWorktreeSession(repositoryId, worktreeId);
+      flushRender();
+      return session ? {
+        id: session.id,
+        name: session.name,
+        agent: session.agent,
+        purpose: session.sessionPurpose,
+        worktreeIdentity: session.worktreeIdentity ? { ...session.worktreeIdentity } : null,
+        draft: session.composer.draft,
+        composerOpen: session.composer.open,
+      } : null;
+    },
+    gitFilter: () => ({
+      filter: state.ui.gitFilter,
+      search: state.ui.gitSearch,
+      visible: [...document.querySelectorAll('.git-worktree-row')].map((row) => row.dataset.worktreeId),
     }),
-    dismissGitReview() { closeGitReview(); flushRender(); },
+    setGitFilter(filter, search = state.ui.gitSearch) {
+      state.ui.gitFilter = GIT_FILTERS.has(filter) ? filter : 'action';
+      state.ui.gitSearch = String(search || '');
+      $('#git-search').value = state.ui.gitSearch;
+      invalidate('attention'); flushRender();
+      return this.gitFilter();
+    },
+    gitSessions: () => orderedSessions()
+      .filter((session) => session.sessionPurpose === GIT_SESSION_PURPOSE)
+      .map((session) => ({
+        id: session.id,
+        name: session.name,
+        agent: session.agent,
+        draft: session.composer.draft,
+        composerOpen: session.composer.open,
+        worktreeIdentity: session.worktreeIdentity ? { ...session.worktreeIdentity } : null,
+      })),
+    insertGitPrompt(id, insertId) {
+      const session = testSession(id);
+      const inserted = insertGitComposerPrompt(session, insertId);
+      flushRender();
+      return { inserted, draft: session.composer.draft };
+    },
+    setGitDraft(id, draft, start = null, end = null) {
+      const session = testSession(id);
+      setComposerDraft(session, draft);
+      const textarea = session.els.composerTextarea;
+      const selectionStart = Number.isInteger(start) ? Math.max(0, Math.min(start, session.composer.draft.length)) : session.composer.draft.length;
+      const selectionEnd = Number.isInteger(end) ? Math.max(selectionStart, Math.min(end, session.composer.draft.length)) : selectionStart;
+      textarea.focus();
+      textarea.setSelectionRange(selectionStart, selectionEnd);
+      return session.composer.draft;
+    },
+    setVercelProjects(projects) {
+      state.ui.vercel.projects = Array.isArray(projects) ? projects.map((project) => ({ ...project })) : [];
+      updateVercelButtons();
+      flushRender();
+    },
     async waitForGit() {
       await Promise.all([...state.ui.gitRoots.values()].map((entry) => entry.promise));
       flushRender();
@@ -15111,11 +15170,6 @@ document.addEventListener('keydown', (e) => {
   handleInboxQueueKeydown(e);
   handleRendererShortcutKeydown(e);
   if (e.key === 'Escape') {
-    if (state.ui.gitReview) {
-      e.preventDefault();
-      closeGitReview();
-      return;
-    }
     if (state.ui.captureApproval) {
       e.preventDefault();
       finishCaptureApproval(false, 'Capture denied in Chromux.');
@@ -15143,8 +15197,6 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-$('#git-review-close').onclick = closeGitReview;
-$('#git-review-scrim').onclick = closeGitReview;
 
 document.addEventListener('click', (event) => {
   if (event.target.closest('.server-launcher-popover, .start-server')) return;

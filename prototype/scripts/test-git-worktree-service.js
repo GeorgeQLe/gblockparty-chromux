@@ -121,94 +121,18 @@ const service = createGitWorktreeService({
   assert.deepStrictEqual(linked.associatedSessionIds, ['latest']);
   assert.strictEqual(linked.stale, false);
 
-  const diff = await service.diff({
-    repositoryId: observed.repository.id,
-    worktreeId: linked.id,
-    path: 'unicode ü.txt',
-  });
-  assert.strictEqual(diff.ok, true);
-  assert.strictEqual(diff.untracked, true);
-  assert.match(diff.text, /untracked/);
-  const outsidePath = path.join(temp, 'outside-secret.txt');
-  fs.writeFileSync(outsidePath, 'outside\n');
-  fs.symlinkSync(outsidePath, path.join(linkedPath, 'outside-link.txt'));
-  const withSymlink = await service.inventory();
-  const symlinkWorktree = withSymlink.repositories[0].worktrees.find((worktree) => worktree.id === linked.id);
-  const symlinkDiff = await service.diff({
-    repositoryId: observed.repository.id,
-    worktreeId: symlinkWorktree.id,
-    path: 'outside-link.txt',
-  });
-  assert.strictEqual(symlinkDiff.error.code, 'FILE_UNAVAILABLE');
-
-  const staged = await service.stage({
-    repositoryId: observed.repository.id,
-    worktreeId: linked.id,
-    paths: ['tracked.txt', 'unicode ü.txt'],
-  });
-  assert.strictEqual(staged.ok, true);
-  const afterStage = await service.inventory();
-  const stagedLinked = afterStage.repositories[0].worktrees.find((worktree) => worktree.id === linked.id);
-  assert.strictEqual(stagedLinked.totals.staged, 2);
-
-  const preview = await service.commitPreview({
-    repositoryId: observed.repository.id,
-    worktreeId: linked.id,
-    message: 'test: review worktree',
-  });
-  assert.strictEqual(preview.ok, true);
-  assert.strictEqual(preview.files.length, 2);
-  assert.match(preview.warning, /hooks/);
-  const staleCommit = await service.commit({
-    repositoryId: observed.repository.id,
-    worktreeId: linked.id,
-    message: preview.message,
-    fingerprint: 'stale',
-  });
-  assert.strictEqual(staleCommit.error.code, 'PREVIEW_STALE');
-  const committed = await service.commit({
-    repositoryId: observed.repository.id,
-    worktreeId: linked.id,
-    message: preview.message,
-    fingerprint: preview.fingerprint,
-  });
-  assert.strictEqual(committed.ok, true);
-
-  fs.appendFileSync(path.join(linkedPath, 'tracked.txt'), 'hook rejection\n');
-  await service.stage({
-    repositoryId: observed.repository.id,
-    worktreeId: linked.id,
-    paths: ['tracked.txt'],
-  });
-  const hooksDir = path.join(repositoryPath, '.git', 'hooks');
-  const preCommit = path.join(hooksDir, 'pre-commit');
-  fs.writeFileSync(preCommit, '#!/bin/sh\necho hook rejected >&2\nexit 3\n', { mode: 0o755 });
-  const hookPreview = await service.commitPreview({
-    repositoryId: observed.repository.id,
-    worktreeId: linked.id,
-    message: 'test: rejected by hook',
-  });
-  const hookFailure = await service.commit({
-    repositoryId: observed.repository.id,
-    worktreeId: linked.id,
-    message: hookPreview.message,
-    fingerprint: hookPreview.fingerprint,
-  });
-  assert.strictEqual(hookFailure.error.code, 'COMMIT_FAILED');
-  assert.match(hookFailure.error.details, /hook rejected/);
-  fs.unlinkSync(preCommit);
-
-  const remotePath = path.join(temp, 'remote.git');
-  execFileSync('/usr/bin/git', ['init', '--bare', '-q', remotePath]);
-  const preReceive = path.join(remotePath, 'hooks', 'pre-receive');
-  fs.writeFileSync(preReceive, '#!/bin/sh\necho ruleset rejected >&2\nexit 1\n', { mode: 0o755 });
-  execFileSync('/usr/bin/git', ['-C', repositoryPath, 'remote', 'add', 'origin', remotePath]);
-  const rejectedPublish = await service.publish({
-    repositoryId: observed.repository.id,
-    worktreeId: linked.id,
-  });
-  assert.strictEqual(rejectedPublish.error.code, 'PUBLISH_FAILED');
-  assert.match(rejectedPublish.error.details, /ruleset rejected|pre-receive hook declined/);
+  for (const removedMutation of [
+    'diff', 'stage', 'unstage', 'commitPreview', 'commit',
+    'fetch', 'pull', 'publish', 'push', 'sync',
+  ]) {
+    assert.strictEqual(service[removedMutation], undefined,
+      `${removedMutation} must not remain exposed by the read-only worktree service`);
+  }
+  assert.strictEqual(
+    execFileSync('/usr/bin/git', ['-C', linkedPath, 'status', '--porcelain']).toString().trim().split('\n').length,
+    2,
+    'read-only inventory must not mutate the selected worktree',
+  );
 
   const forgotten = service.forget(observed.repository.id);
   assert.strictEqual(forgotten.ok, true);

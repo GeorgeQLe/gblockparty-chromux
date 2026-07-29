@@ -1,5 +1,87 @@
 # Session History
 
+## 2026-07-29 — Chromux v0.74.0 session-first Threads and dedicated Git sessions
+
+- **User goal:** Resolve the existing merge conflict without dropping either
+  side, then implement and publish the accepted plan that restores Threads as
+  a session-first inbox and replaces the embedded Git mutation drawer with
+  reusable dedicated worktree sessions.
+- **Changed files:** `RELEASES.md`, `prototype/README.md`,
+  `prototype/git-worktree-service.js`, `prototype/main.js`,
+  `prototype/package.json`, `prototype/package-lock.json`,
+  `prototype/preload.js`, `prototype/renderer/index.html`,
+  `prototype/renderer/renderer.js`, `prototype/renderer/styles.css`,
+  `prototype/scripts/test-composer-renderer.js`,
+  `prototype/scripts/test-full-browser-composer-renderer.js`,
+  `prototype/scripts/test-git-worktree-service.js`,
+  `prototype/scripts/test-restore-session-identity.js`,
+  `prototype/scripts/test-session-rail-renderer.js`, `tasks/todo.md`, and this
+  history entry. The preceding conflict-resolution commit also reconciles the
+  user-owned `RELEASES.md`, `tasks/history.md`, and `tasks/todo.md` records
+  while preserving both source lines.
+- **Per-file purpose:** Renderer markup, styles, and logic own the exclusive
+  Threads ranking, accurate counts, searchable Git navigator, dedicated
+  worktree-session lifecycle, and bounded unsent Composer inserts. Main and
+  preload retain only read-only Git observation/catalog/forget bridges and add
+  schema-v11 restore sanitation; the Git service removes mutation methods.
+  Renderer/service/restore tests prove the changed behavior, while the two
+  Composer harnesses retain their source contracts. Package metadata, docs,
+  release notes, and task records advance and explain v0.74.0.
+- **User-goal mapping:** Every live session renders in exactly one highest
+  priority section and carries all its reasons there; empty priority sections
+  disappear and All Sessions excludes ranked sessions. Ordinary worktree
+  obligations stay in Git, while only live-associated conflicts enter Action
+  Required and open the same canonical worktree session. Git rows expose
+  branch/status/divergence/age/session context; selection inherits the newest
+  associated agent or Codex, preserves reused drafts and terminal state, and
+  never auto-submits. Restore metadata is bounded and exact-path matched.
+- **Tests run:** `node --check` passed for changed application and test
+  JavaScript. Focused `npm run test:git-worktree-service`,
+  `npm run test:session-rail-renderer`,
+  `npm run test:restore-session-identity`,
+  `npm run test:composer-renderer`, and
+  `npm run test:full-browser-composer-renderer` passed. The complete
+  `npm test` prototype matrix and source `npm run smoke` passed. Final
+  conflict-triage and stale-selection review fixes passed the affected
+  session-rail renderer suite again. `npm run package:mac` produced the arm64
+  app, both packaged plist version fields reported `0.74.0`, and the packaged
+  executable returned `SMOKE_OK`. The renderer geometry fixture exercised
+  large catalogs, narrow-sidebar containment, keyboard focus, and every
+  supported appearance/mode. `git diff --check`, mutation-surface scans, and
+  package/lock version checks passed.
+- **Skipped tests:** Physical Windows/WSL terminal restoration and signed
+  Squirrel install/update require the external Windows release machine. A
+  live Vercel deployment was not run because this feature only prepares an
+  unsent agent prompt and intentionally leaves the existing reviewed
+  `VERCEL · READY` shipping action canonical; no `deploy.md` or
+  `tasks/deploy.md` contract exists.
+- **Adversarial review:** Applied
+  `.agents/skillpacks/docs/quality-gate-contract.md` through a
+  failure-oriented exact-diff review of section exclusivity, catalog scale,
+  lifecycle reuse, restore trust boundaries, byte limits, DOM/IPC/service
+  mutation remnants, and release topology. Findings fixed were projected
+  conflict rows ignoring explicit Done/Snooze triage and a stale catalog
+  selection refreshing without retrying its target. The review also changed
+  agent inheritance to use the newest associated session even when its
+  terminal has ended, as required by the accepted plan.
+- **Residual risk:** Native Windows/WSL path canonicalization and session
+  resurrection remain covered by contract fixtures rather than a physical
+  machine. If a restored Git session fails to reuse there, first run
+  `npm run test:restore-session-identity`, then inspect the sanitized runtime,
+  distro, cwd, and worktree identity tuple before changing matching rules.
+  Electron Packager also emits its established optional `.icon` probe warning
+  while successfully producing the `.icns` bundle.
+- **Rollback note:** Revert the v0.74.0 shipping commit and its preceding
+  conflict-resolution commit, then publish a newer corrective release; do not
+  delete user worktrees, drafts, or repository catalog data. Removing the tag
+  or GitHub Release is a separate explicit release rollback.
+- **Ownership boundary:** All current tracked modifications are listed above
+  and belong to this release. No unrelated untracked or user-owned worktree
+  changes are included, and the original conflict sides remain represented in
+  history.
+- **Next command:** After publication, complete the remaining live Vercel OAuth
+  dashboard/UAT gate recorded in `tasks/todo.md`.
+
 ## 2026-07-28 — Chromux v0.69.2 Windows 10 and dependency-audit candidate
 
 - **User goal:** Resolve the post-sync Windows 10/terminal-contrast stash

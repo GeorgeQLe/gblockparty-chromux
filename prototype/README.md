@@ -127,11 +127,11 @@ animation; only confirmed Working animates.
 ### Session rail
 
 The left rail has two persisted icon views while the horizontal tabs remain the primary navigator.
-**Threads** is the default unified session view. A pinned, expanded **Needs Attention** section appears
-above exact-working-directory groups whenever sessions have actionable items, failed deliveries, queued
-browser previews, or unseen background completions. Each session appears once, with all of its reasons and
-actions together, and returns to its directory group as soon as the last reason clears. Managed
-**Chromux Update** status appears in a pinned system row above Needs Attention. Opening or dismissing a
+**Threads** is the default unified session view. Every live session is ranked into exactly one visible
+section: **Action Required**, **Ready to Finish**, **Working**, or **All Sessions**. Empty priority sections
+disappear, and all reasons for a session stay together on its highest-priority card. Managed
+**Chromux Update** status remains a system card. Only conflicts associated with a live session enter
+Threads; ordinary dirty, ahead, unpublished, and stale worktrees remain in Git. Opening or dismissing a
 completion consumes it to a quiet Idle state, while completions already visible in the active session become
 Idle immediately. The thread-list filter defaults to **Recent**, ordering Working sessions and working-directory
 groups by meaningful work (creation, submitted prompts, turn-state changes, or explicit attention actions)
@@ -148,10 +148,11 @@ Clicking anywhere in the preview is a secondary activation path, while clicking 
 the already-active Threads row confirms the connection with a linked row-to-terminal highlight. Choose
 **Settings → Thread Preview Size → Compact, Comfortable, or Large** to adjust effective preview text size
 without changing terminal wrapping; Comfortable is the default.
-**Git Changes** tracks the working-copy diffs in repositories used by live sessions,
-showing each changed file, its status, whether it has staged changes, and repository-level staged/unstaged
-totals. It refreshes automatically while selected. The badge on Threads counts individual outstanding items,
-including managed-update notices, without switching away from Git Changes.
+**Git Changes** is a compact searchable repository/worktree navigator with Action, Stale, and All filters.
+Each row shows branch, staged, unstaged, untracked, conflict, ahead/behind, age, and associated-session state.
+Selecting a worktree creates or focuses one dedicated `Git · <branch>` agent session, seeds an editable
+unsent status-review draft only when needed, and opens Composer. The Git icon owns its review count and
+emphasizes conflicts; the Threads badge counts only ranked Threads work.
 
 ### Multiline terminal composer
 
@@ -410,7 +411,7 @@ See [`docs/troubleshooting.md`](docs/troubleshooting.md) for the full support gu
 | --- | --- |
 | Capture payloads, screenshots, recordings, contact sheets, and manifests | `~/.chromux/captures/<timestamp>-<unique-suffix>/` |
 | Delivery log | `~/.chromux/delivery-log.jsonl` |
-| Restore snapshot | `~/.chromux/restore-sessions.json` (schema v10; includes validated provider conversation IDs, custom tab-group membership/focus, last deliberate activity, ordered browser page/explorer tabs, optional 64 KiB Composer drafts, staged browser-context references, the full-browser Composer-open flag, up to 20 bounded historical attention records per session, and up to 200 bounded Done/Snooze inbox records; routing targets remain ephemeral and old candidate `chatMessages` are discarded) |
+| Restore snapshot | `~/.chromux/restore-sessions.json` (schema v11; includes validated provider conversation IDs, custom tab-group membership/focus, last deliberate activity, ordered browser page/explorer tabs, optional 64 KiB Composer drafts, staged browser-context references, the full-browser Composer-open flag, up to 20 bounded historical attention records per session, up to 200 bounded Done/Snooze inbox records, and sanitized dedicated Git-worktree purpose/identity metadata; routing targets remain ephemeral and old candidate `chatMessages` are discarded) |
 | Git repository catalog | `~/.chromux/git-repositories.json` (mode `0600`; at most 100 canonical host/WSL repository roots previously seen through sessions, with first/last-seen and latest associated-session activity) |
 | Prompt history | `~/.chromux/prompt-history.json` (local plaintext, mode `0600`, 100 entries/project, 5 MiB total) |
 | Saved projects | `~/.chromux/projects.json` |
@@ -422,16 +423,22 @@ See [`docs/troubleshooting.md`](docs/troubleshooting.md) for the full support gu
 
 ## Threads inbox and Git review
 
-Threads always shows **Action Required**, **Ready to Finish**, **Working**, and
-**All Sessions** in that order. The badge counts only actionable and
-ready-to-finish obligations. Use Up/Down or `j`/`k` to move through inbox
+Threads ranks sessions into **Action Required**, **Ready to Finish**,
+**Working**, then **All Sessions**, hiding empty priority sections. The badge
+counts only actionable and ready-to-finish cards. Use Up/Down or `j`/`k` to move through inbox
 items, Enter or `o` to open, `d` to mark Done, and `s` to open Snooze presets.
-A new turn or attention sequence, changed Git state, or expired snooze reopens
-the matching item.
+A new turn or attention sequence, a live-associated conflict, or expired snooze
+reopens the matching item.
 
 Git Changes catalogs repositories seen by Chromux and enumerates every linked
-worktree. Selecting a worktree opens a review drawer for bounded diffs,
-whole-file staging, explicit commit previews, and confirmed remote actions.
+worktree. Search and Action/Stale/All filters keep large catalogs bounded in
+their own view. Selecting a worktree creates or reuses one session keyed by
+runtime, distribution, and canonical path. New sessions inherit the newest
+associated agent or use Codex, open Composer, and keep every prompt unsent.
+Git-session inserts cover status review, conflict resolution, commit
+preparation, safe sync/publish, GitHub review, stale worktree/stash audit, and
+saved-mapping Vercel preparation. Chromux does not expose stage, unstage,
+commit, fetch, pull, publish, push, sync, or diff mutations through this view.
 **Forget** removes only the catalog entry; it never deletes or changes
 repository files. **Stale** means uncommitted, unpublished, or outgoing work
 whose session, changed-file, and relevant HEAD activity are all at least seven

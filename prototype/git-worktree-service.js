@@ -8,8 +8,6 @@ const CATALOG_SCHEMA_VERSION = 1;
 const MAX_REPOSITORIES = 100;
 const MAX_PATH_CHARS = 8192;
 const MAX_LABEL_CHARS = 120;
-const MAX_COMMIT_MESSAGE_CHARS = 1000;
-const MAX_DIFF_BYTES = 256 * 1024;
 const STALE_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
 
 function stableId(prefix, ...parts) {
@@ -422,198 +420,16 @@ function createGitWorktreeService({
     return { ok: true, kind: 'inventory', repositories };
   }
 
-  async function resolveTarget(request) {
-    if (!request || typeof request.repositoryId !== 'string' || typeof request.worktreeId !== 'string') {
-      return { failure: error('INVALID_TARGET', 'Repository and worktree identifiers are required.') };
-    }
-    const repository = readCatalog().find((candidate) => candidate.id === request.repositoryId);
-    if (!repository) return { failure: error('UNKNOWN_REPOSITORY', 'Repository is no longer in the local catalog.') };
-    const inspected = await inspectRepository(repository, []);
-    const worktree = inspected.worktrees.find((candidate) => candidate.id === request.worktreeId);
-    if (!worktree) return { failure: error('STALE_WORKTREE', 'The selected worktree no longer belongs to this repository.') };
-    if (worktree.error) return { failure: error('WORKTREE_UNAVAILABLE', worktree.error) };
-    return { repository, worktree };
-  }
-
-  function selectedFiles(worktree, paths) {
-    if (!Array.isArray(paths) || paths.length === 0 || paths.length > 1000) return null;
-    const available = new Set(worktree.files.flatMap((file) => [file.path, file.originalPath].filter(Boolean)));
-    const clean = [...new Set(paths)];
-    return clean.every((filePath) => boundedText(filePath, MAX_PATH_CHARS) && available.has(filePath)) ? clean : null;
-  }
-
-  async function fingerprint(repository, worktree) {
-    const response = await command(repository, worktree.path, [
-      'status', '--porcelain=v2', '-z', '--branch', '--untracked-files=all',
-    ], { timeout: 8000 });
-    return response.ok
-      ? crypto.createHash('sha256').update(response.stdout).digest('hex')
-      : null;
-  }
-
-  async function diff(request) {
-    const target = await resolveTarget(request);
-    if (target.failure) return target.failure;
-    const { repository, worktree } = target;
-    const paths = selectedFiles(worktree, [request.path]);
-    if (!paths) return error('STALE_FILE', 'The selected file is no longer changed in this worktree.');
-    const file = worktree.files.find((candidate) => candidate.path === request.path || candidate.originalPath === request.path);
-    if (file.index === '?' && file.worktree === '?') {
-      let absolute;
-      try {
-        absolute = await canonicalize({ runtime: repository.runtime, distro: repository.distro, cwd: worktree.path, child: file.path });
-      } catch {
-        return error('FILE_UNAVAILABLE', 'The untracked file could not be resolved safely.');
-      }
-      if (repository.runtime !== 'host') {
-        const response = await command(repository, worktree.path, ['diff', '--no-index', '--no-color', '--', '/dev/null', file.path], { timeout: 8000 });
-        const text = response.stdout || response.stderr || '';
-        return { ok: true, kind: 'diff', text: text.slice(0, MAX_DIFF_BYTES), truncated: text.length > MAX_DIFF_BYTES, binary: false };
-      }
-      let data;
-      try {
-        const stats = fs.statSync(absolute);
-        if (!stats.isFile()) return error('FILE_UNAVAILABLE', 'The selected path is not a regular file.');
-        if (stats.size > MAX_DIFF_BYTES) return { ok: true, kind: 'diff', text: '', truncated: true, binary: false, size: stats.size };
-        data = fs.readFileSync(absolute);
-      } catch {
-        return error('FILE_UNAVAILABLE', 'The selected file could not be read.');
-      }
-      if (data.includes(0)) return { ok: true, kind: 'diff', text: '', truncated: false, binary: true, size: data.length };
-      return { ok: true, kind: 'diff', text: data.toString('utf8'), truncated: false, binary: false, untracked: true };
-    }
-    const args = ['diff', '--no-ext-diff', '--no-color'];
-    if (request.staged) args.push('--cached');
-    args.push('--', request.path);
-    const response = await command(repository, worktree.path, args, { timeout: 8000, maxBuffer: MAX_DIFF_BYTES * 2 });
-    if (!response.ok) return error('DIFF_FAILED', 'Git could not produce this diff.', response.stderr);
-    const bytes = Buffer.byteLength(response.stdout);
-    const binary = /Binary files .* differ|GIT binary patch/.test(response.stdout);
-    return {
-      ok: true,
-      kind: 'diff',
-      text: binary ? '' : Buffer.from(response.stdout).subarray(0, MAX_DIFF_BYTES).toString('utf8'),
-      truncated: bytes > MAX_DIFF_BYTES,
-      binary,
-      size: bytes,
-    };
-  }
-
-  async function mutateFiles(request, mode) {
-    const target = await resolveTarget(request);
-    if (target.failure) return target.failure;
-    const { repository, worktree } = target;
-    if (worktree.locked) return error('LOCKED_WORKTREE', `Git reports this worktree as locked: ${worktree.locked}`);
-    if (worktree.conflicted && mode === 'unstage') {
-      return error('CONFLICTED_WORKTREE', 'Resolve conflicts before changing the staged conflict state.');
-    }
-    const paths = selectedFiles(worktree, request.paths);
-    if (!paths) return error('STALE_FILE', 'One or more selected files are no longer changed.');
-    const args = mode === 'stage'
-      ? ['add', '--', ...paths]
-      : ['restore', '--staged', '--', ...paths];
-    if (mode === 'unstage' && worktree.unborn) {
-      args.splice(0, args.length, 'rm', '--cached', '--', ...paths);
-    }
-    const response = await command(repository, worktree.path, args, { timeout: 15000 });
-    if (!response.ok) return error(`${mode.toUpperCase()}_FAILED`, `Git ${mode} failed.`, response.stderr);
-    return { ok: true, kind: mode, repositoryId: repository.id, worktreeId: worktree.id };
-  }
-
-  async function commitPreview(request) {
-    const target = await resolveTarget(request);
-    if (target.failure) return target.failure;
-    const { repository, worktree } = target;
-    if (worktree.locked) return error('LOCKED_WORKTREE', `Git reports this worktree as locked: ${worktree.locked}`);
-    const message = typeof request.message === 'string' ? request.message.trim() : '';
-    if (!message || message.length > MAX_COMMIT_MESSAGE_CHARS || message.includes('\0')) {
-      return error('INVALID_MESSAGE', `Enter a commit message between 1 and ${MAX_COMMIT_MESSAGE_CHARS} characters.`);
-    }
-    const stagedFiles = worktree.files.filter((file) => ![' ', '?', '.'].includes(file.index));
-    if (stagedFiles.length === 0) return error('NOTHING_STAGED', 'Stage at least one whole file before committing.');
-    return {
-      ok: true,
-      kind: 'commit-preview',
-      repositoryId: repository.id,
-      worktreeId: worktree.id,
-      target: worktree.path,
-      branch: worktree.branch,
-      message,
-      files: stagedFiles.map((file) => file.path),
-      fingerprint: await fingerprint(repository, worktree),
-      warning: 'Repository commit hooks will execute.',
-    };
-  }
-
-  async function commit(request) {
-    const preview = await commitPreview(request);
-    if (!preview.ok) return preview;
-    if (!request.fingerprint || request.fingerprint !== preview.fingerprint) {
-      return error('PREVIEW_STALE', 'The staged state changed after preview. Review the commit again.');
-    }
-    const repository = readCatalog().find((candidate) => candidate.id === request.repositoryId);
-    if (!repository) return error('UNKNOWN_REPOSITORY', 'Repository was forgotten after the commit preview.');
-    const response = await command(repository, preview.target, ['commit', '-m', preview.message], { timeout: 120000 });
-    if (!response.ok) return error('COMMIT_FAILED', 'Commit failed. Hooks may have rejected or changed the commit.', response.stderr);
-    return { ok: true, kind: 'commit', output: response.stdout.trim(), target: preview.target };
-  }
-
-  async function remoteAction(request, action) {
-    const target = await resolveTarget(request);
-    if (target.failure) return target.failure;
-    const { repository, worktree } = target;
-    if (worktree.locked) return error('LOCKED_WORKTREE', `Git reports this worktree as locked: ${worktree.locked}`);
-    if (worktree.conflicted) return error('CONFLICTED_WORKTREE', 'Resolve conflicts before running remote operations.');
-    const remotesResponse = await command(repository, worktree.path, ['remote'], { timeout: 3000 });
-    const remotes = remotesResponse.ok ? remotesResponse.stdout.split(/\r?\n/).filter(Boolean) : [];
-    const upstreamRemote = worktree.upstream && worktree.upstream.includes('/')
-      ? worktree.upstream.split('/')[0] : null;
-    const remote = upstreamRemote || (remotes.includes('origin') ? 'origin' : remotes[0]);
-    let args;
-    if (action === 'fetch') args = remote ? ['fetch', remote] : ['fetch', '--all'];
-    else if (action === 'pull') {
-      if (!worktree.upstream) return error('NO_UPSTREAM', 'Publish this branch before pulling.');
-      args = ['pull', '--ff-only'];
-    } else if (action === 'push') {
-      if (!worktree.upstream) return error('NO_UPSTREAM', 'Publish this branch before pushing.');
-      args = ['push'];
-    } else if (action === 'publish') {
-      if (!remote || !worktree.branch || worktree.detached) return error('CANNOT_PUBLISH', 'A named branch and configured remote are required.');
-      args = ['push', '--set-upstream', remote, worktree.branch];
-    } else if (action === 'sync') {
-      if (!worktree.upstream) return error('NO_UPSTREAM', 'Publish this branch before syncing.');
-      const pull = await command(repository, worktree.path, ['pull', '--ff-only'], { timeout: 120000, network: true });
-      if (!pull.ok) return error('SYNC_PULL_FAILED', 'Sync stopped because the fast-forward pull failed.', pull.stderr);
-      args = ['push'];
-    } else {
-      return error('INVALID_ACTION', 'Unsupported Git action.');
-    }
-    const response = await command(repository, worktree.path, args, { timeout: 120000, network: true });
-    if (!response.ok) return error(`${action.toUpperCase()}_FAILED`, `Git ${action} failed.`, response.stderr);
-    return { ok: true, kind: action, target: worktree.path, effect: args.join(' '), output: response.stdout.trim() };
-  }
-
   return {
     catalog,
     forget,
     observe,
     inventory,
-    diff,
-    stage: (request) => mutateFiles(request, 'stage'),
-    unstage: (request) => mutateFiles(request, 'unstage'),
-    commitPreview,
-    commit,
-    fetch: (request) => remoteAction(request, 'fetch'),
-    pull: (request) => remoteAction(request, 'pull'),
-    publish: (request) => remoteAction(request, 'publish'),
-    push: (request) => remoteAction(request, 'push'),
-    sync: (request) => remoteAction(request, 'sync'),
   };
 }
 
 module.exports = {
   CATALOG_SCHEMA_VERSION,
-  MAX_DIFF_BYTES,
   STALE_AFTER_MS,
   createGitWorktreeService,
   normalizeCatalogRecord,

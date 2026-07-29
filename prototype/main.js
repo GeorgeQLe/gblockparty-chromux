@@ -1507,6 +1507,26 @@ function sanitizeRestoreSession(session) {
     try { cwd = windowsPathToLinux(cwd); } catch { /* retain unresolved legacy POSIX path */ }
   }
   const agent = KNOWN_AGENTS.includes(session.agent) ? session.agent : '';
+  const requestedGitPurpose = session.sessionPurpose === 'git-worktree';
+  const identity = session.worktreeIdentity && typeof session.worktreeIdentity === 'object'
+    ? session.worktreeIdentity : null;
+  const identityRuntime = identity?.runtime === 'wsl' ? 'wsl' : 'host';
+  const identityDistro = identityRuntime === 'wsl'
+    && typeof identity?.distro === 'string' && identity.distro
+    ? identity.distro.slice(0, 200) : null;
+  const identityPath = typeof identity?.path === 'string'
+    && identity.path.length > 0
+    && identity.path.length <= MAX_RESTORE_PATH_CHARS
+    && !identity.path.includes('\0')
+    && (identityRuntime === 'wsl' ? identity.path.startsWith('/') : path.isAbsolute(identity.path))
+    ? identity.path : null;
+  const validWorktreeIdentity = requestedGitPurpose
+    && identityPath
+    && identityPath === cwd
+    && identityRuntime === runtime
+    && (runtime !== 'wsl' || identityDistro === distro)
+    ? { runtime: identityRuntime, distro: identityDistro, path: identityPath }
+    : null;
   const queue = Array.isArray(session.queue)
     ? session.queue.slice(0, 50).map((item) => ({
       url: typeof item.url === 'string' ? item.url : '',
@@ -1592,6 +1612,9 @@ function sanitizeRestoreSession(session) {
     unresolved: runtime === 'wsl' && !runtimeState.distros.some((candidate) => candidate.name === distro && candidate.version === 2),
     cwd,
     agent,
+    ...(validWorktreeIdentity
+      ? { sessionPurpose: 'git-worktree', worktreeIdentity: validWorktreeIdentity }
+      : {}),
     resumeId: sanitizeResumeId(session.resumeId),
     ...(typeof session.customTabGroupId === 'string' && CUSTOM_TAB_GROUP_ID_RE.test(session.customTabGroupId)
       ? { customTabGroupId: session.customTabGroupId }
@@ -1660,7 +1683,7 @@ function writeRestoreSnapshot({
       lastActivityAt: normalizedActivityTimestamp(session.lastActivityAt, snapshotSavedAt),
     })) : [];
   const payload = {
-    schemaVersion: 10,
+    schemaVersion: 11,
     restoreId: restoreId || `restore-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     reason,
     savedAt: snapshotSavedAt,
@@ -1705,6 +1728,10 @@ function readRestoreSnapshot() {
         delete clean.stagedBrowserContexts;
         clean.browserLayoutMode = 'terminal';
         clean.fullBrowserComposerOpen = false;
+      }
+      if (schemaVersion < 11) {
+        delete clean.sessionPurpose;
+        delete clean.worktreeIdentity;
       }
       delete clean.chatMessages;
       delete clean.chatOpen;
@@ -1946,7 +1973,7 @@ function createWindow() {
           if (process.env.CHROMUX_E2E_OUT) fs.writeFileSync(process.env.CHROMUX_E2E_OUT, String(result));
           else console.log('E2E_RESULT:', result);
         } catch (err) {
-          console.log('E2E_FAIL:', err.message);
+          console.log('E2E_FAIL:', err && err.stack ? err.stack : err.message);
         }
         if (process.env.CHROMUX_SHOT) {
           const img = await win.webContents.capturePage();
@@ -3450,14 +3477,6 @@ ipcMain.handle('git-repositories-read', () => gitWorktrees.catalog());
 ipcMain.handle('git-repository-observe', (_e, request = {}) => gitWorktrees.observe(request));
 ipcMain.handle('git-repository-forget', (_e, repositoryId) => gitWorktrees.forget(repositoryId));
 ipcMain.handle('git-worktree-inventory', (_e, request = {}) => gitWorktrees.inventory(request));
-ipcMain.handle('git-worktree-diff', (_e, request = {}) => gitWorktrees.diff(request));
-ipcMain.handle('git-worktree-stage', (_e, request = {}) => gitWorktrees.stage(request));
-ipcMain.handle('git-worktree-unstage', (_e, request = {}) => gitWorktrees.unstage(request));
-ipcMain.handle('git-worktree-commit-preview', (_e, request = {}) => gitWorktrees.commitPreview(request));
-ipcMain.handle('git-worktree-commit', (_e, request = {}) => gitWorktrees.commit(request));
-for (const action of ['fetch', 'pull', 'publish', 'push', 'sync']) {
-  ipcMain.handle(`git-worktree-${action}`, (_e, request = {}) => gitWorktrees[action](request));
-}
 ipcMain.handle('vercel-capability', (_e, location = {}) => vercel.capability(location));
 ipcMain.handle('vercel-connections-read', () => vercel.connections());
 ipcMain.handle('vercel-connect-cli', (_e, request = {}) => vercel.connectCli(request));

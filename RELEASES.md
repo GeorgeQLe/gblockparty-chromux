@@ -1,8 +1,34 @@
 # Release Notes
 
+## GBlockParty Chromux v0.74.0
+
+Tag: `chromux-v0.74.0`
+
+- Restore Threads as a session-first inbox: rank every live session into
+  exactly one of Action Required, Ready to Finish, Working, or All Sessions;
+  combine its reasons on the highest-priority card; hide empty priority
+  sections; and report accurate counts.
+- Keep ordinary dirty, ahead, unpublished, and stale worktrees in Git mode.
+  Only a conflict associated with a live session enters Action Required, where
+  its action opens the dedicated Git session.
+- Replace the embedded Git mutation drawer with a searchable
+  Action/Stale/All worktree navigator. Selecting a canonical worktree creates
+  or reuses `Git · <branch>`, inherits the newest associated agent or Codex,
+  preserves existing terminal/draft state, and opens an editable unsent status
+  review in Composer.
+- Add bounded Git-session prompt inserts for status, conflict, commit,
+  sync/publish, GitHub, stale-state, and saved-mapping Vercel preparation.
+  Remove renderer, preload, IPC, and service exposure for diff, stage,
+  unstage, commit, fetch, pull, publish, push, and sync mutations.
+- Advance restore snapshots to schema v11 with sanitized, path-matched
+  `git-worktree` session identity so dedicated sessions remain reusable after
+  restart.
+- Absorb the unpublished v0.73.0 source candidate into this release without
+  creating or moving a v0.73.0 tag.
+
 ## GBlockParty Chromux v0.73.0
 
-Planned tag: `chromux-v0.73.0`
+Unpublished candidate; superseded by `chromux-v0.74.0`.
 
 - Add a Windows-only, keyboard-accessible, five-stage first-run setup and
   diagnostics wizard with resumable WSL2 selection, required Bash/Git/Node

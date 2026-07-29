@@ -6,6 +6,14 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Restore Threads as a single-placement session inbox, move ordinary Git
+  obligations to a searchable worktree navigator, replace the embedded Git
+  mutation drawer with reusable dedicated Git agent sessions and unsent
+  Composer inserts, advance restore snapshots to schema v11, and ship v0.74.0.
+  _(source: user-supplied Restore Threads and Replace Embedded Git Review plan;
+  evidence: renderer/main/preload/service changes, focused and complete
+  prototype coverage, package metadata, docs, and `RELEASES.md`)_
+
 - [x] Make browser queue attention intentional and turn-aware: add authenticated
   MCP/OSC submissions, persist browser-versus-attention visibility, bound
   terminal candidates to the current agent turn, keep terminal fallback out of

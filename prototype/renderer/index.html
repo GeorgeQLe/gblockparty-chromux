@@ -49,6 +49,7 @@
           </button>
           <button class="rail-mode-btn" data-rail-mode="git" aria-label="Git changes" title="Track Git working-copy changes" aria-pressed="false">
             <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="15" r="2"/><circle cx="14" cy="10" r="2"/><path d="M6 7v6m2-6.4 4.2 2.5"/></svg>
+            <span id="rail-git-count" class="rail-count zero">0</span>
           </button>
         </nav>
         <div class="rail-head">
@@ -62,6 +63,14 @@
             <path d="M3 4h14l-5.4 6.2v4.3l-3.2 1.6v-4.9z"/>
           </svg>
         </button>
+        <div id="git-toolbar" class="git-toolbar hidden" role="search" aria-label="Filter Git worktrees">
+          <input id="git-search" type="search" placeholder="Search branch or path" aria-label="Search Git worktrees" autocomplete="off" spellcheck="false">
+          <div class="git-filter-group" role="group" aria-label="Git worktree filter">
+            <button type="button" data-git-filter="action" aria-pressed="true">ACTION</button>
+            <button type="button" data-git-filter="stale" aria-pressed="false">STALE</button>
+            <button type="button" data-git-filter="all" aria-pressed="false">ALL</button>
+          </div>
+        </div>
       </div>
       <div id="thread-list"></div>
       <div class="rail-foot">
@@ -107,18 +116,6 @@
       </main>
     </div>
   </div>
-
-  <aside id="git-review-drawer" class="git-review-drawer hidden" role="dialog" aria-modal="true" aria-labelledby="git-review-title">
-    <header class="git-review-header">
-      <div>
-        <span class="microlabel">REPOSITORY REVIEW</span>
-        <h2 id="git-review-title">WORKTREE</h2>
-      </div>
-      <button id="git-review-close" class="icon-btn" type="button" aria-label="Close Git review">×</button>
-    </header>
-    <div id="git-review-body" class="git-review-body"></div>
-  </aside>
-  <div id="git-review-scrim" class="git-review-scrim hidden"></div>
 
   <div id="session-search-panel" class="session-search-panel hidden" role="dialog" aria-label="Search sessions">
     <label class="session-search-field">

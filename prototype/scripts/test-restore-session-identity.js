@@ -169,6 +169,33 @@ fs.writeFileSync(e2ePath, `
   expect(schemaTenQueue.sessions[0].queue[0].visibility === 'browser'
     && schemaTenQueue.sessions[0].queue[1].visibility === 'attention',
   'schema v10 should preserve explicit browser visibility and default legacy queue records to attention');
+  expect(!Object.prototype.hasOwnProperty.call(schemaTenQueue.sessions[0], 'sessionPurpose')
+    && !Object.prototype.hasOwnProperty.call(schemaTenQueue.sessions[0], 'worktreeIdentity'),
+  'schema v10 should migrate without dedicated Git-session identity');
+
+  const schemaEleven = await window.chromuxTest.restorePayload({
+    schemaVersion: 11,
+    savedAt: legacySavedAt,
+    sessions: [
+      { name: 'git-valid', cwd: ${JSON.stringify(shared)}, agent: 'codex',
+        sessionPurpose: 'git-worktree',
+        worktreeIdentity: { runtime: 'host', distro: null, path: ${JSON.stringify(shared)} } },
+      { name: 'git-stale-path', cwd: ${JSON.stringify(shared)}, agent: 'codex',
+        sessionPurpose: 'git-worktree',
+        worktreeIdentity: { runtime: 'host', distro: null, path: ${JSON.stringify(path.join(shared, 'other'))} } },
+      { name: 'git-invalid-purpose', cwd: ${JSON.stringify(shared)}, agent: 'codex',
+        sessionPurpose: 'arbitrary',
+        worktreeIdentity: { runtime: 'host', distro: null, path: ${JSON.stringify(shared)} } },
+    ],
+  });
+  expect(schemaEleven.sessions[0].sessionPurpose === 'git-worktree'
+    && schemaEleven.sessions[0].worktreeIdentity.path === ${JSON.stringify(shared)}
+    && schemaEleven.sessions[0].worktreeIdentity.runtime === 'host',
+  'schema v11 should preserve bounded matching Git-worktree identity');
+  expect(!Object.prototype.hasOwnProperty.call(schemaEleven.sessions[1], 'sessionPurpose')
+    && !Object.prototype.hasOwnProperty.call(schemaEleven.sessions[1], 'worktreeIdentity')
+    && !Object.prototype.hasOwnProperty.call(schemaEleven.sessions[2], 'sessionPurpose'),
+  'schema v11 should discard stale or unsupported session identity metadata');
 
   const exact = await window.chromux.resolveRestoreSessions({ sessions: [
     { name: 'tab-a', cwd: ${JSON.stringify(shared)}, agent: 'claude', resumeId: ${JSON.stringify(ids.exactA)} },
@@ -228,6 +255,8 @@ fs.writeFileSync(e2ePath, `
     { id: 'bad-state', state: 'ignored', updatedAt: '2026-07-23T01:02:03.000Z' },
   ], sessions: [
     { name: 'valid', cwd: ${JSON.stringify(shared)}, agent: 'claude', resumeId: ${JSON.stringify(ids.exactB)}, composerDraft: 'saved draft',
+      sessionPurpose: 'git-worktree',
+      worktreeIdentity: { runtime: 'host', distro: null, path: ${JSON.stringify(shared)} },
       customTabGroupId: 'group-saved-valid', wasActive: true, wasLastActiveInGroup: true,
       chatMessages: [{ id: 'discard-saved', role: 'assistant', text: 'discard',
         createdAt: '2026-07-23T01:02:04.000Z', source: 'terminal',
@@ -259,24 +288,27 @@ fs.writeFileSync(e2ePath, `
         { id: 'bad-time:1', type: 'delivery', detail: 'no', occurredAt: 0 },
       ] },
   ] });
-  expect(saved.schemaVersion === 10, 'new snapshot must use schema v10');
+  expect(saved.schemaVersion === 11, 'new snapshot must use schema v11');
   expect(saved.inboxTriage.length === 2
     && saved.inboxTriage[0].state === 'done'
     && saved.inboxTriage[1].state === 'snoozed',
-  'schema v10 should bound and sanitize Done/Snooze inbox records');
+  'schema v11 should retain bounded schema-v10 Done/Snooze inbox records');
   expect(saved.sessions[0].lastActivityAt === '2026-07-23T01:02:03.000Z'
     && typeof saved.sessions[1].lastActivityAt === 'string',
-  'schema v10 should retain schema-v7 activity timestamps and provide a valid fallback for malformed or absent activity');
+  'schema v11 should retain schema-v7 activity timestamps and provide a valid fallback for malformed or absent activity');
   expect(saved.sessions[0].resumeId === ${JSON.stringify(ids.exactB)}, 'valid resumeId not persisted');
   expect(saved.sessions[0].customTabGroupId === 'group-saved-valid'
     && saved.sessions[0].wasActive === true && saved.sessions[0].wasLastActiveInGroup === true,
-  'schema v10 group membership and focus metadata did not round-trip');
+  'schema v11 group membership and focus metadata did not round-trip');
   expect(!Object.prototype.hasOwnProperty.call(saved.sessions[0], 'chatMessages')
     && !Object.prototype.hasOwnProperty.call(saved.sessions[0], 'chatOpen')
     && saved.sessions[0].stagedBrowserContexts.length === 1
     && saved.sessions[0].browserLayoutMode === 'browserChromux'
     && saved.sessions[0].fullBrowserComposerOpen === true,
-  'schema v10 Composer context and presentation metadata did not round-trip');
+  'schema v11 Composer context and presentation metadata did not round-trip');
+  expect(saved.sessions[0].sessionPurpose === 'git-worktree'
+    && saved.sessions[0].worktreeIdentity.path === ${JSON.stringify(shared)},
+  'schema v11 Git-worktree purpose and identity did not round-trip');
   expect(!Object.prototype.hasOwnProperty.call(saved.sessions[0], 'resume')
     && !Object.prototype.hasOwnProperty.call(saved.sessions[0], 'agentMessagePreview'),
   'transient DETECT name/excerpt metadata must not enter restore snapshots');
