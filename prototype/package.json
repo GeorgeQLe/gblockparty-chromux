@@ -61,6 +61,7 @@
     "test:capture-main-integration": "node scripts/test-capture-main-integration.js",
     "uat:capture-delivery-recovery": "node scripts/test-capture-delivery-recovery.js --write-report",
     "test:preview-queue-renderer": "node scripts/test-preview-queue-renderer.js",
+    "test:browser-queue": "node scripts/test-browser-queue.js",
     "test:preview-probe": "node scripts/test-preview-probe.js",
     "test:favorites-renderer": "node scripts/test-favorites-renderer.js",
     "test:projects-renderer": "node scripts/test-projects-renderer.js",

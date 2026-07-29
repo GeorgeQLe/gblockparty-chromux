@@ -6,6 +6,14 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Make browser queue attention intentional and turn-aware: add authenticated
+  MCP/OSC submissions, persist browser-versus-attention visibility, bound
+  terminal candidates to the current agent turn, keep terminal fallback out of
+  Threads/session/group badges, document the contract, and ship v0.72.0.
+  _(source: user-supplied Intentional, Turn-Aware Browser Queue Links plan;
+  evidence: `prototype/browser-queue.js`, MCP/control/renderer integration,
+  preview/MCP/turn/restore coverage, package metadata, docs, and `RELEASES.md`)_
+
 - [ ] Complete the v0.71.0 one-button Vercel shipping workflow. Main-process
   runtime discovery, encrypted CLI/token/OAuth profile primitives, canonical
   linked-root/project persistence, narrow IPC, security documentation, and

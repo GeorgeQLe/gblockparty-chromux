@@ -47,18 +47,19 @@ let finished = false;
 child.stdout.on('data', (chunk) => {
   output += chunk;
   const lines = output.trim().split('\n').filter(Boolean);
-  if (lines.length < 5 || finished) return;
+  if (lines.length < 6 || finished) return;
   finished = true;
   try {
-    const responses = lines.slice(0, 5).map(JSON.parse);
+    const responses = lines.slice(0, 6).map(JSON.parse);
     const initialize = responses.find((response) => response.id === 1);
     const listed = responses.find((response) => response.id === 2);
     const imageRead = responses.find((response) => response.id === 3);
     const yamlRead = responses.find((response) => response.id === 4);
     const unavailable = responses.find((response) => response.id === 5);
+    const previewUnavailable = responses.find((response) => response.id === 6);
 
     assert.equal(initialize.result.serverInfo.name, 'chromux-resource-broker');
-    assert.equal(initialize.result.serverInfo.version, '0.65.0');
+    assert.equal(initialize.result.serverInfo.version, '0.72.0');
     assert.deepEqual(initialize.result.capabilities.resources, { subscribe: false, listChanged: false });
     const names = listed.result.tools.map((tool) => tool.name);
     for (const expected of [
@@ -74,6 +75,7 @@ child.stdout.on('data', (chunk) => {
       'chromux_capture_screenshot',
       'chromux_record_start',
       'chromux_record_stop',
+      'chromux_browser_queue_add',
     ]) {
       assert(names.includes(expected), `missing ${expected}`);
     }
@@ -90,12 +92,18 @@ child.stdout.on('data', (chunk) => {
       listed.result.tools.find((tool) => tool.name === 'chromux_capture_targets_list').annotations.readOnlyHint,
       true,
     );
+    const browserQueue = listed.result.tools.find((tool) => tool.name === 'chromux_browser_queue_add');
+    assert.deepEqual(browserQueue.inputSchema.required, ['url']);
+    assert.equal(browserQueue.inputSchema.properties.url.maxLength, 4096);
+    assert.equal(browserQueue.inputSchema.properties.reason.maxLength, 240);
+    assert.equal(browserQueue.annotations.readOnlyHint, false);
 
     assert.equal(imageRead.result.contents[0].mimeType, 'image/png');
     assert.equal(imageRead.result.contents[0].blob, png.toString('base64'));
     assert.equal(yamlRead.result.contents[0].mimeType, 'application/yaml');
     assert(yamlRead.result.contents[0].text.includes(`chromux://capture/${artifact.artifactId}/screenshot.png`));
     assert(unavailable.error.message.includes('Chromux is not running'));
+    assert(previewUnavailable.error.message.includes('Chromux is not running'));
   } catch (error) {
     console.error(error.stack);
     process.exitCode = 1;
@@ -121,4 +129,10 @@ child.stdin.write(`${JSON.stringify({
   id: 5,
   method: 'tools/call',
   params: { name: 'chromux_capture_targets_list', arguments: {} },
+})}\n`);
+child.stdin.write(`${JSON.stringify({
+  jsonrpc: '2.0',
+  id: 6,
+  method: 'tools/call',
+  params: { name: 'chromux_browser_queue_add', arguments: { url: 'https://example.com/intentional', reason: 'review it' } },
 })}\n`);

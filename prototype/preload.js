@@ -18,6 +18,8 @@ contextBridge.exposeInMainWorld('chromux', {
   // capture + delivery
   capturePrepare: (payload, pngBase64) => ipcRenderer.invoke('capture-prepare', { payload, pngBase64 }),
   onCaptureControlRequest: (cb) => ipcRenderer.on('capture-control-request', (_e, message) => cb(message)),
+  onBrowserQueueRequest: (cb) => ipcRenderer.on('browser-queue-request', (_e, message) => cb(message)),
+  browserQueueRespond: (message) => ipcRenderer.send('browser-queue-response', message),
   captureControlRespond: (message) => ipcRenderer.send('capture-control-response', message),
   captureRecordChunk: (message) => ipcRenderer.send('capture-record-chunk', message),
   captureRecordComplete: (message) => ipcRenderer.send('capture-record-complete', message),
@@ -43,6 +45,7 @@ contextBridge.exposeInMainWorld('chromux', {
   projectConfig: (cwd) => ipcRenderer.invoke('project-config', cwd),
   projectScriptResolve: (cwd, script) => ipcRenderer.invoke('project-script-resolve', { cwd, script }),
   previewProbe: (url) => ipcRenderer.invoke('preview-probe', url),
+  browserQueueValidate: (request) => ipcRenderer.invoke('browser-queue-validate', request || {}),
   gitRoot: (cwd) => ipcRenderer.invoke('git-root', cwd),
   gitDiffSummary: (cwd) => ipcRenderer.invoke('git-diff-summary', cwd),
   gitRepositoriesRead: () => ipcRenderer.invoke('git-repositories-read'),

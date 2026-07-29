@@ -296,7 +296,8 @@
 
     const focused = session.id === activeId;
     const items = [];
-    const queue = session.browser && Array.isArray(session.browser.queue) ? session.browser.queue : [];
+    const queue = session.browser && Array.isArray(session.browser.queue)
+      ? session.browser.queue.filter((item) => item.visibility !== 'browser') : [];
     if (!focused && queue.length > 0) {
       const next = queue[0];
       const detail = next.reason ? `${next.reason}: ${next.url}` : next.url;
@@ -481,9 +482,10 @@
       expectedTabIndicator: projectSessionStatus(session, activityIndicators).kind,
       projectedKinds: sessionItems.map((item) => item.kind),
       projectedOrder: projected.map((item) => item.id),
-      queueCount: session.browser && Array.isArray(session.browser.queue) ? session.browser.queue.length : 0,
-      queueHead: session.browser && Array.isArray(session.browser.queue) && session.browser.queue[0]
-        ? session.browser.queue[0].url : null,
+      queueCount: session.browser && Array.isArray(session.browser.queue)
+        ? session.browser.queue.filter((item) => item.visibility !== 'browser').length : 0,
+      queueHead: session.browser && Array.isArray(session.browser.queue)
+        ? (session.browser.queue.find((item) => item.visibility !== 'browser')?.url || null) : null,
       updatePhase: updateQueue && updateQueue.phase || 'idle',
     };
   }

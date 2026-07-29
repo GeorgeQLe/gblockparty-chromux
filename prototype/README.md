@@ -283,7 +283,11 @@ images and private local `chromux://capture/...` resources. See
    rollout-file index and the existing terminal/directory label.
 2. **Approve the preview** — run your dev server (or ask the agent to). When the terminal
    prints `http://localhost:5173` (or any loopback URL, or an absolute `/path/to/page.html`),
-   Chromux queues it in the badged **QUEUE** — nothing auto-opens. Approve with queue
+   Chromux keeps a bounded candidate set for the current agent turn and queues candidates
+   at its actionable/completion boundary. Uninstrumented sessions retain a delayed
+   compatibility fallback. These detected targets appear in the paired browser's **QUEUE**
+   without creating Threads or session-tab attention. Intentional MCP/OSC requests and
+   page popups also appear in those attention surfaces. Nothing auto-opens. Approve with queue
    **OPEN**, click a terminal link, or type a URL in the browser bar and hit ⏎.
    Loopback rows show **CHECKING…**, **READY**, or **SERVER OFFLINE** from a bounded TCP probe.
    Offline rows offer **RECHECK** and **START SERVER…**. The launcher reads only the originating

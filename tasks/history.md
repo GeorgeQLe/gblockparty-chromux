@@ -1408,3 +1408,47 @@
   complete the active Vercel shipping engine while the Windows signing
   environments, credentials, runners, and prior signed installer are
   provisioned.
+
+## 2026-07-28 — Intentional, turn-aware browser queue links
+
+- Added authenticated MCP and OSC browser queue submissions with structured
+  queued/already-queued/refreshed outcomes.
+- Made terminal URL/file discovery a bounded current-turn browser-only fallback
+  and removed it from Threads plus session/group attention badges.
+- Persisted queue visibility, retained legacy restore behavior, documented the
+  explicit signal contract, and prepared the v0.72.0 release.
+- Ship manifest — User goal: make browser queue attention intentional and
+  turn-aware, then publish v0.72.0. Changed feature files:
+  `prototype/browser-queue.js`, main/preload/control/MCP/renderer integration,
+  attention and signal domains, preview/resource/restore/group tests, package
+  metadata, README/resource/privacy/troubleshooting docs, `RELEASES.md`, and
+  task records. Per-file purpose and user-goal mapping: the validation module
+  owns bounded authenticated URL admission and WSL file bridging; main/preload
+  bridge the existing local control socket and renderer; renderer/attention
+  own candidate lifecycle, persisted visibility, shared queue outcomes, and
+  presentation filtering; tests prove boundaries and compatibility; docs and
+  metadata define the public contract and release.
+- Executable verification: changed JavaScript passed `node --check`; browser
+  queue validation, preview renderer, restore identity, group badge, resource
+  broker/MCP, and turn-signal focused tests passed; the complete registered
+  prototype matrix passed twice, including synchronized output, attention
+  diagnostics, session rail, shortcuts, browser lifecycle, Windows platform,
+  and the adjacent Vercel worktree suites. Source smoke passed. The final
+  macOS arm64 package built with both plist version fields at `0.72.0`, and its
+  packaged smoke passed.
+- Adversarial review traced missing/exited/wrong-session/wrong-token callers,
+  unequal token lengths, credential-bearing/unsupported/oversized URLs,
+  missing/directory local targets, async file-validation turn races, WSL file
+  URL conversion, queue/candidate bounds, duplicate upgrades, open refreshes,
+  exit/new-input cleanup, legacy restore defaults, browser-only restore
+  persistence, and every Threads/tab/group/count projection. It fixed restore
+  sanitization dropping visibility, WSL returning an unloadable Linux file
+  URL, and stale async file validation crossing into a newer turn.
+- Skipped tests and residual risk: real Windows/WSL interactive MCP invocation
+  was not available on this macOS host; deterministic bridge/validation and
+  Windows platform tests passed. No live external agent called the MCP tool;
+  the same control transport is covered by integration and app-not-running
+  contract tests. The packager's established optional `.icon` probe warning
+  was accepted because the bundle was produced and smoked. Rollback: revert the
+  v0.72.0 feature commit and release/tag; queue restore remains backward
+  compatible because legacy records default to attention visibility.

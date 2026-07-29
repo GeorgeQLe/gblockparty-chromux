@@ -1,6 +1,9 @@
 // Chromux — deterministic agent-attention signals (wire protocols v1 + v2).
 // Extracts Chromux OSC sequences from PTY output:
 //   ESC ] 777 ; chromux ; v1 ; <event> ; <session-id> [ ; <detail-b64url> ] BEL
+//   ESC ] 777 ; chromux ; v2 ; <base64url JSON envelope> BEL
+// v2 also carries authenticated `browser-preview` envelopes; renderer.js
+// validates and routes those separately from turn lifecycle envelopes.
 // (ST — ESC \ — is accepted as an alternate terminator.)
 //
 // Chunk-boundary safe: a trailing fragment that could still become a Chromux

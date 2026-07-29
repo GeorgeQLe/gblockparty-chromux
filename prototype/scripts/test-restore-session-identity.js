@@ -154,6 +154,22 @@ fs.writeFileSync(e2ePath, `
   expect(Array.isArray(schemaNine.inboxTriage) && schemaNine.inboxTriage.length === 0,
     'schema v9 should migrate with empty inbox triage state');
 
+  const schemaTenQueue = await window.chromuxTest.restorePayload({
+    schemaVersion: 10,
+    savedAt: legacySavedAt,
+    sessions: [{
+      name: 'queue-visibility', cwd: ${JSON.stringify(shared)}, agent: 'codex',
+      queue: [
+        { url: 'https://example.com/browser-only', source: 'TERM',
+          reason: 'detected in agent output', visibility: 'browser', ts: 1 },
+        { url: 'https://example.com/legacy', source: 'TERM', ts: 2 },
+      ],
+    }],
+  });
+  expect(schemaTenQueue.sessions[0].queue[0].visibility === 'browser'
+    && schemaTenQueue.sessions[0].queue[1].visibility === 'attention',
+  'schema v10 should preserve explicit browser visibility and default legacy queue records to attention');
+
   const exact = await window.chromux.resolveRestoreSessions({ sessions: [
     { name: 'tab-a', cwd: ${JSON.stringify(shared)}, agent: 'claude', resumeId: ${JSON.stringify(ids.exactA)} },
     { name: 'tab-b', cwd: ${JSON.stringify(shared)}, agent: 'claude', resumeId: ${JSON.stringify(ids.exactB)} },

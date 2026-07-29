@@ -24,6 +24,11 @@ fs.writeFileSync(e2ePath, `
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const htmlPath = ${JSON.stringify(htmlPath)};
   const htmlFileUrl = ${JSON.stringify(htmlFileUrl)};
+  const oscPreview = (sessionId, token, url, reason = null) => {
+    const json = JSON.stringify({ v: 2, event: 'browser-preview', sessionId, token, url, reason });
+    const encoded = btoa(json).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');
+    return '\\x1b]777;chromux;v2;' + encoded + '\\x07';
+  };
 
   await new Promise((resolve) => setTimeout(resolve, 100));
 
@@ -162,6 +167,9 @@ fs.writeFileSync(e2ePath, `
   expect(q.queueCount(id) === 0, 'typed prompt echo should not queue a preview');
   q.feed(id, 'agent later printed http://localhost:49151/typed-url\\r\\n');
   expect(q.currentUrl(id) === null, 'agent-printed URL must still not auto-open');
+  expect(q.queueCount(id) === 0 && JSON.stringify(q.candidates(id)) === JSON.stringify(['http://localhost:49151/typed-url']),
+    'active-turn URL should remain a bounded candidate until the Codex completion boundary');
+  q.emit(id, 'turn-end');
   expect(JSON.stringify(q.queueUrls(id)) === JSON.stringify(['http://localhost:49151/typed-url']),
     'agent-printed URL should queue for approval: ' + JSON.stringify(q.queueUrls(id)));
 
@@ -172,10 +180,83 @@ fs.writeFileSync(e2ePath, `
   expect(JSON.stringify(q.queueUrls(id)) === JSON.stringify(['http://localhost:49151/typed-url']),
     'chunked typed URL echo should not queue: ' + JSON.stringify(q.queueUrls(id)));
   q.feed(id, 'agent later printed http://localhost:49151/chunked-typed\\r\\n');
+  q.emit(id, 'turn-end');
   expect(JSON.stringify(q.queueUrls(id)) === JSON.stringify([
     'http://localhost:49151/typed-url',
     'http://localhost:49151/chunked-typed',
   ]), 'later agent output of chunked typed URL should still queue');
+
+  const latestTurnId = await q.addSession({ name: 'latest-turn-only', agent: 'codex' });
+  q.typeInput(latestTurnId, 'first request\\r');
+  q.feed(latestTurnId, 'first turn http://localhost:49151/stale-candidate\\r\\n');
+  expect(q.candidates(latestTurnId).length === 1, 'first active turn should retain one candidate');
+  q.typeInput(latestTurnId, 'replacement request\\r');
+  expect(q.candidates(latestTurnId).length === 0, 'new user input must clear stale turn candidates');
+  for (let index = 0; index < 30; index += 1) {
+    q.feed(latestTurnId, 'candidate http://localhost:49151/latest-' + index + '\\r\\n');
+  }
+  expect(q.candidates(latestTurnId).length === 24
+    && q.candidates(latestTurnId)[0].endsWith('/latest-6')
+    && q.candidates(latestTurnId)[23].endsWith('/latest-29'),
+  'active-turn candidates should be bounded to the latest 24: ' + JSON.stringify(q.candidates(latestTurnId)));
+  q.emit(latestTurnId, 'turn-end');
+  expect(q.queueCount(latestTurnId) === 24
+    && !q.queueUrls(latestTurnId).some((url) => url.includes('stale-candidate')),
+  'Codex completion should promote only the latest bounded turn');
+
+  for (const [agent, boundary] of [['claude', 'input-needed'], ['grok', 'turn-end']]) {
+    const boundaryId = await q.addSession({ name: agent + '-boundary', agent });
+    q.emit(boundaryId, 'turn-start');
+    q.typeInput(boundaryId, 'build it\\r');
+    q.feed(boundaryId, 'preview http://localhost:49151/' + agent + '-boundary\\r\\n');
+    expect(q.queueCount(boundaryId) === 0, agent + ' active turn should retain its preview candidate: '
+      + JSON.stringify({ turn: q.turnState(boundaryId), candidates: q.candidates(boundaryId), queue: q.queueUrls(boundaryId) }));
+    q.emit(boundaryId, boundary);
+    expect(q.queueCount(boundaryId) === 1
+      && q.queueItems(boundaryId)[0].visibility === 'browser',
+    agent + ' actionable/completion boundary should promote the browser-only candidate');
+  }
+
+  const uninstrumentedId = await q.addSession({
+    name: 'uninstrumented-fallback',
+    agent: 'claude',
+    turnState: 'working',
+  });
+  q.typeInput(uninstrumentedId, 'start server\\r');
+  q.feed(uninstrumentedId, 'Local: http://localhost:49151/uninstrumented\\r\\n');
+  expect(q.queueCount(uninstrumentedId) === 0, 'uninstrumented active turn should begin as a candidate');
+  await wait(1650);
+  expect(q.queueUrls(uninstrumentedId)[0] === 'http://localhost:49151/uninstrumented'
+    && q.queueItems(uninstrumentedId)[0].visibility === 'browser',
+  'uninstrumented fallback should eventually remain available in the browser-only queue');
+
+  const explicitId = await q.addSession({ name: 'explicit-preview-session', agent: 'codex' });
+  const terminalFirst = q.routeExplicit(explicitId, 'https://example.com/explicit', 'MCP', 'review the implementation');
+  expect(terminalFirst.status === 'queued', 'first explicit request should report queued');
+  const duplicateExplicit = q.routeExplicit(explicitId, 'https://example.com/explicit', 'MCP', 'review the implementation');
+  expect(duplicateExplicit.status === 'alreadyQueued', 'duplicate explicit request should report alreadyQueued');
+  const explicitItem = q.queueItems(explicitId)[0];
+  expect(explicitItem.visibility === 'attention' && explicitItem.source === 'MCP',
+    'MCP request should create an attention-visible queue item: ' + JSON.stringify(explicitItem));
+  const explicitHolder = await q.addSession({ name: 'explicit-holder', agent: '' });
+  q.focus(explicitHolder);
+  expect(q.attentionItems().some((item) => item.kind === 'QUEUE 1' && item.name === 'explicit-preview-session'),
+    'explicit MCP request should surface in Threads');
+  expect(q.tabBadge(explicitId) === '1', 'explicit MCP request should surface in the session-tab badge');
+  q.openQueued(explicitId, 'https://example.com/explicit');
+  const refreshedExplicit = q.routeExplicit(explicitId, 'https://example.com/explicit', 'MCP', 'refresh the implementation');
+  expect(refreshedExplicit.status === 'refreshed',
+    'explicit request for an already-open target should report refreshed without requeueing');
+
+  const oscId = await q.addSession({ name: 'osc-preview-session', agent: 'claude' });
+  q.setSignalToken(oscId, 'osc-secret');
+  q.feed(oscId, oscPreview(oscId, 'wrong-token', 'https://example.com/rejected'));
+  expect(q.queueCount(oscId) === 0, 'wrong-token preview OSC must be rejected');
+  q.feed(oscId, oscPreview(oscId, 'osc-secret', 'https://example.com/osc', 'open the UI'));
+  await wait(50);
+  expect(q.queueItems(oscId)[0].source === 'OSC'
+    && q.queueItems(oscId)[0].visibility === 'attention',
+  'authenticated preview OSC should share explicit attention queue semantics');
 
   const fileId = await q.addSession({ name: 'file-preview-session', agent: 'codex' });
   q.typeInput(fileId, 'open ' + htmlPath + '\\r');
@@ -186,6 +267,7 @@ fs.writeFileSync(e2ePath, `
   q.feed(fileId, 'agent later printed ' + htmlPath + '\\r\\n');
   await wait(80);
   expect(q.currentUrl(fileId) === null, 'agent-printed local .html must not auto-open');
+  q.emit(fileId, 'turn-end');
   expect(JSON.stringify(q.queueUrls(fileId)) === JSON.stringify([htmlFileUrl]),
     'agent-printed local .html should queue for approval: ' + JSON.stringify(q.queueUrls(fileId)));
   q.openQueued(fileId, htmlFileUrl);
@@ -227,8 +309,8 @@ fs.writeFileSync(e2ePath, `
   const holder = await q.addSession({ name: 'attention-holder', agent: '' });
   q.focus(holder);
   const attention = q.attentionItems().find((item) => item.kind === 'QUEUE 3' && item.name === 'preview-session');
-  expect(attention && attention.detail === 'detected in agent output: http://localhost:49151/uat-a',
-    'Threads attention detail should include reason and URL: ' + JSON.stringify(attention));
+  expect(!attention, 'terminal fallback queues must stay out of Threads: ' + JSON.stringify(q.attentionItems()));
+  expect(q.tabBadge(queueId) === '0', 'terminal fallback queues must stay out of the session-tab badge');
   q.focus(queueId);
 
   q.openQueued(queueId, 'http://localhost:49151/uat-a');
@@ -248,7 +330,16 @@ fs.writeFileSync(e2ePath, `
   expect(legacyItem.source === 'RESTORE', 'legacy queue item without reason should default to RESTORE source');
   expect(legacyItem.reason === 'restored from previous session',
     'legacy queue item should default to restored reason: ' + JSON.stringify(legacyItem));
+  expect(legacyItem.visibility === 'attention', 'legacy restored queue records should default to attention visibility');
   expect(legacyItem.liveness === 'checking', 'restored loopback preview should be reprobed from checking state');
+
+  const browserRestoreId = await q.addSession({
+    name: 'browser-only-restore',
+    agent: 'codex',
+    queue: [{ url: 'https://example.com/browser-only', source: 'TERM', visibility: 'browser', reason: 'detected in agent output' }],
+  });
+  expect(q.queueItems(browserRestoreId)[0].visibility === 'browser',
+    'new queue visibility should survive restore normalization');
 
   const failureId = await q.addSession({ name: 'failed-browser-session', agent: 'codex' });
   q.failLoad(failureId, 'http://localhost:49149/failed');

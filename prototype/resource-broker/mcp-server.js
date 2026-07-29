@@ -17,6 +17,7 @@ const caller = {
   pid: process.ppid,
   cooperative: true,
 };
+const signalToken = process.env.CHROMUX_SIGNAL_TOKEN || '';
 const client = new BrokerClient({ client: caller });
 const captureClient = new CaptureControlClient({ caller });
 const chromuxHome = process.env.CHROMUX_HOME_DIR || path.join(os.homedir(), '.chromux');
@@ -35,10 +36,11 @@ const tools = [
   ['chromux_capture_screenshot', 'Request one-time in-app approval, then capture a paired browser evidence bundle or the Chromux window.', { targetId: { type: 'string', minLength: 1, maxLength: 256 } }],
   ['chromux_record_start', 'Request one-time in-app approval, then start a bounded Chromux-window recording.', { targetId: { type: 'string', minLength: 1, maxLength: 256 } }],
   ['chromux_record_stop', 'Stop a recording owned by this MCP client and return its completed artifact.', { recordingId: { type: 'string', pattern: '^recording-[0-9]{8}t[0-9]{6}-[a-f0-9]{12}$' } }],
+  ['chromux_browser_queue_add', 'Add an intentional URL to the originating Chromux session browser queue without opening it.', { url: { type: 'string', minLength: 1, maxLength: 4096 }, reason: { type: 'string', maxLength: 240 } }],
 ].map(([name, description, properties]) => ({
   name,
   description,
-  inputSchema: { type: 'object', properties, required: Object.keys(properties).filter((key) => !['ttlMs', 'operationPid', 'wait', 'args'].includes(key)), additionalProperties: false },
+  inputSchema: { type: 'object', properties, required: Object.keys(properties).filter((key) => !['ttlMs', 'operationPid', 'wait', 'args', 'reason'].includes(key)), additionalProperties: false },
   annotations: {
     openWorldHint: false,
     destructiveHint: name === 'chromux_simulator_execute',
@@ -62,6 +64,11 @@ const captureRoutes = {
   chromux_capture_screenshot: ['capture.screenshot', (args) => args],
   chromux_record_start: ['record.start', (args) => args],
   chromux_record_stop: ['record.stop', (args) => args],
+  chromux_browser_queue_add: ['browser.queue.add', (args) => ({
+    ...args,
+    sessionId: caller.sessionId,
+    token: signalToken,
+  })],
 };
 
 function resourceContent(link) {
@@ -96,7 +103,7 @@ async function handle(message) {
         tools: { listChanged: false },
         resources: { subscribe: false, listChanged: false },
       },
-      serverInfo: { name: 'chromux-resource-broker', version: '0.65.0' },
+      serverInfo: { name: 'chromux-resource-broker', version: '0.72.0' },
     };
   }
   if (message.method === 'tools/list') return { tools };

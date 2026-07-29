@@ -170,6 +170,16 @@ fs.writeFileSync(e2ePath, `
   let shipping = groups.upper().find((group) => group.id === customTwo.id);
   expect(shipping.indicator === 'action', 'group must project the highest-priority session status');
   expect(Number(shipping.badge) >= 3, 'group badge must total attention and queued items');
+  const attentionBadge = Number(shipping.badge);
+  groups.setQueue(beta, [
+    'https://localhost:3000',
+    'https://localhost:3001',
+    { url: 'https://localhost:3002', source: 'TERM',
+      reason: 'detected in agent output', visibility: 'browser' },
+  ]);
+  shipping = groups.upper().find((group) => group.id === customTwo.id);
+  expect(Number(shipping.badge) === attentionBadge,
+    'browser-only fallback must not increase the tab-group attention badge');
   tabs.emitSignal(beta, 'turn-started');
   shipping = groups.upper().find((group) => group.id === customTwo.id);
   expect(shipping.indicator === 'working', 'group status must update when a hidden session starts working');

@@ -23,6 +23,19 @@ Tag: `chromux-v0.72.0`
   Squirrel feed directory.
 - Refresh vulnerable packaging transitive dependencies and retain compatibility
   with older Git worktree porcelain plus Linux-hosted Electron regression runs.
+- Add authenticated `chromux_browser_queue_add` MCP and `browser-preview` OSC
+  signals so agents can intentionally queue bounded HTTP(S) or existing local
+  file targets for their originating Chromux session.
+- Keep terminal URL/path discovery as a turn-aware, bounded compatibility
+  fallback. New user input clears stale candidates; Claude and Grok promote at
+  actionable/completion boundaries, Codex promotes at completion, and
+  uninstrumented sessions retain a delayed browser-only fallback.
+- Persist queue visibility and keep terminal fallback records inside the paired
+  browser queue without creating Threads entries, session-tab badges, or
+  tab-group attention counts. Explicit MCP/OSC requests and page popups retain
+  those attention surfaces; legacy restored records remain compatible.
+- Return structured `queued`, `alreadyQueued`, and `refreshed` outcomes for
+  explicit requests while preserving the existing user-approved **OPEN** flow.
 
 ## GBlockParty Chromux v0.71.0
 

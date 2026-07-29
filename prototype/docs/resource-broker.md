@@ -54,6 +54,7 @@ The MCP bridge exposes:
 - `chromux_capture_targets_list`
 - `chromux_capture_screenshot`
 - `chromux_record_start` / `chromux_record_stop`
+- `chromux_browser_queue_add`
 
 Chromux's **RESOURCES** view shows owners, expirations, queues, wait time, simulator capacity, cancellation, and force release. Force release does not stop an operation that is already running; use it only after checking the owner is stale.
 
@@ -66,6 +67,35 @@ Chromux while preserving the MCP caller identity. Requests and responses are
 bounded, disconnects stop caller-owned recordings, and no TCP listener is
 opened. If the app is not running, the bridge returns an actionable error and
 does not auto-launch it.
+
+`chromux_browser_queue_add` requires `url` and accepts an optional reason of at
+most 240 characters. The bridge takes the originating session and its
+authentication token from `CHROMUX_SESSION_ID` and `CHROMUX_SIGNAL_TOKEN`;
+callers cannot select another session. Chromux accepts normalized HTTP(S) URLs
+without embedded credentials and existing local `file:` targets. A successful
+call returns `{ status: "queued" }`, `{ status: "alreadyQueued" }`, or
+`{ status: "refreshed" }`. Queueing never navigates; **OPEN** remains a user
+action. The same control channel and named-pipe path are used by the Windows/WSL
+MCP launcher.
+
+Agents that cannot call MCP may emit an authenticated v2 OSC envelope to their
+own `/dev/tty`. Its base64url JSON body uses:
+
+```json
+{
+  "v": 2,
+  "event": "browser-preview",
+  "sessionId": "<CHROMUX_SESSION_ID>",
+  "token": "<CHROMUX_SIGNAL_TOKEN>",
+  "url": "http://localhost:5173/",
+  "reason": "review the running UI"
+}
+```
+
+The complete terminal sequence is `ESC ] 777 ; chromux ; v2 ; <body> BEL`
+(ST is also accepted). Missing, exited, mismatched, malformed, oversized, or
+unauthenticated session claims are rejected. MCP and OSC enter the same
+attention-visible queue action.
 
 `chromux_capture_targets_list` returns only opaque Chromux-window or
 paired-browser target IDs, labels, and capability flags; page URLs remain hidden

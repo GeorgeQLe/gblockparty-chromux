@@ -245,6 +245,9 @@ const BOUNDS = {
   composerContextReferenceBytes: 2048,
   stagedBrowserContexts: 5,
   restoreAttentionDetailBytes: 4096,
+  browserQueueItems: 50,
+  previewTurnCandidates: 24,
+  previewFallbackMs: 1500,
 };
 
 function normalizeFavoriteUrl(rawUrl) {
@@ -798,6 +801,7 @@ function normalizeQueueItem(item, fallbackSource = 'RESTORE') {
     source,
     reason: hasReason ? item.reason.trim() : queueReasonForSource(source),
     detectedText: typeof item.detectedText === 'string' && item.detectedText ? item.detectedText : null,
+    visibility: item.visibility === 'browser' ? 'browser' : 'attention',
     ts: Number.isFinite(item.ts) ? item.ts : Date.now(),
     liveness: isProbeableLoopbackUrl(item.url) ? 'checking' : null,
     probeGeneration: 0,
@@ -810,6 +814,7 @@ function queueItemForPreview(url, source, detail = {}) {
     source,
     reason: detail.reason || queueReasonForSource(source),
     detectedText: detail.detectedText || null,
+    visibility: detail.visibility,
     ts: Date.now(),
   }, source);
 }
@@ -1299,15 +1304,81 @@ function feedDetector(session, chunk) {
         // Soft-wrapped terminal lines can split a long path into a shorter,
         // still-plausible one — only route paths that exist on disk.
         const p = decodeURIComponent(hit.url.replace(/^file:\/\//, ''));
+        const generation = session.turn.generation;
         window.chromux.fileExists(p).then((ok) => {
-          if (ok) routePreview(session, hit.url, hit.source, { detectedText: line });
+          if (ok && generation === session.turn.generation) {
+            routeTerminalPreviewCandidate(session, hit.url, hit.source, { detectedText: line });
+          }
         });
       } else {
-        routePreview(session, hit.url, hit.source, { detectedText: line });
+        routeTerminalPreviewCandidate(session, hit.url, hit.source, { detectedText: line });
       }
     }
     ageTypedPreviewSuppressions(session);
   }
+}
+
+function clearPreviewCandidates(session) {
+  if (!session || !session.term) return;
+  for (const candidate of session.term.previewCandidates || []) clearTimeout(candidate.timer);
+  session.term.previewCandidates = [];
+}
+
+function previewTurnIsActive(session) {
+  return Boolean(session && session.agent && ['pending', 'working'].includes(session.turn.state));
+}
+
+function rememberPreviewCandidate(session, url, source, detail = {}) {
+  const candidates = session.term.previewCandidates;
+  const existing = candidates.find((candidate) => candidate.url === url);
+  if (existing) {
+    existing.detectedText = detail.detectedText || existing.detectedText;
+    return existing;
+  }
+  const candidate = {
+    url,
+    source,
+    detectedText: detail.detectedText || null,
+    generation: session.turn.generation,
+    timer: null,
+  };
+  candidates.push(candidate);
+  while (candidates.length > BOUNDS.previewTurnCandidates) {
+    const removed = candidates.shift();
+    clearTimeout(removed && removed.timer);
+  }
+  if (!session.turn.instrumented) {
+    candidate.timer = setTimeout(() => {
+      if (!state.sessions.has(session.id)
+        || !session.term.previewCandidates.includes(candidate)
+        || candidate.generation !== session.turn.generation) return;
+      session.term.previewCandidates = session.term.previewCandidates.filter((item) => item !== candidate);
+      routePreview(session, candidate.url, candidate.source, {
+        detectedText: candidate.detectedText,
+        visibility: 'browser',
+      });
+    }, BOUNDS.previewFallbackMs);
+  }
+  return candidate;
+}
+
+function routeTerminalPreviewCandidate(session, url, source, detail = {}) {
+  if (previewTurnIsActive(session)) {
+    rememberPreviewCandidate(session, url, source, detail);
+    return { status: 'candidate' };
+  }
+  return routePreview(session, url, source, { ...detail, visibility: 'browser' });
+}
+
+function promotePreviewCandidates(session) {
+  if (!session || !session.term.previewCandidates.length) return [];
+  const generation = session.turn.generation;
+  const candidates = session.term.previewCandidates.filter((candidate) => candidate.generation === generation);
+  clearPreviewCandidates(session);
+  return candidates.map((candidate) => routePreview(session, candidate.url, candidate.source, {
+    detectedText: candidate.detectedText,
+    visibility: 'browser',
+  }));
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -1495,6 +1566,11 @@ function apply(event) {
           session.turn, event.signal, event.detail, Date.now(), event.envelope || null,
         );
         if (session.turn.state !== previousTurnState) session.lastActivityAt = Date.now();
+        if ((tabStateChanged && ['needsInput', 'permission', 'authentication', 'rateLimited', 'toolFailed', 'completed']
+          .includes(session.turn.state))
+          || (session.agent === 'codex' && event.signal === 'turn-end')) {
+          promotePreviewCandidates(session);
+        }
         if (tabStateChanged && session.id === state.activeId && session.turn.state === 'completed') {
           session.turn.attentionSeenAt = Math.max(session.turn.attentionSeenAt || 0, session.turn.since || 0);
           window.chromuxAttention.consumeCompletedTurn(session.turn, Date.now());
@@ -1506,6 +1582,7 @@ function apply(event) {
       if (session) trackTypedPreviewSuppressions(session, event.data);
       if (!session) return;
       const submitted = /[\r\n]/.test(String(event.data || ''));
+      if (submitted) clearPreviewCandidates(session);
       if (submitted) session.lastActivityAt = Date.now();
       const inputTurnChanged = window.chromuxAttention.applyUserInputTurnTransition(
         session,
@@ -1522,6 +1599,7 @@ function apply(event) {
       break;
     case 'session-exited':
       if (session) {
+        clearPreviewCandidates(session);
         tabStateChanged = session.lifecycle.alive;
         session.lifecycle.alive = false;
         session.term.codexCompletionIntent = null;
@@ -1561,8 +1639,15 @@ function apply(event) {
         const item = queueItemForPreview(event.url, event.source || 'TERM', {
           reason: event.reason,
           detectedText: event.detectedText,
+          visibility: event.visibility,
         });
-        if (item) session.browser.queue.push(item);
+        if (item) {
+          session.browser.queue.push(item);
+          if (session.browser.queue.length > BOUNDS.browserQueueItems) {
+            const browserOnly = session.browser.queue.findIndex((candidate) => candidate.visibility === 'browser');
+            session.browser.queue.splice(browserOnly >= 0 ? browserOnly : 0, 1);
+          }
+        }
       }
       break;
     case 'preview-opened':
@@ -1751,6 +1836,7 @@ function newSessionShape({ id, name, cwd, agent, runtime = null, distro = null }
       oscColorReplySignatures: [],
       promptSnapshotInvalidated: false,
       previewSuppress: [],
+      previewCandidates: [],
     },
     composer: {
       open: false,
@@ -1851,9 +1937,19 @@ function routePreview(session, url, source, detail = {}) {
       try { openTab.webview.reload(); } catch { /* not ready */ }
       flashRefresh(session);
     }
-    return;
+    return { status: 'refreshed', url };
   }
-  if (b.queue.some((q) => q.url === url)) return;
+  const queued = b.queue.find((q) => q.url === url);
+  if (queued) {
+    if (detail.visibility === 'attention' && queued.visibility !== 'attention') {
+      queued.visibility = 'attention';
+      queued.source = source;
+      queued.reason = detail.reason || queueReasonForSource(source);
+      queued.detectedText = detail.detectedText || queued.detectedText;
+      renderQueue(session);
+    }
+    return { status: 'alreadyQueued', url };
+  }
   apply({
     type: 'preview-queued',
     sessionId: session.id,
@@ -1861,13 +1957,16 @@ function routePreview(session, url, source, detail = {}) {
     source,
     reason: detail.reason,
     detectedText: detail.detectedText,
+    visibility: detail.visibility,
   });
   renderQueue(session);
   probeQueuedPreview(session, url);
+  return { status: 'queued', url };
 }
 
 function flashRefresh(session) {
   const el = session.els.refreshFlash;
+  if (!el) return;
   el.classList.add('show');
   clearTimeout(session._flashT);
   session._flashT = setTimeout(() => el.classList.remove('show'), 1400);
@@ -1923,6 +2022,7 @@ function queueLoopbackFailure(session, url) {
       url,
       source: 'TERM',
       reason: 'server connection failed',
+      visibility: 'browser',
     });
     item = queuedPreview(session, url);
   }
@@ -2172,8 +2272,9 @@ function updateBadges() {
   for (const s of state.sessions.values()) {
     if (!s.els || !s.els.tabBadge) continue;
     queued += s.browser.queue.length;
-    s.els.tabBadge.textContent = String(s.browser.queue.length);
-    s.els.tabBadge.classList.toggle('zero', s.browser.queue.length === 0);
+    const attentionCount = s.browser.queue.filter((item) => item.visibility !== 'browser').length;
+    s.els.tabBadge.textContent = String(attentionCount);
+    s.els.tabBadge.classList.toggle('zero', attentionCount === 0);
   }
   $('#g-queued').textContent = String(queued);
   $('#g-sessions').textContent = String(state.sessions.size);
@@ -3882,6 +3983,25 @@ window.chromux.onCaptureControlRequest((message) => {
       error: { message: error?.message || String(error), code: error?.code || null },
     });
   });
+});
+window.chromux.onBrowserQueueRequest((message) => {
+  try {
+    const payload = message && message.payload || {};
+    const session = state.sessions.get(payload.sessionId);
+    if (!session || !session.lifecycle.alive) throw new Error('The originating Chromux session is missing or has exited.');
+    const url = normalizedBrowserUrl(payload.url);
+    if (!url) throw new Error('Browser queue URL is invalid.');
+    const result = routePreview(session, url, 'MCP', {
+      reason: payload.reason || 'requested by agent',
+      visibility: 'attention',
+    });
+    window.chromux.browserQueueRespond({ requestId: message.requestId, result });
+  } catch (error) {
+    window.chromux.browserQueueRespond({
+      requestId: message && message.requestId,
+      error: { message: error?.message || String(error) },
+    });
+  }
 });
 window.addEventListener('beforeunload', () => {
   if (state.ui.captureApproval) finishCaptureApproval(false, 'Chromux window closed.');
@@ -6152,7 +6272,9 @@ function groupAttentionCount(group) {
     updateQueue: state.updateQueue,
     updateStatus: state.updateStatus,
   }).filter((item) => ids.has(item.sessionId) && item.type !== 'queue').length;
-  return attention + group.sessions.reduce((total, session) => total + session.browser.queue.length, 0);
+  return attention + group.sessions.reduce((total, session) => (
+    total + session.browser.queue.filter((item) => item.visibility !== 'browser').length
+  ), 0);
 }
 
 function groupStatus(group) {
@@ -9245,6 +9367,7 @@ function snapshotOpenSessions() {
       source: item.source || 'RESTORE',
       reason: item.reason || queueReasonForSource(item.source || 'RESTORE'),
       detectedText: item.detectedText || null,
+      visibility: item.visibility,
       ts: item.ts || Date.now(),
     })),
     ...(attentionBySession.get(session.id)?.length
@@ -9929,6 +10052,15 @@ function handlePtyData(id, data) {
   s.term.signalBuf = res.buf;
   for (const sig of res.signals) {
     const env = sig.envelope;
+    const previewEnvelope = env && env.event === 'browser-preview';
+    const previewUrl = previewEnvelope && typeof env.url === 'string' && env.url.length <= 4096
+      ? normalizedBrowserUrl(env.url) : null;
+    const validPreview = previewEnvelope
+      && env.sessionId === id
+      && env.token === s.turn.token
+      && Boolean(previewUrl)
+      && (env.reason === null || env.reason === undefined
+        || (typeof env.reason === 'string' && env.reason.length <= 240));
     const validV2 = !env || (
       env.sessionId === id
       && env.token === s.turn.token
@@ -9946,12 +10078,31 @@ function handlePtyData(id, data) {
       && (env.resumeId === null || env.resumeId === undefined
         || (typeof env.resumeId === 'string' && /^[0-9a-f][0-9a-f-]{15,127}$/i.test(env.resumeId)))
     );
-    if (sig.malformed || sig.sessionId !== id || !validV2) {
+    if (sig.malformed || sig.sessionId !== id || (!validV2 && !validPreview)) {
       apply({
         type: 'signal-rejected',
         sessionId: id,
         signal: sig.malformed ? null : sig.event,
         claimedSessionId: sig.sessionId || null,
+      });
+    } else if (validPreview) {
+      const validation = Array.isArray(s._written)
+        ? Promise.resolve({ url: previewUrl, reason: env.reason || null })
+        : window.chromux.browserQueueValidate({
+        sessionId: id,
+        token: env.token,
+        url: previewUrl,
+        reason: env.reason,
+      });
+      validation.then((validated) => {
+        const live = state.sessions.get(id);
+        if (!live || !live.lifecycle.alive || live.turn.token !== env.token) return;
+        routePreview(live, validated.url, 'OSC', {
+          reason: validated.reason || 'requested by agent',
+          visibility: 'attention',
+        });
+      }).catch(() => {
+        apply({ type: 'signal-rejected', sessionId: id, signal: env.event, claimedSessionId: env.sessionId });
       });
     } else if (env && env.event === 'unknown-notification') {
       if (env.resumeId) s.resumeId = env.resumeId;
@@ -12225,9 +12376,12 @@ if (window.chromuxTest) {
         flushRender();
         return result;
       },
-      setQueue(sessionId, urls) {
+      setQueue(sessionId, items) {
         const session = testSession(sessionId);
-        session.browser.queue = (urls || []).map((url) => normalizeQueueItem({ url }, 'RESTORE')).filter(Boolean);
+        session.browser.queue = (items || []).map((item) => normalizeQueueItem(
+          typeof item === 'string' ? { url: item } : item,
+          'RESTORE',
+        )).filter(Boolean);
         renderQueue(session);
         flushRender();
       },
@@ -13010,6 +13164,10 @@ if (window.chromuxTest) {
       handlePtyData(id, chunk);
       flushRender();
     },
+    emit(id, event, detail = null) {
+      apply({ type: 'turn-signal', sessionId: id, signal: event, detail });
+      flushRender();
+    },
     queueUrls: (id) => testSession(id).browser.queue.map((item) => item.url),
     queueItems: (id) => testSession(id).browser.queue.map((item) => ({ ...item })),
     queueRows: (id) => [...testSession(id).els.queueList.querySelectorAll('.queue-item')].map((el) => ({
@@ -13021,6 +13179,18 @@ if (window.chromuxTest) {
       ariaLabel: el.getAttribute('aria-label') || '',
     })),
     queueCount: (id) => testSession(id).browser.queue.length,
+    tabBadge: (id) => testSession(id).els.tabBadge?.textContent || '0',
+    candidates: (id) => testSession(id).term.previewCandidates.map((item) => item.url),
+    turnState: (id) => ({ ...testSession(id).turn }),
+    setSignalToken(id, token) { testSession(id).turn.token = token; },
+    routeExplicit(id, url, source = 'MCP', reason = 'requested by agent') {
+      const result = routePreview(testSession(id), normalizedBrowserUrl(url), source, {
+        reason,
+        visibility: 'attention',
+      });
+      flushRender();
+      return result;
+    },
     currentUrl: (id) => testSession(id).browser.currentUrl,
     activeBrowserTabId: (id) => testSession(id).browser.activeTabId,
     pendingQueueNavigation: () => state.pendingQueueNavigation ? { ...state.pendingQueueNavigation } : null,

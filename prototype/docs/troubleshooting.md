@@ -164,7 +164,23 @@ terminal sessions remain isolated.
 
 ## Review queue
 
-Chromux never auto-opens a detected preview. Every localhost / loopback / local `.html` hit and every popup goes to QUEUE until you approve it. Opening a queued or favorite URL creates/focuses a page tab and restores the browser if it was shut.
+Chromux never auto-opens a preview. Terminal localhost / loopback / local
+`.html` hits are deduplicated within the current agent turn and promoted at an
+actionable or completion boundary; starting another turn clears stale
+candidates. Codex uses its completion callback. If no hook signal is available,
+a short delayed browser-only fallback preserves ordinary dev-server discovery.
+Terminal fallback records appear only in the paired browser QUEUE, not Threads,
+session-tab badges, or tab-group attention. Explicit MCP/OSC requests and page
+popups remain attention-visible. Opening a queued or favorite URL
+creates/focuses a page tab and restores the browser if it was shut.
+
+For intentional agent routing, prefer `chromux_browser_queue_add` from the
+registered Chromux MCP server. It must run inside the originating Chromux
+session so `CHROMUX_SESSION_ID` and `CHROMUX_SIGNAL_TOKEN` are available. If the
+tool reports that Chromux is not running, open the app; if it reports a missing
+or exited session, retry from a live Chromux terminal. Wrong-session/token
+claims, credential-bearing URLs, unsupported protocols, overlong values, and
+missing/non-file local targets are rejected.
 
 Use QUEUE to open the next preview intentionally. Command-J reveals and focuses the next queued OPEN button without opening it. If a page seems stale, check whether the updated URL is waiting in QUEUE.
 

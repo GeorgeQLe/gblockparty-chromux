@@ -46,6 +46,7 @@ const { previewProbe } = require('./preview-probe');
 const { cleanupOrphanedStorage } = require('./storage-cleanup');
 const { createGitWorktreeService } = require('./git-worktree-service');
 const { createVercelService } = require('./vercel-service');
+const { normalizeBrowserQueueRequest } = require('./browser-queue');
 const { resolveChromuxUserDataPath } = require('./user-data-path');
 const { CaptureArtifactStore } = require('./capture/artifact-store');
 const { CaptureCoordinator } = require('./capture/coordinator');
@@ -171,9 +172,11 @@ let captureCoordinator = null;
 let captureControlServer = null;
 let displayMediaGrant = null;
 let captureRendererSequence = 0;
+let previewRendererSequence = 0;
 let captureShutdownComplete = false;
 let captureShutdownPromise = null;
 const captureRendererPending = new Map();
+const previewRendererPending = new Map();
 const wslRuntime = new WslRuntime();
 let runtimeState = {
   kind: process.platform === 'win32' ? 'wsl' : 'host',
@@ -596,6 +599,34 @@ function requestCaptureRenderer(action, payload = {}, timeoutMs = 35_000) {
   });
 }
 
+function requestPreviewRenderer(payload = {}, timeoutMs = 5000) {
+  if (!win || win.isDestroyed() || win.webContents.isDestroyed()) {
+    return Promise.reject(new Error('Chromux window is not available.'));
+  }
+  const requestId = `preview-rpc-${process.pid}-${++previewRendererSequence}`;
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      previewRendererPending.delete(requestId);
+      reject(new Error('Chromux browser queue request timed out.'));
+    }, timeoutMs);
+    previewRendererPending.set(requestId, { resolve, reject, timer });
+    win.webContents.send('browser-queue-request', { requestId, payload });
+  });
+}
+
+function normalizeExplicitPreviewRequest(params = {}) {
+  return normalizeBrowserQueueRequest(params, {
+    sessionForId: (sessionId) => ptys.get(sessionId),
+    platform: process.platform,
+    linuxPathToWindows,
+  });
+}
+
+async function addExplicitBrowserQueue(params = {}) {
+  const request = normalizeExplicitPreviewRequest(params);
+  return requestPreviewRenderer(request);
+}
+
 function decodeCaptureBase64(value, maxBytes, label) {
   if (typeof value !== 'string' || !value || value.length > Math.ceil(maxBytes * 4 / 3) + 16) {
     throw new Error(`${label} is missing or too large`);
@@ -761,7 +792,11 @@ async function initializeCaptureControl() {
   });
   captureControlServer = new CaptureControlServer({
     chromuxHome: CHROMUX_HOME,
-    dispatch: (method, params, caller) => captureCoordinator.dispatch(method, params, caller),
+    dispatch: (method, params, caller) => (
+      method === 'browser.queue.add'
+        ? addExplicitBrowserQueue(params, caller)
+        : captureCoordinator.dispatch(method, params, caller)
+    ),
     onDisconnect: (caller) => captureCoordinator.disconnect(caller),
   });
   await captureControlServer.start();
@@ -780,6 +815,16 @@ ipcMain.on('capture-control-response', (event, message = {}) => {
   } else {
     pending.resolve(message.result);
   }
+});
+
+ipcMain.on('browser-queue-response', (event, message = {}) => {
+  if (!win || event.sender !== win.webContents) return;
+  const pending = previewRendererPending.get(message.requestId);
+  if (!pending) return;
+  previewRendererPending.delete(message.requestId);
+  clearTimeout(pending.timer);
+  if (message.error) pending.reject(new Error(message.error.message || 'Browser queue request failed.'));
+  else pending.resolve(message.result);
 });
 
 ipcMain.on('capture-record-chunk', (event, message = {}) => {
@@ -1459,7 +1504,7 @@ function sanitizeRestoreSession(session) {
   }
   const agent = KNOWN_AGENTS.includes(session.agent) ? session.agent : '';
   const queue = Array.isArray(session.queue)
-    ? session.queue.map((item) => ({
+    ? session.queue.slice(0, 50).map((item) => ({
       url: typeof item.url === 'string' ? item.url : '',
       source: typeof item.reason === 'string' && item.reason.trim() && typeof item.source === 'string' && item.source
         ? item.source
@@ -1468,6 +1513,7 @@ function sanitizeRestoreSession(session) {
         ? item.reason.trim()
         : QUEUE_REASON_BY_SOURCE.RESTORE,
       detectedText: typeof item.detectedText === 'string' && item.detectedText ? item.detectedText : null,
+      visibility: item.visibility === 'browser' ? 'browser' : 'attention',
       ts: Number.isFinite(item.ts) ? item.ts : Date.now(),
     })).filter((item) => item.url)
     : [];
@@ -1991,6 +2037,7 @@ ipcMain.handle('pty-create', (_e, { id, cwd, location, command, agent = '', cols
     env: spec.env,
   });
   p.chromuxLocation = workspace;
+  p.chromuxSignalToken = signalToken;
   ptys.set(id, p);
   if (!SMOKE) {
     resourceClient.request('resource.register', {
@@ -3326,6 +3373,12 @@ ipcMain.handle('project-script-resolve', (_e, { cwd, location: inputLocation, sc
   return config.valid ? { ...config, ...location, location } : config;
 });
 ipcMain.handle('preview-probe', (_e, url) => previewProbe(url));
+ipcMain.handle('browser-queue-validate', (event, request = {}) => {
+  if (!win || win.isDestroyed() || event.sender !== win.webContents) {
+    throw new Error('Browser queue validation is only available to the active Chromux window.');
+  }
+  return normalizeExplicitPreviewRequest(request);
+});
 ipcMain.handle('git-root', (_e, cwd) => gitRoot(cwd));
 ipcMain.handle('git-diff-summary', (_e, cwd) => gitDiffSummary(cwd));
 ipcMain.handle('git-repositories-read', () => gitWorktrees.catalog());
@@ -3552,4 +3605,9 @@ app.on('before-quit', (event) => {
     pending.reject(new Error('Chromux is shutting down.'));
   }
   captureRendererPending.clear();
+  for (const pending of previewRendererPending.values()) {
+    clearTimeout(pending.timer);
+    pending.reject(new Error('Chromux is shutting down.'));
+  }
+  previewRendererPending.clear();
 });
