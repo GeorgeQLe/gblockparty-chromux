@@ -10,6 +10,8 @@ const GITHUB_LATEST_URL = 'https://api.github.com/repos/openai/codex/releases/la
 const HOMEBREW_CASK_URL = 'https://formulae.brew.sh/api/cask/codex.json';
 const NPM_PACKAGE_URL = 'https://registry.npmjs.org/@openai%2fcodex';
 const RELEASE_URL = 'https://github.com/openai/codex/releases/latest';
+const CODEX_RELEASE_REDIRECT_PATH_RE = /^\/openai\/codex\/releases\/tag\/rust-v((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))$/;
+const REDIRECT_STATUS_CODES = new Set([301, 302, 303, 307, 308]);
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_CACHE_MS = 60 * 60 * 1000;
 const DEFAULT_RETRY_DELAYS_MS = [1000, 2000];
@@ -126,6 +128,66 @@ function requestJson(url, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
   });
 }
 
+function fetchLatestReleaseRedirect(url, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+  return new Promise((resolve, reject) => {
+    const request = https.get(url, {
+      headers: {
+        Accept: 'text/html',
+        'User-Agent': 'GBlockParty-Chromux-Codex-Update-Check',
+      },
+    }, (response) => {
+      response.resume();
+      response.on('end', () => {
+        resolve({
+          statusCode: response.statusCode,
+          location: typeof response.headers.location === 'string' ? response.headers.location : null,
+        });
+      });
+    });
+    request.setTimeout(timeoutMs, () => request.destroy(new Error('Codex latest-release check timed out')));
+    request.on('error', reject);
+  });
+}
+
+function releaseFromLatestRedirect(response) {
+  if (!response || !REDIRECT_STATUS_CODES.has(response.statusCode) || typeof response.location !== 'string') {
+    throw new Error('Codex latest-release response was not a redirect');
+  }
+
+  let redirectUrl;
+  try {
+    redirectUrl = new URL(response.location, RELEASE_URL);
+  } catch {
+    throw new Error('Codex latest-release redirect was malformed');
+  }
+
+  if (
+    redirectUrl.protocol !== 'https:'
+    || redirectUrl.hostname !== 'github.com'
+    || redirectUrl.port
+    || redirectUrl.username
+    || redirectUrl.password
+    || redirectUrl.search
+    || redirectUrl.hash
+  ) {
+    throw new Error('Codex latest-release redirect target was invalid');
+  }
+
+  const match = redirectUrl.pathname.match(CODEX_RELEASE_REDIRECT_PATH_RE);
+  if (!match) throw new Error('Codex latest-release redirect target was not a stable release');
+  if (
+    response.location !== redirectUrl.pathname
+    && response.location !== `https://github.com${redirectUrl.pathname}`
+  ) {
+    throw new Error('Codex latest-release redirect location was not canonical');
+  }
+
+  return {
+    version: match[1],
+    releaseUrl: `https://github.com${redirectUrl.pathname}`,
+  };
+}
+
 function runFile(file, args, { timeoutMs = DEFAULT_TIMEOUT_MS, onOutput = null, env = process.env } = {}) {
   return new Promise((resolve, reject) => {
     const child = execFile(file, args, {
@@ -155,6 +217,7 @@ function createCodexUpdateService({
   envPath = codexSearchPath(),
   now = () => Date.now(),
   request = requestJson,
+  redirectRequest = fetchLatestReleaseRedirect,
   run = runFile,
   resolveExecutable = () => resolveCodexExecutable({ envPath }),
   cacheMs = DEFAULT_CACHE_MS,
@@ -183,9 +246,22 @@ function createCodexUpdateService({
       return { version, releaseUrl: RELEASE_URL };
     }
 
-    const release = await request(GITHUB_LATEST_URL, { timeoutMs });
-    const version = parseVersion(release && release.tag_name);
-    if (!version) throw new Error('GitHub returned a malformed Codex release');
+    let release;
+    let resolved;
+    try {
+      release = await request(GITHUB_LATEST_URL, { timeoutMs });
+    } catch {
+      resolved = releaseFromLatestRedirect(await redirectRequest(RELEASE_URL, { timeoutMs }));
+    }
+    if (!resolved) {
+      const version = parseVersion(release && release.tag_name);
+      if (!version) throw new Error('GitHub returned a malformed Codex release');
+      resolved = {
+        version,
+        releaseUrl: typeof release.html_url === 'string' ? release.html_url : RELEASE_URL,
+      };
+    }
+    const { version } = resolved;
     if (installKind === 'npm') {
       let packageInfo;
       try {
@@ -199,7 +275,7 @@ function createCodexUpdateService({
     }
     return {
       version,
-      releaseUrl: typeof release.html_url === 'string' ? release.html_url : RELEASE_URL,
+      releaseUrl: resolved.releaseUrl,
     };
   }
 
@@ -306,11 +382,14 @@ module.exports = {
   GITHUB_LATEST_URL,
   HOMEBREW_CASK_URL,
   NPM_PACKAGE_URL,
+  RELEASE_URL,
   codexSearchPath,
   compareVersions,
   createCodexUpdateService,
+  fetchLatestReleaseRedirect,
   installKindFor,
   parseVersion,
+  releaseFromLatestRedirect,
   resolveCodexExecutable,
   resolveOnPath,
   sanitizeError,

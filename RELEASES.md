@@ -1,5 +1,20 @@
 # Release Notes
 
+## GBlockParty Chromux v0.72.1
+
+Tag: `chromux-v0.72.1`
+
+- Recover Codex startup checks from unauthenticated GitHub REST rate limits by
+  validating the public latest-release redirect before accepting its exact
+  stable version. npm installations still require that version to exist in the
+  registry.
+- After all bounded release checks fail, start every queued restored Codex
+  session once in saved order and keep Codex launches ungated for the rest of
+  that app run.
+- Keep the failure warning non-blocking with background retry and dismiss
+  actions. A later successful check clears the warning when current, or reports
+  the available release without updating live sessions.
+
 ## GBlockParty Chromux v0.72.0
 
 Tag: `chromux-v0.72.0`

@@ -29,6 +29,14 @@ No active priority documentation items.
 
 - [x] Retry the complete Codex startup update check up to three times, keep restored Codex tabs queued without exposing intermediate errors, release them in saved order on retry success, preserve manual retry and install behavior, and ship v0.69.3. _(source: user-supplied implementation plan; evidence: `prototype/codex-update-service.js`, focused service/renderer-gate coverage, complete prototype suite, package metadata, and `RELEASES.md`)_
 
+- [x] Recover Codex startup update checks from GitHub API 403s with a validated
+  public release redirect, then fail open after bounded discovery failure,
+  release every queued restore in order, keep the app-run gate bypassed, and
+  make retry informational for live sessions; ship v0.72.1. _(source:
+  user-supplied Fix Codex 403 Restart Recovery plan; evidence:
+  `prototype/codex-update-service.js`, renderer gate recovery, focused and full
+  prototype coverage, package metadata, and `RELEASES.md`)_
+
 - [x] Add an isolated Codex Activity Indicator Lab with paired interactive PTY and structured JSONL lanes, explicit model-usage gates, five live scenarios, sanitized evidence export, fake-CLI and Electron coverage, v0.67.0 metadata, and a live Codex 0.145.0 UAT report without changing production attention inference. _(source: user-supplied implementation plan; evidence: `prototype/activity-lab/`, activity-lab scripts/tests/docs, `docs/testing/activity-lab-uat-0.67.0.md`, and `RELEASES.md`)_
 
 - [x] Resolve whether Codex exposes a same-turn structured lifecycle source; reject the persistent app-server pilot after Gate 1 produced no observable same-turn lifecycle; implement and validate the conservative non-animated Pending fallback; archive sanitized v0.69.0 evidence without duplicate model invocation. _(source: user-approved five-turn/two-gate plan; evidence: `prototype/codex-app-server-lifecycle.js`, same-turn probe and fake coverage, focused/full prototype suites, `docs/testing/codex-activity-approval-0.69.0.md`, production-fix plan, and `RELEASES.md`)_

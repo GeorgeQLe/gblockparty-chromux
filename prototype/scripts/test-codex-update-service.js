@@ -8,9 +8,13 @@ const {
   GITHUB_LATEST_URL,
   HOMEBREW_CASK_URL,
   NPM_PACKAGE_URL,
+  RELEASE_URL,
   createCodexUpdateService,
+  releaseFromLatestRedirect,
   resolveOnPath,
 } = require('../codex-update-service');
+
+const VALID_REDIRECT = '/openai/codex/releases/tag/rust-v1.2.4';
 
 function fixture({
   executable = '/opt/homebrew/Cellar/codex/1.2.3/bin/codex',
@@ -49,6 +53,10 @@ function fixture({
       if (url === GITHUB_LATEST_URL) return { tag_name: `rust-v${latest}`, html_url: `https://github.com/openai/codex/releases/tag/rust-v${latest}` };
       if (url === `${NPM_PACKAGE_URL}/${latest}`) return npmReady ? { version: latest } : {};
       throw new Error(`Unexpected URL: ${url}`);
+    },
+    redirectRequest: async (url) => {
+      calls.push(['redirect', url]);
+      return { statusCode: 302, location: VALID_REDIRECT };
     },
   });
   return {
@@ -145,6 +153,86 @@ function fixture({
   });
   assert.match((await npmLag.service.check()).error, /not yet available from npm/);
 
+  for (const location of [VALID_REDIRECT, `https://github.com${VALID_REDIRECT}`]) {
+    assert.deepEqual(
+      releaseFromLatestRedirect({ statusCode: 302, location }),
+      {
+        version: '1.2.4',
+        releaseUrl: `https://github.com${VALID_REDIRECT}`,
+      },
+      'relative and canonical absolute redirects should resolve the stable release',
+    );
+  }
+
+  const invalidRedirects = [
+    { statusCode: 200, location: VALID_REDIRECT },
+    { statusCode: 302 },
+    { statusCode: 302, location: 'https://evil.example/openai/codex/releases/tag/rust-v1.2.4' },
+    { statusCode: 302, location: '//evil.example/openai/codex/releases/tag/rust-v1.2.4' },
+    { statusCode: 302, location: `https://github.com:443${VALID_REDIRECT}` },
+    { statusCode: 302, location: `https://user@github.com${VALID_REDIRECT}` },
+    { statusCode: 302, location: `https://user:pass@github.com${VALID_REDIRECT}` },
+    { statusCode: 302, location: '/other/codex/releases/tag/rust-v1.2.4' },
+    { statusCode: 302, location: '/openai/other/releases/tag/rust-v1.2.4' },
+    { statusCode: 302, location: '/openai/codex/releases/latest' },
+    { statusCode: 302, location: '/openai/codex/releases/tag/v1.2.4' },
+    { statusCode: 302, location: '/openai/codex/releases/tag/rust-v01.2.4' },
+    { statusCode: 302, location: '/openai/codex/releases/tag/rust-v1.2.4-beta.1' },
+    { statusCode: 302, location: `${VALID_REDIRECT}?from=latest` },
+    { statusCode: 302, location: `${VALID_REDIRECT}#notes` },
+    { statusCode: 302, location: 'https://github.com/%' },
+    { statusCode: 302, location: 'not a URL' },
+  ];
+  for (const redirect of invalidRedirects) {
+    assert.throws(
+      () => releaseFromLatestRedirect(redirect),
+      /Codex latest-release/,
+      `invalid redirect should fail closed: ${JSON.stringify(redirect)}`,
+    );
+  }
+
+  let fallbackApiCalls = 0;
+  let fallbackRedirectCalls = 0;
+  const rateLimited = createCodexUpdateService({
+    resolveExecutable: () => '/usr/local/bin/codex',
+    run: async () => ({ stdout: 'codex 1.2.3', stderr: '' }),
+    request: async (url) => {
+      fallbackApiCalls += 1;
+      assert.equal(url, GITHUB_LATEST_URL);
+      throw new Error('Codex update source returned HTTP 403');
+    },
+    redirectRequest: async (url) => {
+      fallbackRedirectCalls += 1;
+      assert.equal(url, RELEASE_URL);
+      return { statusCode: 302, location: VALID_REDIRECT };
+    },
+    retryDelaysMs: [1000, 2000],
+    wait: async () => { throw new Error('fallback success must not exhaust retries'); },
+  });
+  const fallbackStatus = await rateLimited.check();
+  assert.equal(fallbackStatus.error, null);
+  assert.equal(fallbackStatus.latestVersion, '1.2.4');
+  assert.equal(fallbackApiCalls, 1);
+  assert.equal(fallbackRedirectCalls, 1);
+
+  let npmFallbackRegistryCalls = 0;
+  const npmFallbackLag = createCodexUpdateService({
+    resolveExecutable: () => '/usr/local/lib/node_modules/@openai/codex/bin/codex.js',
+    run: async () => ({ stdout: 'codex 1.2.3', stderr: '' }),
+    request: async (url) => {
+      if (url === GITHUB_LATEST_URL) throw new Error('rate limited');
+      if (url === `${NPM_PACKAGE_URL}/1.2.4`) {
+        npmFallbackRegistryCalls += 1;
+        return {};
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    },
+    redirectRequest: async () => ({ statusCode: 302, location: VALID_REDIRECT }),
+    retryDelaysMs: [],
+  });
+  assert.match((await npmFallbackLag.check()).error, /not yet available from npm/);
+  assert.equal(npmFallbackRegistryCalls, 1, 'redirect fallback must retain exact npm availability validation');
+
   const missing = createCodexUpdateService({ resolveExecutable: () => null, retryDelaysMs: [] });
   assert.match((await missing.check()).error, /not found on PATH/);
 
@@ -153,6 +241,7 @@ function fixture({
       resolveExecutable: () => '/usr/local/bin/codex',
       run: async () => ({ stdout: 'codex 1.2.3', stderr: '' }),
       request: async () => { throw error; },
+      redirectRequest: async () => { throw error; },
       retryDelaysMs: [],
     });
     assert.match((await failing.check()).error, new RegExp(error.message));
@@ -162,6 +251,7 @@ function fixture({
     resolveExecutable: () => '/usr/local/bin/codex',
     run: async () => ({ stdout: 'codex 1.2.3', stderr: '' }),
     request: async () => ({ tag_name: 'nightly' }),
+    redirectRequest: async () => { throw new Error('fallback fixture failed'); },
     retryDelaysMs: [],
   });
   assert.match((await malformed.check()).error, /malformed Codex release/);
@@ -187,6 +277,7 @@ function fixture({
         html_url: 'https://github.com/openai/codex/releases/tag/rust-v1.2.4',
       };
     },
+    redirectRequest: async () => { throw new Error('transient fallback failure'); },
     retryDelaysMs: [1000, 2000],
     wait: async (delayMs) => { retryWaits.push(delayMs); },
   });
@@ -201,17 +292,29 @@ function fixture({
 
   const failedWaits = [];
   let failedAttempts = 0;
+  let failedApiAttempts = 0;
+  let failedRedirectAttempts = 0;
   const exhausted = createCodexUpdateService({
     resolveExecutable: () => '/usr/local/bin/codex',
     run: async () => {
       failedAttempts += 1;
-      throw new Error(`unsafe\u0000 final ${failedAttempts}`);
+      return { stdout: 'codex 1.2.3', stderr: '' };
+    },
+    request: async () => {
+      failedApiAttempts += 1;
+      throw new Error(`private API failure ${failedApiAttempts}`);
+    },
+    redirectRequest: async () => {
+      failedRedirectAttempts += 1;
+      throw new Error(`unsafe\u0000 final ${failedRedirectAttempts}`);
     },
     retryDelaysMs: [1000, 2000],
     wait: async (delayMs) => { failedWaits.push(delayMs); },
   });
   const exhaustedStatus = await exhausted.check();
   assert.equal(failedAttempts, 3, 'three consecutive failures should stop after the third attempt');
+  assert.equal(failedApiAttempts, 3, 'each retry should rerun the API source');
+  assert.equal(failedRedirectAttempts, 3, 'each retry should rerun the redirect fallback');
   assert.deepEqual(failedWaits, [1000, 2000], 'final failure should be returned only after both retry delays');
   assert.equal(exhaustedStatus.error, 'unsafe final 3', 'only the final sanitized failure should be exposed');
 

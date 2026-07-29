@@ -35,8 +35,11 @@ fs.writeFileSync(e2ePath, `
   const initialTabs = [...document.querySelectorAll('#tab-list .session-tab')].map((tab) => tab.textContent);
   expect(initialTabs.some((text) => text.includes('claude-immediate')), 'Claude restore should open during Codex preflight');
   expect(initialTabs.some((text) => text.includes('shell-immediate')), 'shell restore should open during Codex preflight');
-  expect(!initialTabs.some((text) => text.includes('codex-held')), 'Codex restore should remain held');
-  expect(gate.warning().title.includes('1 session waiting'), 'mixed restore should use one Codex workspace prompt');
+  expect(initialTabs.some((text) => text.includes('codex-held')), 'Codex restore should fail open after exhausted preflight');
+  expect(gate.warning().title.includes('Codex update check failed'),
+    'mixed restore should report startup fail-open: ' + JSON.stringify(gate.warning()));
+  expect(gate.warning().buttons.join(',') === 'RETRY CHECK,DISMISS',
+    'startup fail-open should expose only non-blocking recovery actions');
 
   gate.reset();
   gate.useFakeLauncher();
@@ -96,8 +99,8 @@ fs.writeFileSync(e2ePath, `
 
   gate.reset();
   gate.useFakeLauncher();
-  gate.launch('codex', 'offline-one', []);
-  gate.launchOptions({
+  const offlineOne = gate.launch('codex', 'offline-one', []);
+  const offlineComposer = gate.launchOptions({
     name: 'offline-composer',
     composerDraft: 'review before sending',
     initialStagedBrowserContexts: [{
@@ -113,18 +116,55 @@ fs.writeFileSync(e2ePath, `
     initialFullBrowserComposerOpen: true,
   });
   await gate.setStatus({ error: 'offline fixture' });
+  await Promise.all([offlineOne, offlineComposer]);
   warning = gate.warning();
-  expect(warning.buttons.includes('RETRY CHECK') && warning.buttons.includes('RESUME ANYWAY'),
-    'failed check should remain held with retry and bypass');
-  expect(gate.snapshot().some((row) => row.name === 'offline-one' && row.agent === 'codex'),
-    'held Codex launch should remain in quit/update snapshots');
-  const heldComposer = gate.snapshot().find((row) => row.name === 'offline-composer');
-  expect(heldComposer && heldComposer.composerDraft === 'review before sending'
-    && heldComposer.stagedBrowserContexts.length === 1
-    && heldComposer.browserLayoutMode === 'browserChromux'
-    && heldComposer.fullBrowserComposerOpen === true
-    && !Object.prototype.hasOwnProperty.call(heldComposer, 'chatMessages'),
-  'held Codex launches should retain initial routed-Composer state and requested presentation');
+  expect(gate.launched().join(',') === 'offline-one,offline-composer',
+    'failed startup check should release every queued launch exactly once in saved order');
+  expect(gate.phase() === 'bypassed', 'failed startup check should bypass the gate for the app run');
+  expect(warning.title.includes('2 sessions released') && warning.detail.includes('offline fixture'),
+    'fail-open warning should report the sanitized failure and released-session count');
+  expect(warning.buttons.join(',') === 'RETRY CHECK,DISMISS',
+    'fail-open warning should remain recoverable without RESUME ANYWAY');
+
+  const backgroundRetry = gate.retryWith({
+    currentVersion: '1.2.3',
+    latestVersion: '1.2.4',
+    updateAvailable: true,
+    releaseUrl: 'https://github.com/openai/codex/releases/tag/rust-v1.2.4',
+  }, 50);
+  const concurrent = gate.launch('codex', 'concurrent-after-fail-open', []);
+  const concurrentSession = await concurrent;
+  expect(gate.waiting().length === 0 && gate.phase() === 'bypassed',
+    'background retry must not re-gate a concurrent Codex launch');
+  expect(concurrentSession?.name === 'concurrent-after-fail-open',
+    'concurrent Codex launch should start normally during background retry');
+  await backgroundRetry;
+  warning = gate.warning();
+  expect(gate.launched().join(',') === 'offline-one,offline-composer',
+    'background retry must not relaunch or duplicate released sessions: ' + gate.launched().join(','));
+  expect(warning.title.includes('restart later')
+    && warning.detail.includes('Installed 1.2.3; latest 1.2.4')
+    && warning.buttons.includes('RELEASE NOTES')
+    && warning.buttons.includes('RETRY CHECK')
+    && warning.buttons.includes('DISMISS')
+    && !warning.buttons.includes('UPDATE CODEX'),
+  'live-session retry should show release information but defer installation');
+
+  await gate.retryWith({ currentVersion: '1.2.4', latestVersion: '1.2.4', updateAvailable: false });
+  warning = gate.warning();
+  expect(!warning.title.includes('Codex update'),
+    'successful-current background retry should clear the fail-open warning: ' + JSON.stringify(warning));
+  expect(gate.phase() === 'bypassed', 'successful retry must leave the app-run bypass active');
+
+  const afterCurrent = gate.launch('codex', 'after-current-retry', []);
+  const afterCurrentSession = await afterCurrent;
+  expect(afterCurrentSession?.name === 'after-current-retry' && gate.waiting().length === 0,
+    'new Codex launches must stay ungated after retry success');
+
+  await gate.retryWith({ error: 'offline again' });
+  warning = gate.warning();
+  expect(warning.buttons.includes('RETRY CHECK') && warning.buttons.includes('DISMISS'),
+    'repeated background failure should remain recoverable');
 
   gate.reset();
   const adoption = window.chromuxTestShellAdoption;
