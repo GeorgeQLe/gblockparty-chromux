@@ -1390,7 +1390,8 @@
   run `30416977625` then passed clean install, tests, package metadata
   derivation, Forge/Squirrel packaging, package inspection, packaged boot
   smoke, and artifact upload. Its remaining Node 20 annotation identified
-  upload-artifact v4, so upload/download actions were also advanced to v5.
+  upload-artifact v4; v5 still declared Node 20, so official Node 24-backed v6
+  upload/download actions replaced it.
 - Skipped tests: real Authenticode signing, Squirrel install/upgrade/uninstall,
   physical Windows 10/11 setup/restore UAT, and `/releases/latest`
   verification require the protected Azure identity, protected GitHub
