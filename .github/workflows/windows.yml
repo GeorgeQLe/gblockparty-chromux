@@ -46,7 +46,7 @@ jobs:
           $exe = Get-ChildItem out -Recurse -Filter 'GBlockParty Chromux.exe' | Select-Object -First 1
           $process = Start-Process $exe.FullName -ArgumentList '--smoke' -PassThru
           if (-not $process.WaitForExit(30000)) { Stop-Process $process.Id -Force; throw 'Packaged smoke timed out' }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: GBlockParty-Chromux-${{ steps.meta.outputs.version }}-windows-x64-unsigned-validation
           path: |

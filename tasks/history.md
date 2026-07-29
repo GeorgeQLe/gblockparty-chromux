@@ -1386,7 +1386,11 @@
   that have no compatible override; this is accepted for build-only tooling,
   while the shipped production dependency audit remains clean. The same run's
   Node 20 deprecation warnings were resolved by moving checkout and setup-node
-  to their Node 24-backed v5 releases.
+  to their Node 24-backed v5 releases. The rebased v0.73.0 Windows validation
+  run `30416977625` then passed clean install, tests, package metadata
+  derivation, Forge/Squirrel packaging, package inspection, packaged boot
+  smoke, and artifact upload. Its remaining Node 20 annotation identified
+  upload-artifact v4, so upload/download actions were also advanced to v5.
 - Skipped tests: real Authenticode signing, Squirrel install/upgrade/uninstall,
   physical Windows 10/11 setup/restore UAT, and `/releases/latest`
   verification require the protected Azure identity, protected GitHub
