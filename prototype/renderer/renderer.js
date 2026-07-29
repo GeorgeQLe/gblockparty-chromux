@@ -354,7 +354,7 @@ const TERM_THEMES = {
     red: '#a33a2c', brightRed: '#d45747', green: '#13764d', brightGreen: '#239b68',
     yellow: '#8a5b00', brightYellow: '#b77c0e', blue: '#006d9c', brightBlue: '#218fc0',
     magenta: '#674fa3', brightMagenta: '#8b70c7', cyan: '#08758a', brightCyan: '#2699ad',
-    white: '#dbe9f6', brightWhite: '#ffffff',
+    white: '#173b62', brightWhite: '#173b62',
   },
   'retro-os-light': {
     background: '#ffffff', foreground: '#141414', cursor: '#30309a', cursorAccent: '#ffffff',
@@ -362,7 +362,7 @@ const TERM_THEMES = {
     red: '#9b1c1c', brightRed: '#d6393b', green: '#1f7a34', brightGreen: '#37b24d',
     yellow: '#a05a00', brightYellow: '#e8940a', blue: '#30309a', brightBlue: '#5656c7',
     magenta: '#7d2c85', brightMagenta: '#a94eb3', cyan: '#0b6a7d', brightCyan: '#18a5c0',
-    white: '#d0d0d0', brightWhite: '#ffffff',
+    white: '#141414', brightWhite: '#141414',
   },
   'retro-os-dark': {
     background: '#101214', foreground: '#eeeeee', cursor: '#9c9cff', cursorAccent: '#101214',
@@ -386,7 +386,7 @@ const TERM_THEMES = {
     red: '#c83c3c', brightRed: '#e85c5c', green: '#3f9b00', brightGreen: '#58cc02',
     yellow: '#9a6900', brightYellow: '#cc9100', blue: '#087eae', brightBlue: '#1cb0f6',
     magenta: '#8d4eb4', brightMagenta: '#b16bda', cyan: '#087f6b', brightCyan: '#20ad94',
-    white: '#dce5ee', brightWhite: '#ffffff',
+    white: '#293244', brightWhite: '#293244',
   },
   'liquid-glass-dark': {
     background: '#111827', foreground: '#e7edf7', cursor: '#23b7ec', cursorAccent: '#111827',
@@ -402,9 +402,11 @@ const TERM_THEMES = {
     red: '#b83c31', brightRed: '#df5a4d', green: '#137c55', brightGreen: '#26a874',
     yellow: '#8a5c08', brightYellow: '#bd8215', blue: '#0f78a0', brightBlue: '#199dcc',
     magenta: '#6656b8', brightMagenta: '#8979dc', cyan: '#0d7886', brightCyan: '#28a2b1',
-    white: '#dbe5f2', brightWhite: '#ffffff',
+    white: '#172231', brightWhite: '#172231',
   },
 };
+
+const TERMINAL_MINIMUM_CONTRAST_RATIO = 4.5;
 
 function terminalThemeFor(theme = state.ui.theme, mode = state.ui.themeMode) {
   return TERM_THEMES[`${theme}-${mode}`] || TERM_THEMES['liquid-glass-light'];
@@ -8396,7 +8398,8 @@ function openThreadPreview(session, anchor, { anchorHovered = false } = {}) {
     const terminal = new Terminal({
       cols: Math.max(2, session.term.term.cols || 80), rows: Math.max(1, session.term.term.rows || 24),
       fontFamily: '"SF Mono", Menlo, monospace', fontSize: 11, lineHeight: 1.15,
-      cursorBlink: false, disableStdin: true, scrollback: THREAD_PREVIEW_SCROLLBACK, theme: terminalThemeFor(),
+      cursorBlink: false, disableStdin: true, scrollback: THREAD_PREVIEW_SCROLLBACK,
+      minimumContrastRatio: TERMINAL_MINIMUM_CONTRAST_RATIO, theme: terminalThemeFor(),
     });
     terminal.open(host);
     return {
@@ -8864,6 +8867,7 @@ async function createSessionNow({
     cursorBlink: true,
     scrollback: 8000,
     macOptionIsMeta: true,
+    minimumContrastRatio: TERMINAL_MINIMUM_CONTRAST_RATIO,
     theme: terminalThemeFor(),
     linkHandler: {
       activate(event, text) {
@@ -11601,7 +11605,10 @@ if (window.chromuxTest) {
     session._written = written;
     session._ptyInputs = [];
     if (realTerminal) {
-      const term = new Terminal({ cols, rows, scrollback: 600, fontFamily: 'monospace', fontSize: 12, lineHeight: 1, theme: terminalThemeFor() });
+      const term = new Terminal({
+        cols, rows, scrollback: 600, fontFamily: 'monospace', fontSize: 12, lineHeight: 1,
+        minimumContrastRatio: TERMINAL_MINIMUM_CONTRAST_RATIO, theme: terminalThemeFor(),
+      });
       term.open(viewEls.termHost);
       term.resize(cols, rows);
       term.onData((data) => handleTerminalInput(session, data));
@@ -13882,6 +13889,7 @@ if (window.chromuxTest) {
         fontFamily: 'monospace',
         fontSize: 12,
         lineHeight: 1,
+        minimumContrastRatio: TERMINAL_MINIMUM_CONTRAST_RATIO,
         theme: terminalThemeFor(),
       });
       term.open(viewEls.termHost);
@@ -13919,6 +13927,7 @@ if (window.chromuxTest) {
         fontFamily: 'monospace',
         fontSize: 12,
         lineHeight: 1,
+        minimumContrastRatio: TERMINAL_MINIMUM_CONTRAST_RATIO,
         theme: terminalThemeFor(),
       });
       const fitAddon = new FitAddon.FitAddon();

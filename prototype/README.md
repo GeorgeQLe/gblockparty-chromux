@@ -1,6 +1,6 @@
 # Chromux — v1 prototype
 
-A macOS and Windows 11 desktop **agent cockpit**: parallel Claude Code / Codex / Grok Build terminal sessions,
+A macOS and Windows desktop **agent cockpit**: parallel Claude Code / Codex / Grok Build terminal sessions,
 each paired 1:1 with an embedded Chromium browser pane. Localhost dev-server previews and
 generated `file://` HTML open next to the session that produced them — no alt-tabbing — and
 one click packages browser evidence (console tail + picked element + screenshot + URL) into a
@@ -17,13 +17,15 @@ unified-sidebar layout toggle, productization.
 Requires: macOS, Node 22.12+, Xcode command-line tools (for the `node-pty` native build), and the
 `claude` CLI on your PATH (only needed for delivery; everything else works without it).
 
-On Windows, Chromux requires Windows 11 22H2+ x64, WSL2, and an initialized
-WSL2 distribution containing Bash, Git, Node 22.12+, and each desired agent
-CLI. Windows 10, WSL1, ARM64, native PowerShell, and Git Bash sessions are not
-supported in v0.62. Choose the default distribution in Settings. Changing it
-affects new records only; existing sessions/projects retain their distribution.
-Each runtime has its own **Projects Root**; Windows keeps a separate canonical
-Linux path for every WSL distribution.
+On Windows, Chromux requires Windows 10 22H2+ x64 (build 19045 or newer,
+including Windows 11), an updated WSL2 installation, and an initialized WSL2
+distribution containing Bash, Git, Node 22.12+, and each desired agent CLI.
+Run `wsl --update` before setup. Older Windows builds, WSL1, ARM64, native
+PowerShell, and Git Bash sessions are not supported. Choose the default
+distribution in Settings. Changing it affects new records only; existing
+sessions/projects retain their distribution. Each runtime has its own
+**Projects Root**; Windows keeps a separate canonical Linux path for every WSL
+distribution.
 
 ```sh
 cd prototype
@@ -53,8 +55,8 @@ npm ci
 npm run make:win
 ```
 
-Forge produces `GBlockParty-Chromux-Setup-0.62.0-x64.exe`,
-`GBlockPartyChromux-0.62.0-full.nupkg`, and `RELEASES` under
+Forge produces `GBlockParty-Chromux-Setup-0.69.2-x64.exe`,
+`GBlockPartyChromux-0.69.2-full.nupkg`, and `RELEASES` under
 `out/make/squirrel.windows/x64`. This first per-user installer is unsigned, so
 SmartScreen normally displays **Windows protected your PC**. Select **More info
 → Run anyway** only for an installer verified against the official GitHub

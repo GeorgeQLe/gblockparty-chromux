@@ -66,8 +66,17 @@ Tag: `chromux-v0.69.3`
 
 ## GBlockParty Chromux v0.69.2
 
-Tag: `chromux-v0.69.2`
+Tag: `chromux-v0.69.2` (pending real Windows 10 UAT)
 
+- Add Windows 10 22H2+ x64 support at build 19045 or newer, including Windows
+  11, while rejecting older builds, malformed release strings, ARM64, and ia32.
+- Require updated WSL2, retain per-distribution Projects Roots, and retarget
+  Windows Squirrel packaging and the mandatory real-machine UAT to v0.69.2.
+- Keep ANSI white and bright-white readable on every light terminal theme and
+  enforce xterm's WCAG AA 4.5:1 contrast floor across live terminals, hover
+  previews, and renderer test terminals.
+- Resolve `tar` and `brace-expansion` to patched releases, bringing the
+  production dependency audit to zero findings.
 - Add a dependency-free, loopback-only localhost first-success fixture with
   stable review markers, health routing, a documented fixed port, and
   ephemeral-port test support.

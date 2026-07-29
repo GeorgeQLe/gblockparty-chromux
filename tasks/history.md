@@ -1,5 +1,100 @@
 # Session History
 
+## 2026-07-28 — Chromux v0.69.2 Windows 10 and dependency-audit candidate
+
+- **User goal:** Resolve the post-sync Windows 10/terminal-contrast stash
+  conflicts originally based on published v0.67.0, preserve upstream work and
+  the backup stash, apply safe npm audit fixes, then rebase the candidate over
+  concurrent published work through v0.69.1 and ship it as v0.69.2.
+- **Changed files:** `.github/workflows/windows.yml`, `README.md`,
+  `RELEASES.md`, deletion of `docs/testing/windows-uat-0.62.0.md`, addition of
+  `docs/testing/windows-uat-0.69.2.md`, `prototype/README.md`,
+  `prototype/package-lock.json`, `prototype/package.json`,
+  `prototype/platform/host.js`, `prototype/renderer/renderer.js`,
+  `prototype/scripts/test-themes-renderer.js`,
+  `prototype/scripts/test-windows-platform.js`, `tasks/history.md`, and
+  `tasks/todo.md`.
+- **Per-file purpose:** The workflow, package metadata, prototype guide,
+  release-parser fixture, release notes, task gate, and UAT report align
+  v0.69.2 Squirrel names and release checks. The root/prototype guides define
+  Windows 10 build 19045+, updated WSL2, and retained per-distribution Projects
+  Roots. `host.js` owns strict build parsing and the x64/build-19045 gate.
+  `renderer.js` maps ANSI white/bright-white to readable light foregrounds and
+  gives every live, preview, and test terminal a 4.5:1 minimum contrast ratio.
+  The theme and Windows scripts combine upstream geometry/palette coverage with
+  contrast, malformed-version, architecture, WSL1, boundary, and v0.69.2 asset
+  assertions. The lockfile resolves `brace-expansion` 5.0.8 and `tar` 7.5.22.
+  Task/history records retain upstream history and define the remaining gate.
+- **User-goal mapping:** Windows x64 build 19045 and newer, including Windows
+  11, is accepted; older, malformed, ARM64, and ia32 environments are rejected.
+  Light-terminal Codex headers remain readable without changing dark palettes.
+  Upstream v0.62-v0.69.1 release history and project-root behavior remain
+  intact, the obsolete v0.62 UAT is replaced by the v0.69.2 gate, every
+  resolved path is included, and `stash@{0}` remains available.
+- **Tests run:** `npm install` rebuilt `node-pty`; changed JavaScript passed
+  `node --check`; `npm run test:themes-renderer`,
+  `npm run test:windows-platform`, `npm run test:ci:windows`,
+  `node scripts/test-capture-packaging.js`, and `npm run smoke` passed, with
+  `THEMES_RENDERER_OK`, Windows platform/CI success, packaging success, and
+  `SMOKE_OK`. The complete registered matrix was run in sorted segments; every
+  platform-applicable suite outside the host limitations below passed.
+  `npm audit --omit=dev` reports zero vulnerabilities. Package/lock/version,
+  single-gate, conflict-marker, staged-boundary, and `git diff --check` audits
+  passed. After rebasing over concurrent v0.68.0-v0.69.1 changes, the changed
+  JavaScript syntax checks, theme renderer, complete Windows CI command,
+  capture-packaging test, production audit, and source smoke all passed again
+  against the exact v0.69.2 tree.
+- **Skipped tests:** Real Windows 10/WSL2 interaction and Squirrel
+  install/update require the external build-19045 machine and remain the
+  publication gate. On this Linux host the macOS-only capture integration
+  correctly reports unsupported, the Prevent Sleep renderer lacks D-Bus, and
+  project-launcher/session-rail/native-pointer geometry fixtures cannot obtain
+  stable native display integration; their platform-neutral contracts,
+  Windows CI subset, themes, packaging, and source smoke passed.
+- **Adversarial review:** Applied
+  `.agents/skillpacks/docs/quality-gate-contract.md` through a failure-oriented
+  exact-diff review. It checked malformed and four-component Windows releases,
+  build/architecture boundaries, WSL1 retention, every terminal constructor,
+  all light/dark palettes, workflow/UAT/parser asset parity, one Windows todo,
+  historical release preservation, package/lock resolution, secret-like text,
+  conflict markers, unstaged changes, and stash retention. Findings fixed were
+  stale v0.62/v0.67.1 asset references, a superseded UAT path in history, and
+  the post-fetch version collision with concurrent v0.68.0-v0.69.1 releases;
+  the candidate was retargeted to v0.69.2 without dropping their source,
+  release notes, or tests. No production finding remains.
+- **Residual risk:** Thirty-four development-only npm findings remain nested in
+  Electron Forge/Squirrel with no compatible automatic fix; `npm audit fix
+  --force` proposes an unsafe Forge downgrade and was rejected, while the
+  production tree is clean. Physical ConPTY/WSL2, unsigned Squirrel lifecycle,
+  SmartScreen behavior, and Windows caption/input geometry remain unverified
+  until the real-machine UAT passes. The Linux-only display fixture failures
+  above also remain environmental verification gaps, not accepted production
+  behavior.
+- **Rollback note:** Revert the v0.69.2 candidate commit to return to the prior
+  published source; do not delete `stash@{0}`. If a release is later published,
+  remove its tag/GitHub Release only as an explicit rollback operation.
+- **Next command:** On a real Windows 10 Pro 22H2 build-19045 x64 machine, use
+  `$guide` to complete `docs/testing/windows-uat-0.69.2.md`, build and hash the
+  three Squirrel assets, then tag/publish only after a complete PASS.
+
+## 2026-07-27 — Chromux v0.67.1 Windows 10 and terminal-contrast candidate
+
+- Rebased the Windows 10 build-19045 compatibility and light-terminal contrast
+  work onto the published v0.67.0 line without rewriting prior release history.
+  Windows x64 build 19045 or newer is accepted, including Windows 11; older,
+  malformed, ARM64, and ia32 environments remain rejected.
+- Mapped ANSI white and bright-white to each light palette's readable foreground
+  and enabled xterm's 4.5:1 minimum contrast ratio for live terminals, hover
+  previews, and renderer test terminals. Updated WSL2 requirements, Windows
+  packaging metadata, release fixtures, and the real-machine gate to v0.67.1.
+- Verification for this conflict resolution covers syntax, theme rendering,
+  Windows platform and CI suites, the complete prototype matrix where the host
+  supports Electron, version consistency, conflict-marker absence, and
+  `git diff --check`. The candidate was superseded before publication by
+  the post-sync candidate; its real Windows 10 build-19045 gate continues in
+  `docs/testing/windows-uat-0.69.2.md`. No tag, GitHub Release, or
+  stash removal was authorized.
+
 ## 2026-07-27 — Chromux v0.66.0 unified project launcher candidate
 
 - Replaced the overloaded new-session modal with **Open Existing** and **Create Project** tabs, retained Command/Control-T for existing directories, and added guarded Command/Control-N routing from host, terminal, and non-editable webview focus.
@@ -44,7 +139,6 @@
 - Increased Liquid Glass titlebar branding clearance and gave the SESSIONS, QUEUED, and SENT gauges visible 1 px boundaries with symmetric 9×4 px padding in both brightness modes.
 - Prepared package/lock metadata and release notes for v0.62.1; no tag, GitHub Release, publish, or `/releases/latest` change was made because the v0.62 Windows UAT gate remains open.
 - Ship manifest — User goal: correct cramped Liquid Glass macOS controls and undersized glass gauges without changing other theme behavior or disturbing unrelated work. Changed files and per-file purpose: `prototype/renderer/renderer.js` calculates the native-control x-coordinate from measured header geometry; `prototype/renderer/styles.css` owns Liquid Glass titlebar clearance and gauge boundary/padding; `prototype/scripts/test-themes-renderer.js` covers all eight theme/mode positions plus Liquid Glass spacing in both modes; `prototype/package.json`, `prototype/package-lock.json`, and `RELEASES.md` prepare v0.62.1; `tasks/todo.md` and this entry record the gated candidate. User-goal mapping: only titlebar control positioning and Liquid Glass header spacing changed; colors, typography, pill shape, theme switching, terminal palettes, APIs, IPC payloads, and data structures remain unchanged. Tests run: the updated theme regression first failed at Retro-OS x=14, then `npm run test:themes-renderer` and `npm run test:window-config` passed; all registered prototype tests passed through `npm test`; changed JavaScript syntax and scoped `git diff --check` passed; unobstructed Liquid Glass Light/Dark captures were inspected for branding clearance, balanced pills, visible borders, clipping, and overflow. Skipped tests: packaging and packaged smoke were not repeated because no packaging logic or runtime dependency changed and the user-requested release remains deliberately unshipped; the complete source test matrix exercised the changed renderer boundary. Adversarial review: traced fractional/inset header geometry, integer IPC validation, all theme/mode coordinates, Liquid Glass light/dark boundary contrast, exact three-gauge coverage, titlebar width, existing Settings controls, and concurrent user-owned alignment/research/interrogation files. No blocking implementation finding remains. Accepted warning: the first direct unobstructed Electron capture aborted inside the macOS sandbox and passed unchanged in the approved GUI execution context; a global `git diff --check` reports pre-existing trailing whitespace in `research/devtool-dx-journey.md`, while the scoped change is clean. Residual risk: Electron `capturePage` excludes native window decorations, so screenshots validate the web titlebar clearance and gauges while the real-Electron coordinate assertions validate traffic-light placement. Rollback note: revert the seven v0.62.1 source/test/release metadata files and the two task records; v0.62.0 remains the prior candidate metadata. Deploy blocked: do not tag or publish `chromux-v0.62.1` until `docs/testing/windows-uat-0.62.0.md` records a real Windows 11/WSL2 PASS and the Squirrel release assets are built. Next command: complete the real Windows UAT gate, then build, tag, publish, and verify v0.62.1.
-
 ## 2026-07-26 — Chromux v0.62.0 paired-browser fullscreen hotkey
 
 - Added guarded `Command+Shift+F` / `Control+Shift+F` routing through the shared parser, host and embedded-webview input interception, main/preload bridge, renderer fallback, View menu, rail tooltip, and diagnostics catalog.
@@ -1185,9 +1279,11 @@
   `node scripts/test-vercel-service.js`, and `git diff --check` passed;
   `node scripts/test-vercel-renderer.js` aborted inside the command sandbox,
   then passed in the approved outside-sandbox Electron context; `npm test`
-  passed the complete prototype matrix outside the sandbox with no warnings.
-  The repository has no `scripts/audit-task-docs.mjs`, so no task-doc audit
-  command applies.
+  passed the complete prototype matrix outside the sandbox with no warnings,
+  then passed again after the additive `origin/main` merge brought in the
+  Windows/theme candidate changes. Focused Windows and Vercel service checks
+  also passed after conflict resolution. The repository has no
+  `scripts/audit-task-docs.mjs`, so no task-doc audit command applies.
 - Skipped tests: no live Vercel CLI account/token/OAuth/deployment or WSL
   runtime was exercised because those require external credentials or a
   Windows environment; deterministic service and real-Electron fixtures cover

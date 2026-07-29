@@ -29,9 +29,12 @@ function windowOptions(platform = process.platform) {
 
 function windowsSupport({ platform = process.platform, arch = process.arch, release = require('os').release() } = {}) {
   if (platform !== 'win32') return { supported: true, error: null };
-  const build = Number(String(release).split('.')[2] || 0);
-  if (arch !== 'x64') return { supported: false, error: 'Chromux v0.62 requires Windows 11 x64.' };
-  if (build < 22621) return { supported: false, error: 'Chromux v0.62 requires Windows 11 22H2 (build 22621) or newer.' };
+  const match = String(release).match(/^\d+\.\d+\.(\d+)(?:\.\d+)?$/);
+  const build = match ? Number(match[1]) : null;
+  if (arch !== 'x64') return { supported: false, error: 'Chromux requires Windows 10 22H2 or newer on x64.' };
+  if (build === null || build < 19045) {
+    return { supported: false, error: 'Chromux requires Windows 10 22H2 (build 19045) or newer.' };
+  }
   return { supported: true, error: null };
 }
 
