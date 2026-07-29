@@ -103,7 +103,7 @@ async function handle(message) {
         tools: { listChanged: false },
         resources: { subscribe: false, listChanged: false },
       },
-      serverInfo: { name: 'chromux-resource-broker', version: '0.72.0' },
+      serverInfo: { name: 'chromux-resource-broker', version: '0.73.0' },
     };
   }
   if (message.method === 'tools/list') return { tools };

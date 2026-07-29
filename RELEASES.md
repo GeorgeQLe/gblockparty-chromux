@@ -1,8 +1,8 @@
 # Release Notes
 
-## GBlockParty Chromux v0.72.0
+## GBlockParty Chromux v0.73.0
 
-Tag: `chromux-v0.72.0`
+Planned tag: `chromux-v0.73.0`
 
 - Add a Windows-only, keyboard-accessible, five-stage first-run setup and
   diagnostics wizard with resumable WSL2 selection, required Bash/Git/Node
@@ -24,6 +24,11 @@ Tag: `chromux-v0.72.0`
 - Retain compatibility with older Git worktree porcelain, legacy Electron
   Forge packaging dependencies, current GitHub Actions runtimes, and
   Linux-hosted Electron regression runs.
+
+## GBlockParty Chromux v0.72.0
+
+Tag: `chromux-v0.72.0`
+
 - Add authenticated `chromux_browser_queue_add` MCP and `browser-preview` OSC
   signals so agents can intentionally queue bounded HTTP(S) or existing local
   file targets for their originating Chromux session.

@@ -1,4 +1,4 @@
-# Chromux v0.72.0 signed Windows installer UAT
+# Chromux v0.73.0 signed Windows installer UAT
 
 Status: **PENDING PROTECTED WORKFLOW AND REAL-MACHINE PASS**
 
@@ -8,7 +8,7 @@ files as an immutable Actions artifact, and run this candidate unchanged on:
 - Windows 10 Pro 22H2 build 19045 x64 with current WSL2;
 - current Windows 11 x64 with current WSL2.
 
-`chromux-v0.72.0` must not be published until both jobs pass and a reviewer
+`chromux-v0.73.0` must not be published until both jobs pass and a reviewer
 approves the protected `windows-release` environment.
 
 ## Candidate identity
@@ -26,7 +26,7 @@ approves the protected `windows-release` environment.
 ## Automated pre-UAT gates
 
 - [ ] `prototype/package.json`, tag, title, filenames, and workflow inputs all
-  resolve to `0.72.0` / `chromux-v0.72.0`.
+  resolve to `0.73.0` / `chromux-v0.73.0`.
 - [ ] Complete Windows-focused test suite passes on `windows-2022`.
 - [ ] Packager and Squirrel use `@electron/windows-sign` with Artifact
   Signing's x64 DLib, SHA-256 file/timestamp digests, and
@@ -69,16 +69,16 @@ approves the protected `windows-release` environment.
 
 ## Draft and publication gate
 
-- [ ] Draft title is `GBlockParty Chromux v0.72.0`.
+- [ ] Draft title is `GBlockParty Chromux v0.73.0`.
 - [ ] All five assets are uploaded, re-downloaded, nonempty, and hash-identical
   to the candidate.
 - [ ] Re-downloaded Setup and nested full-package signatures pass trust,
   publisher, and timestamp verification.
 - [ ] Draft GitHub API metadata parses as one complete Squirrel asset set with
   common feed directory
-  `.../releases/download/chromux-v0.72.0/`.
+  `.../releases/download/chromux-v0.73.0/`.
 - [ ] Protected reviewer approves publication.
-- [ ] `/releases/latest` resolves to `chromux-v0.72.0` and remains parseable by
+- [ ] `/releases/latest` resolves to `chromux-v0.73.0` and remains parseable by
   Chromux.
 
 ## Evidence

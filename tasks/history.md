@@ -1321,10 +1321,10 @@
   candidate UAT before draft verification and publication.
 - Ship manifest — User goal: implement the supplied signed per-user Windows
   installer, protected release pipeline, resumable first-run diagnostics, live
-  readiness gates, tests, documentation, and v0.72.0 release preparation.
+  readiness gates, tests, documentation, and v0.73.0 release preparation.
   Changed files: `.github/workflows/windows.yml`,
   `.github/workflows/windows-release.yml`, `RELEASES.md`,
-  `docs/testing/windows-signed-installer-uat-0.72.0.md`, `prototype/README.md`,
+  `docs/testing/windows-signed-installer-uat-0.73.0.md`, `prototype/README.md`,
   `prototype/docs/privacy-and-local-data.md`,
   `prototype/docs/troubleshooting.md`, `prototype/docs/windows-setup.md`,
   `prototype/forge.config.js`, `prototype/main.js`, `prototype/preload.js`,
@@ -1353,7 +1353,7 @@
   status contract, narrow IPC, UX, gates, migration, and self-test; updater and
   artifact/signing scripts derive and validate the exact Squirrel feed and
   signed candidate; tests cover setup, updater, packaging, and host
-  compatibility; metadata/docs communicate v0.72.0 onboarding, retention,
+  compatibility; metadata/docs communicate v0.73.0 onboarding, retention,
   troubleshooting, and release gates; the Git fallback and Electron test
   changes resolve older-Git and Linux-host failures surfaced by the complete
   suite. User-goal mapping: every planned readiness check, capability rule,
@@ -1409,18 +1409,22 @@
   variables with an official prior-installer URL allowlist.
 - Residual risk: a live GitHub audit found only `Preview` and `Production`
   environments, no repository Actions variables or secrets, no self-hosted
-  runners, and a latest v0.70.0 Release with no assets. Therefore the Artifact
+  runners, and a latest v0.72.0 Release with no assets. Therefore the Artifact
   Signing identity/profile, protected `windows-signing` and `windows-release`
   approvals, exact publisher subject, prior signed installer, and labeled
   Windows 10/11 WSL2 runners are confirmed blockers rather than unobserved
   assumptions. Concurrent upstream work also makes the unfinished v0.71.0
-  Vercel shipping task an explicit publication blocker; v0.72.0 must not ship
+  Vercel shipping task an explicit publication blocker; v0.73.0 must not ship
   that incomplete feature accidentally. Rollback: revert the scoped commits
   before publication; after publication, revert, issue a higher corrective
   SemVer, and never replace immutable signed assets. Next command: `$exec` to
   complete the active Vercel shipping engine while the Windows signing
   environments, credentials, runners, and prior signed installer are
   provisioned.
+- A concurrent browser-queue feature published and tagged v0.72.0 while the
+  Windows CI compatibility correction was in progress. The signed-installer
+  candidate was therefore advanced to the next available minor, v0.73.0,
+  without rewriting the immutable v0.72.0 tag or Release.
 
 ## 2026-07-28 — Intentional, turn-aware browser queue links
 

@@ -59,7 +59,7 @@ child.stdout.on('data', (chunk) => {
     const previewUnavailable = responses.find((response) => response.id === 6);
 
     assert.equal(initialize.result.serverInfo.name, 'chromux-resource-broker');
-    assert.equal(initialize.result.serverInfo.version, '0.72.0');
+    assert.equal(initialize.result.serverInfo.version, '0.73.0');
     assert.deepEqual(initialize.result.capabilities.resources, { subscribe: false, listChanged: false });
     const names = listed.result.tools.map((tool) => tool.name);
     for (const expected of [
