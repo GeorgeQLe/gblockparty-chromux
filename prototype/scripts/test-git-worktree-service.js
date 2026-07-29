@@ -24,6 +24,10 @@ assert.strictEqual(worktrees[0].branch, 'main');
 assert.strictEqual(worktrees[1].detached, true);
 assert.strictEqual(worktrees[1].locked, 'maintenance');
 assert.match(worktrees[2].prunable, /non-existent/);
+assert.strictEqual(parseWorktreePorcelain([
+  'worktree /tmp/main tree', 'HEAD abc', 'branch refs/heads/main', '',
+  'worktree /tmp/linked', 'HEAD def', 'branch refs/heads/linked', '',
+].join('\n')).length, 2, 'older Git newline-delimited porcelain must remain supported');
 assert.deepStrictEqual(parseWorktreePorcelain('malformed\0HEAD nope\0'), []);
 
 const status = parseStatusPorcelainV2([

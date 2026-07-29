@@ -102,6 +102,7 @@ const child = spawn(process.execPath, [electronCli, '.', '--smoke'], {
     ...process.env,
     HOME: homeDir,
     P_BASE: projectsRoot,
+    P_NP_HOOK: '',
     PATH: `/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:${process.env.PATH || ''}`,
     CHROMUX_E2E: e2ePath,
     CHROMUX_E2E_OUT: e2eOutPath,

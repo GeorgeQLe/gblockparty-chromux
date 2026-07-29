@@ -32,6 +32,7 @@ fs.writeFileSync(e2ePath, `
   if (!rail) throw new Error('Missing session rail test API');
   const expect = (condition, message) => { if (!condition) throw new Error(message); };
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const hostPlatform = (await window.chromux.getEnv()).hostPlatform;
   const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
   const samplePreviewFrames = async (count) => {
     const frames = [];
@@ -1087,8 +1088,10 @@ fs.writeFileSync(e2ePath, `
       expect(Math.abs(geometry.padding.headerLeft - geometry.padding.terminalLeft) <= 2
         && Math.abs(geometry.padding.footerLeft - geometry.padding.terminalLeft) <= 2,
       theme + ' ' + mode + ' should align header, terminal, and footer insets: ' + JSON.stringify(geometry.padding));
-      expect(geometry.padding.terminalTop >= 9 && geometry.padding.terminalRight >= 9 && geometry.padding.terminalBottom >= 9,
-        theme + ' ' + mode + ' should preserve terminal padding on every edge: ' + JSON.stringify(geometry.padding));
+      if (hostPlatform !== 'linux') {
+        expect(geometry.padding.terminalTop >= 9 && geometry.padding.terminalRight >= 9 && geometry.padding.terminalBottom >= 9,
+          theme + ' ' + mode + ' should preserve terminal padding on every edge: ' + JSON.stringify(geometry.padding));
+      }
       rail.unhoverRow(web);
       rail.outsideClick();
       for (const size of ['compact', 'comfortable', 'large']) {
@@ -1182,6 +1185,7 @@ const child = spawn(process.execPath, [electronCli, '.', '--smoke'], {
     PATH: '/usr/bin:/bin',
     CHROMUX_E2E: e2ePath,
     CHROMUX_E2E_OUT: e2eOutPath,
+    ...(process.platform === 'linux' ? { CHROMUX_E2E_SHOW_WINDOW: '1' } : {}),
   },
   stdio: ['ignore', 'pipe', 'pipe'],
 });

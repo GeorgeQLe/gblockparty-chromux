@@ -29,7 +29,10 @@ fs.writeFileSync(e2ePath, `
   if (toggle.checked) throw new Error('Prevent Sleep should default off');
   const initial = (await window.chromux.getEnv()).preventSleep;
   if (!initial.available) {
-    if (!toggle.disabled || label.textContent !== 'UNAVAILABLE') throw new Error('unavailable state was not rendered');
+    await waitFor(
+      async () => toggle.disabled && label.textContent === 'UNAVAILABLE',
+      'unavailable state was not rendered',
+    );
     return JSON.stringify({ ok: true, unavailable: true });
   }
 

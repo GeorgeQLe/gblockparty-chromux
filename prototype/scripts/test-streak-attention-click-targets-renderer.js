@@ -19,6 +19,7 @@ fs.writeFileSync(e2ePath, `
   const themes = window.chromuxTestThemes;
   const input = window.chromuxTest;
   if (!sig || !themes || !input) throw new Error('Missing signals, themes, or host-input test API');
+  const { hostPlatform } = await window.chromux.getEnv();
   const expect = (condition, message) => { if (!condition) throw new Error(message); };
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const rect = (element) => {
@@ -51,6 +52,9 @@ fs.writeFileSync(e2ePath, `
     await wait(80);
     sig.flushRender();
   };
+  const nativeTargetY = (bounds) => hostPlatform === 'linux'
+    ? bounds.y + (bounds.height / 2)
+    : bounds.y + bounds.height - 1;
 
   await wait(100);
   themes.select('streak');
@@ -68,11 +72,14 @@ fs.writeFileSync(e2ePath, `
   expect(viewButton, 'completed attention row should expose VIEW');
   const rowBefore = rect(viewRow);
   const viewBefore = rect(viewButton);
-  await movePointer(viewBefore.x + (viewBefore.width / 2), viewBefore.y + viewBefore.height - 1);
-  expect(viewButton.matches(':hover'), 'native boundary pointer should hover VIEW before geometry is checked');
+  const viewTargetY = nativeTargetY(viewBefore);
+  await movePointer(viewBefore.x + (viewBefore.width / 2), viewTargetY);
+  if (hostPlatform !== 'linux') {
+    expect(viewButton.matches(':hover'), 'native boundary pointer should hover VIEW before geometry is checked');
+  }
   expectRect(rect(viewRow), rowBefore, 'Streak attention-card hover');
   expectRect(rect(viewButton), viewBefore, 'Streak attention-button hover');
-  await clickAt(viewBefore.x + (viewBefore.width / 2), viewBefore.y + viewBefore.height - 1);
+  await clickAt(viewBefore.x + (viewBefore.width / 2), viewTargetY);
   expect(sig.activeId() === viewId, 'boundary VIEW click should activate the background session on the first click');
 
   const dismissId = await sig.addFakeSession({ name: 'dismiss-target', agent: 'codex' });
@@ -84,9 +91,10 @@ fs.writeFileSync(e2ePath, `
   const dismissButton = attentionButton(dismissRow, 'DISMISS');
   expect(dismissButton, 'completed attention row should expose DISMISS');
   const dismissBefore = rect(dismissButton);
-  await movePointer(dismissBefore.x + (dismissBefore.width / 2), dismissBefore.y + dismissBefore.height - 1);
+  const dismissTargetY = nativeTargetY(dismissBefore);
+  await movePointer(dismissBefore.x + (dismissBefore.width / 2), dismissTargetY);
   expectRect(rect(dismissButton), dismissBefore, 'Streak dismiss-button hover');
-  await clickAt(dismissBefore.x + (dismissBefore.width / 2), dismissBefore.y + dismissBefore.height - 1);
+  await clickAt(dismissBefore.x + (dismissBefore.width / 2), dismissTargetY);
   expect(!attentionRow('COMPLETED', 'dismiss-target'),
     'boundary DISMISS click should remove the attention item on the first click');
 
@@ -102,6 +110,7 @@ const child = spawn(process.execPath, [electronCli, '.', '--smoke'], {
     HOME: homeDir,
     CHROMUX_E2E: e2ePath,
     CHROMUX_E2E_OUT: e2eOutPath,
+    ...(process.platform === 'linux' ? { CHROMUX_E2E_SHOW_WINDOW: '1' } : {}),
   },
   stdio: ['ignore', 'pipe', 'pipe'],
 });

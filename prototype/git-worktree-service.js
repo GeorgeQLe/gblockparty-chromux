@@ -30,7 +30,8 @@ function parseWorktreePorcelain(output) {
   if (typeof output !== 'string') return [];
   const records = [];
   let current = null;
-  for (const raw of output.split('\0')) {
+  const fields = output.includes('\0') ? output.split('\0') : output.split(/\r?\n/);
+  for (const raw of fields) {
     const field = raw.replace(/^\n+|\n+$/g, '');
     if (!field) {
       if (current && current.path) records.push(current);
@@ -386,7 +387,10 @@ function createGitWorktreeService({
   }
 
   async function inspectRepository(repository, sessions = []) {
-    const response = await command(repository, repository.root, ['worktree', 'list', '--porcelain', '-z'], { timeout: 8000 });
+    let response = await command(repository, repository.root, ['worktree', 'list', '--porcelain', '-z'], { timeout: 8000 });
+    if (!response.ok) {
+      response = await command(repository, repository.root, ['worktree', 'list', '--porcelain'], { timeout: 8000 });
+    }
     if (!response.ok) return {
       ...repository,
       worktrees: [],

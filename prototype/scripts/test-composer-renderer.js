@@ -637,7 +637,14 @@ fs.writeFileSync(e2ePath, `
 const electronCli = path.join(appDir, 'node_modules', '.bin', 'electron');
 const child = spawn(process.execPath, [electronCli, '.', '--smoke'], {
   cwd: appDir,
-  env: { ...process.env, HOME: homeDir, PATH: '/usr/bin:/bin', CHROMUX_E2E: e2ePath, CHROMUX_E2E_OUT: e2eOutPath },
+  env: {
+    ...process.env,
+    HOME: homeDir,
+    PATH: '/usr/bin:/bin',
+    CHROMUX_E2E: e2ePath,
+    CHROMUX_E2E_OUT: e2eOutPath,
+    ...(process.platform === 'linux' ? { CHROMUX_E2E_SHOW_WINDOW: '1' } : {}),
+  },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 let stdout = '';

@@ -22,6 +22,10 @@ function waitFor(predicate, timeoutMs = 10_000) {
 }
 
 (async () => {
+  if (process.platform !== 'darwin') {
+    console.log(`CAPTURE_MAIN_INTEGRATION_SKIPPED_${process.platform.toUpperCase()}`);
+    return;
+  }
   const appDir = path.resolve(__dirname, '..');
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'chromux-capture-main-'));
   const homeDir = path.join(tmpDir, 'home');
