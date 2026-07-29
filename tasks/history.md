@@ -1360,14 +1360,20 @@
   setup stage, signing boundary, immutable-candidate asset, real-machine gate,
   release/latest assertion, compatibility promise, and documentation surface
   maps directly to those files.
-- Tests run: `npm run test:ci:windows`; the complete `npm test` matrix in
-  alphabetical continuation chunks after each surfaced host failure;
+- Tests run: `npm run test:ci:windows`; the complete pre-integration `npm test`
+  matrix in alphabetical continuation chunks after each surfaced host failure;
   focused Git worktree, composer, prevent-sleep, project-launcher,
   session-rail, Streak native-input, terminal-scroll, and Windows setup
   renderer reruns; JavaScript syntax checks; workflow YAML parsing with
   `js-yaml`; `npm audit --json` (zero vulnerabilities); `git diff --check`; and
-  focused setup, signing, and artifact tests after adversarial fixes. All
-  executable checks passed without product warnings.
+  focused setup, signing, and artifact tests after adversarial fixes. After
+  rebasing onto the concurrent v0.71.0 Vercel foundation, the Windows CI
+  suite, Vercel service/renderer checks, Windows setup renderer check, syntax,
+  YAML, audit, and complete `npm test` matrix all passed. The complete Linux
+  Electron matrix used its existing one-retry policy for one animation-timing
+  assertion, one native-pointer geometry race, and one post-success native
+  shutdown abort; each passed on retry. Those are accepted Linux test-host
+  flake signals, not Windows product warnings.
 - Skipped tests: real Authenticode signing, Squirrel install/upgrade/uninstall,
   physical Windows 10/11 setup/restore UAT, and `/releases/latest`
   verification require the protected Azure identity, protected GitHub
@@ -1388,13 +1394,17 @@
   required exact signer-subject equality, cross-checked build metadata against
   actual sizes/hashes, and passed workflow inputs through environment
   variables with an official prior-installer URL allowlist.
-- Residual risk: the Microsoft Artifact Signing tenant/profile, protected
-  environment approvals, exact publisher subject, prior signed installer URL,
-  and labeled Windows 10/11 WSL2 runners have not yet been observed. Any
-  missing prerequisite will stop the workflow before publication; the first
-  actionable proof is a protected `windows-release.yml` run recorded in the
-  pending v0.72.0 UAT report. Rollback: revert the scoped commits before
-  publication; after publication, revert, issue a higher corrective SemVer,
-  and never replace the immutable signed v0.72.0 assets. Next command:
-  `gh workflow run windows-release.yml -f release_tag=chromux-v0.72.0
-  -f previous_installer_url=<official-prior-signed-setup-url>`.
+- Residual risk: a live GitHub audit found only `Preview` and `Production`
+  environments, no repository Actions variables or secrets, no self-hosted
+  runners, and a latest v0.70.0 Release with no assets. Therefore the Artifact
+  Signing identity/profile, protected `windows-signing` and `windows-release`
+  approvals, exact publisher subject, prior signed installer, and labeled
+  Windows 10/11 WSL2 runners are confirmed blockers rather than unobserved
+  assumptions. Concurrent upstream work also makes the unfinished v0.71.0
+  Vercel shipping task an explicit publication blocker; v0.72.0 must not ship
+  that incomplete feature accidentally. Rollback: revert the scoped commits
+  before publication; after publication, revert, issue a higher corrective
+  SemVer, and never replace immutable signed assets. Next command: `$exec` to
+  complete the active Vercel shipping engine while the Windows signing
+  environments, credentials, runners, and prior signed installer are
+  provisioned.
