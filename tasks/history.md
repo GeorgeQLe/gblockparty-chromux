@@ -1391,7 +1391,9 @@
   derivation, Forge/Squirrel packaging, package inspection, packaged boot
   smoke, and artifact upload. Its remaining Node 20 annotation identified
   upload-artifact v4; v5 still declared Node 20, so official Node 24-backed v6
-  upload/download actions replaced it.
+  upload/download actions replaced it. Final run `30418925211` passed all
+  stages without annotations and uploaded
+  `GBlockParty-Chromux-0.73.0-windows-x64-unsigned-validation`.
 - Skipped tests: real Authenticode signing, Squirrel install/upgrade/uninstall,
   physical Windows 10/11 setup/restore UAT, and `/releases/latest`
   verification require the protected Azure identity, protected GitHub
@@ -1414,7 +1416,7 @@
   variables with an official prior-installer URL allowlist.
 - Residual risk: a live GitHub audit found only `Preview` and `Production`
   environments, no repository Actions variables or secrets, no self-hosted
-  runners, and a latest v0.72.0 Release with no assets. Therefore the Artifact
+  runners, and a latest v0.72.1 Release with no assets. Therefore the Artifact
   Signing identity/profile, protected `windows-signing` and `windows-release`
   approvals, exact publisher subject, prior signed installer, and labeled
   Windows 10/11 WSL2 runners are confirmed blockers rather than unobserved
