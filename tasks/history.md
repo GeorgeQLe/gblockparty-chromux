@@ -1433,6 +1433,29 @@
   candidate was therefore advanced to the next available minor, v0.73.0,
   without rewriting the immutable v0.72.0 tag or Release.
 
+## 2026-07-28 — Codex 403 restart recovery v0.72.1
+
+- Published isolated hotfix `aa04368` as `chromux-v0.72.1`; GitHub API and the
+  public `/releases/latest` redirect both resolved to the matching release.
+  Forward-integrated only the Codex service, renderer, focused tests, task
+  record, and release-note bullets into the planned v0.73.0 candidate. The
+  separate Vercel integration branch and its files remain excluded.
+- Validation on the exact hotfix boundary: focused syntax/service/Electron
+  gate suites, complete `npm test`, source smoke, macOS arm64 package, packaged
+  smoke, bundle/package/lock version consistency, and whitespace checks all
+  passed. The optional `.icon` probe warning was accepted because packaging and
+  packaged smoke succeeded.
+- Adversarial review rejected noncanonical status/origin/credentials/port/path/
+  tag/query/fragment redirects and leading-zero stable versions, retained exact
+  npm availability and bounded retries, and proved ordered single fail-open,
+  permanent app-run bypass, concurrent launches, recoverable background retry,
+  and deferred live-session installation. It added renderer-side control-byte
+  removal and a 500-character error bound. A forced live REST 403 was skipped
+  because deterministic injected coverage proves the boundary without spending
+  shared rate limit. Residual risk is a future GitHub redirect contract change;
+  it fails closed into the tested non-blocking path. Rollback the forward-port
+  commit if needed; published v0.72.1 remains immutable.
+
 ## 2026-07-28 — Intentional, turn-aware browser queue links
 
 - Added authenticated MCP and OSC browser queue submissions with structured

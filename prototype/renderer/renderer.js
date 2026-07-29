@@ -211,6 +211,7 @@ const state = {
     progress: '',
     checkPromise: null,
     releasePromise: null,
+    failOpenWarning: null,
   },
   lifecyclePrompt: null,
   testInstallUpdateResult: null,
@@ -8823,6 +8824,12 @@ function codexLaunchIsReleased() {
   return state.codexUpdate.phase === 'released' || state.codexUpdate.phase === 'bypassed';
 }
 
+function sanitizeCodexUpdateError(value) {
+  return String(value || 'Codex update check failed')
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
+    .slice(0, 500);
+}
+
 function queueCodexLaunch(options, action = null) {
   return new Promise((resolve, reject) => {
     state.codexUpdate.queue.push({
@@ -8840,6 +8847,7 @@ async function releaseCodexLaunches({ bypass = false } = {}) {
   if (state.codexUpdate.releasePromise) return state.codexUpdate.releasePromise;
   state.codexUpdate.phase = 'releasing';
   state.codexUpdate.releasePromise = (async () => {
+    let releasedCount = 0;
     while (state.codexUpdate.queue.length > 0) {
       const queued = state.codexUpdate.queue.shift();
       try {
@@ -8849,6 +8857,7 @@ async function releaseCodexLaunches({ bypass = false } = {}) {
             ? await state.testCodexLaunchExecutor(queued.options)
             : await createSessionNow(queued.options));
         queued.resolve(session);
+        releasedCount += 1;
       } catch (error) {
         queued.reject(error);
       }
@@ -8856,31 +8865,63 @@ async function releaseCodexLaunches({ bypass = false } = {}) {
     state.codexUpdate.phase = bypass ? 'bypassed' : 'released';
     state.codexUpdate.releasePromise = null;
     renderWorkspaceWarning();
+    return releasedCount;
   })();
   return state.codexUpdate.releasePromise;
 }
 
+async function applyCodexPreflightStatus(status, { background = false } = {}) {
+  const codex = state.codexUpdate;
+  if (status?.error) status = { ...status, error: sanitizeCodexUpdateError(status.error) };
+  codex.status = status;
+  if (background) {
+    const releasedCount = codex.failOpenWarning?.releasedCount || 0;
+    codex.phase = 'bypassed';
+    if (status && !status.error && status.updateAvailable === false) {
+      codex.failOpenWarning = null;
+    } else if (status && !status.error && status.updateAvailable === true) {
+      codex.failOpenWarning = { kind: 'update-available', releasedCount };
+    } else {
+      codex.failOpenWarning = {
+        kind: 'check-failed',
+        releasedCount,
+        error: status?.error || 'Codex update check failed',
+      };
+    }
+    renderWorkspaceWarning();
+    return status;
+  }
+  if (status && !status.error && status.updateAvailable === false) {
+    await releaseCodexLaunches();
+  } else if (status && !status.error && status.updateAvailable === true) {
+    codex.phase = 'update-available';
+    renderWorkspaceWarning();
+  } else {
+    const releasedCount = await releaseCodexLaunches({ bypass: true });
+    codex.failOpenWarning = {
+      kind: 'check-failed',
+      releasedCount,
+      error: status?.error || 'Codex update check failed',
+    };
+    renderWorkspaceWarning();
+  }
+  return status;
+}
+
 async function checkCodexPreflight({ force = false } = {}) {
   if (state.codexUpdate.checkPromise) return state.codexUpdate.checkPromise;
-  state.codexUpdate.phase = 'checking';
+  const background = state.codexUpdate.phase === 'bypassed';
+  if (!background) state.codexUpdate.phase = 'checking';
   state.codexUpdate.progress = '';
   renderWorkspaceWarning();
-  state.codexUpdate.checkPromise = window.chromux.checkCodexUpdate({ force }).then(async (status) => {
-    state.codexUpdate.status = status;
+  const check = state.testCodexUpdateCheck || window.chromux.checkCodexUpdate;
+  state.codexUpdate.checkPromise = Promise.resolve(check({ force })).then(async (status) => {
     state.codexUpdate.checkPromise = null;
-    if (status && !status.error && status.updateAvailable === false) {
-      await releaseCodexLaunches();
-    } else {
-      state.codexUpdate.phase = status && status.error ? 'check-failed' : 'update-available';
-      renderWorkspaceWarning();
-    }
-    return status;
+    return applyCodexPreflightStatus(status, { background });
   }).catch((error) => {
-    state.codexUpdate.status = { error: error && error.message ? error.message : 'Codex update check failed' };
+    const status = { error: sanitizeCodexUpdateError(error && error.message) };
     state.codexUpdate.checkPromise = null;
-    state.codexUpdate.phase = 'check-failed';
-    renderWorkspaceWarning();
-    return state.codexUpdate.status;
+    return applyCodexPreflightStatus(status, { background });
   });
   return state.codexUpdate.checkPromise;
 }
@@ -10740,6 +10781,51 @@ function renderWorkspaceWarning() {
     return;
   }
 
+  const failOpen = codex && codex.phase === 'bypassed' ? codex.failOpenWarning : null;
+  if (failOpen) {
+    const status = codex.status || {};
+    const released = failOpen.releasedCount || 0;
+    const main = document.createElement('div');
+    main.className = 'rw-main';
+    const title = document.createElement('div');
+    title.className = 'rw-title';
+    title.textContent = failOpen.kind === 'update-available'
+      ? 'Codex update available — restart later'
+      : `Codex update check failed — ${released} session${released === 1 ? '' : 's'} released`;
+    const detail = document.createElement('div');
+    detail.className = 'rw-detail';
+    detail.textContent = failOpen.kind === 'update-available'
+      ? `Installed ${status.currentVersion}; latest ${status.latestVersion}. Running sessions were not interrupted; update Codex during a later safe restart.`
+      : `${failOpen.error || 'Codex update check failed'}. Chromux started the saved sessions without blocking this app run.`;
+    detail.title = detail.textContent;
+    main.append(title, detail);
+
+    const actions = document.createElement('div');
+    actions.className = 'rw-actions';
+    if (failOpen.kind === 'update-available') {
+      const notes = document.createElement('button');
+      notes.className = 'rw-action';
+      notes.textContent = 'RELEASE NOTES';
+      notes.onclick = () => window.chromux.openUpdateRelease({ status }).catch(() => {});
+      actions.appendChild(notes);
+    }
+    const retryCheck = document.createElement('button');
+    retryCheck.className = 'rw-action rw-primary';
+    retryCheck.textContent = 'RETRY CHECK';
+    retryCheck.onclick = () => checkCodexPreflight({ force: true }).catch(() => {});
+    const dismiss = document.createElement('button');
+    dismiss.className = 'rw-action rw-dismiss';
+    dismiss.textContent = 'DISMISS';
+    dismiss.onclick = () => {
+      codex.failOpenWarning = null;
+      renderWorkspaceWarning();
+    };
+    actions.append(retryCheck, dismiss);
+    host.append(main, actions);
+    host.classList.remove('hidden');
+    return;
+  }
+
   const retry = state.resumeRetryWarning;
   if (retry) {
     const main = document.createElement('div');
@@ -11894,7 +11980,9 @@ if (window.chromuxTest) {
       state.codexUpdate.progress = '';
       state.codexUpdate.checkPromise = null;
       state.codexUpdate.releasePromise = null;
+      state.codexUpdate.failOpenWarning = null;
       state.testCodexLaunchExecutor = null;
+      state.testCodexUpdateCheck = null;
       state.testCodexLaunchTrace = [];
       renderWorkspaceWarning();
     },
@@ -11917,13 +12005,13 @@ if (window.chromuxTest) {
       return createSession({ cwd: '/tmp', ...options, agent: 'codex' });
     },
     setStatus(status) {
-      state.codexUpdate.status = { ...status };
-      state.codexUpdate.phase = status.error
-        ? 'check-failed'
-        : (status.updateAvailable ? 'update-available' : 'checking');
-      if (status.updateAvailable === false && !status.error) return releaseCodexLaunches();
-      renderWorkspaceWarning();
-      return Promise.resolve();
+      return applyCodexPreflightStatus({ ...status });
+    },
+    retryWith(status, delayMs = 0) {
+      state.testCodexUpdateCheck = () => new Promise((resolve) => {
+        setTimeout(() => resolve({ ...status }), delayMs);
+      });
+      return checkCodexPreflight({ force: true });
     },
     failUpdate(error = 'fixture update failure') {
       state.codexUpdate.status = { ...(state.codexUpdate.status || {}), error };
