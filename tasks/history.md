@@ -16,9 +16,11 @@
   `prototype/scripts/test-full-browser-composer-renderer.js`,
   `prototype/scripts/test-git-worktree-service.js`,
   `prototype/scripts/test-restore-session-identity.js`,
-  `prototype/scripts/test-session-rail-renderer.js`, `tasks/todo.md`, and this
-  history entry. The workflow files are the already-reviewed Node 24 action
-  updates integrated from current `origin/main`. The preceding
+  `prototype/scripts/test-session-rail-renderer.js`,
+  `prototype/scripts/test-streak-attention-click-targets-renderer.js`,
+  `tasks/todo.md`, and this history entry. The workflow files are the
+  already-reviewed Node 24 action updates integrated from current
+  `origin/main`. The preceding
   conflict-resolution commit also reconciles the user-owned `RELEASES.md`,
   `tasks/history.md`, and `tasks/todo.md` records while preserving both source
   lines.
@@ -26,12 +28,12 @@
   Threads ranking, accurate counts, searchable Git navigator, dedicated
   worktree-session lifecycle, and bounded unsent Composer inserts. The
   integrated workflows retain the primary branch's current artifact runtimes.
-  Main and
-  preload retain only read-only Git observation/catalog/forget bridges and add
-  schema-v11 restore sanitation; the Git service removes mutation methods.
-  Renderer/service/restore tests prove the changed behavior, while the two
-  Composer harnesses retain their source contracts. Package metadata, docs,
-  release notes, and task records advance and explain v0.74.0.
+  Main and preload retain only read-only Git observation/catalog/forget
+  bridges and add schema-v11 restore sanitation; the Git service removes
+  mutation methods. Renderer/service/restore tests prove the changed behavior,
+  the Streak fixture keeps native pointer verification in a visible window,
+  and the two Composer harnesses retain their source contracts. Package
+  metadata, docs, release notes, and task records advance and explain v0.74.0.
 - **User-goal mapping:** Every live session renders in exactly one highest
   priority section and carries all its reasons there; empty priority sections
   disappear and All Sessions excludes ranked sessions. Ordinary worktree
@@ -68,7 +70,11 @@
   conflict rows ignoring explicit Done/Snooze triage and a stale catalog
   selection refreshing without retrying its target. The review also changed
   agent inheritance to use the newest associated session even when its
-  terminal has ended, as required by the accepted plan.
+  terminal has ended, as required by the accepted plan. Exact-merge validation
+  exposed intermittent macOS native hover delivery in a background Electron
+  window; the pointer fixture now requests a visible window and passed five
+  consecutive repetitions without weakening its hover, geometry, or click
+  assertions.
 - **Residual risk:** Native Windows/WSL path canonicalization and session
   resurrection remain covered by contract fixtures rather than a physical
   machine. If a restored Git session fails to reuse there, first run

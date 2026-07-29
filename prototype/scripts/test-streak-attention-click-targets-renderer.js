@@ -75,7 +75,17 @@ fs.writeFileSync(e2ePath, `
   const viewTargetY = nativeTargetY(viewBefore);
   await movePointer(viewBefore.x + (viewBefore.width / 2), viewTargetY);
   if (hostPlatform !== 'linux') {
-    expect(viewButton.matches(':hover'), 'native boundary pointer should hover VIEW before geometry is checked');
+    const targetElement = document.elementFromPoint(
+      Math.round(viewBefore.x + (viewBefore.width / 2)),
+      Math.round(viewTargetY),
+    );
+    expect(viewButton.matches(':hover'), 'native boundary pointer should hover VIEW before geometry is checked: '
+      + JSON.stringify({
+        viewBefore, viewTargetY, hostPlatform,
+        targetElement: targetElement
+          ? { tag: targetElement.tagName, className: targetElement.className, text: targetElement.textContent }
+          : null,
+      }));
   }
   expectRect(rect(viewRow), rowBefore, 'Streak attention-card hover');
   expectRect(rect(viewButton), viewBefore, 'Streak attention-button hover');
@@ -110,7 +120,7 @@ const child = spawn(process.execPath, [electronCli, '.', '--smoke'], {
     HOME: homeDir,
     CHROMUX_E2E: e2ePath,
     CHROMUX_E2E_OUT: e2eOutPath,
-    ...(process.platform === 'linux' ? { CHROMUX_E2E_SHOW_WINDOW: '1' } : {}),
+    CHROMUX_E2E_SHOW_WINDOW: '1',
   },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
