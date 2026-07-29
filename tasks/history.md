@@ -1365,15 +1365,28 @@
   focused Git worktree, composer, prevent-sleep, project-launcher,
   session-rail, Streak native-input, terminal-scroll, and Windows setup
   renderer reruns; JavaScript syntax checks; workflow YAML parsing with
-  `js-yaml`; `npm audit --json` (zero vulnerabilities); `git diff --check`; and
+  `js-yaml`; `npm audit --omit=dev --json` (zero production vulnerabilities);
+  `git diff --check`; and
   focused setup, signing, and artifact tests after adversarial fixes. After
   rebasing onto the concurrent v0.71.0 Vercel foundation, the Windows CI
   suite, Vercel service/renderer checks, Windows setup renderer check, syntax,
-  YAML, audit, and complete `npm test` matrix all passed. The complete Linux
+  YAML, production audit, and complete `npm test` matrix all passed. The
+  complete Linux
   Electron matrix used its existing one-retry policy for one animation-timing
   assertion, one native-pointer geometry race, and one post-success native
   shutdown abort; each passed on retry. Those are accepted Linux test-host
   flake signals, not Windows product warnings.
+- The first pushed Windows validation run passed `npm ci` and the complete
+  Windows test suite, then exposed that the global secure
+  `brace-expansion@5.0.8` override is API-incompatible with Forge's legacy
+  `minimatch` consumers (`expand is not a function`). The override was removed
+  while retaining compatible secure `tar` and `tmp` overrides, and the
+  package/lock boundary was regenerated. The full development-tool audit still
+  reports transitive advisories in legacy Forge/Squirrel dependency ranges
+  that have no compatible override; this is accepted for build-only tooling,
+  while the shipped production dependency audit remains clean. The same run's
+  Node 20 deprecation warnings were resolved by moving checkout and setup-node
+  to their Node 24-backed v5 releases.
 - Skipped tests: real Authenticode signing, Squirrel install/upgrade/uninstall,
   physical Windows 10/11 setup/restore UAT, and `/releases/latest`
   verification require the protected Azure identity, protected GitHub

@@ -32,8 +32,8 @@ jobs:
       run:
         working-directory: prototype
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22.12.0
           cache: npm
@@ -69,8 +69,8 @@ jobs:
       ARTIFACT_SIGNING_CLIENT_VERSION: ${{ vars.ARTIFACT_SIGNING_CLIENT_VERSION }}
       WINDOWS_SIGN_PUBLISHER: ${{ vars.WINDOWS_SIGN_PUBLISHER }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22.12.0
           cache: npm
@@ -166,8 +166,8 @@ jobs:
       run:
         working-directory: prototype
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22.12.0
       - uses: actions/download-artifact@v4
@@ -197,8 +197,8 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       WINDOWS_SIGN_PUBLISHER: ${{ vars.WINDOWS_SIGN_PUBLISHER }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22.12.0
       - uses: actions/download-artifact@v4

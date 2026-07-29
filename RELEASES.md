@@ -21,8 +21,9 @@ Tag: `chromux-v0.72.0`
 - Re-download and verify every draft GitHub Release asset before atomic
   publication, then verify `/releases/latest` and Chromux's validated common
   Squirrel feed directory.
-- Refresh vulnerable packaging transitive dependencies and retain compatibility
-  with older Git worktree porcelain plus Linux-hosted Electron regression runs.
+- Retain compatibility with older Git worktree porcelain, legacy Electron
+  Forge packaging dependencies, current GitHub Actions runtimes, and
+  Linux-hosted Electron regression runs.
 - Add authenticated `chromux_browser_queue_add` MCP and `browser-preview` OSC
   signals so agents can intentionally queue bounded HTTP(S) or existing local
   file targets for their originating Chromux session.
