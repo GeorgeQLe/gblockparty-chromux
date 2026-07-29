@@ -1481,6 +1481,49 @@
   was created. Release is blocked until the public client ID is committed and
   the sanitized live UAT report reaches PASS. Next command: register the public
   app, then rerun `$exec` to complete UAT and publish `chromux-v0.71.0`.
+## 2026-07-28 — Codex 403 restart recovery hotfix
+
+- Added a strict public GitHub latest-release redirect fallback for non-Homebrew
+  Codex installs while retaining exact npm registry availability checks and the
+  existing bounded three-attempt schedule.
+- Failed startup discovery now releases every queued Codex launch once in saved
+  order, bypasses the gate for the app run, and leaves a non-blocking sanitized
+  warning. Background retry never re-gates sessions, clears a current result,
+  or reports an available update for a later safe restart without installing.
+- Ship manifest — User goal: recover restored Codex sessions from exhausted
+  GitHub API 403 checks and publish isolated v0.72.1. Changed files:
+  `prototype/codex-update-service.js` implements and validates redirect
+  discovery; `prototype/renderer/renderer.js` owns fail-open and background
+  retry state; the two focused test scripts prove redirect rejection, retries,
+  ordered release, no re-gating, warning actions, and deferred installation;
+  package and lock metadata set v0.72.1; `RELEASES.md`, `tasks/todo.md`, and
+  this entry record the release. These files map directly to discovery,
+  recovery, verification, versioning, and handoff requirements. Unrelated
+  Vercel work remains on its separate integration branch and is excluded from
+  this hotfix boundary.
+- Tests run: focused service and real-Electron gate suites with syntax checks;
+  complete `npm test`; source `npm run smoke`; macOS arm64 `npm run
+  package:mac`; packaged-app smoke; bundle/package/lock version consistency;
+  staged and unstaged whitespace checks. All passed. The packager's established
+  optional `.icon` probe warning was accepted because the app bundle was
+  produced and smoked successfully.
+- Adversarial review checked redirect status/origin/credentials/port/path/tag/
+  query/fragment canonicalization, strict stable SemVer, exact npm readiness,
+  bounded error exposure, retry count, ordered single release, concurrent
+  launches, repeated retry, and live-session installation safety. It tightened
+  leading-zero rejection and added renderer-side control-character stripping
+  plus a 500-character bound.
+- Skipped tests: a live forced GitHub REST 403 was not induced because doing so
+  is nondeterministic and could consume shared rate limit; injected API/fallback
+  service coverage exercises the same boundary. No separate screenshot review
+  was needed because the real-Electron test asserts the exact warning copy and
+  actions. Residual risk is limited to GitHub changing its canonical public
+  redirect contract; that fails closed and triggers the tested non-blocking
+  recovery. Rollback: revert the hotfix commit and issue a higher corrective
+  SemVer after publication; never move or replace the immutable v0.72.1 tag.
+  Next command: integrate the source-only fix onto current `main` while
+  retaining its planned v0.73.0 metadata.
+
 ## 2026-07-28 — Intentional, turn-aware browser queue links
 
 - Added authenticated MCP and OSC browser queue submissions with structured
