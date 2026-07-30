@@ -1,6 +1,6 @@
 {
   "name": "chromux",
-  "version": "0.75.0",
+  "version": "0.76.0",
   "productName": "GBlockParty Chromux",
   "description": "OSS desktop front-end for local and GBlockParty-managed agent/browser workspaces.",
   "main": "main.js",
@@ -29,6 +29,9 @@
     "uat:localhost-first-success": "node scripts/uat-localhost-first-success.js",
     "activity-lab": "electron activity-lab-main.js --activity-lab",
     "test:activity-lab": "node scripts/test-activity-lab-core.js && node scripts/test-activity-lab-runner.js && node scripts/test-activity-lab-smoke.js && node scripts/test-codex-app-server-lifecycle.js",
+    "sidebar-lab": "electron sidebar-lab-main.js --sidebar-lab",
+    "test:sidebar-lab": "node scripts/test-sidebar-lab-core.js && node scripts/test-sidebar-lab-renderer.js && node scripts/test-sidebar-lab-smoke.js",
+    "uat:sidebar-lab": "node scripts/run-sidebar-lab-uat.js",
     "test:codex-app-server-lifecycle": "node scripts/test-codex-app-server-lifecycle.js",
     "probe:codex-same-turn": "node scripts/run-same-turn-probe.js",
     "capture:themes": "node scripts/capture-themes.js",

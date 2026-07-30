@@ -1,0 +1,1604 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-30T14:38:55.287Z",
+  "fixtureId": "contextual-sidebar-v1",
+  "scenarioIds": [
+    "approval-blocker",
+    "remembered-after-churn",
+    "cross-project-switch",
+    "interruption-reorientation",
+    "working-versus-review",
+    "close-and-recover"
+  ],
+  "variantOrder": [
+    "focus",
+    "current",
+    "cursor",
+    "agmux",
+    "t3",
+    "linear",
+    "claude",
+    "zed",
+    "codex",
+    "vibe"
+  ],
+  "trials": [
+    {
+      "variantId": "focus",
+      "scenarioId": "approval-blocker",
+      "durationMs": 900,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 0,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 5,
+        "switchingEffort": 5
+      }
+    },
+    {
+      "variantId": "focus",
+      "scenarioId": "remembered-after-churn",
+      "durationMs": 940,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 0,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 5,
+        "switchingEffort": 5
+      }
+    },
+    {
+      "variantId": "focus",
+      "scenarioId": "cross-project-switch",
+      "durationMs": 980,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 2,
+      "keystrokes": 0,
+      "scrollDistance": 0,
+      "sessionSwitches": 1,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 5,
+        "switchingEffort": 5
+      }
+    },
+    {
+      "variantId": "focus",
+      "scenarioId": "interruption-reorientation",
+      "durationMs": 1020,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 0,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 5,
+        "switchingEffort": 5
+      }
+    },
+    {
+      "variantId": "focus",
+      "scenarioId": "working-versus-review",
+      "durationMs": 1060,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 2,
+      "keystrokes": 0,
+      "scrollDistance": 0,
+      "sessionSwitches": 1,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 5,
+        "switchingEffort": 5
+      }
+    },
+    {
+      "variantId": "focus",
+      "scenarioId": "close-and-recover",
+      "durationMs": 1100,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 0,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 5,
+        "switchingEffort": 5
+      }
+    },
+    {
+      "variantId": "current",
+      "scenarioId": "approval-blocker",
+      "durationMs": 975,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 80,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "current",
+      "scenarioId": "remembered-after-churn",
+      "durationMs": 1015,
+      "completed": true,
+      "incorrectOpens": 1,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 80,
+      "sessionSwitches": 0,
+      "rowRelocations": 7,
+      "ratings": {
+        "orientation": 2,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "current",
+      "scenarioId": "cross-project-switch",
+      "durationMs": 1055,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 2,
+      "keystrokes": 0,
+      "scrollDistance": 80,
+      "sessionSwitches": 1,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "current",
+      "scenarioId": "interruption-reorientation",
+      "durationMs": 1095,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 80,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "current",
+      "scenarioId": "working-versus-review",
+      "durationMs": 1135,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 2,
+      "keystrokes": 0,
+      "scrollDistance": 80,
+      "sessionSwitches": 1,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "current",
+      "scenarioId": "close-and-recover",
+      "durationMs": 1175,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 80,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "cursor",
+      "scenarioId": "approval-blocker",
+      "durationMs": 1050,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 160,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "cursor",
+      "scenarioId": "remembered-after-churn",
+      "durationMs": 1090,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 160,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "cursor",
+      "scenarioId": "cross-project-switch",
+      "durationMs": 1130,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 2,
+      "keystrokes": 0,
+      "scrollDistance": 160,
+      "sessionSwitches": 1,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "cursor",
+      "scenarioId": "interruption-reorientation",
+      "durationMs": 1170,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 160,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "cursor",
+      "scenarioId": "working-versus-review",
+      "durationMs": 1210,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 2,
+      "keystrokes": 0,
+      "scrollDistance": 160,
+      "sessionSwitches": 1,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "cursor",
+      "scenarioId": "close-and-recover",
+      "durationMs": 1250,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 160,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "agmux",
+      "scenarioId": "approval-blocker",
+      "durationMs": 1125,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 0,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 5,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "agmux",
+      "scenarioId": "remembered-after-churn",
+      "durationMs": 1165,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 0,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 5,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "agmux",
+      "scenarioId": "cross-project-switch",
+      "durationMs": 1205,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 2,
+      "keystrokes": 0,
+      "scrollDistance": 0,
+      "sessionSwitches": 1,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 5,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "agmux",
+      "scenarioId": "interruption-reorientation",
+      "durationMs": 1245,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 0,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 5,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "agmux",
+      "scenarioId": "working-versus-review",
+      "durationMs": 1285,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 2,
+      "keystrokes": 0,
+      "scrollDistance": 0,
+      "sessionSwitches": 1,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 5,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "agmux",
+      "scenarioId": "close-and-recover",
+      "durationMs": 1325,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 0,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 5,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "t3",
+      "scenarioId": "approval-blocker",
+      "durationMs": 1200,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 80,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "t3",
+      "scenarioId": "remembered-after-churn",
+      "durationMs": 1240,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 80,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "t3",
+      "scenarioId": "cross-project-switch",
+      "durationMs": 1280,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 2,
+      "keystrokes": 0,
+      "scrollDistance": 80,
+      "sessionSwitches": 1,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "t3",
+      "scenarioId": "interruption-reorientation",
+      "durationMs": 1320,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 80,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "t3",
+      "scenarioId": "working-versus-review",
+      "durationMs": 1360,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 2,
+      "keystrokes": 0,
+      "scrollDistance": 80,
+      "sessionSwitches": 1,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "t3",
+      "scenarioId": "close-and-recover",
+      "durationMs": 1400,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 80,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "linear",
+      "scenarioId": "approval-blocker",
+      "durationMs": 1275,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 160,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 5,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "linear",
+      "scenarioId": "remembered-after-churn",
+      "durationMs": 1315,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 160,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 5,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "linear",
+      "scenarioId": "cross-project-switch",
+      "durationMs": 1355,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 2,
+      "keystrokes": 0,
+      "scrollDistance": 160,
+      "sessionSwitches": 1,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 5,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "linear",
+      "scenarioId": "interruption-reorientation",
+      "durationMs": 1395,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 160,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 5,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "linear",
+      "scenarioId": "working-versus-review",
+      "durationMs": 1435,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 2,
+      "keystrokes": 0,
+      "scrollDistance": 160,
+      "sessionSwitches": 1,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 5,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "linear",
+      "scenarioId": "close-and-recover",
+      "durationMs": 1475,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 160,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 5,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "claude",
+      "scenarioId": "approval-blocker",
+      "durationMs": 1350,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 0,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 5
+      }
+    },
+    {
+      "variantId": "claude",
+      "scenarioId": "remembered-after-churn",
+      "durationMs": 1390,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 0,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 5
+      }
+    },
+    {
+      "variantId": "claude",
+      "scenarioId": "cross-project-switch",
+      "durationMs": 1430,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 2,
+      "keystrokes": 0,
+      "scrollDistance": 0,
+      "sessionSwitches": 1,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 5
+      }
+    },
+    {
+      "variantId": "claude",
+      "scenarioId": "interruption-reorientation",
+      "durationMs": 1470,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 0,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 5
+      }
+    },
+    {
+      "variantId": "claude",
+      "scenarioId": "working-versus-review",
+      "durationMs": 1510,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 2,
+      "keystrokes": 0,
+      "scrollDistance": 0,
+      "sessionSwitches": 1,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 5
+      }
+    },
+    {
+      "variantId": "claude",
+      "scenarioId": "close-and-recover",
+      "durationMs": 1550,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 0,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 5
+      }
+    },
+    {
+      "variantId": "zed",
+      "scenarioId": "approval-blocker",
+      "durationMs": 1425,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 80,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "zed",
+      "scenarioId": "remembered-after-churn",
+      "durationMs": 1465,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 80,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "zed",
+      "scenarioId": "cross-project-switch",
+      "durationMs": 1505,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 2,
+      "keystrokes": 0,
+      "scrollDistance": 80,
+      "sessionSwitches": 1,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "zed",
+      "scenarioId": "interruption-reorientation",
+      "durationMs": 1545,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 80,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "zed",
+      "scenarioId": "working-versus-review",
+      "durationMs": 1585,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 2,
+      "keystrokes": 0,
+      "scrollDistance": 80,
+      "sessionSwitches": 1,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "zed",
+      "scenarioId": "close-and-recover",
+      "durationMs": 1625,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 80,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "codex",
+      "scenarioId": "approval-blocker",
+      "durationMs": 1500,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 160,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "codex",
+      "scenarioId": "remembered-after-churn",
+      "durationMs": 1540,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 160,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "codex",
+      "scenarioId": "cross-project-switch",
+      "durationMs": 1580,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 2,
+      "keystrokes": 0,
+      "scrollDistance": 160,
+      "sessionSwitches": 1,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "codex",
+      "scenarioId": "interruption-reorientation",
+      "durationMs": 1620,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 160,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "codex",
+      "scenarioId": "working-versus-review",
+      "durationMs": 1660,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 2,
+      "keystrokes": 0,
+      "scrollDistance": 160,
+      "sessionSwitches": 1,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "codex",
+      "scenarioId": "close-and-recover",
+      "durationMs": 1700,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 160,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "vibe",
+      "scenarioId": "approval-blocker",
+      "durationMs": 1575,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 0,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "vibe",
+      "scenarioId": "remembered-after-churn",
+      "durationMs": 1615,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 0,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "vibe",
+      "scenarioId": "cross-project-switch",
+      "durationMs": 1655,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 2,
+      "keystrokes": 0,
+      "scrollDistance": 0,
+      "sessionSwitches": 1,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "vibe",
+      "scenarioId": "interruption-reorientation",
+      "durationMs": 1695,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 0,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "vibe",
+      "scenarioId": "working-versus-review",
+      "durationMs": 1735,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 2,
+      "keystrokes": 0,
+      "scrollDistance": 0,
+      "sessionSwitches": 1,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    },
+    {
+      "variantId": "vibe",
+      "scenarioId": "close-and-recover",
+      "durationMs": 1775,
+      "completed": true,
+      "incorrectOpens": 0,
+      "clicks": 1,
+      "keystrokes": 0,
+      "scrollDistance": 0,
+      "sessionSwitches": 0,
+      "rowRelocations": 0,
+      "ratings": {
+        "orientation": 4,
+        "attentionClarity": 4,
+        "switchingEffort": 4
+      }
+    }
+  ],
+  "aggregates": [
+    {
+      "variantId": "current",
+      "trials": 6,
+      "completionRate": 1,
+      "medianDurationMs": 1075,
+      "medianScore": 95.11500000000001,
+      "medianSpatialChurn": 0,
+      "byTask": [
+        {
+          "scenarioId": "approval-blocker",
+          "medianScore": 95.31,
+          "medianDurationMs": 975,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "remembered-after-churn",
+          "medianScore": 86.55,
+          "medianDurationMs": 1015,
+          "medianSpatialChurn": 7
+        },
+        {
+          "scenarioId": "cross-project-switch",
+          "medianScore": 94.79,
+          "medianDurationMs": 1055,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "interruption-reorientation",
+          "medianScore": 95.52,
+          "medianDurationMs": 1095,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "working-versus-review",
+          "medianScore": 94.92,
+          "medianDurationMs": 1135,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "close-and-recover",
+          "medianScore": 95.64,
+          "medianDurationMs": 1175,
+          "medianSpatialChurn": 0
+        }
+      ]
+    },
+    {
+      "variantId": "cursor",
+      "trials": 6,
+      "completionRate": 1,
+      "medianDurationMs": 1150,
+      "medianScore": 93.725,
+      "medianSpatialChurn": 0,
+      "byTask": [
+        {
+          "scenarioId": "approval-blocker",
+          "medianScore": 93.66,
+          "medianDurationMs": 1050,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "remembered-after-churn",
+          "medianScore": 93.79,
+          "medianDurationMs": 1090,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "cross-project-switch",
+          "medianScore": 93.25,
+          "medianDurationMs": 1130,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "interruption-reorientation",
+          "medianScore": 94.03,
+          "medianDurationMs": 1170,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "working-versus-review",
+          "medianScore": 93.47,
+          "medianDurationMs": 1210,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "close-and-recover",
+          "medianScore": 94.23,
+          "medianDurationMs": 1250,
+          "medianSpatialChurn": 0
+        }
+      ]
+    },
+    {
+      "variantId": "linear",
+      "trials": 6,
+      "completionRate": 1,
+      "medianDurationMs": 1375,
+      "medianScore": 90.735,
+      "medianSpatialChurn": 0,
+      "byTask": [
+        {
+          "scenarioId": "approval-blocker",
+          "medianScore": 90.54,
+          "medianDurationMs": 1275,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "remembered-after-churn",
+          "medianScore": 90.77,
+          "medianDurationMs": 1315,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "cross-project-switch",
+          "medianScore": 90.32,
+          "medianDurationMs": 1355,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "interruption-reorientation",
+          "medianScore": 91.18,
+          "medianDurationMs": 1395,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "working-versus-review",
+          "medianScore": 90.7,
+          "medianDurationMs": 1435,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "close-and-recover",
+          "medianScore": 91.54,
+          "medianDurationMs": 1475,
+          "medianSpatialChurn": 0
+        }
+      ]
+    },
+    {
+      "variantId": "t3",
+      "trials": 6,
+      "completionRate": 1,
+      "medianDurationMs": 1300,
+      "medianScore": 91.12,
+      "medianSpatialChurn": 0,
+      "byTask": [
+        {
+          "scenarioId": "approval-blocker",
+          "medianScore": 90.98,
+          "medianDurationMs": 1200,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "remembered-after-churn",
+          "medianScore": 91.18,
+          "medianDurationMs": 1240,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "cross-project-switch",
+          "medianScore": 90.71,
+          "medianDurationMs": 1280,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "interruption-reorientation",
+          "medianScore": 91.55,
+          "medianDurationMs": 1320,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "working-versus-review",
+          "medianScore": 91.06,
+          "medianDurationMs": 1360,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "close-and-recover",
+          "medianScore": 91.87,
+          "medianDurationMs": 1400,
+          "medianSpatialChurn": 0
+        }
+      ]
+    },
+    {
+      "variantId": "codex",
+      "trials": 6,
+      "completionRate": 1,
+      "medianDurationMs": 1600,
+      "medianScore": 87.515,
+      "medianSpatialChurn": 0,
+      "byTask": [
+        {
+          "scenarioId": "approval-blocker",
+          "medianScore": 87.23,
+          "medianDurationMs": 1500,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "remembered-after-churn",
+          "medianScore": 87.49,
+          "medianDurationMs": 1540,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "cross-project-switch",
+          "medianScore": 87.08,
+          "medianDurationMs": 1580,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "interruption-reorientation",
+          "medianScore": 87.97,
+          "medianDurationMs": 1620,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "working-versus-review",
+          "medianScore": 87.54,
+          "medianDurationMs": 1660,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "close-and-recover",
+          "medianScore": 88.41,
+          "medianDurationMs": 1700,
+          "medianSpatialChurn": 0
+        }
+      ]
+    },
+    {
+      "variantId": "claude",
+      "trials": 6,
+      "completionRate": 1,
+      "medianDurationMs": 1450,
+      "medianScore": 89.795,
+      "medianSpatialChurn": 0,
+      "byTask": [
+        {
+          "scenarioId": "approval-blocker",
+          "medianScore": 89.56,
+          "medianDurationMs": 1350,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "remembered-after-churn",
+          "medianScore": 89.8,
+          "medianDurationMs": 1390,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "cross-project-switch",
+          "medianScore": 89.37,
+          "medianDurationMs": 1430,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "interruption-reorientation",
+          "medianScore": 90.24,
+          "medianDurationMs": 1470,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "working-versus-review",
+          "medianScore": 89.79,
+          "medianDurationMs": 1510,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "close-and-recover",
+          "medianScore": 90.64,
+          "medianDurationMs": 1550,
+          "medianSpatialChurn": 0
+        }
+      ]
+    },
+    {
+      "variantId": "zed",
+      "trials": 6,
+      "completionRate": 1,
+      "medianDurationMs": 1525,
+      "medianScore": 88.28,
+      "medianSpatialChurn": 0,
+      "byTask": [
+        {
+          "scenarioId": "approval-blocker",
+          "medianScore": 88.02,
+          "medianDurationMs": 1425,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "remembered-after-churn",
+          "medianScore": 88.27,
+          "medianDurationMs": 1465,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "cross-project-switch",
+          "medianScore": 87.85,
+          "medianDurationMs": 1505,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "interruption-reorientation",
+          "medianScore": 88.74,
+          "medianDurationMs": 1545,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "working-versus-review",
+          "medianScore": 88.29,
+          "medianDurationMs": 1585,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "close-and-recover",
+          "medianScore": 89.15,
+          "medianDurationMs": 1625,
+          "medianSpatialChurn": 0
+        }
+      ]
+    },
+    {
+      "variantId": "agmux",
+      "trials": 6,
+      "completionRate": 1,
+      "medianDurationMs": 1225,
+      "medianScore": 92.985,
+      "medianSpatialChurn": 0,
+      "byTask": [
+        {
+          "scenarioId": "approval-blocker",
+          "medianScore": 92.9,
+          "medianDurationMs": 1125,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "remembered-after-churn",
+          "medianScore": 93.07,
+          "medianDurationMs": 1165,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "cross-project-switch",
+          "medianScore": 92.57,
+          "medianDurationMs": 1205,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "interruption-reorientation",
+          "medianScore": 93.38,
+          "medianDurationMs": 1245,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "working-versus-review",
+          "medianScore": 92.86,
+          "medianDurationMs": 1285,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "close-and-recover",
+          "medianScore": 93.65,
+          "medianDurationMs": 1325,
+          "medianSpatialChurn": 0
+        }
+      ]
+    },
+    {
+      "variantId": "vibe",
+      "trials": 6,
+      "completionRate": 1,
+      "medianDurationMs": 1675,
+      "medianScore": 86.815,
+      "medianSpatialChurn": 0,
+      "byTask": [
+        {
+          "scenarioId": "approval-blocker",
+          "medianScore": 86.52,
+          "medianDurationMs": 1575,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "remembered-after-churn",
+          "medianScore": 86.78,
+          "medianDurationMs": 1615,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "cross-project-switch",
+          "medianScore": 86.38,
+          "medianDurationMs": 1655,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "interruption-reorientation",
+          "medianScore": 87.28,
+          "medianDurationMs": 1695,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "working-versus-review",
+          "medianScore": 86.85,
+          "medianDurationMs": 1735,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "close-and-recover",
+          "medianScore": 87.72,
+          "medianDurationMs": 1775,
+          "medianSpatialChurn": 0
+        }
+      ]
+    },
+    {
+      "variantId": "focus",
+      "trials": 6,
+      "completionRate": 1,
+      "medianDurationMs": 1000,
+      "medianScore": 98.56,
+      "medianSpatialChurn": 0,
+      "byTask": [
+        {
+          "scenarioId": "approval-blocker",
+          "medianScore": 98.56,
+          "medianDurationMs": 900,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "remembered-after-churn",
+          "medianScore": 98.56,
+          "medianDurationMs": 940,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "cross-project-switch",
+          "medianScore": 97.9,
+          "medianDurationMs": 980,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "interruption-reorientation",
+          "medianScore": 98.56,
+          "medianDurationMs": 1020,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "working-versus-review",
+          "medianScore": 97.9,
+          "medianDurationMs": 1060,
+          "medianSpatialChurn": 0
+        },
+        {
+          "scenarioId": "close-and-recover",
+          "medianScore": 98.56,
+          "medianDurationMs": 1100,
+          "medianSpatialChurn": 0
+        }
+      ]
+    }
+  ],
+  "recommendation": {
+    "summary": "Synthesize task-level winners; do not promote the aggregate leader automatically.",
+    "taskWinners": [
+      {
+        "scenarioId": "approval-blocker",
+        "variantId": "focus"
+      },
+      {
+        "scenarioId": "remembered-after-churn",
+        "variantId": "focus"
+      },
+      {
+        "scenarioId": "cross-project-switch",
+        "variantId": "focus"
+      },
+      {
+        "scenarioId": "interruption-reorientation",
+        "variantId": "focus"
+      },
+      {
+        "scenarioId": "working-versus-review",
+        "variantId": "focus"
+      },
+      {
+        "scenarioId": "close-and-recover",
+        "variantId": "focus"
+      }
+    ],
+    "patterns": [
+      "Stable project/session placement",
+      "A separate actionable attention lens",
+      "Pinned and contextual switching shortcuts"
+    ],
+    "spatialStabilityLeader": "focus",
+    "candidate": "Focus Split with stable project groups, a collapsible triage lens, searchable history, and explicit split-open."
+  },
+  "sources": [
+    {
+      "variantId": "current",
+      "source": "Chromux",
+      "hypothesis": "Priority partitions accelerate triage but increase spatial churn."
+    },
+    {
+      "variantId": "cursor",
+      "source": "Cursor",
+      "hypothesis": "One searchable recency list keeps every agent visible."
+    },
+    {
+      "variantId": "linear",
+      "source": "Linear",
+      "hypothesis": "Stable project navigation plus a triage lens separates place from urgency."
+    },
+    {
+      "variantId": "t3",
+      "source": "T3 Code",
+      "hypothesis": "Rich active cards and compact settled shelves match lifecycle density."
+    },
+    {
+      "variantId": "codex",
+      "source": "Codex",
+      "hypothesis": "Pins, project groups, worktrees, and history reinforce task identity."
+    },
+    {
+      "variantId": "claude",
+      "source": "Claude Code Desktop",
+      "hypothesis": "Filters and explicit split-open reduce cross-project switching cost."
+    },
+    {
+      "variantId": "zed",
+      "source": "Zed",
+      "hypothesis": "Stable project sections and separate history preserve spatial memory."
+    },
+    {
+      "variantId": "agmux",
+      "source": "agmux",
+      "hypothesis": "Stable navigation with a separate attention dashboard improves reorientation."
+    },
+    {
+      "variantId": "vibe",
+      "source": "Vibe Kanban",
+      "hypothesis": "Lifecycle lanes make work and review state directly comparable."
+    },
+    {
+      "variantId": "focus",
+      "source": "Synthesis",
+      "hypothesis": "Persistent navigation plus two contextual sessions balances memory and focus."
+    }
+  ],
+  "safety": {
+    "syntheticDataOnly": true,
+    "realPathsExcluded": true,
+    "promptsExcluded": true,
+    "terminalOutputExcluded": true,
+    "userSessionsExcluded": true
+  }
+}

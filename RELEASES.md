@@ -1,5 +1,20 @@
 # Release Notes
 
+## GBlockParty Chromux v0.76.0
+
+Tag: `chromux-v0.76.0`
+
+- Add an isolated developer-only Contextual Sidebar Lab with Gallery and
+  counterbalanced Study modes, 18 synthetic sessions, six instrumented tasks,
+  the current Threads control, and nine market-inspired navigation concepts.
+- Record completion, speed, errors, interactions, switching, scroll, row
+  relocation, and flow ratings; export a sanitized schema-v1 report with
+  median task/variant scoring, separate spatial churn, and a synthesized
+  recommendation.
+- Keep production Threads, preload, session state, PTYs, Git state, and user
+  profiles outside the lab. Add deterministic core/renderer/Electron coverage,
+  a no-model 60-trial UAT baseline, and reproduction/source documentation.
+
 ## GBlockParty Chromux v0.75.0
 
 Tag: `chromux-v0.75.0`

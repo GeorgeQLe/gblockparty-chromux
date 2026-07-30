@@ -32,6 +32,26 @@ npm install        # also rebuilds node-pty against Electron
 npm start
 ```
 
+## Contextual Sidebar Lab
+
+The developer-only Sidebar Lab compares the current Threads organization with
+nine alternatives over the same 18 synthetic sessions and six tasks. It is a
+separate Electron entry point: it creates a temporary profile and has no access
+to production sessions, preferences, PTYs, Git state, or production IPC.
+
+```sh
+npm run sidebar-lab
+npm run test:sidebar-lab
+npm run uat:sidebar-lab
+```
+
+Use **Gallery** for side-by-side review. Use **Study** for seeded,
+counterbalanced trials with task timing, errors, interactions, session
+switches, scroll distance, row relocation, and three 1–5 flow ratings. Exported
+schema-v1 JSON contains fixture/scenario identifiers and sanitized metrics
+only. See [the study guide](docs/sidebar-lab.md) and
+[research/source index](docs/sidebar-lab-sources.md).
+
 ### Install as a macOS app
 
 ```sh

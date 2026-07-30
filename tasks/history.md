@@ -1,5 +1,70 @@
 # Session History
 
+## 2026-07-30 — Chromux v0.76.0 Contextual Sidebar Lab
+
+- **User goal:** Build and ship a standalone developer-only Electron lab that
+  compares the current Threads sidebar with nine market-inspired alternatives
+  over identical synthetic data, captures task-level evidence, and recommends
+  a synthesized production direction without changing production Threads.
+- **Changed files and per-file purpose:** `prototype/sidebar-lab-main.js` and
+  `prototype/sidebar-lab-preload.js` own the temporary profile and three
+  lab-local IPC methods. `prototype/sidebar-lab/{fixtures,variants,core}.js`
+  own the 18-session/four-project fixture, six scenarios, ten layout models,
+  transitions, counterbalancing, scoring, aggregation, sanitization, and
+  recommendation. `prototype/sidebar-lab/{index.html,styles.css,model-browser.js,renderer.js}`
+  own Gallery/Study rendering, responsive/reduced-motion behavior, search,
+  filters, history, keyboard actions, telemetry, ratings, and reset flow.
+  `prototype/scripts/test-sidebar-lab-{core,renderer,smoke}.js` and
+  `run-sidebar-lab-uat.js` own deterministic, Electron, responsive, export,
+  and no-model matrix coverage. `prototype/docs/sidebar-lab*.md`,
+  `prototype/docs/testing/sidebar-lab-*`, and `prototype/README.md` document
+  reproduction, sources, limits, and archive the report/screenshots.
+  `prototype/package.json`, lockfile, `RELEASES.md`, `tasks/todo.md`, and this
+  entry own commands, v0.76.0 metadata, release notes, and bookkeeping.
+- **User-goal mapping:** Gallery renders all ten concepts over stable fixture
+  identities. Study uses a seeded variant order, deterministic status churn,
+  six task flows, behavioral metrics, three flow ratings, and clean resets.
+  Schema-v1 export allowlists identifiers/metrics, reports task and overall
+  medians plus spatial churn, and recommends a synthesis instead of blindly
+  selecting the aggregate leader. The separate main/preload imports no
+  production session, preference, PTY, Git, or renderer state.
+- **Tests run:** `npm run test:sidebar-lab` passed core, renderer-contract,
+  desktop Electron, 760px Electron, reduced-motion, isolation, identity, and
+  sanitized-export checks. `npm run uat:sidebar-lab` generated all 60
+  deterministic variant/scenario records. `npm run
+  test:session-rail-renderer` passed. The exact final diff passed `npm test`,
+  JavaScript syntax checks, `git diff --check`, version metadata validation,
+  and visual inspection of the Gallery and Study PNGs.
+- **Skipped tests:** No live model or real user-session study was run because
+  the accepted scope requires synthetic fixtures and a no-model UAT; human
+  usability evidence is explicitly required before production adoption. App
+  packaging was skipped because this developer entry point ships as source
+  inside the existing prototype and the complete Electron suite exercises it.
+  Deploy was skipped because neither `deploy.md` nor `tasks/deploy.md` exists.
+- **Adversarial review:** Used the quality-gate contract's permitted
+  failure-oriented equivalent: exact-diff ownership scan, production-file
+  zero-diff check, hostile report-field unit input, fixture-path scan,
+  Node/browser layout parity checks, desktop/narrow Electron isolation,
+  complete regression suite, and visual QA. Findings fixed were a hidden Study
+  concept being counted as an eleventh Gallery card, capture racing Chromium
+  paint, author CSS overriding the `hidden` attribute, project IDs appearing
+  as Current Hybrid labels, Current Hybrid priority groups following recency
+  instead of the production order, missing Linear triage and Claude split
+  secondary surfaces, and two completed fixture rows with invalid agent names.
+- **Residual risk:** The deterministic UAT proves instrumentation and report
+  plumbing, not comparative usability. A human evaluator must run Study mode
+  before using its recommendation. The Node and browser layout implementations
+  are duplicated because the sandboxed renderer cannot `require`; parity tests
+  cover placement/identity, and `npm run test:sidebar-lab` is the first check
+  if either model changes.
+- **Rollback note:** Revert the v0.76.0 shipping commit and publish a newer
+  corrective release. Production Threads requires no state migration or
+  rollback because its files and contracts are unchanged.
+- **Ownership boundary:** The worktree was clean at start. Every changed or
+  added file belongs to this feature; no pre-existing user changes are included.
+- **Next command:** Run `npm run sidebar-lab` and collect the first internal
+  human Study report before planning a production sidebar candidate.
+
 ## 2026-07-29 — Chromux v0.74.1 reliable Codex activity indicators
 
 - **User goal:** Restore immediate Codex working feedback without conflating

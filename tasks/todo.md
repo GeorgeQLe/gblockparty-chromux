@@ -6,6 +6,15 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Add an isolated Contextual Sidebar Lab comparing the current Threads
+  control with nine market-inspired alternatives over identical synthetic
+  data, Gallery and counterbalanced Study modes, sanitized schema-v1 evidence,
+  deterministic/no-model coverage, documentation, and ship v0.76.0.
+  _(source: user-supplied Chromux Contextual Sidebar Lab plan; evidence:
+  isolated Electron main/preload, ten fixture-driven concepts, six-scenario
+  study instrumentation, schema-v1 report/scoring, focused and complete
+  prototype coverage, no-model UAT/screenshots, docs, and v0.76.0 metadata)_
+
 - [x] Add a session-local startup loading experience for every managed Claude
   Code, Codex, and Grok Build launch; retain hidden PTY output, reveal only
   after a rendered provider prompt, provide a 15-second manual escape hatch

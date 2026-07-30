@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chromux Contextual Sidebar Lab</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <p class="eyebrow">Developer-only · synthetic data</p>
+      <h1>Contextual Sidebar Lab</h1>
+      <p class="lede">Ten navigation models. One fleet. Six instrumented tasks.</p>
+    </div>
+    <div class="header-actions">
+      <div class="mode-switch" role="group" aria-label="Lab mode">
+        <button id="gallery-mode" class="active" aria-pressed="true">Gallery</button>
+        <button id="study-mode" aria-pressed="false">Study</button>
+      </div>
+      <button id="export-report">Export report</button>
+    </div>
+  </header>
+  <section class="safety" aria-label="Isolation boundaries">
+    <strong>Isolated</strong><span>Temporary Electron profile</span><span>No production IPC</span>
+    <span>No real sessions, paths, PTYs, Git state, or preferences</span><span id="version">Loading…</span>
+  </section>
+  <section class="controls">
+    <label>Search <input id="search" type="search" placeholder="Session, project, branch…" autocomplete="off"></label>
+    <label>Status <select id="status-filter"><option value="all">All</option><option value="approval">Action required</option>
+      <option value="working">Working</option><option value="ready">Ready</option><option value="idle">Idle</option>
+      <option value="snoozed">Snoozed</option></select></label>
+    <label>Project <select id="project-filter"><option value="all">All projects</option></select></label>
+    <label class="history-toggle"><input id="include-history" type="checkbox"> Include history</label>
+  </section>
+  <main>
+    <section id="gallery" class="gallery" aria-label="Sidebar concept gallery"></section>
+    <section id="study" class="study" hidden>
+      <aside class="study-brief">
+        <p class="eyebrow">Task <span id="trial-progress"></span></p>
+        <h2 id="scenario-name"></h2><p id="scenario-instruction"></p>
+        <div class="study-actions"><button id="start-trial">Start trial</button><button id="skip-trial" class="quiet">Skip</button></div>
+        <div id="ratings" hidden>
+          <h3>How did that feel?</h3>
+          <label>Orientation <input data-rating="orientation" type="range" min="1" max="5" value="3"><output>3</output></label>
+          <label>Attention clarity <input data-rating="attentionClarity" type="range" min="1" max="5" value="3"><output>3</output></label>
+          <label>Switching effort <input data-rating="switchingEffort" type="range" min="1" max="5" value="3"><output>3</output></label>
+          <button id="save-rating">Save &amp; continue</button>
+        </div>
+      </aside>
+      <div id="study-concept" class="study-concept"></div>
+    </section>
+  </main>
+  <footer><span id="telemetry">Gallery ready</span><span>Arrow keys navigate · Enter opens · / searches · H toggles history</span></footer>
+  <script src="model-browser.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>
