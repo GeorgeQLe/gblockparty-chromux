@@ -1,6 +1,6 @@
 {
   "name": "chromux",
-  "version": "0.74.1",
+  "version": "0.75.0",
   "productName": "GBlockParty Chromux",
   "description": "OSS desktop front-end for local and GBlockParty-managed agent/browser workspaces.",
   "main": "main.js",
@@ -93,6 +93,7 @@
     "test:themes-renderer": "node scripts/test-themes-renderer.js",
     "test:synchronized-output-renderer": "node scripts/test-synchronized-output-renderer.js",
     "test:terminal-scroll-bottom-renderer": "node scripts/test-terminal-scroll-bottom-renderer.js",
+    "test:startup-loader-renderer": "node scripts/test-startup-loader-renderer.js",
     "package": "npm run package:mac",
     "package:mac": "electron-packager . Chromux --platform=darwin --arch=arm64 --icon=build/icon --app-bundle-id=dev.georgele.chromux --extend-info=build/Info.plist --overwrite --out=dist --ignore='^/dist' --ignore='^/out' --ignore='^/build/icon.iconset' --asar.unpack='**/node_modules/node-pty/**'",
     "verify:packaged-settings": "node scripts/verify-packaged-settings-persistence.js",

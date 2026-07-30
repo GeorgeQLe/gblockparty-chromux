@@ -1095,6 +1095,9 @@ const CODEX_FRAME_VERTICAL_RE = /^\s*[│┃║]\s?(.*?)(?:\s?[│┃║])?\s*$/
 const CODEX_NUMERIC_CHOOSER_SELECTED_RE = /^\s*[›❯]\s*([1-9])\.\s+\S/u;
 const CODEX_NUMERIC_CHOOSER_OPTION_RE = /^\s*(?:[›❯]\s*)?([1-9])\.\s+\S/u;
 const CODEX_NUMERIC_CHOOSER_FOOTER_RE = /\b(?:enter|return)\b.{0,80}\b(?:confirm|submit|select|continue|proceed)\b|\b(?:confirm|submit|select|continue|proceed)\b.{0,80}\b(?:enter|return)\b/iu;
+const AGENT_STARTUP_TIMEOUT_MS = 15_000;
+const AGENT_STARTUP_BUFFER_ROWS = 120;
+const AGENT_STARTUP_PHASES = new Set(['starting', 'ready', 'stalled', 'revealed']);
 
 function terminalBufferRow(buffer, index, endColumn = null) {
   const line = buffer && typeof buffer.getLine === 'function' ? buffer.getLine(index) : null;
@@ -1208,6 +1211,37 @@ function readCodexRenderedPrompt(session) {
   if (!utf8WithinLimit(value)) return { status: 'overflow', text: '' };
   if (!framed && !hasChrome) return { status: 'ambiguous', text: value };
   return { status: 'resolved', text: value };
+}
+
+function renderedTerminalTail(term, maximumRows = AGENT_STARTUP_BUFFER_ROWS) {
+  const buffer = term && term.buffer && term.buffer.active;
+  if (!buffer || typeof buffer.getLine !== 'function' || !Number.isFinite(buffer.length)) return [];
+  const end = Math.max(0, buffer.length - 1);
+  const start = Math.max(0, end - Math.max(1, maximumRows) + 1);
+  const lines = [];
+  for (let index = start; index <= end; index += 1) {
+    lines.push(buffer.getLine(index)?.translateToString(true) || '');
+  }
+  return lines;
+}
+
+function agentStartupPromptReady(session) {
+  if (!session || !session.lifecycle.alive || !ADOPTABLE_AGENTS.has(session.agent)) return false;
+  if (session.agent === 'codex') return readCodexRenderedPrompt(session).status === 'resolved';
+  const term = session.term && session.term.term;
+  const rendered = renderedTerminalCursorContext(term);
+  if (!rendered) return false;
+  const cursorLine = String(rendered.cursorLine || '').trimEnd();
+  const lines = renderedTerminalTail(term);
+  if (session.agent === 'claude') {
+    return /^\s*❯(?:\s+.*)?$/u.test(cursorLine)
+      && lines.some((line) => /\bClaude Code\b/iu.test(line));
+  }
+  if (session.agent === 'grok') {
+    return /^\s*(?:>|›|❯)(?:\s+.*)?$/u.test(cursorLine)
+      && lines.some((line) => /\bGrok(?:\s+Build)?\b/iu.test(line));
+  }
+  return false;
 }
 
 function resolveCurrentTerminalPrompt(session) {
@@ -1805,7 +1839,7 @@ function flushRender() {
 
 function newSessionShape({
   id, name, cwd, agent, runtime = null, distro = null,
-  sessionPurpose = null, worktreeIdentity = null,
+  sessionPurpose = null, worktreeIdentity = null, startupLoading = false,
 }) {
   const capabilities = {
     claude: { turnStarted: 'native', inputRequired: 'native', permissionRequired: 'native', authenticationRequired: 'native', rateLimited: 'native', toolFailed: 'native', turnCompleted: 'native' },
@@ -1872,6 +1906,14 @@ function newSessionShape({
       promptSnapshotInvalidated: false,
       previewSuppress: [],
       previewCandidates: [],
+      startup: {
+        phase: startupLoading && ADOPTABLE_AGENTS.has(agent) ? 'starting' : 'revealed',
+        timer: null,
+        exited: false,
+        exitCode: null,
+        revealReason: startupLoading && ADOPTABLE_AGENTS.has(agent) ? null : 'immediate',
+        openComposerOnReveal: false,
+      },
     },
     composer: {
       open: false,
@@ -5427,13 +5469,45 @@ function buildSessionView(session) {
   termHead.append(termLabel, termCwd, vercelBtn, composeBtn);
   const termHost = document.createElement('div');
   termHost.className = 'term-host';
+  const startupLoader = document.createElement('section');
+  startupLoader.className = 'agent-startup-loader hidden';
+  startupLoader.setAttribute('role', 'status');
+  startupLoader.setAttribute('aria-live', 'polite');
+  startupLoader.setAttribute('aria-atomic', 'true');
+  const startupEyebrow = document.createElement('div');
+  startupEyebrow.className = 'agent-startup-eyebrow';
+  startupEyebrow.textContent = 'AGENT SESSION';
+  const startupTitle = document.createElement('div');
+  startupTitle.className = 'agent-startup-title';
+  const startupStatus = document.createElement('div');
+  startupStatus.className = 'agent-startup-status';
+  const startupCwd = document.createElement('div');
+  startupCwd.className = 'agent-startup-cwd';
+  startupCwd.textContent = session.cwd;
+  startupCwd.title = session.cwd;
+  const startupRows = document.createElement('div');
+  startupRows.className = 'agent-startup-rows';
+  startupRows.setAttribute('aria-hidden', 'true');
+  for (let index = 0; index < 8; index += 1) {
+    const row = document.createElement('span');
+    row.style.setProperty('--startup-row', String(index));
+    startupRows.appendChild(row);
+  }
+  const revealTerminalBtn = document.createElement('button');
+  revealTerminalBtn.type = 'button';
+  revealTerminalBtn.className = 'head-btn agent-startup-reveal hidden';
+  revealTerminalBtn.textContent = 'SHOW TERMINAL';
+  revealTerminalBtn.setAttribute('aria-label', 'Show terminal startup output');
+  startupLoader.append(
+    startupEyebrow, startupTitle, startupStatus, startupCwd, startupRows, revealTerminalBtn,
+  );
   const scrollToBottom = document.createElement('button');
   scrollToBottom.type = 'button';
   scrollToBottom.className = 'term-scroll-bottom hidden';
   scrollToBottom.textContent = '↓ SKIP TO BOTTOM';
   scrollToBottom.title = 'Skip to latest terminal output';
   scrollToBottom.setAttribute('aria-label', 'Skip to latest terminal output');
-  termHost.appendChild(scrollToBottom);
+  termHost.append(scrollToBottom, startupLoader);
   const composer = document.createElement('section');
   composer.className = 'terminal-composer hidden'; composer.setAttribute('aria-label', 'Multiline terminal composer');
   const composerToolbar = document.createElement('div'); composerToolbar.className = 'composer-toolbar';
@@ -5721,6 +5795,7 @@ function buildSessionView(session) {
   fullBrowserComposerBtn.onclick = () => toggleFullBrowserComposer(session);
   pickBtn.onclick = () => (session.browser.picking ? null : startPick(session));
   captureBtn.onclick = () => openCaptureModal(session, { selector: null, outerHTML: null, pageTitle: null, pageUrl: activePageTab(session)?.currentUrl || null });
+  revealTerminalBtn.onclick = () => revealAgentTerminal(session, 'manual');
 
   // divider drag
   divider.addEventListener('mousedown', (e) => {
@@ -5745,7 +5820,8 @@ function buildSessionView(session) {
   });
 
   return {
-    view, termPane, termLabel, termHost, scrollToBottom, vercelBtn, composeBtn, composer, composerTextarea, composerStatus, composerCount,
+    view, termPane, termLabel, termHost, scrollToBottom, startupLoader, startupTitle, startupStatus,
+    startupCwd, startupRows, revealTerminalBtn, vercelBtn, composeBtn, composer, composerTextarea, composerStatus, composerCount,
     submitComposerBtn, historyBtn, expandComposerBtn, closeComposerBtn, composerInputChoice, composerInputChoiceActions,
     composerContext, contextChips, contextTarget, contextAgent, attachPageBtn, contextError, switchRouteTargetBtn,
     gitComposerInserts,
@@ -6128,6 +6204,10 @@ function toggleComposerExpanded(session) {
 
 function openComposer(session) {
   if (!session || !session.els) return null;
+  if (session.term.startup.phase !== 'revealed') {
+    session.term.startup.openComposerOnReveal = true;
+    return { sessionId: session.id, open: false, pending: true };
+  }
   if (session.composer.open) return { sessionId: session.id, open: true };
   // Resolve while xterm still has its original size and visibility. Codex's
   // rendered editor is canonical; the session-local keystroke model is a
@@ -6278,6 +6358,7 @@ function blockComposerRoute(source, targetId, message) {
 function composerRouteConflict(source, target) {
   if (!target) return 'That target session no longer exists.';
   if (!target.lifecycle.alive) return `${target.name} has exited.`;
+  if (target.term.startup.phase !== 'revealed') return `${target.name} is still starting.`;
   if (target.id !== source.id && target.composer.draft) {
     return `${target.name} already has a Composer draft.`;
   }
@@ -8725,6 +8806,7 @@ function adoptSessionAgent(session, agent, source = 'unknown', detail = {}) {
 
 function handleTerminalInput(session, data) {
   if (!session) return null;
+  if (session.term.startup.phase !== 'revealed') return { blocked: 'agent-startup' };
   const raw = String(data || '');
   const userInput = sanitizeTerminalUserInput(session.term, raw);
   const rewrite = userInput === raw ? rewriteShellLaunchInput(session, raw) : null;
@@ -9083,6 +9165,7 @@ async function createSessionNow({
   const id = 's' + state.counter;
   const session = newSessionShape({
     id, name, cwd, agent, runtime, distro, sessionPurpose, worktreeIdentity,
+    startupLoading: true,
   });
   if (state.env?.smoke) session._testCommand = command !== undefined ? command : agentCommand(agent);
   session.customTabGroupId = validCustomTabGroup(initialCustomTabGroupId) ? initialCustomTabGroupId : null;
@@ -9186,6 +9269,7 @@ async function createSessionNow({
   session.term.resizeObserver.observe(viewEls.termHost);
 
   state.sessions.set(id, session);
+  beginAgentStartup(session);
   session.composer.routeTargetId = session.composer.fullBrowserOpen ? id : session.composer.routeTargetId;
   renderComposer(session);
   for (const source of state.sessions.values()) renderComposerContexts(source);
@@ -9199,6 +9283,7 @@ async function createSessionNow({
       cols: term.cols, rows: term.rows,
     });
   } catch (error) {
+    clearAgentStartupTimer(session);
     state.sessions.delete(id);
     viewEls.view.remove();
     tabEls.tab.remove();
@@ -9272,6 +9357,7 @@ function activateSession(id, { consumeRestoredCompletion = true } = {}) {
     if (active) {
       requestAnimationFrame(() => {
         s.term.fit();
+        if (s.term.startup.phase !== 'revealed') return;
         if (s.composer.open) s.els.composerTextarea.focus();
         else s.term.term.focus();
       });
@@ -9290,6 +9376,7 @@ function closeSession(id) {
   if (state.pendingQueueNavigation?.sessionId === id) state.pendingQueueNavigation = null;
   if (state.ui.threadPreview?.sessionId === id) dismissThreadPreview();
   if (s._threadCueTimer) clearTimeout(s._threadCueTimer);
+  clearAgentStartupTimer(s);
   resetSynchronizedOutput(s);
   window.chromux.ptyKill(id);
   if (s.term.scrollToBottom) s.term.scrollToBottom.dispose();
@@ -10114,6 +10201,7 @@ function writePtyPayload(session, payload) {
   const shouldRecover = hasVisibleTerminalPayload(payload);
   if (session._ptyOutputTestTrace) session._ptyOutputTestTrace.writes.push(payload);
   session.term.term.write(payload, () => {
+    inspectAgentStartupReadiness(session);
     if (!shouldRecover) return;
     if (session._ptyOutputTestTrace) session._ptyOutputTestTrace.recoveryPayloads.push(payload);
     recoverCodexCompletionFromRenderedTerminal(session, recoveryGeneration, payload);
@@ -10297,6 +10385,100 @@ function handlePtyData(id, data) {
 
 window.chromux.onPtyData(({ id, data }) => handlePtyData(id, data));
 
+function agentStartupProviderName(agent) {
+  return {
+    claude: 'Claude Code',
+    codex: 'Codex',
+    grok: 'Grok Build',
+  }[agent] || 'Agent';
+}
+
+function clearAgentStartupTimer(session) {
+  const startup = session && session.term && session.term.startup;
+  if (!startup || !startup.timer) return;
+  clearTimeout(startup.timer);
+  startup.timer = null;
+}
+
+function renderAgentStartup(session) {
+  const startup = session && session.term && session.term.startup;
+  const els = session && session.els;
+  if (!startup || !els || !AGENT_STARTUP_PHASES.has(startup.phase)) return;
+  const revealed = startup.phase === 'revealed';
+  const stalled = startup.phase === 'stalled';
+  els.termHost.classList.toggle('agent-startup-blocked', !revealed);
+  els.termHost.setAttribute('aria-busy', String(!revealed));
+  const xterm = els.termHost.querySelector('.xterm');
+  const helper = els.termHost.querySelector('.xterm-helper-textarea');
+  if (xterm) xterm.setAttribute('aria-hidden', String(!revealed));
+  if (helper) helper.tabIndex = revealed ? 0 : -1;
+  els.startupLoader.classList.toggle('hidden', revealed);
+  els.startupLoader.classList.toggle('stalled', stalled);
+  els.startupLoader.classList.toggle('exited', Boolean(startup.exited));
+  els.startupTitle.textContent = startup.exited
+    ? `${agentStartupProviderName(session.agent)} exited`
+    : `Starting ${agentStartupProviderName(session.agent)}`;
+  els.startupStatus.textContent = startup.exited
+    ? `The process exited${Number.isFinite(startup.exitCode) ? ` with code ${startup.exitCode}` : ''} before its prompt appeared.`
+    : (stalled ? 'Still starting. You can inspect the terminal without stopping startup.'
+      : 'Waiting for the interactive prompt…');
+  els.revealTerminalBtn.classList.toggle('hidden', !stalled);
+  els.composeBtn.disabled = !revealed;
+}
+
+function revealAgentTerminal(session, reason = 'prompt') {
+  const startup = session && session.term && session.term.startup;
+  if (!startup || startup.phase === 'revealed') return false;
+  startup.phase = reason === 'prompt' ? 'ready' : startup.phase;
+  startup.revealReason = reason;
+  clearAgentStartupTimer(session);
+  const openComposerAfterReveal = startup.openComposerOnReveal;
+  startup.openComposerOnReveal = false;
+  startup.phase = 'revealed';
+  renderAgentStartup(session);
+  if (openComposerAfterReveal) {
+    openComposer(session);
+    renderFullBrowserComposer(session);
+  }
+  requestAnimationFrame(() => {
+    if (state.sessions.get(session.id) !== session) return;
+    session.term.fit();
+    if (state.activeId !== session.id) return;
+    if (session.composer.open) session.els.composerTextarea.focus();
+    else session.term.term.focus();
+  });
+  return true;
+}
+
+function stallAgentStartup(session) {
+  const startup = session && session.term && session.term.startup;
+  if (!startup || startup.phase !== 'starting') return false;
+  startup.timer = null;
+  startup.phase = 'stalled';
+  renderAgentStartup(session);
+  return true;
+}
+
+function beginAgentStartup(session, { timeoutMs = AGENT_STARTUP_TIMEOUT_MS } = {}) {
+  const startup = session && session.term && session.term.startup;
+  if (!startup) return;
+  clearAgentStartupTimer(session);
+  renderAgentStartup(session);
+  if (startup.phase !== 'starting') return;
+  const active = document.activeElement;
+  if (active && session.els.termHost.contains(active) && typeof active.blur === 'function') active.blur();
+  startup.timer = setTimeout(() => {
+    if (state.sessions.get(session.id) === session) stallAgentStartup(session);
+  }, Math.max(0, timeoutMs));
+}
+
+function inspectAgentStartupReadiness(session) {
+  const startup = session && session.term && session.term.startup;
+  if (!startup || startup.phase !== 'starting') return false;
+  if (!agentStartupPromptReady(session)) return false;
+  return revealAgentTerminal(session, 'prompt');
+}
+
 let ptyAgentScanInFlight = false;
 let lastPtyAgentScanAt = 0;
 
@@ -10369,6 +10551,13 @@ function handlePtyExit({ id, exitCode }) {
   }
   apply({ type: 'session-exited', sessionId: id, exitCode });
   s.term.term.write(`\r\n\x1b[38;5;210m── session exited (${exitCode}) ──\x1b[0m\r\n`);
+  if (s.term.startup.phase !== 'revealed') {
+    clearAgentStartupTimer(s);
+    s.term.startup.phase = 'stalled';
+    s.term.startup.exited = true;
+    s.term.startup.exitCode = exitCode;
+    renderAgentStartup(s);
+  }
   renderComposer(s);
   if (isQuickCodexResumeExit(s)) showResumeRetryWarning(s, exitCode);
 }
@@ -12302,6 +12491,8 @@ if (window.chromuxTest) {
   const addFakeSession = ({ name = 'test-session', agent = 'codex', cwd = '/tmp', alive = true, turnState = 'unknown', queue = [], attentionRecords = [], resumeLaunch = null } = {}) => {
     state.counter += 1;
     const session = newSessionShape({ id: 's' + state.counter, name, cwd, agent });
+    session.term.startup.phase = 'revealed';
+    session.term.startup.revealReason = 'test-fixture';
     session.lifecycle.alive = alive;
     if (resumeLaunch) {
       session.lifecycle.resumeLaunch = {
@@ -12342,6 +12533,8 @@ if (window.chromuxTest) {
   } = {}) => {
     state.counter += 1;
     const session = newSessionShape({ id: 's' + state.counter, name, cwd, agent });
+    session.term.startup.phase = 'revealed';
+    session.term.startup.revealReason = 'test-fixture';
     session.customTabGroupId = validCustomTabGroup(customTabGroupId) ? customTabGroupId : null;
     session.turn.state = turnState;
     if (turnState !== 'unknown') session.turn.since = Date.now();
@@ -12385,6 +12578,66 @@ if (window.chromuxTest) {
     if (Number.isFinite(lastActivityAt)) session.lastActivityAt = lastActivityAt;
     flushRender();
     return session.id;
+  };
+
+  window.chromuxTestStartupLoader = {
+    timeoutMs: () => AGENT_STARTUP_TIMEOUT_MS,
+    addSession({
+      name = 'startup-test', agent = 'codex', cwd = '/tmp/startup-test',
+      cols = 80, rows = 24, timeoutMs = AGENT_STARTUP_TIMEOUT_MS,
+    } = {}) {
+      const id = addRenderableTestSession({ name, agent, cwd, realTerminal: true, cols, rows });
+      const session = testSession(id);
+      session.term.startup.phase = ADOPTABLE_AGENTS.has(agent) ? 'starting' : 'revealed';
+      session.term.startup.exited = false;
+      session.term.startup.exitCode = null;
+      session.term.startup.revealReason = ADOPTABLE_AGENTS.has(agent) ? null : 'shell';
+      beginAgentStartup(session, { timeoutMs });
+      return id;
+    },
+    write(id, data) { handlePtyData(id, String(data)); },
+    input(id, data) { return handleTerminalInput(testSession(id), String(data)); },
+    ptyInputs: (id) => (testSession(id)._ptyInputs || []).slice(),
+    exit(id, exitCode = 1) { handlePtyExit({ id, exitCode }); },
+    reveal(id) { testSession(id).els.revealTerminalBtn.click(); },
+    focus(id) { activateSession(id); flushRender(); },
+    close(id) {
+      const session = testSession(id);
+      const timerWasActive = Boolean(session.term.startup.timer);
+      closeSession(id);
+      return { timerWasActive, timerCleared: !session.term.startup.timer };
+    },
+    exists: (id) => state.sessions.has(id),
+    state(id) {
+      const session = testSession(id);
+      const loaderStyle = getComputedStyle(session.els.startupLoader);
+      const helper = session.els.termHost.querySelector('.xterm-helper-textarea');
+      return {
+        phase: session.term.startup.phase,
+        revealReason: session.term.startup.revealReason,
+        exited: session.term.startup.exited,
+        exitCode: session.term.startup.exitCode,
+        timerActive: Boolean(session.term.startup.timer),
+        hidden: session.els.startupLoader.classList.contains('hidden'),
+        stalled: session.els.startupLoader.classList.contains('stalled'),
+        busy: session.els.termHost.getAttribute('aria-busy'),
+        role: session.els.startupLoader.getAttribute('role'),
+        live: session.els.startupLoader.getAttribute('aria-live'),
+        title: session.els.startupTitle.textContent,
+        status: session.els.startupStatus.textContent,
+        cwd: session.els.startupCwd.textContent,
+        revealHidden: session.els.revealTerminalBtn.classList.contains('hidden'),
+        revealLabel: session.els.revealTerminalBtn.textContent,
+        composeDisabled: session.els.composeBtn.disabled,
+        background: loaderStyle.backgroundColor,
+        color: loaderStyle.color,
+        display: loaderStyle.display,
+        bufferText: renderedTerminalTail(session.term.term).join('\n'),
+        terminalAriaHidden: session.els.termHost.querySelector('.xterm')?.getAttribute('aria-hidden') || null,
+        helperTabIndex: helper ? helper.tabIndex : null,
+        terminalFocused: document.activeElement === helper,
+      };
+    },
   };
 
   window.chromuxTestComposer = {
@@ -14296,6 +14549,7 @@ if (window.chromuxTest) {
     pendingInput: (id) => testSession(id).term.typedInputBuf,
     ptyInputs: (id) => (testSession(id)._ptyInputs || []).slice(),
     clearPtyInputs(id) { testSession(id)._ptyInputs = []; },
+    ptyOutput(id, data) { handlePtyData(id, String(data)); },
     exit(id, exitCode = 0) { handlePtyExit({ id, exitCode }); flushRender(); },
     close(id) { closeSession(id); flushRender(); },
     expand(id) { toggleComposerExpanded(testSession(id)); flushRender(); },

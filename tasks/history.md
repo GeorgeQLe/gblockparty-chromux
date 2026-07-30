@@ -1792,3 +1792,85 @@
   Release needs cleanup. Next command: make a signed-in browser available or
   create the public app manually, confirm deployment write permission is
   exposed, provide only its public client ID, then rerun `$exec`.
+
+## 2026-07-30 — Agent startup loading experience and v0.75.0
+
+- Added a session-local, theme-aware startup skeleton for every managed Claude
+  Code, Codex, and Grok Build launch. PTY bytes continue through xterm,
+  lifecycle/title parsing, preview detection, and retained scrollback while
+  terminal and Composer input remain unavailable behind the loader.
+- Added rendered-buffer readiness recognition using the existing bounded Codex
+  prompt parser plus provider-branded Claude Code and Grok Build prompt checks.
+  Recognized prompts restore fit/focus without background focus theft; a
+  15-second stall remains covered until explicit **SHOW TERMINAL**, and an
+  early exit reports its code through the same accessible surface.
+- Ship manifest — User goal: cover fresh, duplicated, restored, and resumed
+  managed agent sessions with a loading page until a rendered interactive
+  prompt appears; preserve hidden startup output and shell immediacy; provide
+  stalled/manual-reveal, early-exit, accessibility, theme, focus, and cleanup
+  behavior; then release v0.75.0.
+- Changed files and per-file purpose: `prototype/renderer/renderer.js` owns the
+  startup phases, bounded recognizers, timers, input/focus guards, deferred
+  Composer restoration, exit/close handling, renderer test seam, and launch
+  integration; `prototype/renderer/styles.css` supplies the palette-driven,
+  reduced-motion-aware skeleton; `prototype/scripts/test-startup-loader-renderer.js`
+  covers providers, shell bypass, background/restore semantics, rendered
+  readiness, scrollback retention, the production timeout, strict stalled
+  manual reveal, early exit, cleanup, focus, accessibility, and every
+  theme/mode; `prototype/scripts/test-full-browser-composer-renderer.js` proves
+  a page-created managed Claude session waits for readiness before Composer
+  interaction; `prototype/scripts/test-session-rail-renderer.js` proves a
+  dedicated Git session retains and opens its unsent review Composer after
+  readiness; `prototype/package.json` adds the focused command and sets
+  0.75.0; `prototype/package-lock.json` mirrors 0.75.0; `RELEASES.md` documents
+  the release; `tasks/todo.md` and this history entry record completion.
+- User-goal mapping: only `createSessionNow` opts managed launches into
+  `starting`, so fresh/duplicate/restore/resume paths share one lifecycle while
+  shells and synthetic fixtures stay immediate. Every clean PTY payload is
+  still rendered and detected before a write-completion readiness inspection.
+  Codex reuses its structural prompt parser; Claude and Grok require a current
+  prompt plus a provider brand within a 120-row tail. The loader marks xterm
+  inaccessible and non-focusable, blocks terminal/Composer input, and keeps a
+  requested Git/browser Composer pending until reveal. A 15-second transition
+  is permanently manual—even if a prompt appears later—and session close
+  clears its timer.
+- Tests run: changed JavaScript `node --check` and `git diff --check` passed;
+  focused startup-loader, synchronized-output, Composer, full-browser
+  Composer, themes, restore identity, resume retry, terminal scroll/focus, and
+  session-rail suites passed; the complete `npm test` prototype matrix passed
+  on the final diff; source `npm run smoke` passed; `npm run package` produced
+  the macOS arm64 app; both packaged plist version fields report 0.75.0; and
+  the packaged app returned `SMOKE_OK`.
+- Skipped tests: no live Claude Code, Codex, or Grok model session was launched,
+  because that would require account authentication and billable/external
+  model activity. Real xterm fixtures exercise the rendered prompt contracts,
+  and intentional future CLI drift falls back to the tested manual reveal
+  instead of exposing startup output. Separate screenshot capture was skipped
+  because the real Electron renderer test checks the visible loader, opaque
+  theme surface, content, accessibility state, and all eight theme/mode
+  combinations; no image baseline exists for this surface.
+- Adversarial review: performed a failure-oriented changed-file review and
+  launch/input/focus/timer/exit/restore scan as the explicit equivalent review
+  path because no `quality-sweep` or `expert-review` skill is installed. It
+  found and fixed generic test sessions accidentally inheriting production
+  loading state, routed Composer remaining callable while starting, and
+  dedicated Git review Composer losing its requested open state. It also
+  checked split/synchronized writes, prompt-after-timeout behavior, exit/write
+  races, inactive readiness, helper textarea tab order, reduced motion, close
+  disposal, shell adoption, queued Codex launch release, and create failure
+  cleanup. No blocking finding remains.
+- Accepted warning and residual risk: Electron Packager again probed for the
+  optional `.icon` format before successfully producing and running the
+  versioned arm64 bundle. Provider prompt recognition intentionally depends on
+  current CLI branding and prompt glyphs within 120 rendered rows. If a future
+  CLI changes that contract, the user will see **Still starting** and can use
+  **SHOW TERMINAL**; PTY output, lifecycle signals, and scrollback remain
+  intact, and the focused fixtures identify which recognizer needs updating.
+- Rollback note: revert the v0.75.0 shipping commit, delete tag and GitHub
+  Release `chromux-v0.75.0`, and republish v0.74.1 as latest if needed. The
+  shipping boundary is exactly the nine source, test, metadata, release, and
+  task files named above plus this history entry; the worktree was clean before
+  implementation. Deploy skipped: no explicit manual deploy contract exists;
+  the GitHub Release is Chromux's required update channel. Next command:
+  complete the dashboard-only Vercel OAuth app registration and live preview
+  proof tracked in `tasks/todo.md`.

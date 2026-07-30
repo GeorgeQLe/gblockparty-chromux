@@ -6,6 +6,15 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Add a session-local startup loading experience for every managed Claude
+  Code, Codex, and Grok Build launch; retain hidden PTY output, reveal only
+  after a rendered provider prompt, provide a 15-second manual escape hatch
+  and early-exit state, preserve shell/background/focus behavior, and ship
+  v0.75.0. _(source: user-supplied Agent Startup Loading Experience plan;
+  evidence: renderer lifecycle/UI/readiness changes, focused provider,
+  timeout, restore, accessibility, theme, cleanup, adjacent, and complete
+  prototype coverage, package metadata, `RELEASES.md`, tag, and GitHub Release)_
+
 - [x] Restore reliable Codex working indicators with immediate pending
   spinners, authoritative completion without title/output start evidence,
   exact `/clear` stale-completion protection, and an end-to-end Activity Lab

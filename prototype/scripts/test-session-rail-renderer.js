@@ -1130,9 +1130,14 @@ fs.writeFileSync(e2ePath, `
     && gitSession.agent === 'claude'
     && gitSession.worktreeIdentity.path === ${JSON.stringify(canonicalRepoDir)}
     && gitSession.draft.includes('Review the current Git status')
-    && gitSession.composerOpen,
-  'selecting a worktree should create an active dedicated Git session with inherited agent and unsent review draft: '
+    && !gitSession.composerOpen,
+  'selecting a worktree should create an active loading Git session with inherited agent and unsent review draft: '
     + JSON.stringify(gitSession));
+  rail.ptyOutput(gitSession.id, 'Claude Code v2.1.0\\r\\n? for shortcuts\\r\\n❯ ');
+  await nextFrame();
+  await nextFrame();
+  expect(rail.gitSessions().find((session) => session.id === gitSession.id)?.composerOpen,
+    'the deferred Git Composer should open after the rendered Claude prompt is ready');
   const insertedGitPrompt = rail.insertGitPrompt(gitSession.id, 'commit');
   expect(insertedGitPrompt.inserted && insertedGitPrompt.draft.includes('prepare a commit plan'),
     'Git Composer inserts should remain editable and unsent');

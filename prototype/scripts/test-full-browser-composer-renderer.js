@@ -327,6 +327,8 @@ fs.writeFileSync(e2ePath, `
     && !Object.prototype.hasOwnProperty.call(createdRow, 'chatOpen'),
   'schema v11 should persist staged evidence while discarding chat ledger fields');
 
+  composer.ptyOutput(created.id, 'Claude Code v2.1.0\\r\\n? for shortcuts\\r\\n❯ ');
+  await tick();
   composer.enterFull(created.id);
   composer.clickToggle(created.id);
   composer.expand(created.id);

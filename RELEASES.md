@@ -1,5 +1,19 @@
 # Release Notes
 
+## GBlockParty Chromux v0.75.0
+
+Tag: `chromux-v0.75.0`
+
+- Cover every managed Claude Code, Codex, and Grok Build launch with a
+  theme-aware startup skeleton while retaining all PTY output in terminal
+  scrollback and preserving lifecycle, preview, and title processing.
+- Reveal the terminal only after xterm renders a provider-recognizable
+  interactive prompt. Plain shell sessions remain immediate, and background
+  or restored sessions become ready without stealing focus.
+- After 15 seconds, keep the loader visible with a manual **SHOW TERMINAL**
+  escape hatch. Report early process exits through the same accessible surface
+  and clean up startup timers when sessions close.
+
 ## GBlockParty Chromux v0.74.1
 
 Tag: `chromux-v0.74.1`
