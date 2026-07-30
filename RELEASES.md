@@ -1,5 +1,20 @@
 # Release Notes
 
+## GBlockParty Chromux v0.74.1
+
+Tag: `chromux-v0.74.1`
+
+- Show immediate Codex submission spinners when activity indicators are
+  enabled while retaining internal pending state, update blocking, and
+  provider-confirmed Working classification.
+- Accept authenticated v2 and generated v1 Codex completion notifications for
+  ordinary pending turns even when title or meaningful-output start evidence
+  never arrived. Keep exact `/clear` protected from delayed completion.
+- Upgrade the isolated Activity Indicator Lab interactive lane to use the
+  production submission projection, OSC parser, attention reducer, and Codex
+  notify completion path, then end resident TUI processes after observed turn
+  completion.
+
 ## GBlockParty Chromux v0.74.0
 
 Tag: `chromux-v0.74.0`

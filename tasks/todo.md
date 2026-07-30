@@ -6,6 +6,15 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Restore reliable Codex working indicators with immediate pending
+  spinners, authoritative completion without title/output start evidence,
+  exact `/clear` stale-completion protection, and an end-to-end Activity Lab
+  notify lane; ship v0.74.1. _(source: user-supplied Restore Reliable Codex
+  Working Indicators plan, rebased from its v0.73.1 snapshot onto current
+  v0.74.0; evidence: activity reducer/projection, rendered/shadow submission
+  capture, production-path lab runner, focused/full/live coverage, package
+  metadata, sanitized UAT, and `RELEASES.md`)_
+
 - [x] Restore Threads as a single-placement session inbox, move ordinary Git
   obligations to a searchable worktree navigator, replace the embedded Git
   mutation drawer with reusable dedicated Git agent sessions and unsent

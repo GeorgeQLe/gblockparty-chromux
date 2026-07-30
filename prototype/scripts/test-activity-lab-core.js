@@ -11,6 +11,7 @@ const {
   sanitizeReport,
   structuredTransition,
 } = require('../activity-lab/core');
+const { normalizedScreenText } = require('../activity-lab/runner');
 
 const partial = parseJsonLines('', '{"type":"turn.started"}\n{"type":"turn.');
 assert.deepStrictEqual(partial.records[0].event, { type: 'turn.started' });
@@ -30,6 +31,14 @@ assert.deepStrictEqual(titlesB.titles, ['⠋ Working', 'Codex']);
 assert.strictEqual(normalizeState('working'), 'working');
 assert.strictEqual(normalizeState('pending'), null);
 assert.ok(Buffer.byteLength(boundedAppend('', 'x'.repeat(MAX_OUTPUT_BYTES + 100))) <= MAX_OUTPUT_BYTES);
+assert.ok(normalizedScreenText(
+  '\u001b[3;3HDo\u001b[3;6Hyou\u001b[3;10Htrust\u001b[3;16Hthe\u001b[3;20Hcontents'
+  + '\u001b[3;29Hof\u001b[3;32Hthis\u001b[3;37Hdirectory?\u001b[7;1H› 1. Yes, continue',
+).includes('Doyoutrustthecontentsofthisdirectory?›1.Yes,continue'));
+assert.ok(/Context\d+%left/i.test(normalizedScreenText(
+  '\u001b[10;1H› Write tests for @filename\u001b[12;1Hgpt-5.6-sol · Context 100% left',
+)));
+assert.ok(normalizedScreenText('\u001b[10;1H? for shortcuts\u001b[12;1H› ').includes('?forshortcuts›'));
 
 const comparison = compareLanes([
   { lane: 'reference', state: 'working', at: 100 },

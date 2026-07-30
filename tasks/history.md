@@ -1,5 +1,83 @@
 # Session History
 
+## 2026-07-29 — Chromux v0.74.1 reliable Codex activity indicators
+
+- **User goal:** Restore immediate Codex working feedback without conflating
+  internal pending state with provider-confirmed Working, accept authoritative
+  completion when no start heuristic fired, retain exact `/clear` safety, and
+  prove the lifecycle with an upgraded isolated Activity Lab before publishing
+  the patch release.
+- **Changed files:** `prototype/renderer/attention.js` owns pending projection,
+  completion acceptance, and exact-clear barriers;
+  `prototype/renderer/renderer.js` supplies the canonical rendered/shadow
+  submitted line; `prototype/main.js` accepts whitespace-bearing Codex notify
+  JSON in the generated v1 fallback; `prototype/activity-lab/runner.js`,
+  `prototype/scripts/run-activity-lab-uat.js`, and the fake CLI fixture own
+  production-like PTY submission, trust/update/config handling, OSC/reducer
+  exercise, notify diagnostics, resident cleanup, filtered metadata-only
+  diagnosis, and configured-binary provenance. Activity, notifier, turn,
+  indicator, Threads, and diagnostics tests carry the regressions.
+  `docs/testing/activity-lab-uat-0.74.1.md` archives sanitized live evidence.
+  Package metadata/lock, `RELEASES.md`, `tasks/todo.md`, and this entry own the
+  v0.74.1 release boundary.
+- **User-goal mapping:** Enabled indicators project pending as a spinner while
+  state remains pending, update-unsafe, and outside the Working section.
+  Ordinary rendered, native, and Composer submissions leave the completion
+  barrier open; only exact trimmed `/clear` arms it. Authenticated v2 and
+  generated v1 completion can therefore finish pending directly, producing
+  Idle when active and Completed when backgrounded. Existing generation,
+  timestamp, session/token, event-id/sequence, focus, cancellation, exit, and
+  disabled-indicator contracts remain unchanged.
+- **Executable verification:** The requested focused Activity Lab, runner,
+  Electron smoke, Codex notifier, turn-signal, tab-indicator, session-rail,
+  diagnostics, and update-queue suites passed. Changed JavaScript syntax
+  checks passed. The complete registered `npm test` matrix passed. Source
+  `npm run smoke` passed. `npm run package:mac` produced the arm64 app; both
+  plist version fields are `0.74.1`, the bundle references `electron.icns`,
+  and the packaged executable returned `SMOKE_OK`. The opt-in five-scenario
+  live UAT passed against an exact temporary Codex 0.145.0 installation with
+  no timeouts, stale spinners, or cross-session leakage; every normal scenario
+  completed, cancellation stopped, and idle stayed idle.
+- **Skipped tests:** Physical Windows/WSL UI qualification remains covered by
+  the complete deterministic Windows platform/setup matrix because the change
+  is renderer-domain and lab-only process orchestration. No production deploy
+  was run because neither `deploy.md` nor `tasks/deploy.md` exists. The global
+  CLI advanced to 0.146.0 during testing, so the planned 0.145.0 gate used a
+  verified temporary npm prefix rather than mutating the installed CLI.
+- **Adversarial review:** Applied
+  `.agents/skillpacks/docs/quality-gate-contract.md` through an exact-diff,
+  failure-oriented review of ordinary/direct/rendered/Composer submissions,
+  ambiguous autocomplete, `/clear` variants, wrong-session and duplicate
+  envelopes, active/background consumption, disabled indicators, update
+  safety, concurrent runs, cancellation, process exit, temporary trust,
+  version drift, update prompts, shell topology, notify invocation/delivery,
+  sanitization, and cleanup. Findings fixed were rendered `/clear` being lost
+  at Enter, whitespace-bearing notify JSON missing the v1 guard, fake compact
+  JSON hiding that bug, direct lab startup bypassing PTY submission, prompt
+  text landing in trust/update choosers, version-specific composer chrome,
+  configured-binary provenance drift, and empty sanitized session IDs.
+- **Residual risk:** Codex 0.145.0 invoked the live notify hook, matched its
+  payload, and successfully wrote `/dev/tty`, but the lab's outer node-pty did
+  not observe that OSC; live stop evidence therefore came from the same
+  production title-idle reducer used by Chromux. The fake resident TUI requires
+  the complete generated-v1 notify → production OSC parser → pending reducer
+  path, and renderer coverage separately proves authenticated v2 and generated
+  v1 pending completion. If future Codex versions remove title-idle evidence,
+  rerun `npm run test:activity-lab` and the opt-in UAT before changing fallback
+  order.
+- **Accepted warning:** Electron Packager emitted its established optional
+  `.icon` probe warning; the produced app contains and references the `.icns`
+  icon and passed packaged smoke.
+- **Rollback note:** Revert the v0.74.1 shipping commit and publish a newer
+  corrective patch. Do not move or delete the release tag as an implicit
+  rollback.
+- **Ownership boundary:** The worktree was clean at start. Every modified or
+  added file belongs to this release; generated `prototype/dist/` output and
+  the temporary pinned CLI/report files remain untracked or outside the
+  repository and are not in the commit.
+- **Next command:** Complete the outstanding Vercel public OAuth registration
+  and live deployment proof recorded in `tasks/todo.md`.
+
 ## 2026-07-29 — Chromux v0.74.0 session-first Threads and dedicated Git sessions
 
 - **User goal:** Resolve the existing merge conflict without dropping either

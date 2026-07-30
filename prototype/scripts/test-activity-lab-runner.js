@@ -24,7 +24,12 @@ async function run() {
   await finished;
   const trace = events.filter((row) => row.channel === 'activity-lab-trace').map((row) => row.payload);
   assert.ok(trace.some((row) => row.lane === 'interactive' && row.state === 'launching'));
-  assert.ok(trace.some((row) => row.lane === 'interactive' && row.state === 'working'));
+  assert.ok(trace.some((row) => row.lane === 'interactive'
+    && row.rawType === 'submission-projection' && row.state === 'working'));
+  assert.ok(trace.some((row) => row.lane === 'interactive'
+    && row.rawType === 'codex-notify-invoked' && row.source === 'codex:notify-delivered'));
+  assert.ok(trace.some((row) => row.lane === 'interactive'
+    && row.rawType === 'codex-notify' && row.state === 'completed'));
   assert.ok(trace.some((row) => row.lane === 'reference' && row.source === 'structured:turn.started'));
   assert.ok(trace.some((row) => row.lane === 'reference' && row.source === 'structured:turn.completed'));
   assert.ok(trace.filter((row) => row.rawType === 'process-exit').every((row) => row.state === 'completed'));

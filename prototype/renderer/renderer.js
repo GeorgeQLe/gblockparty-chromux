@@ -1258,6 +1258,12 @@ function trackTypedPreviewSuppressions(session, data) {
   if (!session || !data) return '';
   const t = session.term;
   const raw = String(data);
+  if (/[\r\n]/.test(raw) && session.agent === 'codex') {
+    // Capture Codex's canonical rendered editor before Enter invalidates the
+    // prompt snapshot. resolveCurrentTerminalPrompt falls back to the bounded
+    // keystroke shadow when the rendered prompt is unavailable or ambiguous.
+    resolveCurrentTerminalPrompt(session);
+  }
   if (/^[1-9]$/.test(raw) && hasActiveCodexNumericChooser(session)) {
     t.codexCompletionIntent = null;
     t.typedInputBuf = '';
@@ -1596,7 +1602,7 @@ function apply(event) {
       break;
     case 'user-input':
       // Only state-changing input is worth ring space — raw typing is noise.
-      if (session) trackTypedPreviewSuppressions(session, event.data);
+      const submittedLine = session ? trackTypedPreviewSuppressions(session, event.data) : '';
       if (!session) return;
       const submitted = /[\r\n]/.test(String(event.data || ''));
       if (submitted) clearPreviewCandidates(session);
@@ -1605,6 +1611,7 @@ function apply(event) {
         session,
         event.data,
         Date.now(),
+        submittedLine,
       );
       if (!inputTurnChanged) {
         if (submitted) invalidate('attention');

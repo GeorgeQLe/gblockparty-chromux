@@ -652,9 +652,9 @@ fs.writeFileSync(e2ePath, `
   const pendingRow = rail.groups().filter((group) => group.key.startsWith('cwd:'))
     .flatMap((group) => group.rows).find((row) => row.id === pendingWorker);
   expect(pendingRow?.status === 'Awaiting agent activity'
-    && pendingRow.animationName === 'none'
+    && pendingRow.animationName === 'tabActivitySpin'
     && !workingGroup.rows.some((row) => row.id === pendingWorker),
-  'pending Codex sessions should remain non-animated outside the Working section');
+  'pending Codex sessions should spin in their directory row without joining the Working section');
   expect(workingGroup.rows.map((row) => row.id).join(',') === [webTwo, worker].join(','),
     'Recent should order Working rows newest first');
   const workingActivityBeforeFocus = rail.activityAt(worker);

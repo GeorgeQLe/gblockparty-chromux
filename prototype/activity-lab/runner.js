@@ -6,6 +6,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 const pty = require('node-pty');
 const attention = require('../renderer/attention');
+const signals = require('../renderer/signals');
 const {
   boundedAppend,
   extractTerminalTitles,
@@ -23,6 +24,41 @@ function makeWorkspace(fixture = {}) {
     fs.writeFileSync(path.join(dir, name), String(value), { mode: 0o600 });
   }
   return dir;
+}
+
+function writeCodexNotifyScript(cwd) {
+  const notifyPath = path.join(cwd, 'chromux-activity-lab-notify.sh');
+  fs.writeFileSync(notifyPath, [
+    '#!/bin/sh',
+    '[ -n "$CHROMUX_SESSION_ID" ] || { : > "$(dirname "$0")/chromux-activity-lab-notify-env-missing"; : > "$(dirname "$0")/chromux-activity-lab-notify-invoked"; exit 0; }',
+    'case "$1" in',
+    '  *\'"type"\'*\'"agent-turn-complete"\'*) ;;',
+    '  *) : > "$(dirname "$0")/chromux-activity-lab-notify-invoked"; exit 0 ;;',
+    'esac',
+    ': > "$(dirname "$0")/chromux-activity-lab-notify-matched"',
+    'if printf \'\\033]777;chromux;v1;turn-end;%s\\007\' "$CHROMUX_SESSION_ID" > /dev/tty 2>/dev/null; then',
+    '  : > "$(dirname "$0")/chromux-activity-lab-notify-delivered"',
+    'else',
+    '  : > "$(dirname "$0")/chromux-activity-lab-notify-delivery-failed"',
+    'fi',
+    ': > "$(dirname "$0")/chromux-activity-lab-notify-invoked"',
+    '',
+  ].join('\n'), { mode: 0o700 });
+  fs.chmodSync(notifyPath, 0o700);
+  return notifyPath;
+}
+
+function normalizedScreenText(value) {
+  return String(value || '')
+    .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\|$)/g, '')
+    .replace(/\x1b[PX^_][\s\S]*?(?:\x1b\\|$)/g, '')
+    .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '')
+    .replace(/\x1b[@-_]/g, '')
+    .replace(/[\x00-\x20\x7f]+/g, '');
+}
+
+function shellQuote(value) {
+  return `'${String(value).replace(/'/g, `'\\''`)}'`;
 }
 
 class ActivityLabRunner {
@@ -56,28 +92,119 @@ class ActivityLabRunner {
 
   startInteractive(run, cwd, prompt) {
     this.emit(run, 'interactive', 'process-spawned', 'launching', 'process:spawn', 'high', 'running');
-    const child = pty.spawn(this.codexBin, ['-s', 'read-only', '-a', 'never', '-C', cwd, prompt], {
+    const sessionId = String(run.id).replace(/[^A-Za-z0-9_-]/g, '-').slice(0, 120)
+      || 'activity-lab';
+    const notifyPath = writeCodexNotifyScript(cwd);
+    const notifyMarker = path.join(cwd, 'chromux-activity-lab-notify-invoked');
+    const notifyEnvMissingMarker = path.join(cwd, 'chromux-activity-lab-notify-env-missing');
+    const notifyMatchedMarker = path.join(cwd, 'chromux-activity-lab-notify-matched');
+    const notifyDeliveredMarker = path.join(cwd, 'chromux-activity-lab-notify-delivered');
+    const notifyDeliveryFailedMarker = path.join(cwd, 'chromux-activity-lab-notify-delivery-failed');
+    const notifyConfig = `notify=["${notifyPath.replace(/[\\"]/g, '\\$&')}"]`;
+    const codexArgs = [
+      '-c', 'tui.theme="ansi"',
+      '-c', notifyConfig,
+      '-c', 'check_for_update_on_startup=false',
+      '-s', 'read-only',
+      '-a', 'never',
+      '-C', cwd,
+    ];
+    const useShell = process.platform !== 'win32';
+    const command = [this.codexBin, ...codexArgs].map(shellQuote).join(' ');
+    const child = pty.spawn(useShell ? '/bin/sh' : this.codexBin,
+      useShell ? ['-c', command] : codexArgs, {
       name: 'xterm-color',
       cols: 100,
       rows: 32,
       cwd,
-      env: { ...process.env, TERM: 'xterm-color', NO_COLOR: '1' },
+      env: {
+        ...process.env,
+        TERM: 'xterm-color',
+        NO_COLOR: '1',
+        CHROMUX_SESSION_ID: sessionId,
+      },
     });
     run.children.push({ lane: 'interactive', child, kill: () => child.kill() });
     let titleBuffer = '';
+    let signalBuffer = '';
     let output = '';
+    let completionObserved = false;
+    let submitted = false;
+    let trustHandled = false;
+    let submitTimer = null;
+    let completionKillTimer = null;
+    const observeCompletion = (delayMs) => {
+      completionObserved = true;
+      if (!completionKillTimer) completionKillTimer = setTimeout(() => child.kill(), delayMs);
+    };
+    let notifyInvocationObserved = false;
+    const notifyProbe = setInterval(() => {
+      if (notifyInvocationObserved || !fs.existsSync(notifyMarker)) return;
+      notifyInvocationObserved = true;
+      const notifySource = fs.existsSync(notifyEnvMissingMarker) ? 'codex:notify-env-missing'
+        : (!fs.existsSync(notifyMatchedMarker) ? 'codex:notify-payload-ignored'
+          : (fs.existsSync(notifyDeliveryFailedMarker) ? 'codex:notify-delivery-failed'
+            : (fs.existsSync(notifyDeliveredMarker) ? 'codex:notify-delivered' : 'codex:notify-invoked')));
+      this.emit(run, 'interactive', 'codex-notify-invoked', null,
+        notifySource, 'high', 'running');
+    }, 100);
     const session = {
       agent: 'codex',
       turn: {
-        state: 'pending',
+        state: 'idle',
         activityObserved: false,
         completionBlocked: false,
         attentionSeenAt: 0,
+        eventIds: [],
       },
     };
+    const submitPrompt = () => {
+      submitTimer = null;
+      if (submitted || run.cancelled
+        || !run.children.some((entry) => entry.lane === 'interactive')) return;
+      submitted = true;
+      attention.applyUserInputTurnTransition(session, `${prompt}\r`, Date.now(), prompt);
+      const projected = attention.projectSessionStatus({
+        ...session,
+        lifecycle: { alive: true },
+      }, true);
+      this.emit(run, 'interactive', 'submission-projection',
+        projected.kind === 'working' ? 'working' : null,
+        'chromux:submission-projection', 'high', 'running');
+      child.write(`${prompt}\r`);
+    };
     child.onData((data) => {
-      output = boundedAppend(output, data);
-      const parsed = extractTerminalTitles(titleBuffer, data);
+      const parsedSignals = signals.extractChromuxSignals(signalBuffer, data);
+      signalBuffer = parsedSignals.buf;
+      for (const signal of parsedSignals.signals) {
+        if (signal.version !== 'v1' || signal.sessionId !== sessionId || signal.event !== 'turn-end') {
+          this.emit(run, 'interactive', 'codex-notify-rejected', null,
+            'chromux:osc-rejected', 'none', 'running');
+          continue;
+        }
+        const previous = session.turn.state;
+        if (attention.applyTurnSignal(session.turn, signal.event, signal.detail, Date.now())
+          && session.turn.state !== previous) {
+          if (session.turn.state === 'completed') observeCompletion(150);
+          this.emit(run, 'interactive', 'codex-notify', session.turn.state,
+            'codex:notify-v1', 'high', 'running');
+        }
+      }
+      output = boundedAppend(output, parsedSignals.clean);
+      const screenText = normalizedScreenText(output);
+      if (!trustHandled && screenText.includes('Doyoutrustthecontentsofthisdirectory?')
+        && screenText.includes('Yes,continue')) {
+        trustHandled = true;
+        output = '';
+        this.emit(run, 'interactive', 'temporary-workspace-trust', 'launching',
+          'codex:temporary-workspace-trust', 'high', 'running');
+        child.write('1\r');
+      } else if (!submitted && !submitTimer
+        && (screenText.includes('?forshortcuts') || /Context\d+%left/i.test(screenText))
+        && /[›❯]/u.test(screenText)) {
+        submitTimer = setTimeout(submitPrompt, 50);
+      }
+      const parsed = extractTerminalTitles(titleBuffer, parsedSignals.clean);
       titleBuffer = parsed.remainder;
       for (const title of parsed.titles) {
         const previous = session.turn.state;
@@ -85,6 +212,7 @@ class ActivityLabRunner {
         if (applied && session.turn.state !== previous) {
           this.emit(run, 'interactive', 'terminal-title', session.turn.state,
             session.turn.source, session.turn.confidence, 'running');
+          if (session.turn.state === 'completed') observeCompletion(500);
         }
         else this.emit(run, 'interactive', 'terminal-title', null, 'codex:title-unrecognized', 'none', 'running');
       }
@@ -96,11 +224,17 @@ class ActivityLabRunner {
       }, Date.now()) && session.turn.state !== previous) {
         this.emit(run, 'interactive', 'rendered-terminal-fallback', session.turn.state,
           session.turn.source, session.turn.confidence, 'running');
+        if (session.turn.state === 'completed') observeCompletion(500);
       }
     });
     child.onExit(({ exitCode, signal }) => {
-      const state = run.cancelled ? 'cancelled' : (exitCode === 0 ? 'completed' : 'failed');
-      this.emit(run, 'interactive', 'process-exit', state, 'process:exit', 'high', 'exited',
+      if (submitTimer) clearTimeout(submitTimer);
+      if (completionKillTimer) clearTimeout(completionKillTimer);
+      clearInterval(notifyProbe);
+      const state = run.cancelled ? 'cancelled'
+        : (completionObserved ? 'completed' : 'failed');
+      this.emit(run, 'interactive', 'process-exit', state,
+        completionObserved ? 'process:exit' : 'process:exit-before-notify', 'high', 'exited',
         `exit=${exitCode};signal=${signal || 0}`);
       this.finishChild(run, 'interactive');
     });
@@ -187,4 +321,11 @@ class ActivityLabRunner {
   }
 }
 
-module.exports = { ActivityLabRunner, DEFAULT_TIMEOUT_MS, makeWorkspace };
+module.exports = {
+  ActivityLabRunner,
+  DEFAULT_TIMEOUT_MS,
+  makeWorkspace,
+  normalizedScreenText,
+  shellQuote,
+  writeCodexNotifyScript,
+};

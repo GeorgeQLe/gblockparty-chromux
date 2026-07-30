@@ -160,8 +160,8 @@ fs.writeFileSync(e2ePath, `
   expect(sig.turnState(codexSubmit).state === 'pending',
     'Codex submitted input should await provider activity instead of inferring working');
   expect(sig.turnState(codexSubmit).generation === 1, 'ordinary Codex submission should advance the turn generation');
-  expect(sig.turnState(codexSubmit).completionBlocked === true,
-    'pending Codex input should reject completion until activity is observed');
+  expect(sig.turnState(codexSubmit).completionBlocked === false,
+    'ordinary pending Codex input should accept its authenticated completion without start evidence');
   expect(itemsFor('COMPLETED', 'codex-submit').length === 0, 'Codex submitted line should not create completed attention');
   sig.feedPtyChunk(codexSubmit, titleOsc('\\u2839 Implementing this'));
   expect(sig.turnState(codexSubmit).state === 'working'
@@ -250,6 +250,22 @@ fs.writeFileSync(e2ePath, `
   expect(sig.turnState(codexSubmit).state === 'pending', 'new Codex input after fallback completion returns to pending');
   expect(itemsFor('COMPLETED', 'codex-submit').length === 0,
     'new Codex input clears fallback completed attention');
+
+  const pendingNotify = sig.addTerminalSession({ name: 'codex-pending-notify', agent: 'codex' });
+  sig.focus(holder);
+  sig.typeInput(pendingNotify, 'complete from notify alone\\r');
+  expect(sig.turnState(pendingNotify).state === 'pending'
+    && sig.turnState(pendingNotify).activityObserved === false
+    && sig.turnState(pendingNotify).completionBlocked === false,
+  'ordinary Codex submission should remain internally pending and completion-ready');
+  sig.emitSignal(pendingNotify, 'turn-end', 'Notify-only completion');
+  expect(sig.turnState(pendingNotify).state === 'completed',
+    'generated v1 Codex completion should finish pending without title or output start evidence');
+  expect(itemsFor('COMPLETED', 'codex-pending-notify').length === 1,
+    'background notify-only completion should enter completed attention');
+  sig.focus(pendingNotify);
+  expect(sig.turnState(pendingNotify).state === 'idle',
+    'active notify-only completion should be consumed to idle');
 
   const codexClear = sig.addTerminalSession({ name: 'codex-clear', agent: 'codex', turnState: 'idle' });
   sig.focus(holder);
@@ -416,8 +432,8 @@ fs.writeFileSync(e2ePath, `
     'a delayed native completion must not resurrect a cleared turn');
   sig.typeInput(clearDuringTurn, 'next ordinary request\\r');
   expect(sig.turnState(clearDuringTurn).state === 'pending'
-    && sig.turnState(clearDuringTurn).completionBlocked === true,
-  'the next ordinary prompt must await fresh activity');
+    && sig.turnState(clearDuringTurn).completionBlocked === false,
+  'the next ordinary prompt must accept its own completion before start evidence');
   sig.feedPtyChunk(clearDuringTurn, titleOsc('\\u2839 Next ordinary request'));
   expect(sig.turnState(clearDuringTurn).state === 'working',
     'fresh title activity should start the next ordinary request');
@@ -490,6 +506,18 @@ fs.writeFileSync(e2ePath, `
     'new turn must retain the accepted session event sequence');
   expect(sig.turnState(codexV2Recovery).eventIds.includes('codex-event-1'),
     'new turn must retain session event deduplication history');
+  sig.feedPtyChunk(codexV2Recovery, oscV2({
+    ...codexBase,
+    event: 'turn-completed',
+    turnId: 'codex-turn-2',
+    eventId: 'codex-event-2',
+    sequence: 8,
+    timestamp: Date.now() + 20,
+    message: 'Second turn completed before start evidence',
+  }));
+  expect(sig.turnState(codexV2Recovery).state === 'completed',
+    'authenticated v2 completion should finish ordinary pending without title or output evidence');
+  sig.typeInput(codexV2Recovery, 'third turn\\r');
   sig.feedPtyChunk(codexV2Recovery, titleOsc('\\u2839 codex-v2-recovery'));
   sig.feedPtyChunk(codexV2Recovery, '\\x1b[?25l\\x1b[2K\\r\\x1b[38;5;245m? for shortcuts\\r\\n');
   expect(sig.turnState(codexV2Recovery).state === 'working',

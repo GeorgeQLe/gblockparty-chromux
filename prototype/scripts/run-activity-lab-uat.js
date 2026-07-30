@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const { ActivityLabRunner } = require('../activity-lab/runner');
-const scenarios = require('../activity-lab/scenarios');
+const allScenarios = require('../activity-lab/scenarios');
 const { compareLanes, sanitizeReport } = require('../activity-lab/core');
 const pkg = require('../package.json');
 
@@ -17,9 +17,22 @@ if (process.env.CHROMUX_ACTIVITY_LAB_UAT !== '1') {
 const trace = [];
 const results = [];
 const finishedResolvers = new Map();
+const scenarioFilter = String(process.env.CHROMUX_ACTIVITY_LAB_SCENARIO || '').trim();
+const scenarios = scenarioFilter
+  ? allScenarios.filter((scenario) => scenario.id === scenarioFilter)
+  : allScenarios;
+if (scenarioFilter && scenarios.length === 0) {
+  console.error(`Unknown activity-lab scenario: ${scenarioFilter}`);
+  process.exit(2);
+}
 const runner = new ActivityLabRunner({
   send(channel, payload) {
-    if (channel === 'activity-lab-trace') trace.push(payload);
+    if (channel === 'activity-lab-trace') {
+      trace.push(payload);
+      if (process.env.CHROMUX_ACTIVITY_LAB_TRACE === '1') {
+        process.stdout.write(`  ${payload.lane} ${payload.rawType} ${payload.state || '-'} ${payload.source}\n`);
+      }
+    }
     if (channel === 'activity-lab-run-finished') {
       finishedResolvers.get(payload.id)?.();
       finishedResolvers.delete(payload.id);
@@ -63,7 +76,11 @@ async function runScenario(scenario) {
     process.stdout.write(`Running ${scenario.name}…\n`);
     await runScenario(scenario);
   }
-  const codexVersion = execFileSync('codex', ['--version'], { encoding: 'utf8' }).trim();
+  const codexVersion = execFileSync(
+    process.env.CHROMUX_ACTIVITY_LAB_CODEX || 'codex',
+    ['--version'],
+    { encoding: 'utf8' },
+  ).trim();
   const report = sanitizeReport({
     chromuxVersion: pkg.version,
     codexVersion,

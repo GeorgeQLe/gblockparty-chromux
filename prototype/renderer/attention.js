@@ -65,7 +65,7 @@
   function applyTurnSignal(turn, signal, detail, now, envelope = null) {
     const next = TURN_SIGNAL_STATES[signal];
     if (!turn || !next) return false;
-    if (next === 'completed' && (turn.completionBlocked || turn.state === 'pending')) return false;
+    if (next === 'completed' && turn.completionBlocked) return false;
     if (envelope) {
       if (!V2_EVENTS.has(signal)) return false;
       if (turn.inputAt && envelope.timestamp <= turn.inputAt) return false;
@@ -107,7 +107,7 @@
     return true;
   }
 
-  function applyUserInputTurnTransition(session, input, now) {
+  function applyUserInputTurnTransition(session, input, now, submittedLine = '') {
     const turn = session && session.turn;
     if (!turn) return false;
     const submitted = /[\r\n]/.test(input || '');
@@ -119,7 +119,8 @@
       turn.acknowledged = false;
       turn.generation = (Number(turn.generation) || 0) + 1;
       turn.activityObserved = false;
-      turn.completionBlocked = true;
+      turn.completionBlocked = String(submittedLine || input || '')
+        .replace(/[\r\n]+$/g, '').trim() === '/clear';
       resetTurnProtocol(turn, now);
       return true;
     }
@@ -445,7 +446,7 @@
     }
     if (turnState === 'pending') {
       return {
-        kind: 'pending',
+        kind: activityIndicators ? 'working' : 'pending',
         icon: '',
         label: 'Awaiting agent activity',
         status: 'Awaiting agent activity',

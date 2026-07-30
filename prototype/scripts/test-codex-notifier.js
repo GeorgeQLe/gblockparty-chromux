@@ -118,7 +118,7 @@ function expectFallback(output, label) {
     'thread-id': 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
     turn_id: 'official-turn',
     last_assistant_message: 'Implemented the requested fix.',
-  });
+  }, null, 2);
 
   const validOutput = await runNotifier(notifyPath, official);
   const valid = parsedSignals(validOutput);

@@ -50,9 +50,9 @@ fs.writeFileSync(e2ePath, `
 
   tabs.typeInput(active, 'build this\\r');
   tabs.emitSignal(background, 'turn-start');
-  expect(tabs.state(active).indicator === 'pending'
+  expect(tabs.state(active).indicator === 'working'
     && tabs.state(active).ariaLabel.includes('Awaiting agent activity'),
-  'pending Codex input should show a non-animated awaiting state');
+  'pending Codex input should immediately show a spinner with awaiting semantics');
   const pendingIndicator = document.querySelector(
     '.session-tab[data-session-id="' + CSS.escape(active) + '"] .tab-dot',
   );
@@ -66,9 +66,9 @@ fs.writeFileSync(e2ePath, `
   expect(tabs.state(active).ariaLabel.includes('Agent working'), 'working status should be accessible on the tab');
 
   tabs.typeInput(active, '/clear\\r');
-  expect(tabs.state(active).indicator === 'pending'
+  expect(tabs.state(active).indicator === 'working'
     && tabs.state(active).ariaLabel.includes('Awaiting agent activity'),
-  'focused Codex commands should remain non-animated while awaiting provider evidence');
+  'focused Codex commands should show the pending spinner while retaining the clear barrier');
   tabs.feed(active, '? for shortcuts\\r\\n› ');
   await wait(30); tabs.flushRender();
   expect(tabs.state(active).indicator === 'idle',
@@ -81,9 +81,9 @@ fs.writeFileSync(e2ePath, `
   expect(tabs.state(active).indicator === 'idle',
     'a delayed completion signal after /clear redraw must not revive the spinner');
   tabs.typeInput(active, 'build this again\\r');
-  expect(tabs.state(active).indicator === 'pending'
+  expect(tabs.state(active).indicator === 'working'
     && tabs.state(active).ariaLabel.includes('Awaiting agent activity'),
-  'ordinary input after a command-only turn should return to non-animated pending');
+  'ordinary input after a command-only turn should return to a pending spinner');
   tabs.feed(active, '\\x1b]0;\\u2839 active-agent\\x07');
   expect(tabs.state(active).indicator === 'working'
     && tabs.state(active).ariaLabel.includes('Agent working'),
@@ -94,16 +94,16 @@ fs.writeFileSync(e2ePath, `
   });
   tabs.focus(active);
   tabs.typeInput(backgroundCodex, 'background work\\r');
-  expect(tabs.state(backgroundCodex).indicator === 'pending'
+  expect(tabs.state(backgroundCodex).indicator === 'working'
     && tabs.state(backgroundCodex).ariaLabel.includes('Awaiting agent activity'),
-  'background Codex fixture should begin with non-animated pending');
+  'background Codex fixture should begin with a pending spinner');
   tabs.feed(backgroundCodex, '\\x1b]0;\\u2839 background-codex-clear\\x07');
   expect(tabs.state(backgroundCodex).indicator === 'working',
     'background Codex fixture should begin working after title activity');
   tabs.typeInput(backgroundCodex, '  /clear  \\r');
-  expect(tabs.state(backgroundCodex).indicator === 'pending'
+  expect(tabs.state(backgroundCodex).indicator === 'working'
     && tabs.state(backgroundCodex).ariaLabel.includes('Awaiting agent activity'),
-  'background command submission should retain non-animated pending');
+  'background command submission should retain the pending spinner');
   tabs.feed(backgroundCodex, '? for shortcuts\\r\\n› ');
   await wait(30); tabs.flushRender();
   const clearedRow = document.querySelector('#thread-list .rail-session-row[data-session-id="'
@@ -111,6 +111,25 @@ fs.writeFileSync(e2ePath, `
   expect(tabs.state(backgroundCodex).indicator === 'idle'
     && clearedRow?.querySelector('.rail-status')?.getAttribute('aria-label') === 'Idle',
   'background Codex /clear should project idle through both tabs and Threads');
+
+  const notifyOnlyActive = tabs.addSession({
+    name: 'notify-only-active', agent: 'codex', realTerminal: true,
+  });
+  tabs.focus(notifyOnlyActive);
+  tabs.typeInput(notifyOnlyActive, 'finish without start evidence\\r');
+  expect(tabs.state(notifyOnlyActive).indicator === 'working',
+    'ordinary active submission should immediately project a spinner');
+  tabs.emitSignal(notifyOnlyActive, 'turn-end');
+  expect(tabs.state(notifyOnlyActive).indicator === 'idle',
+    'active pending completion should transition directly to Idle');
+  const notifyOnlyBackground = tabs.addSession({
+    name: 'notify-only-background', agent: 'codex', realTerminal: true,
+  });
+  tabs.focus(active);
+  tabs.typeInput(notifyOnlyBackground, 'finish in background without start evidence\\r');
+  tabs.emitSignal(notifyOnlyBackground, 'turn-end');
+  expect(tabs.state(notifyOnlyBackground).indicator === 'completed',
+    'background pending completion should transition to Completed');
 
   const liveRedrawCodex = tabs.addSession({
     name: 'live-redraw-codex', agent: 'codex', realTerminal: true,
@@ -212,9 +231,9 @@ fs.writeFileSync(e2ePath, `
     name: 'disabled-pending-codex', agent: 'codex', realTerminal: true,
   });
   tabs.typeInput(disabledPending, 'pending while indicators toggle\\r');
-  expect(tabs.state(disabledPending).indicator === 'pending'
+  expect(tabs.state(disabledPending).indicator === 'working'
     && tabs.state(disabledPending).ariaLabel.includes('Awaiting agent activity'),
-  'enabled activity indicators should keep unconfirmed Codex work non-animated');
+  'enabled activity indicators should project pending Codex work as a spinner');
   tabs.setActivityPreference(false);
   expect(tabs.activityPreference() === false, 'switch should disable activity indicators');
   expect(tabs.activityPreferenceStored() === 'false', 'disabled preference should persist');
@@ -223,7 +242,7 @@ fs.writeFileSync(e2ePath, `
   expect(tabs.state(background).indicator === 'live', 'disabled setting should restore background lifecycle dot');
   expect(tabs.state(disabledPending).indicator === 'pending'
     && tabs.state(disabledPending).ariaLabel.includes('Awaiting agent activity'),
-  'disabled setting should preserve the existing non-spinning pending presentation');
+  'disabled setting should preserve a non-spinning pending presentation');
   expect(tabs.state(input).indicator === 'action' && tabs.state(permission).indicator === 'action',
     'disabled activity preference must preserve action-required indicators');
   const inputAttentionRow = document.querySelector(
@@ -237,9 +256,9 @@ fs.writeFileSync(e2ePath, `
   expect(tabs.activityPreferenceStored() === 'true', 'enabled preference should persist');
   expect(tabs.state(active).indicator === 'idle', 're-enabled setting should restore idle state');
   expect(tabs.state(background).indicator === 'working', 're-enabled setting should restore working state');
-  expect(tabs.state(disabledPending).indicator === 'pending'
+  expect(tabs.state(disabledPending).indicator === 'working'
     && tabs.state(disabledPending).ariaLabel.includes('Awaiting agent activity'),
-  're-enabled setting must not animate pending without provider activity');
+  're-enabled setting should restore the pending spinner without changing internal state');
 
   tabs.exit(background, 7);
   expect(tabs.state(background).indicator === 'dead', 'exited session should override working state');

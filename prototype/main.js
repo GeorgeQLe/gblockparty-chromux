@@ -1362,7 +1362,7 @@ function writeCodexNotifyScript() {
     '[ -n "$CHROMUX_SESSION_ID" ] || exit 0',
     ...(hookInstall.helper ? [] : [
       'case "$1" in',
-      '  *\'"type":"agent-turn-complete"\'*) ;;',
+      '  *\'"type"\'*\'"agent-turn-complete"\'*) ;;',
       '  *) exit 0 ;; # only turn completion may signal turn-end',
       'esac',
     ]),
