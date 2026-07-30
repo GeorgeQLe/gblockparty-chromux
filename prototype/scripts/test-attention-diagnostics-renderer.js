@@ -26,7 +26,36 @@ fs.writeFileSync(e2ePath, `
   d.select(first);
   d.focus(second);
   expect(d.selected() === first, 'inspected session must remain independent of focus');
+  const firstOption = d.selectorOption(first);
   d.emit(first, 'turn-start');
+  expect(d.selectorOption(first) === firstOption,
+    'event-driven diagnostic rerenders must preserve unchanged option nodes');
+  expect(d.selected() === first,
+    'event-driven diagnostic rerenders must preserve the selected background session');
+  await new Promise((resolve) => setTimeout(resolve, 1100));
+  await settle();
+  expect(d.selectorOption(first) === firstOption,
+    'timer-driven diagnostic rerenders must preserve unchanged option nodes');
+  expect(d.selected() === first,
+    'timer-driven diagnostic rerenders must preserve the selected background session');
+  const third = d.addSession({ name: 'temporary-session', agent: 'codex' });
+  expect(d.selectorOption(first) === firstOption && d.selectorOption(third),
+    'adding a session should preserve existing options and append the new session');
+  expect(d.selectorIds().join(',') === [first, second, third].join(','),
+    'diagnostic options should retain session ordering when a session is added');
+  d.focus(second);
+  d.select(first);
+  d.exit(third, 9);
+  expect(d.selectorLabels().some((label) => label === 'temporary-session (exited)'),
+    'exiting a session should update its existing option label');
+  const thirdOption = d.selectorOption(third);
+  d.close(third);
+  expect(!d.selectorOption(third) && !thirdOption.isConnected,
+    'closing a session should remove only its option');
+  expect(d.selectorIds().join(',') === [first, second].join(','),
+    'closing a session should preserve the remaining session ordering');
+  expect(d.selectorOption(first) === firstOption && d.selected() === first,
+    'session lifecycle updates must preserve unchanged options and explicit inspection');
   expect(d.groupText().includes('working'), 'tracked Codex working state should render');
   composer.nativeInput(first, '/cl');
   await composer.renderPromptFixture(first, '? for shortcuts\\r\\n› /cl', [
@@ -98,8 +127,19 @@ fs.writeFileSync(e2ePath, `
 
   d.exit(first, 7);
   expect(d.selectorLabels().some((label) => label.includes('(exited)')), 'exited sessions should remain selectable');
+  const exitedFirstOption = d.selectorOption(first);
+  expect(exitedFirstOption === firstOption, 'exiting the inspected session should update its option in place');
   d.close(first);
   expect(d.selected() === second, 'closing inspected session should fall back to active session');
+  expect(!exitedFirstOption.isConnected, 'closing the inspected session should remove its option');
+  const fallback = d.addSession({ name: 'fallback-session', agent: 'codex' });
+  d.focus(second);
+  d.select(fallback);
+  d.clearFocus();
+  d.close(fallback);
+  expect(d.selected() === second,
+    'closing the inspected session without an active session should fall back to the first available session');
+  d.focus(second);
 
   d.enableRestartMock();
   d.toggleDevMode(false);

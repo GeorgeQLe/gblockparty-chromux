@@ -7036,14 +7036,16 @@ function renderDeveloperDiagnostics() {
   if (!inspected) inspected = state.sessions.get(state.activeId) || sessions[0] || null;
   state.ui.diagnosticSessionId = inspected ? inspected.id : null;
   const selector = $('#diagnostic-session');
-  selector.innerHTML = '';
+  const existingOptions = new Map([...selector.options].map((option) => [option.value, option]));
+  const options = [];
   for (const session of sessions) {
-    const option = document.createElement('option');
+    const option = existingOptions.get(session.id) || document.createElement('option');
     option.value = session.id;
     option.textContent = `${sessionDisplayLabel(session)}${session.lifecycle.alive ? '' : ' (exited)'}`;
-    option.selected = Boolean(inspected && inspected.id === session.id);
-    selector.appendChild(option);
+    options.push(option);
   }
+  reconcileChildren(selector, options);
+  selector.value = inspected ? inspected.id : '';
   selector.disabled = sessions.length === 0;
   const groups = $('#diagnostic-groups'); groups.innerHTML = '';
   const events = $('#diagnostic-events'); events.innerHTML = '';
@@ -15331,6 +15333,9 @@ if (window.chromuxTest) {
     mismatches: () => document.querySelectorAll('#diagnostic-groups .mismatch').length,
     events: () => [...document.querySelectorAll('#diagnostic-events .diagnostic-event')].map((node) => node.textContent),
     selectorLabels: () => [...$('#diagnostic-session').options].map((option) => option.textContent),
+    selectorIds: () => [...$('#diagnostic-session').options].map((option) => option.value),
+    selectorOption: (id) => [...$('#diagnostic-session').options].find((option) => option.value === id) || null,
+    clearFocus() { state.activeId = null; flushRender(); },
     enableRestartMock() { state.testDevModeRestart = { calls: [] }; },
     restartCalls: () => state.testDevModeRestart ? state.testDevModeRestart.calls.map((call) => ({ ...call })) : [],
     toggleDevMode(enabled) {

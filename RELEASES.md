@@ -1,5 +1,17 @@
 # Release Notes
 
+## GBlockParty Chromux v0.76.1
+
+Tag: `chromux-v0.76.1`
+
+- Keep Developer Inspect session options mounted across one-second and
+  event-driven diagnostics refreshes so an open native dropdown is not
+  disrupted.
+- Reconcile new, exited, reordered, and closed sessions in place while
+  preserving explicit background inspection and active-or-first fallback.
+- Add real-Electron regression coverage for option identity, selection
+  persistence, session lifecycle updates, and inspected-session closure.
+
 ## GBlockParty Chromux v0.76.0
 
 Tag: `chromux-v0.76.0`

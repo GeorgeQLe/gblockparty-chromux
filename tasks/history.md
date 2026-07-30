@@ -1,5 +1,51 @@
 # Session History
 
+## 2026-07-30 — Chromux v0.76.1 Developer Inspect dropdown stability
+
+- **User goal:** Prevent one-second and event-driven diagnostics refreshes from
+  disrupting the open native Developer Inspect selector while preserving
+  independent selection, session ordering, lifecycle updates, and fallback.
+- **Changed files and per-file purpose:** `prototype/renderer/renderer.js`
+  reconciles options by session ID and exposes narrow Electron-test helpers.
+  `prototype/scripts/test-attention-diagnostics-renderer.js` covers node
+  identity, timer/event refreshes, selection, ordering, lifecycle changes, and
+  both fallback branches. Package metadata/lock, `RELEASES.md`,
+  `tasks/todo.md`, and this entry own v0.76.1 release bookkeeping.
+- **User-goal mapping:** Surviving options are updated and reordered in place;
+  only new or closed sessions add or remove nodes. Selection and disabled state
+  are applied after reconciliation. Diagnostics groups, events, relative ages,
+  and the one-second refresh remain unchanged.
+- **Executable verification:** The red-phase targeted renderer test failed on
+  replaced node identity, then `npm run test:attention-diagnostics`,
+  `npm run test:dev-mode`, JavaScript syntax checks, the direct session-rail
+  and Favorites renderer tests, and the complete `npm test` matrix passed. A
+  final-diff rerun passed through resource UI in-sandbox; after its Electron
+  handoff stalled, the restore test and remaining registered suffix passed
+  outside the sandbox.
+- **Skipped tests:** App packaging and visual screenshot comparison are not
+  useful for this DOM-lifecycle-only fix; real Electron coverage exercises the
+  native selector DOM and actual one-second timer. Deploy is skipped because
+  neither `deploy.md` nor `tasks/deploy.md` exists.
+- **Adversarial review:** Failure-oriented exact-diff review checked stale-node
+  removal, session ordering, exited-label mutation, selection assignment
+  timing, active/first fallback, unchanged refresh cadence, and unrelated
+  changes. It added explicit ordering and no-active fallback assertions. The
+  full suite's retry wrapper observed one unrelated session-rail focus-preview
+  failure in the first run and one unrelated Favorites deduplication failure in
+  the final-diff prefix; their immediate retries and separate direct reruns all
+  passed, so the transients are accepted without changing unrelated code.
+- **Residual risk:** Platform-native select-menu behavior itself is not
+  screenshotable in headless Electron, but node identity is the browser
+  contract that keeps an already-open native menu intact and is exercised
+  across both refresh sources.
+- **Rollback note:** Revert the v0.76.1 shipping commit and publish a newer
+  corrective release; no persisted data, migration, API, or interval changed.
+- **Ownership boundary:** The worktree was clean at start, and every changed
+  file belongs to this scoped patch.
+- **Next command:** Run Developer Mode and manually hold the Inspect dropdown
+  open across several one-second refreshes if native macOS confirmation is
+  desired.
+
 ## 2026-07-30 — Chromux v0.76.0 Contextual Sidebar Lab
 
 - **User goal:** Build and ship a standalone developer-only Electron lab that

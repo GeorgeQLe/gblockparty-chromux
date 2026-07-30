@@ -6,6 +6,16 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Stabilize the Developer Inspect session dropdown by reconciling keyed
+  option nodes across live diagnostics refreshes, preserving independent
+  selection and session order, updating lifecycle changes in place, retaining
+  active-or-first fallback, and ship v0.76.1. _(source: user-supplied
+  Stabilize the Developer Inspect Dropdown plan; evidence:
+  `prototype/renderer/renderer.js`,
+  `prototype/scripts/test-attention-diagnostics-renderer.js`, package
+  metadata, `RELEASES.md`, focused/dev-mode/full prototype coverage, tag, and
+  GitHub Release)_
+
 - [x] Add an isolated Contextual Sidebar Lab comparing the current Threads
   control with nine market-inspired alternatives over identical synthetic
   data, Gallery and counterbalanced Study modes, sanitized schema-v1 evidence,
