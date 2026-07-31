@@ -6,6 +6,17 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Recognize the Codex 0.146 percentage-based context footer in the shared
+  rendered-prompt parser so normal PTY writes, offstage tab activation, and
+  stalled startup recovery dismiss the loader only for a current prompt;
+  preserve focus, accessibility, lifecycle, exit, and manual fallback policy,
+  and ship v0.76.4. _(source: user-supplied Fix Codex 0.146 Startup Readiness
+  Detection plan; evidence: `prototype/renderer/renderer.js`,
+  `prototype/scripts/test-startup-loader-renderer.js`,
+  `prototype/scripts/test-composer-renderer.js`, package metadata,
+  `RELEASES.md`, focused/full prototype coverage, adversarial review, tag, and
+  GitHub Release)_
+
 - [x] Re-evaluate managed-agent startup readiness when a tab is activated so
   Codex, Claude Code, and Grok Build prompts that rendered while offstage
   dismiss the loader without more PTY output; preserve background and

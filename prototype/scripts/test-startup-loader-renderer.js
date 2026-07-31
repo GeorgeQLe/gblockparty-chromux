@@ -22,6 +22,11 @@ fs.writeFileSync(e2ePath, `
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const tick = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   const settle = async () => { await tick(); await tick(); };
+  const codex0146Screen = (context = 62) => [
+    'OpenAI Codex (v0.146.0)',
+    '› Ask Codex anything…',
+    '  Context ' + String(context) + '% left',
+  ].join('\\r\\n') + '\\x1b[1A\\r\\x1b[2C';
 
   expect(startup.timeoutMs() === 15000, 'production stall threshold must remain 15 seconds');
 
@@ -43,7 +48,7 @@ fs.writeFileSync(e2ePath, `
   startup.write(codex, 'login shell startup output\\r\\n');
   await settle();
   expect(startup.state(codex).phase === 'starting', 'ordinary startup output must not reveal Codex');
-  startup.write(codex, 'OpenAI Codex (v0.146.0)\\r\\n? for shortcuts\\r\\n› ');
+  startup.write(codex, codex0146Screen());
   await settle();
   view = startup.state(codex);
   expect(view.phase === 'revealed' && view.hidden && view.busy === 'false' && !view.timerActive,
@@ -52,8 +57,16 @@ fs.writeFileSync(e2ePath, `
     'prompt reveal should restore focus to the active terminal');
   expect(view.terminalAriaHidden === 'false' && view.helperTabIndex === 0 && !view.composeDisabled,
     'prompt reveal should restore terminal accessibility');
-  expect(view.bufferText.includes('login shell startup output') && view.bufferText.includes('? for shortcuts'),
+  expect(view.bufferText.includes('login shell startup output') && view.bufferText.includes('Context 62% left'),
     'startup output must remain in xterm scrollback after reveal');
+
+  const percentageWithoutPrompt = startup.addSession({
+    name: 'codex-percentage-without-prompt', agent: 'codex', cwd: '/work/codex-no-prompt',
+  });
+  startup.write(percentageWithoutPrompt, 'OpenAI Codex (v0.146.0)\\r\\nContext 62% left');
+  await settle();
+  expect(startup.state(percentageWithoutPrompt).phase === 'starting',
+    'percentage context without a current Codex prompt must remain covered');
 
   for (const fixture of [
     { agent: 'claude', brand: 'Claude Code v2.1.214', prompt: '❯ ', title: 'Starting Claude Code' },
@@ -94,7 +107,7 @@ fs.writeFileSync(e2ePath, `
   for (const fixture of [
     {
       agent: 'codex',
-      output: 'OpenAI Codex (v0.146.0)\\r\\n? for shortcuts\\r\\n› ',
+      output: codex0146Screen(),
     },
     {
       agent: 'claude',
@@ -137,7 +150,7 @@ fs.writeFileSync(e2ePath, `
   }
 
   const exitedBackground = startup.addSession({
-    name: 'exited-background-ready', agent: 'claude', cwd: '/work/exited-background-ready',
+    name: 'exited-background-ready', agent: 'codex', cwd: '/work/exited-background-ready',
   });
   await settle();
   startup.exit(exitedBackground, 9);
@@ -145,7 +158,7 @@ fs.writeFileSync(e2ePath, `
     name: 'exited-focus-holder', agent: '', cwd: '/work/exited-focus-holder',
   });
   await settle();
-  startup.renderOnly(exitedBackground, 'Claude Code v2.1.214\\r\\n❯ ');
+  startup.renderOnly(exitedBackground, codex0146Screen());
   await settle();
   expect(startup.state(exitedFocusHolder).terminalFocused,
     'exited background output must not steal focus before activation');
@@ -177,7 +190,7 @@ fs.writeFileSync(e2ePath, `
     'timeout should switch to Still starting with a reveal action: ' + JSON.stringify(view));
   expect(view.status.startsWith('Still starting') && view.revealLabel === 'SHOW TERMINAL',
     'stalled copy and action should be explicit');
-  startup.write(stalled, '? for shortcuts\\r\\n› ');
+  startup.write(stalled, codex0146Screen(61));
   await settle();
   expect(startup.state(stalled).phase === 'revealed'
     && startup.state(stalled).revealReason === 'prompt'

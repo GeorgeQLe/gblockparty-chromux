@@ -1089,7 +1089,7 @@ function isCodexCompletionCandidate(intent, value) {
 
 const CODEX_PROMPT_GLYPH_RE = /^\s*[›❯](?:\s|$)/u;
 const CODEX_PROMPT_PLACEHOLDER_RE = /^(?:ask codex(?: anything)?|type (?:a )?(?:message|prompt)|write a prompt)[.…]*$/iu;
-const CODEX_PROMPT_CHROME_RE = /(?:\?\s+for shortcuts|\bcontext left\b|^\s*choose an option:)/iu;
+const CODEX_PROMPT_CHROME_RE = /(?:\?\s+for shortcuts|\bcontext(?:\s+(?:100|[1-9]?\d)%)?\s+left\b|^\s*choose an option:)/iu;
 const CODEX_FRAME_EDGE_RE = /^\s*[╭╰┌└┏┗╔╚].*[╮╯┐┘┓┛╗╝]\s*$/u;
 const CODEX_FRAME_VERTICAL_RE = /^\s*[│┃║]\s?(.*?)(?:\s?[│┃║])?\s*$/u;
 const CODEX_NUMERIC_CHOOSER_SELECTED_RE = /^\s*[›❯]\s*([1-9])\.\s+\S/u;

@@ -1,5 +1,18 @@
 # Release Notes
 
+## GBlockParty Chromux v0.76.4
+
+Tag: `chromux-v0.76.4`
+
+- Recognize the Codex 0.146 percentage-based context footer, such as
+  `Context 62% left`, as bounded prompt chrome when it accompanies the current
+  rendered `›` prompt.
+- Restore normal PTY-write, background-tab activation, and post-warning startup
+  reveal behavior without changing focus, lifecycle, timeout, or exit policy.
+- Keep prompt-less percentage text and exited sessions covered, retain legacy
+  Codex prompt forms, and add real-Electron startup and Composer regressions
+  shaped like the current cursor-positioned screen.
+
 ## GBlockParty Chromux v0.76.3
 
 Tag: `chromux-v0.76.3`

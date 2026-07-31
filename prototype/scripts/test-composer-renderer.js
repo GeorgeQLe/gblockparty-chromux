@@ -341,10 +341,15 @@ fs.writeFileSync(e2ePath, `
     'Codex prompt borders should be removed without removing prompt content');
 
   const placeholderPrompt = c.addSession({ name: 'placeholder-prompt', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16 });
-  await c.renderPromptFixture(placeholderPrompt, '? for shortcuts\\r\\n› Ask Codex anything…');
+  c.nativeInput(placeholderPrompt, 'stale placeholder shadow'); c.clearPtyInputs(placeholderPrompt);
+  await c.renderPromptFixture(placeholderPrompt, [
+    'OpenAI Codex (v0.146.0)',
+    '› Ask Codex anything…',
+    '  Context 62% left',
+  ].join('\\r\\n') + '\\x1b[1A\\r\\x1b[2C');
   c.open(placeholderPrompt); await tick();
   expect(c.draft(placeholderPrompt) === '' && c.ptyInputs(placeholderPrompt).length === 0,
-    'Codex placeholder text must not transfer as user input');
+    'Codex 0.146 placeholder text must not transfer as user input');
 
   const submittedPrompt = c.addSession({ name: 'submitted-prompt', agent: 'codex', cwd: ${JSON.stringify(projectDir)}, rows: 16 });
   c.nativeInput(submittedPrompt, 'already submitted');

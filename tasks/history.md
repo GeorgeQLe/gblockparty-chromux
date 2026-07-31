@@ -2115,3 +2115,74 @@
   no explicit manual deploy contract exists; the GitHub Release is Chromux's
   required update channel. Next command: complete the dashboard-only Vercel
   OAuth app registration and live preview proof tracked in `tasks/todo.md`.
+
+## 2026-07-31 — Codex 0.146 startup readiness detection and v0.76.4
+
+- Extended the existing bounded Codex prompt-chrome matcher to recognize the
+  current `Context N% left` footer while retaining shortcut, legacy context,
+  chooser, frame, lifecycle, phase, current-prompt, and exit requirements.
+  Normal PTY-write inspection, active-tab inspection, stalled recovery, and
+  `readCodexRenderedPrompt()` remain the authoritative unchanged paths.
+- Replaced simplified startup and Composer fixtures with a Codex 0.146-shaped
+  xterm screen containing the `›` prompt, placeholder, percentage footer, and
+  ANSI cursor movement back to the prompt. Coverage proves normal reveal,
+  missed-callback background coverage, activation reveal, post-warning
+  recovery, activation-only focus/accessibility restoration, rejection of a
+  percentage footer without a current prompt, and exited-session coverage.
+- Ship manifest — User goal: repair Codex 0.146 startup readiness without
+  polling, raw-output matching, generic prompt detection, unconditional tab
+  reveal, or changes to focus, timeout, persistence, IPC, and lifecycle policy;
+  publish v0.76.4.
+- Changed files and per-file purpose: `prototype/renderer/renderer.js` admits a
+  bounded 0–100 percentage between the existing context and left tokens;
+  `prototype/scripts/test-startup-loader-renderer.js` exercises PTY callback,
+  offstage activation, stalled, focus/accessibility, false-positive, and exit
+  behavior with the current screen; `prototype/scripts/test-composer-renderer.js`
+  proves the shared parser resolves that screen instead of retaining a stale
+  keystroke shadow; `prototype/package.json` and
+  `prototype/package-lock.json` set 0.76.4; `RELEASES.md` documents the release;
+  `tasks/todo.md` records completion; this entry records validation, review,
+  residual risk, rollback, and next work.
+- User-goal mapping: the only production source change is the prompt-chrome
+  regular expression used by `readCodexRenderedPrompt()`. The existing `›`
+  search, bounded rendered-buffer scan, prompt placeholder handling, frame
+  handling, lifecycle guard, starting/stalled phase guard, exited guard,
+  active-session animation-frame guard, write callback, timer, manual fallback,
+  focus, accessibility, and Composer paths are unchanged.
+- Executable verification: the new startup-loader assertion first failed with
+  the Codex session still `starting`, and the new Composer assertion first
+  failed by retaining its stale shadow against v0.76.3. After the matcher
+  correction, `npm run test:startup-loader-renderer` and
+  `npm run test:composer-renderer` passed. The complete `npm test` matrix passed
+  on the final source and metadata diff, including every renderer, service,
+  activity/sidebar lab, resource, restore, shell-adoption, provider, Vercel,
+  webview, storage, Windows platform/setup/artifact/signing, and startup suite.
+  Changed JavaScript `node --check`, package/lock 0.76.4 consistency,
+  `git diff --check`, and the exact-diff inspection passed without warnings.
+- Skipped tests: no live Codex model was launched because readiness is a
+  deterministic rendered-xterm contract and live execution would add external
+  authentication and model activity without improving detector coverage. No
+  screenshot baseline exists, and no CSS, geometry, or visible copy changed;
+  real-Electron assertions directly verify loader visibility, terminal
+  accessibility, focus, and retained screen content.
+- Adversarial review: performed a failure-oriented exact-diff and call-site
+  review as the equivalent gate because this repository has no
+  `docs/quality-gate-contract.md`, `quality-sweep`, or `expert-review`. It
+  checked absent/current prompts, 0–100 bounds, legacy `context left`,
+  shortcut and framed prompts, prompt/footer cursor ordering, offstage writes,
+  activation races, starting/stalled/revealed phases, exited/dead sessions,
+  active/background focus, accessibility, timers, Composer extraction, Claude
+  Code and Grok Build isolation, and accidental polling/raw-output/API changes.
+  No blocking finding or scope drift remains.
+- Residual risk: future Codex versions may change the prompt glyph or footer
+  wording again. Such screens remain safely covered behind the existing
+  **SHOW TERMINAL** fallback with PTY output and scrollback intact. The matcher
+  intentionally rejects percentages above 100 and requires an existing
+  current prompt within the bounded rendered region.
+- Rollback note: revert the v0.76.4 shipping commit, delete GitHub Release and
+  tag `chromux-v0.76.4`, and republish v0.76.3 as latest if needed. The exact
+  shipping boundary is the renderer, two renderer regressions, two metadata
+  files, release notes, todo record, and this history entry. Deploy skipped: no
+  explicit manual deploy contract exists; the GitHub Release is Chromux's
+  required update channel. Next command: complete the dashboard-only Vercel
+  OAuth app registration and live preview proof tracked in `tasks/todo.md`.
