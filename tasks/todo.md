@@ -6,6 +6,16 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Recover live managed-agent startup after the 15-second warning by
+  continuing rendered-prompt readiness checks in the stalled state, preserving
+  exited/manual/focus/Composer/accessibility behavior, widening bounded
+  provider evidence to 1,024 rows, and ship v0.76.2. _(source: user-supplied
+  Fix Terminal Startup Readiness Recovery plan; evidence:
+  `prototype/renderer/renderer.js`,
+  `prototype/scripts/test-startup-loader-renderer.js`, package metadata,
+  `RELEASES.md`, focused/adjacent/full prototype coverage, adversarial review,
+  tag, and GitHub Release)_
+
 - [x] Stabilize the Developer Inspect session dropdown by reconciling keyed
   option nodes across live diagnostics refreshes, preserving independent
   selection and session order, updating lifecycle changes in place, retaining

@@ -1,5 +1,19 @@
 # Release Notes
 
+## GBlockParty Chromux v0.76.2
+
+Tag: `chromux-v0.76.2`
+
+- Automatically dismiss the startup loader when a live agent renders its
+  interactive prompt after the 15-second warning; the manual terminal action
+  remains available while the prompt is still pending.
+- Keep exited sessions covered until manually revealed, and preserve retained
+  output, Composer blocking, accessibility restoration, and background-session
+  focus behavior during slow startup recovery.
+- Recognize Claude Code and Grok Build branding within the same bounded
+  1,024-row startup evidence window used by Codex, reducing false stalls after
+  verbose shell initialization.
+
 ## GBlockParty Chromux v0.76.1
 
 Tag: `chromux-v0.76.1`

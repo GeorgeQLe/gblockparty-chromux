@@ -1985,3 +1985,73 @@
   the GitHub Release is Chromux's required update channel. Next command:
   complete the dashboard-only Vercel OAuth app registration and live preview
   proof tracked in `tasks/todo.md`.
+
+## 2026-07-30 — Terminal startup readiness recovery and v0.76.2
+
+- Made the 15-second agent-startup warning recoverable: live managed sessions
+  continue evaluating rendered prompt evidence while stalled and automatically
+  reveal once interactivity is proven. Exited sessions remain covered until
+  manual reveal.
+- Expanded bounded Claude Code and Grok Build branding evidence from 120 to
+  1,024 rendered rows, matching the existing Codex prompt scan, without
+  connecting startup readiness to turn hooks or changing public interfaces,
+  persistence, restore state, focus policy, Composer policy, or lifecycle
+  architecture.
+- Ship manifest — User goal: repair slow startup so a prompt rendered after
+  the warning dismisses the loader, retain the timeout as an escape hatch,
+  preserve adjacent startup/turn behavior, and publish v0.76.2.
+- Changed files and per-file purpose: `prototype/renderer/renderer.js` widens
+  provider evidence and admits live `stalled` readiness checks;
+  `prototype/scripts/test-startup-loader-renderer.js` covers current Codex
+  0.146 and Claude Code 2.1.214 fixtures, ordinary and post-timeout readiness,
+  verbose initialization, exit immunity, manual reveal, focus, timers,
+  accessibility, Composer gating, and retained output; package and lock
+  metadata set 0.76.2; `RELEASES.md` documents the release; `tasks/todo.md`
+  and this entry record completion.
+- User-goal mapping: xterm's existing write-completion callback remains the
+  only automatic startup readiness trigger. It now accepts `starting` or
+  non-exited `stalled`, while provider recognition still requires a current
+  prompt plus bounded rendered evidence. `revealed`, exited, dead, shell, and
+  unsupported-provider sessions cannot enter the new path. Turn-signal code
+  and hooks are unchanged.
+- Tests run: the new >120-row regression failed against v0.76.1, then passed
+  after implementation. `npm run test:startup-loader-renderer`,
+  `npm run test:composer-renderer`, `npm run test:turn-signals-renderer`, and
+  `npm run test:synchronized-output-renderer` passed. Changed JavaScript
+  `node --check`, package/lock version consistency, and `git diff --check`
+  passed. The complete unmodified `npm test` matrix was executed in a
+  disposable independent `launchd` coalition because macOS 26.5.2 otherwise
+  assigned nested test Electron processes to the running production Chromux
+  coalition and aborted in LaunchServices before JavaScript startup. Every
+  matrix script passed; the unchanged broad session-rail suite passed in
+  isolation after timing failures at unrelated preview, Git refresh, mirror,
+  animation, and theme checkpoints.
+- Skipped tests: no live Claude Code, Codex, or Grok model was invoked because
+  provider accounts and billable external work are unnecessary for a rendered
+  xterm readiness contract. Current real-Electron fixtures cover the prompt
+  forms and loader behavior. No screenshot baseline exists, and no CSS or
+  geometry changed; the real renderer assertions directly verify visibility,
+  accessibility, focus, and retained terminal content.
+- Adversarial review: performed a failure-oriented exact-diff review as the
+  repository's explicit equivalent path because no `quality-sweep` or
+  `expert-review` skill is installed. It traced prompt/write versus timeout
+  ordering, write callbacks after exit, manual-reveal races, close cleanup,
+  dead/background sessions, focus theft, Composer restoration, synchronized
+  writes, evidence bounds, scan cost, and startup-versus-turn separation. The
+  explicit `startup.exited` guard and lifecycle-aware recognizer prevent an
+  exited session from recovering; reveal still clears any live timer. No
+  blocking finding or scope drift remains.
+- Residual risk: provider branding and prompt glyphs can change in future CLI
+  releases, and branding beyond 1,024 rendered rows will still require manual
+  reveal by design. The fallback preserves PTY output and scrollback. The
+  session-rail matrix remains host-load-sensitive, but its shifting failures
+  were unrelated to the two-line production diff and it produced a clean
+  isolated pass; the four required adjacent suites and all other matrix
+  scripts passed without product findings.
+- Rollback note: revert the v0.76.2 shipping commit, delete GitHub Release and
+  tag `chromux-v0.76.2`, and republish v0.76.1 as latest if needed. The exact
+  shipping boundary is the renderer, focused regression, two metadata files,
+  release notes, todo record, and this history entry. Deploy skipped: no
+  explicit manual deploy contract exists; the GitHub Release is Chromux's
+  required update channel. Next command: complete the dashboard-only Vercel
+  OAuth app registration and live preview proof tracked in `tasks/todo.md`.

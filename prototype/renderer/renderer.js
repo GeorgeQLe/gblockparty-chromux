@@ -1096,7 +1096,7 @@ const CODEX_NUMERIC_CHOOSER_SELECTED_RE = /^\s*[›❯]\s*([1-9])\.\s+\S/u;
 const CODEX_NUMERIC_CHOOSER_OPTION_RE = /^\s*(?:[›❯]\s*)?([1-9])\.\s+\S/u;
 const CODEX_NUMERIC_CHOOSER_FOOTER_RE = /\b(?:enter|return)\b.{0,80}\b(?:confirm|submit|select|continue|proceed)\b|\b(?:confirm|submit|select|continue|proceed)\b.{0,80}\b(?:enter|return)\b/iu;
 const AGENT_STARTUP_TIMEOUT_MS = 15_000;
-const AGENT_STARTUP_BUFFER_ROWS = 120;
+const AGENT_STARTUP_BUFFER_ROWS = 1024;
 const AGENT_STARTUP_PHASES = new Set(['starting', 'ready', 'stalled', 'revealed']);
 
 function terminalBufferRow(buffer, index, endColumn = null) {
@@ -10476,7 +10476,8 @@ function beginAgentStartup(session, { timeoutMs = AGENT_STARTUP_TIMEOUT_MS } = {
 
 function inspectAgentStartupReadiness(session) {
   const startup = session && session.term && session.term.startup;
-  if (!startup || startup.phase !== 'starting') return false;
+  if (!startup || startup.exited
+    || (startup.phase !== 'starting' && startup.phase !== 'stalled')) return false;
   if (!agentStartupPromptReady(session)) return false;
   return revealAgentTerminal(session, 'prompt');
 }

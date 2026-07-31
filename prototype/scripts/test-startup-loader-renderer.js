@@ -43,10 +43,10 @@ fs.writeFileSync(e2ePath, `
   startup.write(codex, 'login shell startup output\\r\\n');
   await settle();
   expect(startup.state(codex).phase === 'starting', 'ordinary startup output must not reveal Codex');
-  startup.write(codex, '? for shortcuts\\r\\n› ');
+  startup.write(codex, 'OpenAI Codex (v0.146.0)\\r\\n? for shortcuts\\r\\n› ');
   await settle();
   view = startup.state(codex);
-  expect(view.phase === 'revealed' && view.hidden && view.busy === 'false',
+  expect(view.phase === 'revealed' && view.hidden && view.busy === 'false' && !view.timerActive,
     'rendered Codex prompt should reveal the terminal: ' + JSON.stringify(view));
   expect(view.revealReason === 'prompt' && view.terminalFocused,
     'prompt reveal should restore focus to the active terminal');
@@ -56,7 +56,7 @@ fs.writeFileSync(e2ePath, `
     'startup output must remain in xterm scrollback after reveal');
 
   for (const fixture of [
-    { agent: 'claude', brand: 'Claude Code v2.1.0', prompt: '❯ ', title: 'Starting Claude Code' },
+    { agent: 'claude', brand: 'Claude Code v2.1.214', prompt: '❯ ', title: 'Starting Claude Code' },
     { agent: 'grok', brand: 'Grok Build v0.9.0', prompt: '> ', title: 'Starting Grok Build' },
   ]) {
     const id = startup.addSession({
@@ -91,6 +91,17 @@ fs.writeFileSync(e2ePath, `
   expect(!startup.state(background).terminalFocused && startup.state(shellHolder).terminalFocused,
     'background readiness must not steal focus from the active session');
 
+  const verboseClaude = startup.addSession({
+    name: 'verbose-claude', agent: 'claude', cwd: '/work/verbose',
+  });
+  startup.write(verboseClaude, 'Claude Code v2.1.214\\r\\n');
+  startup.write(verboseClaude, Array.from({ length: 180 }, (_, index) => (
+    'shell initialization row ' + String(index + 1)
+  )).join('\\r\\n') + '\\r\\n❯ ');
+  await settle();
+  expect(startup.state(verboseClaude).phase === 'revealed',
+    'Claude branding more than 120 rows before its prompt should remain recognizable');
+
   const stalled = startup.addSession({
     name: 'slow-codex', agent: 'codex', cwd: '/work/slow', timeoutMs: 30,
   });
@@ -102,13 +113,26 @@ fs.writeFileSync(e2ePath, `
     'stalled copy and action should be explicit');
   startup.write(stalled, '? for shortcuts\\r\\n› ');
   await settle();
-  expect(startup.state(stalled).phase === 'stalled',
-    'stalled sessions must never auto-reveal, even when a prompt appears later');
-  startup.reveal(stalled);
-  await settle();
   expect(startup.state(stalled).phase === 'revealed'
-    && startup.state(stalled).revealReason === 'manual',
-  'manual action should reveal stalled terminal output');
+    && startup.state(stalled).revealReason === 'prompt'
+    && startup.state(stalled).hidden && startup.state(stalled).busy === 'false'
+    && !startup.state(stalled).timerActive
+    && startup.state(stalled).terminalAriaHidden === 'false'
+    && startup.state(stalled).helperTabIndex === 0
+    && !startup.state(stalled).composeDisabled,
+  'a prompt arriving after the warning should automatically reveal the terminal');
+
+  const manual = startup.addSession({
+    name: 'manual-codex', agent: 'codex', cwd: '/work/manual', timeoutMs: 30,
+  });
+  startup.write(manual, 'startup output without an interactive prompt\\r\\n');
+  await wait(55);
+  startup.reveal(manual);
+  await settle();
+  expect(startup.state(manual).phase === 'revealed'
+    && startup.state(manual).revealReason === 'manual'
+    && startup.state(manual).bufferText.includes('startup output without an interactive prompt'),
+  'manual action should reveal retained output without prompt evidence');
 
   const exited = startup.addSession({
     name: 'failed-claude', agent: 'claude', cwd: '/work/failed',
@@ -119,6 +143,11 @@ fs.writeFileSync(e2ePath, `
     'early exit should show an exited loader with reveal action: ' + JSON.stringify(view));
   expect(view.title === 'Claude Code exited' && view.status.includes('code 7'),
     'early-exit state should explain the failure');
+  startup.write(exited, 'Claude Code v2.1.214\\r\\n❯ ');
+  await settle();
+  expect(startup.state(exited).phase === 'stalled'
+    && startup.state(exited).exited && startup.state(exited).revealReason === null,
+  'exited sessions must never auto-reveal when later output resembles a prompt');
   startup.reveal(exited);
   await settle();
   expect(startup.state(exited).bufferText.includes('session exited (7)'),
