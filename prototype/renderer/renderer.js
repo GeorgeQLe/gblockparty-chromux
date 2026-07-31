@@ -9358,7 +9358,9 @@ function activateSession(id, { consumeRestoredCompletion = true } = {}) {
     s.els.tab.classList.toggle('active', active);
     if (active) {
       requestAnimationFrame(() => {
+        if (state.activeId !== s.id) return;
         s.term.fit();
+        inspectAgentStartupReadiness(s);
         if (s.term.startup.phase !== 'revealed') return;
         if (s.composer.open) s.els.composerTextarea.focus();
         else s.term.term.focus();
@@ -12599,6 +12601,7 @@ if (window.chromuxTest) {
       return id;
     },
     write(id, data) { handlePtyData(id, String(data)); },
+    renderOnly(id, data) { testSession(id).term.term.write(String(data)); },
     input(id, data) { return handleTerminalInput(testSession(id), String(data)); },
     ptyInputs: (id) => (testSession(id)._ptyInputs || []).slice(),
     exit(id, exitCode = 1) { handlePtyExit({ id, exitCode }); },

@@ -1,5 +1,19 @@
 # Release Notes
 
+## GBlockParty Chromux v0.76.3
+
+Tag: `chromux-v0.76.3`
+
+- Recheck the existing rendered-prompt readiness detectors when a user
+  activates a managed-agent tab, so a prompt that finished rendering while
+  offstage dismisses the startup loader without requiring more PTY output.
+- Preserve background focus, terminal accessibility, and normal activation
+  focus across Codex, Claude Code, and Grok Build while keeping exited sessions
+  covered.
+- Add real-Electron regression coverage for the missed background callback
+  state without changing production APIs, IPC, persistence, or readiness
+  matching.
+
 ## GBlockParty Chromux v0.76.2
 
 Tag: `chromux-v0.76.2`

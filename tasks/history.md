@@ -2055,3 +2055,63 @@
   explicit manual deploy contract exists; the GitHub Release is Chromux's
   required update channel. Next command: complete the dashboard-only Vercel
   OAuth app registration and live preview proof tracked in `tasks/todo.md`.
+
+## 2026-07-31 — Background startup readiness on tab activation and v0.76.3
+
+- Rechecked the existing managed-agent rendered-prompt detectors after fitting
+  an activated terminal, allowing Codex, Claude Code, and Grok Build tabs that
+  became ready offstage to dismiss their startup loader without another PTY
+  write. Stale activation callbacks now stop before fitting, revealing, or
+  focusing a tab that is no longer active.
+- Added a smoke-only direct-render helper and real-Electron cases that reproduce
+  prompt output without the normal PTY readiness callback, preserve the active
+  shell's focus until a real tab switch, restore terminal accessibility and
+  focus after activation, and keep exited sessions covered.
+- Ship manifest — User goal: resolve background managed-agent loading on tab
+  switch without loosening prompt recognition, revealing failures, changing
+  production interfaces, or stealing focus, then publish v0.76.3.
+- Changed files and per-file purpose: `prototype/renderer/renderer.js` guards
+  stale animation frames and invokes shared startup inspection after the active
+  terminal fit; `prototype/scripts/test-startup-loader-renderer.js` covers the
+  missed-callback state for all three managed agents plus focus, accessibility,
+  rapid-switch, and exit behavior; `prototype/package.json` and
+  `prototype/package-lock.json` set 0.76.3; `RELEASES.md` documents the
+  release; `tasks/todo.md` records completion; this entry records validation,
+  review, residual risk, and rollback.
+- User-goal mapping: activation calls only the existing
+  `inspectAgentStartupReadiness()` path, whose lifecycle, provider, phase,
+  exit, bounded evidence, and prompt detectors remain authoritative. The
+  inspection runs only for the session still active at animation-frame time;
+  focus remains behind the existing revealed-phase gate.
+- Executable verification: the new activation assertion failed against
+  v0.76.2 before the production change. The focused
+  `npm run test:startup-loader-renderer` passed after implementation and again
+  after the race guard. The complete `npm test` matrix passed after the final
+  source change, including startup loader, Composer, synchronized output,
+  session rail, shell adoption, restore, theme, turn-signal, webview, Vercel,
+  resource, and Windows-platform suites. Changed JavaScript `node --check`,
+  package/lock version consistency, and `git diff --check` passed.
+- Skipped tests: no live agent model was invoked because readiness depends on
+  rendered terminal state and the real-Electron fixtures deterministically
+  exercise the provider prompts without paid or account-dependent work. No
+  screenshot baseline exists, and no CSS or geometry changed.
+- Adversarial review: the repository lacks the referenced
+  `docs/quality-gate-contract.md`, `quality-sweep`, and `expert-review`, so a
+  failure-oriented exact-diff review served as the equivalent gate. It traced
+  normal and direct xterm writes, activation ordering, rapid switches, stale
+  animation frames, fit timing, active/background focus, Composer focus,
+  starting/stalled/revealed phases, timers, exited/dead sessions, shells, and
+  test-interface isolation. The review found that an older activation frame
+  could otherwise inspect and focus a now-background tab; the active-session
+  guard and tightened regression fixed it. No blocking finding remains.
+- Residual risk: readiness still intentionally depends on current provider
+  branding and prompt glyphs within the existing bounded rendered evidence
+  window. Future CLI prompt changes can leave the loader visible, but the
+  existing manual reveal retains output and provides a safe fallback.
+- Rollback note: revert the v0.76.3 shipping commit, delete GitHub Release and
+  tag `chromux-v0.76.3`, and republish v0.76.2 as latest if needed. The exact
+  shipping boundary is the renderer, startup-loader regression, two metadata
+  files, release notes, todo record, and this history entry. Deploy skipped:
+  no explicit manual deploy contract exists; the GitHub Release is Chromux's
+  required update channel. Next command: complete the dashboard-only Vercel
+  OAuth app registration and live preview proof tracked in `tasks/todo.md`.

@@ -91,6 +91,72 @@ fs.writeFileSync(e2ePath, `
   expect(!startup.state(background).terminalFocused && startup.state(shellHolder).terminalFocused,
     'background readiness must not steal focus from the active session');
 
+  for (const fixture of [
+    {
+      agent: 'codex',
+      output: 'OpenAI Codex (v0.146.0)\\r\\n? for shortcuts\\r\\n› ',
+    },
+    {
+      agent: 'claude',
+      output: 'Claude Code v2.1.214\\r\\n❯ ',
+    },
+    {
+      agent: 'grok',
+      output: 'Grok Build v0.9.0\\r\\n> ',
+    },
+  ]) {
+    const id = startup.addSession({
+      name: fixture.agent + '-missed-background-ready',
+      agent: fixture.agent,
+      cwd: '/work/' + fixture.agent + '-missed-background-ready',
+    });
+    const focusHolder = startup.addSession({
+      name: fixture.agent + '-focus-holder',
+      agent: '',
+      cwd: '/work/' + fixture.agent + '-focus-holder',
+    });
+    startup.renderOnly(id, fixture.output);
+    await settle();
+    const offstageReady = startup.state(id);
+    expect(offstageReady.phase === 'starting' && !offstageReady.hidden,
+      fixture.agent + ' prompt should reproduce a missed background readiness check');
+    expect(!offstageReady.terminalFocused && startup.state(focusHolder).terminalFocused,
+      fixture.agent + ' background prompt must not steal focus before activation');
+    startup.focus(id);
+    await settle();
+    const activatedReady = startup.state(id);
+    expect(activatedReady.phase === 'revealed' && activatedReady.hidden
+      && activatedReady.revealReason === 'prompt',
+    fixture.agent + ' activation should recheck readiness and hide the loader: '
+      + JSON.stringify(activatedReady));
+    expect(activatedReady.terminalFocused
+      && activatedReady.terminalAriaHidden === 'false'
+      && activatedReady.helperTabIndex === 0
+      && !activatedReady.composeDisabled,
+    fixture.agent + ' activated ready terminal should be accessible and focusable');
+  }
+
+  const exitedBackground = startup.addSession({
+    name: 'exited-background-ready', agent: 'claude', cwd: '/work/exited-background-ready',
+  });
+  await settle();
+  startup.exit(exitedBackground, 9);
+  const exitedFocusHolder = startup.addSession({
+    name: 'exited-focus-holder', agent: '', cwd: '/work/exited-focus-holder',
+  });
+  await settle();
+  startup.renderOnly(exitedBackground, 'Claude Code v2.1.214\\r\\n❯ ');
+  await settle();
+  expect(startup.state(exitedFocusHolder).terminalFocused,
+    'exited background output must not steal focus before activation');
+  startup.focus(exitedBackground);
+  await settle();
+  const exitedActivated = startup.state(exitedBackground);
+  expect(exitedActivated.phase === 'stalled' && exitedActivated.exited
+    && !exitedActivated.hidden && exitedActivated.revealReason === null,
+  'activating an exited session must keep its terminal covered: '
+    + JSON.stringify(exitedActivated));
+
   const verboseClaude = startup.addSession({
     name: 'verbose-claude', agent: 'claude', cwd: '/work/verbose',
   });

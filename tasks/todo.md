@@ -6,6 +6,16 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Re-evaluate managed-agent startup readiness when a tab is activated so
+  Codex, Claude Code, and Grok Build prompts that rendered while offstage
+  dismiss the loader without more PTY output; preserve background and
+  activation focus, accessibility, authoritative prompt detection, exit
+  coverage, and ship v0.76.3. _(source: user-supplied Resolve Background Agent
+  Loading on Tab Switch plan; evidence: `prototype/renderer/renderer.js`,
+  `prototype/scripts/test-startup-loader-renderer.js`, package metadata,
+  `RELEASES.md`, focused/full prototype coverage, adversarial review, tag, and
+  GitHub Release)_
+
 - [x] Recover live managed-agent startup after the 15-second warning by
   continuing rendered-prompt readiness checks in the stalled state, preserving
   exited/manual/focus/Composer/accessibility behavior, widening bounded
