@@ -36,8 +36,7 @@ fs.writeFileSync(e2ePath, `
     .find((row) => [...row.querySelectorAll('.attention-reason, .attention-system-row')]
       .some((reason) => reason.dataset.attentionKind === kind)
       && row.querySelector('.attention-name')?.textContent === name);
-  const attentionButton = (row, label) => [...row.querySelectorAll('.attention-actions .qi-btn')]
-    .find((button) => button.textContent === label);
+  const attentionButton = (row, action) => row.querySelector('[data-inbox-action="' + action + '"]');
   const movePointer = async (x, y) => {
     await input.sendHostInput({ type: 'mouseMove', x: Math.round(x), y: Math.round(y) });
     await wait(160);
@@ -70,8 +69,8 @@ fs.writeFileSync(e2ePath, `
 
   const viewRow = attentionRow('COMPLETED', 'view-target');
   expect(viewRow, 'background completed session should render an attention row');
-  const viewButton = attentionButton(viewRow, 'VIEW');
-  expect(viewButton, 'completed attention row should expose VIEW');
+  const viewButton = attentionButton(viewRow, 'dismiss');
+  expect(viewButton, 'completed attention row should expose Dismiss without a duplicate Open action');
   const rowBefore = rect(viewRow);
   const viewBefore = rect(viewButton);
   const viewTargetY = nativeTargetY(viewBefore);
@@ -81,7 +80,8 @@ fs.writeFileSync(e2ePath, `
       Math.round(viewBefore.x + (viewBefore.width / 2)),
       Math.round(viewTargetY),
     );
-    expect(viewButton.matches(':hover'), 'native boundary pointer should hover VIEW before geometry is checked: '
+    expect(targetElement?.dataset?.inboxAction === 'dismiss',
+      'native boundary pointer should hit Dismiss before geometry is checked: '
       + JSON.stringify({
         viewBefore, viewTargetY, hostPlatform,
         targetElement: targetElement
@@ -92,9 +92,10 @@ fs.writeFileSync(e2ePath, `
   expectRect(rect(viewRow), rowBefore, 'Streak attention-card hover');
   expectRect(rect(viewButton), viewBefore, 'Streak attention-button hover');
   await clickAt(viewBefore.x + (viewBefore.width / 2), viewTargetY);
-  expect(sig.activeId() === viewId, 'boundary VIEW click should activate the background session on the first click');
+  expect(!attentionRow('COMPLETED', 'view-target'),
+    'boundary Dismiss click should remove the completed item on the first click');
   expect(document.hasFocus() === false,
-    'native VIEW input must not focus the non-activating E2E window');
+    'native Dismiss input must not focus the non-activating E2E window');
 
   const dismissId = await sig.addFakeSession({ name: 'dismiss-target', agent: 'codex' });
   sig.emitSignal(dismissId, 'turn-end');
@@ -102,7 +103,7 @@ fs.writeFileSync(e2ePath, `
   await movePointer(500, 500);
   const dismissRow = attentionRow('COMPLETED', 'dismiss-target');
   expect(dismissRow, 'second completed session should render an attention row');
-  const dismissButton = attentionButton(dismissRow, 'DISMISS');
+  const dismissButton = attentionButton(dismissRow, 'dismiss');
   expect(dismissButton, 'completed attention row should expose DISMISS');
   const dismissBefore = rect(dismissButton);
   const dismissTargetY = nativeTargetY(dismissBefore);

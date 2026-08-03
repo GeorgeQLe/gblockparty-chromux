@@ -101,19 +101,19 @@ runCase('attention', `(async () => {
 
   rail.windowBlur();
   rail.emit(selected, 'turn-start');
-  rail.emit(selected, 'turn-end', 'Done path');
+  rail.emit(selected, 'turn-end', 'Dismiss path');
   let item = rail.inboxSections().find((section) => section.key === 'ready-finish').items[0];
-  rail.clickInboxAction(item.id, 'DONE');
-  expect(rail.attentionCount() === 0, 'Done should clear the grouped Dock count');
+  rail.clickInboxAction(item.id, 'dismiss');
+  expect(rail.attentionCount() === 0, 'Dismiss should clear the grouped Dock count');
   rail.emit(selected, 'turn-start');
   rail.emit(selected, 'turn-end', 'Snooze path');
   item = rail.inboxSections().find((section) => section.key === 'ready-finish').items[0];
-  rail.clickInboxAction(item.id, 'SNOOZE');
-  rail.clickInboxAction(item.id, '1 HOUR');
+  rail.clickInboxAction(item.id, 'snooze');
+  rail.clickInboxAction(item.id, 'hour');
   expect(rail.attentionCount() === 0, 'Snooze should clear the grouped Dock count');
   rail.expireInbox(item.id);
   expect(rail.attentionCount() === 1, 'an expired snooze should restore the Dock count');
-  rail.clickAttentionAction(selected, 'COMPLETED', 'DISMISS');
+  rail.clickAttentionAction(selected, 'COMPLETED', 'dismiss');
   expect(rail.attentionCount() === 0, 'dismiss should clear the final attention count');
 
   expect(await window.chromux.setDockBadgeCount(-1).then(() => false, () => true),

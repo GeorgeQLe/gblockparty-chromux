@@ -1,5 +1,62 @@
 # Session History
 
+## 2026-08-03 — Chromux v0.80.0 Threads icon actions
+
+- **User goal:** Replace the Threads 2×2 text-action grid with compact icon
+  controls, keep the card/header as ordinary Open, limit Dismiss to supported
+  reasons, preserve Snooze everywhere, and retire new Done triage without
+  breaking saved Done records.
+- **Changed files and per-file purpose:** `prototype/renderer/renderer.js`
+  centralizes accessible SVG action construction, specialized-action and
+  dismissibility policy, stable selectors, keyboard routing, and legacy Done
+  compatibility. `prototype/renderer/styles.css` supplies right-aligned square
+  geometry and hover, active, focus, and theme-variable states. Session-rail,
+  turn-signal, update-queue, Dock-badge, theme, and native Streak tests cover
+  behavior and presentation. README, troubleshooting, and privacy docs explain
+  the new controls and persisted-data contract. Package metadata/lock,
+  `RELEASES.md`, `tasks/todo.md`, and this entry own v0.80.0 bookkeeping.
+- **User-goal mapping:** Ordinary session opening stays on the card and
+  Enter/`o`; only Queue, Git-conflict, and system operations render the arrow
+  icon. Input, completion, delivery, and dismissible system items render ×;
+  permission, authentication, rate-limit, tool-failure, Queue, and conflict do
+  not. Every reason renders the clock icon and retains Snooze presets.
+  Keyboard `d` targets only a present Dismiss icon, so it is a no-op on
+  protected reasons. The sole writer now creates only Snooze records, while
+  the unchanged visibility filter continues reading legacy `state: "done"`
+  records until the reopen token changes.
+- **Executable verification:** Changed JavaScript passed `node --check` and
+  `git diff --check`. Focused session-rail, turn-signal, update-queue, theme,
+  native Streak click-target, and Dock-badge suites passed. The complete
+  `npm test` matrix passed every renderer, Electron, service, platform,
+  packaging-policy, Windows artifact, and signing-configuration suite.
+- **Adversarial review:** The referenced `docs/quality-gate-contract.md`,
+  `quality-sweep`, and `expert-review` are absent, so an exact-diff and
+  interaction-policy review served as the equivalent gate. It checked every
+  attention type, ordinary-versus-specialized Open, historical permission
+  dismissal, all keyboard routes, stale text selectors, legacy reopen tokens,
+  native pointer bounds, SVG accessibility, tooltip/label coverage, 24px
+  geometry, narrow Streak widths, all theme modes, and unchanged persistence
+  schema. It added explicit `o`, complete preset, non-dismissible `d`, and
+  legacy Done assertions; no blocking finding remains.
+- **Warnings, skipped tests, and residual risk:** The complete suite's first
+  Dock-badge rejection fixture missed its asynchronous Settings guidance, then
+  passed the runner's built-in one-time retry and had already passed directly;
+  this timing-only warning is accepted without unrelated changes. Packaging
+  and installer creation are skipped because this renderer/docs change adds no
+  packaged resource or native dependency; real-Electron tests exercise the
+  production DOM, CSS, pointer, and keyboard paths. Native `title` tooltips use
+  Chromium timing and presentation, while their text and action targets are
+  asserted deterministically.
+- **Rollback note:** Revert the v0.80.0 shipping commit and publish a newer
+  corrective release; no public API, IPC, restore schema, or migration changed.
+- **Deploy status:** Deploy skipped because neither `deploy.md` nor
+  `tasks/deploy.md` exists. The GitHub Release is Chromux's required update
+  channel.
+- **Ownership boundary:** The worktree was clean at start, and every changed
+  file belongs to this scoped implementation.
+- **Next command:** Continue the next unblocked Chromux product task or begin
+  the pending daily-driver adoption record during the next real work session.
+
 ## 2026-08-03 — Chromux v0.79.3 terminal viewport preservation
 
 - **User goal:** Preserve the exact visible terminal scrollback row across

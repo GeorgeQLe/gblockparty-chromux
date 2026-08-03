@@ -70,7 +70,7 @@ fs.writeFileSync(e2ePath, `
   q.queue();
   expect(q.phase() === 'ready', 'zero sessions should queue as ready, got ' + q.phase());
   expect(q.attentionKinds()[0] === 'UPDATE READY', 'ready update should be first attention item');
-  expect(q.attentionButtons('UPDATE READY').includes('EXECUTE'), 'ready update should expose EXECUTE');
+  expect(q.attentionButtons('UPDATE READY').includes('open'), 'ready update should expose its specialized action');
   expect(q.installButtonText() === 'INSTALL UPDATE', 'ready settings action should install update');
   q.resetInstallTrace();
   q.setInstallResult({ ok: false, message: 'empty fixture failure', output: 'empty fixture log' });
@@ -145,7 +145,8 @@ fs.writeFileSync(e2ePath, `
   await settle();
   expect(q.phase() === 'ready', 'missing managed source should queue for the manual update flow');
   expect(q.attentionKinds().includes('UPDATE READY'), 'manual update flow should retain UPDATE READY');
-  expect(q.attentionButtons('UPDATE READY').includes('DETAILS'), 'manual update flow should expose DETAILS instead of an unavailable execute action');
+  expect(q.attentionButtons('UPDATE READY').includes('open'),
+    'manual update flow should expose its Settings action instead of an unavailable execute label');
   expect(q.installTrace().lifecyclePrompts === 0, 'manual update queueing should not open lifecycle confirmation');
   expect(q.installTrace().restoreSnapshots === 0, 'manual update queueing should not write a snapshot');
 
@@ -166,8 +167,8 @@ fs.writeFileSync(e2ePath, `
   expect(q.phase() === 'waiting', 'live unknown-turn session should block, got ' + q.phase());
   expect(q.blockers().join(',') === 'live-unknown', 'expected live-unknown blocker');
   expect(q.attentionKinds()[0] === 'UPDATE WAITING', 'waiting update should be first attention item');
-  expect(q.attentionButtons('UPDATE WAITING').includes('EXECUTE'), 'waiting managed update should expose EXECUTE');
-  expect(q.attentionButtons('UPDATE WAITING').includes('DISMISS'), 'waiting update should expose DISMISS');
+  expect(q.attentionButtons('UPDATE WAITING').includes('open'), 'waiting managed update should expose its specialized action');
+  expect(q.attentionButtons('UPDATE WAITING').includes('dismiss'), 'waiting update should expose Dismiss');
   expect(q.installButtonText() === 'INSTALL ANYWAY', 'waiting settings action should allow managed override');
   expect(/install anyway/i.test(q.statusText()), 'waiting settings copy should explain managed override');
 
@@ -180,7 +181,8 @@ fs.writeFileSync(e2ePath, `
     },
   });
   expect(q.phase() === 'waiting', 'no-source status should keep waiting blockers');
-  expect(q.attentionButtons('UPDATE WAITING').includes('DETAILS'), 'waiting update without a managed source should expose DETAILS');
+  expect(q.attentionButtons('UPDATE WAITING').includes('open'),
+    'waiting update without a managed source should expose its Settings action');
   expect(q.installButtonText() === 'FOCUS BLOCKER', 'waiting without managed source should not offer override');
   q.setStatus({
     updateAvailable: true,
@@ -299,7 +301,7 @@ fs.writeFileSync(e2ePath, `
   q.flushRender();
   expect(q.phase() === 'failed', 'failed install should leave failed queue state, got ' + q.phase());
   expect(q.attentionKinds().includes('UPDATE FAILED'), 'failed update should stay visible in the pinned Threads system row');
-  expect(q.attentionButtons('UPDATE FAILED').includes('DISMISS'), 'failed update should expose DISMISS');
+  expect(q.attentionButtons('UPDATE FAILED').includes('dismiss'), 'failed update should expose Dismiss');
   expect(q.installButtonText() === 'RETRY INSTALL', 'failed settings action should retry');
   q.dismissItem('UPDATE FAILED');
   expect(q.phase() === 'failed', 'failed dismissal should wait for confirmation');

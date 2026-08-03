@@ -66,10 +66,9 @@ fs.writeFileSync(e2ePath, `
   expect(itemsFor('PERMISSION', 'historical').length === 1
     && itemsFor('INPUT NEEDED', 'historical').length === 1,
   'new live attention should coexist with restored historical records');
-  sig.dismissItem('PERMISSION', 'historical');
-  expect(itemsFor('PERMISSION', 'historical').length === 0
+  expect(JSON.stringify(itemsFor('PERMISSION', 'historical')[0].actions) === JSON.stringify(['snooze'])
     && itemsFor('INPUT NEEDED', 'historical').length === 1,
-  'historical actionable records should clear only through explicit dismissal');
+  'historical permission records should remain non-dismissible while retaining Snooze');
 
   const queueOnly = sig.addFakeSession({ name: 'queue-only', agent: 'codex', queue: [
     { url: 'http://localhost:4321', source: 'TERM', reason: 'Local preview', ts: Date.now() },
@@ -631,11 +630,11 @@ fs.writeFileSync(e2ePath, `
   expect(sig.turnState(b).state === 'needsInput', 'DISMISS never deletes state');
 
   const focusedActionCases = [
-    ['focused-input', 'input-needed', 'INPUT NEEDED', ['FOCUS', 'DISMISS', 'DONE', 'SNOOZE']],
-    ['focused-permission', 'permission-required', 'PERMISSION', ['FOCUS', 'DONE', 'SNOOZE']],
-    ['focused-auth', 'authentication-required', 'AUTH REQUIRED', ['FOCUS', 'DONE', 'SNOOZE']],
-    ['focused-rate-limit', 'rate-limited', 'RATE LIMITED', ['FOCUS', 'DONE', 'SNOOZE']],
-    ['focused-tool-failure', 'tool-failed', 'TOOL FAILED', ['FOCUS', 'DONE', 'SNOOZE']],
+    ['focused-input', 'input-needed', 'INPUT NEEDED', ['dismiss', 'snooze']],
+    ['focused-permission', 'permission-required', 'PERMISSION', ['snooze']],
+    ['focused-auth', 'authentication-required', 'AUTH REQUIRED', ['snooze']],
+    ['focused-rate-limit', 'rate-limited', 'RATE LIMITED', ['snooze']],
+    ['focused-tool-failure', 'tool-failed', 'TOOL FAILED', ['snooze']],
   ];
   for (const [name, event, kind, actions] of focusedActionCases) {
     const id = sig.addFakeSession({ name, agent: 'claude' });

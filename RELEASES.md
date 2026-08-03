@@ -1,5 +1,23 @@
 # Release Notes
 
+## GBlockParty Chromux v0.80.0
+
+Tag: `chromux-v0.80.0`
+
+- Replace the Threads card's 2×2 text-button grid with compact, right-aligned
+  outline icons for specialized Queue/Git/system actions, supported Dismiss,
+  and universal Snooze; the card header remains the ordinary Open action.
+- Keep permission, authentication, rate-limit, tool-failure, Queue, and
+  conflict reasons non-dismissible while preserving their Open/resolve and
+  Snooze paths.
+- Remap `d` from Done to supported Dismiss, retain Enter/`o` and `s`, stop
+  creating Done triage records, and continue honoring existing saved Done
+  records until their reopen token changes.
+- Add stable action identifiers, descriptive labels and tooltips, decorative
+  SVG treatment, compact focus targets, and real-Electron coverage across
+  Threads layouts, themes, update rows, keyboard navigation, and native Streak
+  click boundaries.
+
 ## GBlockParty Chromux v0.79.3
 
 Tag: `chromux-v0.79.3`

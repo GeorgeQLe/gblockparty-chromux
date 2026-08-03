@@ -7546,31 +7546,52 @@ function dismissAttentionItem(item) {
 
 function attentionItemDismissible(item) {
   if (item.scope === 'global') return item.type !== 'updateRunning';
-  if (item.historical) return true;
   return ['delivery', 'input', 'completed'].includes(item.type);
 }
 
+function attentionItemHasSpecializedAction(item) {
+  if (item.scope === 'global') return true;
+  return item.type === 'queue' || item.type === 'conflict';
+}
+
+function inboxActionButton(action, item, onClick) {
+  const labels = {
+    open: item.primaryAction || 'Open',
+    dismiss: 'Dismiss',
+    snooze: 'Snooze',
+  };
+  const paths = {
+    open: '<path d="M5 12h14M14 7l5 5-5 5"/>',
+    dismiss: '<path d="M7 7l10 10M17 7 7 17"/>',
+    snooze: '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',
+  };
+  const label = labels[action];
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = `qi-btn inbox-icon-action ${action === 'open' ? 'open' : ''}`.trim();
+  button.dataset.inboxAction = action;
+  button.setAttribute('aria-label', `${label}: ${item.kind || 'attention item'}`);
+  button.title = label;
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('focusable', 'false');
+  svg.innerHTML = paths[action];
+  button.appendChild(svg);
+  button.onclick = (event) => {
+    event.stopPropagation();
+    onClick(event);
+  };
+  return button;
+}
+
 function appendAttentionActions(host, item) {
-  const action = attentionAction(item);
-  const primary = document.createElement('button');
-  primary.className = 'qi-btn open';
-  primary.textContent = item.primaryAction || 'VIEW';
-  primary.setAttribute('aria-label', `${primary.textContent}: ${item.kind}`);
-  primary.onclick = (event) => {
-    event.stopPropagation();
-    action();
-  };
-  host.appendChild(primary);
-  if (!attentionItemDismissible(item)) return;
-  const dismiss = document.createElement('button');
-  dismiss.className = 'qi-btn';
-  dismiss.textContent = 'DISMISS';
-  dismiss.setAttribute('aria-label', `Dismiss: ${item.kind}`);
-  dismiss.onclick = (event) => {
-    event.stopPropagation();
-    dismissAttentionItem(item);
-  };
-  host.appendChild(dismiss);
+  if (attentionItemHasSpecializedAction(item)) {
+    host.appendChild(inboxActionButton('open', item, attentionAction(item)));
+  }
+  if (attentionItemDismissible(item)) {
+    host.appendChild(inboxActionButton('dismiss', item, () => dismissAttentionItem(item)));
+  }
 }
 
 function appendUpdateAttentionRow(host, rowData) {
@@ -7979,21 +8000,15 @@ function appendInboxItem(host, rowData) {
     open = attentionAction(item);
     main.onclick = open;
     const actions = document.createElement('div'); actions.className = `inbox-item-actions${system ? ' attention-actions' : ''}`;
-    const openButton = document.createElement('button'); openButton.type = 'button';
-    if (system) openButton.className = 'qi-btn open';
-    openButton.textContent = item.primaryAction || 'OPEN'; openButton.onclick = open;
-    const done = document.createElement('button'); done.type = 'button'; done.textContent = 'DONE';
-    if (system) done.className = 'qi-btn';
-    done.onclick = () => setInboxTriage(item, 'done');
-    const snooze = document.createElement('button'); snooze.type = 'button'; snooze.textContent = 'SNOOZE';
-    if (system) snooze.className = 'qi-btn';
-    snoozeButtons.push([snooze, item]);
-    actions.appendChild(openButton);
-    if (system && attentionItemDismissible(item)) {
-      const dismiss = document.createElement('button'); dismiss.type = 'button'; dismiss.className = 'qi-btn'; dismiss.textContent = 'DISMISS';
-      dismiss.onclick = () => dismissAttentionItem(item); actions.appendChild(dismiss);
+    if (attentionItemHasSpecializedAction(item)) {
+      actions.appendChild(inboxActionButton('open', item, open));
     }
-    actions.append(done, snooze);
+    if (attentionItemDismissible(item)) {
+      actions.appendChild(inboxActionButton('dismiss', item, () => dismissAttentionItem(item)));
+    }
+    const snooze = inboxActionButton('snooze', item, () => {});
+    snoozeButtons.push([snooze, item]);
+    actions.appendChild(snooze);
     card.append(main, actions);
   } else {
     appendThreadSessionRow(card, session, { attention: { session, items } });
@@ -8010,21 +8025,21 @@ function appendInboxItem(host, rowData) {
       detail.textContent = reasonItem.detail || session.cwd || ''; detail.title = detail.textContent; copy.appendChild(detail);
       const actions = document.createElement('div'); actions.className = 'attention-actions';
       appendAttentionActions(actions, reasonItem);
-      const done = document.createElement('button'); done.type = 'button'; done.className = 'qi-btn'; done.textContent = 'DONE';
-      done.onclick = () => setInboxTriage(reasonItem, 'done');
-      const snooze = document.createElement('button'); snooze.type = 'button'; snooze.className = 'qi-btn'; snooze.textContent = 'SNOOZE';
+      const snooze = inboxActionButton('snooze', reasonItem, () => {});
       snoozeButtons.push([snooze, reasonItem]);
-      actions.append(done, snooze); reason.append(copy, actions); reasons.appendChild(reason);
+      actions.appendChild(snooze); reason.append(copy, actions); reasons.appendChild(reason);
     });
     card.appendChild(reasons);
   }
   const menu = document.createElement('div'); menu.className = 'inbox-snooze-menu hidden';
   for (const [preset, label] of [['hour', '1 HOUR'], ['tomorrow', 'TOMORROW'], ['week', 'NEXT WEEK']]) {
     const button = document.createElement('button'); button.type = 'button'; button.textContent = label;
+    button.dataset.inboxSnoozePreset = preset;
     button.onclick = () => setInboxTriage(snoozeItem, 'snoozed', snoozeTarget(preset));
     menu.appendChild(button);
   }
   const custom = document.createElement('button'); custom.type = 'button'; custom.textContent = 'CUSTOM DATE';
+  custom.dataset.inboxSnoozePreset = 'custom';
   custom.onclick = () => openCustomSnooze(snoozeItem); menu.appendChild(custom);
   for (const [button, target] of snoozeButtons) {
     button.onclick = () => {
@@ -8601,12 +8616,12 @@ function handleInboxQueueKeydown(event) {
   }
   if (event.key === 'd') {
     event.preventDefault();
-    [...card.querySelectorAll('button')].find((button) => button.textContent === 'DONE')?.click();
+    card.querySelector('[data-inbox-action="dismiss"]')?.click();
     return true;
   }
   if (event.key === 's') {
     event.preventDefault();
-    [...card.querySelectorAll('button')].find((button) => button.textContent === 'SNOOZE')?.click();
+    card.querySelector('[data-inbox-action="snooze"]')?.click();
     return true;
   }
   return false;
@@ -13601,7 +13616,17 @@ if (window.chromuxTest) {
             detail: detail?.textContent || '',
             color: visibleKind || primary ? getComputedStyle(visibleKind || primary).color : '',
             summaryLines: detail && lineHeight ? Math.round(detail.clientHeight / lineHeight) : 0,
-            actions: [...reason.querySelectorAll('.attention-actions .qi-btn')].map((button) => button.textContent),
+            actions: [...reason.querySelectorAll('[data-inbox-action]')].map((button) => button.dataset.inboxAction),
+            actionDetails: [...reason.querySelectorAll('[data-inbox-action]')].map((button) => ({
+              action: button.dataset.inboxAction,
+              ariaLabel: button.getAttribute('aria-label') || '',
+              title: button.title,
+              text: button.textContent,
+              svgAriaHidden: button.querySelector('svg')?.getAttribute('aria-hidden') || '',
+              svgFocusable: button.querySelector('svg')?.getAttribute('focusable') || '',
+              width: button.getBoundingClientRect().width,
+              height: button.getBoundingClientRect().height,
+            })),
           };
         }),
       };
@@ -13618,13 +13643,12 @@ if (window.chromuxTest) {
         lastInset: rowsRect && rects.length ? rowsRect.bottom - rects[rects.length - 1].bottom : 0,
       };
     },
-    clickAttentionAction(id, kind, label) {
+    clickAttentionAction(id, kind, action) {
       const cards = [...document.querySelectorAll(`.attention-thread[data-session-id="${CSS.escape(id)}"]`)];
       const reason = cards.flatMap((card) => [...card.querySelectorAll('.attention-reason')])
         .find((candidate) => candidate.dataset.attentionKind === kind);
-      const button = [...(reason?.querySelectorAll('.attention-actions .qi-btn') || [])]
-        .find((candidate) => candidate.textContent === label);
-      if (!button) throw new Error(`Missing ${label} action for ${kind} on ${id}`);
+      const button = reason?.querySelector(`[data-inbox-action="${CSS.escape(action)}"]`);
+      if (!button) throw new Error(`Missing ${action} action for ${kind} on ${id}`);
       button.click(); flushRender(); return state.activeId;
     },
     queue(id, url, reason = 'detected in agent output') {
@@ -13725,13 +13749,12 @@ if (window.chromuxTest) {
         )),
       };
     },
-    doubleClickAttentionAction(id, kind, label) {
+    doubleClickAttentionAction(id, kind, action) {
       const cards = [...document.querySelectorAll(`.attention-thread[data-session-id="${CSS.escape(id)}"]`)];
       const reason = cards.flatMap((card) => [...card.querySelectorAll('.attention-reason')])
         .find((candidate) => candidate.dataset.attentionKind === kind);
-      const button = [...(reason?.querySelectorAll('.attention-actions .qi-btn') || [])]
-        .find((candidate) => candidate.textContent === label);
-      if (!button) throw new Error(`Missing ${label} action for ${kind} on ${id}`);
+      const button = reason?.querySelector(`[data-inbox-action="${CSS.escape(action)}"]`);
+      if (!button) throw new Error(`Missing ${action} action for ${kind} on ${id}`);
       button.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
       button.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 2 }));
       button.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, detail: 2 }));
@@ -13921,12 +13944,27 @@ if (window.chromuxTest) {
       })),
     })),
     inboxTriage: () => snapshotInboxTriage(),
-    clickInboxAction(id, label) {
+    clickInboxAction(id, action) {
       const card = [...document.querySelectorAll('#thread-list .inbox-item')]
         .find((candidate) => candidate.dataset.inboxId === id);
-      const button = [...(card?.querySelectorAll('button') || [])].find((candidate) => candidate.textContent === label);
-      if (!button) throw new Error(`Missing inbox action ${label} for ${id}`);
+      const button = card?.querySelector(
+        `[data-inbox-action="${CSS.escape(action)}"], [data-inbox-snooze-preset="${CSS.escape(action)}"]`,
+      );
+      if (!button) throw new Error(`Missing inbox action ${action} for ${id}`);
       button.click(); flushRender();
+    },
+    seedLegacyDone(id) {
+      const row = attentionItems().map(({ item }) => item)
+        .find((candidate) => inboxTriageKey(candidate) === id);
+      if (!row) throw new Error(`Missing inbox item ${id}`);
+      const updatedAt = new Date().toISOString();
+      state.ui.inboxTriage.set(id, {
+        id,
+        state: 'done',
+        updatedAt,
+        reopenToken: inboxReopenToken(row),
+      });
+      invalidate('attention'); flushRender();
     },
     expireInbox(id) {
       const record = state.ui.inboxTriage.get(id);
@@ -14097,14 +14135,14 @@ if (window.chromuxTest) {
     attentionButtons(kind) {
       for (const el of document.querySelectorAll('#thread-list .attention-system-row, #thread-list .attention-reason')) {
         if (el.dataset.attentionKind !== kind) continue;
-        return [...el.querySelectorAll('.attention-actions .qi-btn')].map((button) => button.textContent);
+        return [...el.querySelectorAll('[data-inbox-action]')].map((button) => button.dataset.inboxAction);
       }
       return [];
     },
     clickAttentionPrimary(kind) {
       for (const el of document.querySelectorAll('#thread-list .attention-system-row, #thread-list .attention-reason')) {
         if (el.dataset.attentionKind !== kind) continue;
-        const primary = el.querySelector('.attention-actions .qi-btn.open');
+        const primary = el.querySelector('[data-inbox-action="open"]');
         if (!primary) throw new Error(`No primary action on ${kind}`);
         primary.click();
         flushRender();
@@ -14115,8 +14153,7 @@ if (window.chromuxTest) {
     dismissItem(kind) {
       for (const el of document.querySelectorAll('#thread-list .attention-system-row, #thread-list .attention-reason')) {
         if (el.dataset.attentionKind !== kind) continue;
-        const dismiss = [...el.querySelectorAll('.attention-actions .qi-btn')]
-          .find((button) => button.textContent === 'DISMISS');
+        const dismiss = el.querySelector('[data-inbox-action="dismiss"]');
         if (!dismiss) throw new Error(`No DISMISS on ${kind}`);
         dismiss.click();
         flushRender();
@@ -14204,15 +14241,14 @@ if (window.chromuxTest) {
       kind: el.dataset.attentionKind || '',
       name: el.closest('.attention-item')?.querySelector('.attention-name')?.textContent || '',
       detail: el.querySelector('.attention-detail')?.textContent || '',
-      actions: [...el.querySelectorAll('.attention-actions .qi-btn')].map((button) => button.textContent),
+      actions: [...el.querySelectorAll('[data-inbox-action]')].map((button) => button.dataset.inboxAction),
     })),
     dismissItem(kind, name) {
       for (const el of document.querySelectorAll('#thread-list .attention-reason, #thread-list .attention-system-row')) {
         if (el.dataset.attentionKind !== kind) continue;
         const item = el.closest('.attention-item');
         if (name && item?.querySelector('.attention-name')?.textContent !== name) continue;
-        const buttons = [...el.querySelectorAll('.attention-actions .qi-btn')];
-        const dismiss = buttons.find((b) => b.textContent === 'DISMISS');
+        const dismiss = el.querySelector('[data-inbox-action="dismiss"]');
         if (!dismiss) throw new Error(`No DISMISS on ${kind}`);
         dismiss.click();
         flushRender();

@@ -381,12 +381,18 @@ See [privacy-and-local-data.md](privacy-and-local-data.md) for the complete loca
 ## A thread's attention reason is missing or marked legacy
 
 Use the rail's **Threads** icon for the always-visible **Action Required**,
-**Ready to Finish**, **Working**, and **All Sessions** sections. Done and Snooze
-hide only the current obligation; a new turn, changed attention sequence,
-changed Git status, or expired snooze reopens it. Permission, authentication,
-input, conflict, rate-limit, tool-failure, and delivery failures remain urgent.
-Completed turns, queued previews, uncommitted changes, unpublished branches,
-and outgoing commits appear in Ready to Finish.
+**Ready to Finish**, **Working**, and **All Sessions** sections. Open a card by
+selecting its header or pressing Enter/`o`. The clock icon (or `s`) temporarily
+Snoozes any reason. The × icon (or `d`) Dismisses only supported reasons; it is
+intentionally absent for permission, authentication, conflict, rate-limit,
+tool-failure, and Queue reasons. Arrow icons appear only for specialized Queue,
+Git, or system actions. A new turn, changed attention sequence, changed Git
+status, or expired snooze reopens the matching item. Existing saved Done
+records remain honored until their reopen token changes, but new Done records
+are not created. Permission, authentication, input, conflict, rate-limit,
+tool-failure, and delivery failures remain urgent. Completed turns, queued
+previews, uncommitted changes, unpublished branches, and outgoing commits
+appear in Ready to Finish.
 
 **Git Changes** reads the bounded repository catalog rather than only live
 sessions. If a repository is missing, open a session anywhere inside it. If it

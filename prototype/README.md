@@ -446,7 +446,7 @@ See [`docs/troubleshooting.md`](docs/troubleshooting.md) for the full support gu
 | --- | --- |
 | Capture payloads, screenshots, recordings, contact sheets, and manifests | `~/.chromux/captures/<timestamp>-<unique-suffix>/` |
 | Delivery log | `~/.chromux/delivery-log.jsonl` |
-| Restore snapshot | `~/.chromux/restore-sessions.json` (schema v11; includes validated provider conversation IDs, custom tab-group membership/focus, last deliberate activity, ordered browser page/explorer tabs, optional 64 KiB Composer drafts, staged browser-context references, the full-browser Composer-open flag, up to 20 bounded historical attention records per session, up to 200 bounded Done/Snooze inbox records, and sanitized dedicated Git-worktree purpose/identity metadata; routing targets remain ephemeral and old candidate `chatMessages` are discarded) |
+| Restore snapshot | `~/.chromux/restore-sessions.json` (schema v11; includes validated provider conversation IDs, custom tab-group membership/focus, last deliberate activity, ordered browser page/explorer tabs, optional 64 KiB Composer drafts, staged browser-context references, the full-browser Composer-open flag, up to 20 bounded historical attention records per session, up to 200 bounded Snooze and legacy Done inbox records, and sanitized dedicated Git-worktree purpose/identity metadata; routing targets remain ephemeral and old candidate `chatMessages` are discarded) |
 | Git repository catalog | `~/.chromux/git-repositories.json` (mode `0600`; at most 100 canonical host/WSL repository roots previously seen through sessions, with first/last-seen and latest associated-session activity) |
 | Prompt history | `~/.chromux/prompt-history.json` (local plaintext, mode `0600`, 100 entries/project, 5 MiB total) |
 | Saved projects | `~/.chromux/projects.json` |
@@ -460,10 +460,15 @@ See [`docs/troubleshooting.md`](docs/troubleshooting.md) for the full support gu
 
 Threads ranks sessions into **Action Required**, **Ready to Finish**,
 **Working**, then **All Sessions**, hiding empty priority sections. The badge
-counts only actionable and ready-to-finish cards. Use Up/Down or `j`/`k` to move through inbox
-items, Enter or `o` to open, `d` to mark Done, and `s` to open Snooze presets.
-A new turn or attention sequence, a live-associated conflict, or expired snooze
-reopens the matching item.
+counts only actionable and ready-to-finish cards. The card header opens the
+session; compact outline icons provide Snooze, Dismiss only when the reason
+supports it, and specialized Queue or Git actions. Permission, authentication,
+rate-limit, tool-failure, Queue, and conflict reasons cannot be permanently
+hidden. Use Up/Down or `j`/`k` to move through inbox items, Enter or `o` to
+open, `d` to Dismiss when available, and `s` to open Snooze presets. A new turn
+or attention sequence, a live-associated conflict, or expired snooze reopens
+the matching item. Existing persisted Done records remain honored until their
+reopen token changes, but Chromux no longer creates new Done records.
 
 Git Changes catalogs repositories seen by Chromux and enumerates every linked
 worktree. Search and Action/Stale/All filters keep large catalogs bounded in

@@ -6,6 +6,16 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Replace Threads card text-action grids with compact icon controls; keep
+  ordinary Open on the card, retain specialized Queue/Git/system actions,
+  expose Dismiss only for supported reasons, keep universal Snooze, remap `d`
+  from Done to Dismiss, preserve legacy Done reads without creating new Done
+  records, update documentation and coverage, and ship v0.80.0. _(source:
+  user-supplied Simplify Threads Card Actions with Icons plan; evidence:
+  compact accessible SVG controls, stable action selectors, dismissal and
+  legacy-triage coverage, focused/full prototype validation, package metadata,
+  `RELEASES.md`, tag, and GitHub Release)_
+
 - [x] Preserve each terminal's exact visible scrollback row across immediate
   native-scroll tab switches and window blur/refit races while retaining
   alternate-screen and bottom-following behavior; ship v0.79.3. _(source:

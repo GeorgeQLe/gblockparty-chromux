@@ -379,19 +379,49 @@ body.host-win32 #titlebar {
 }
 .attention-reason .attention-actions {
   width: 100%;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  justify-content: flex-end;
   gap: 4px;
 }
-.attention-reason .attention-actions .qi-btn {
-  width: 100%;
-  min-width: 0;
-  height: auto;
-  min-height: 22px;
-  padding: 3px 5px;
-  line-height: 1.1;
-  white-space: normal;
-  overflow-wrap: anywhere;
+.attention-actions .qi-btn.inbox-icon-action,
+.inbox-item-actions .inbox-icon-action {
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  min-height: 24px;
+  padding: 3px;
+  display: inline-grid;
+  place-items: center;
+  color: var(--faint);
+  background: var(--bg0);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+}
+.inbox-icon-action svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.attention-actions .inbox-icon-action:hover,
+.inbox-item-actions .inbox-icon-action:hover {
+  color: var(--text);
+  border-color: var(--amber);
+  background: var(--bg2);
+}
+.attention-actions .inbox-icon-action:active,
+.inbox-item-actions .inbox-icon-action:active {
+  color: var(--amber);
+  transform: translateY(1px);
+}
+.attention-actions .inbox-icon-action:focus-visible,
+.inbox-item-actions .inbox-icon-action:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 1px;
 }
 
 .rail-group { border: 1px solid var(--line); background: var(--bg1); }
@@ -612,10 +642,10 @@ body[data-thread-preview-size="large"] .thread-preview-attention { max-height: 1
 .inbox-item-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 700 10px/1.2 var(--font-display); }
 .inbox-item-kind { color: var(--amber); font: 800 8px/1 var(--font-display); letter-spacing: .08em; }
 .inbox-item-detail { grid-column: 1 / -1; color: var(--faint); font-size: 9px; line-height: 1.3; overflow-wrap: anywhere; }
-.inbox-item-actions { padding: 0 6px 6px; display: flex; flex-wrap: wrap; gap: 4px; }
+.inbox-item-actions { padding: 0 6px 6px; display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 4px; }
 .inbox-snooze-menu { padding: 0 6px 6px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
 .inbox-snooze-menu.hidden { display: none; }
-.inbox-snooze-menu button, .inbox-item-actions button, .git-mini-button {
+.inbox-snooze-menu button, .git-mini-button {
   min-height: 24px;
   padding: 4px 6px;
   border: 1px solid var(--line);
@@ -625,7 +655,7 @@ body[data-thread-preview-size="large"] .thread-preview-attention { max-height: 1
   letter-spacing: .04em;
   cursor: pointer;
 }
-.inbox-snooze-menu button:hover, .inbox-item-actions button:hover, .git-mini-button:hover { color: var(--text); border-color: var(--amber); }
+.inbox-snooze-menu button:hover, .git-mini-button:hover { color: var(--text); border-color: var(--amber); }
 .git-repository-card { border-bottom: 1px solid var(--line); }
 .git-repository-head { padding: 8px; display: flex; align-items: center; gap: 6px; }
 .git-repository-copy { flex: 1; min-width: 0; }

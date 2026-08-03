@@ -99,14 +99,12 @@ fs.writeFileSync(e2ePath, `
     const card = document.querySelector(
       '.attention-thread[data-session-id="' + CSS.escape(sessionId) + '"]',
     );
-    const fourActionReason = [...(card?.querySelectorAll('.attention-reason') || [])]
-      .find((reason) => reason.querySelectorAll('.attention-actions .qi-btn').length === 4);
     const cardRect = card?.getBoundingClientRect();
-    const actionRects = [...(fourActionReason?.querySelectorAll('.attention-actions .qi-btn') || [])]
+    const actionRects = [...(card?.querySelectorAll('[data-inbox-action]') || [])]
       .map((button) => {
         const rect = button.getBoundingClientRect();
         return {
-          label: button.textContent,
+          action: button.dataset.inboxAction,
           left: rect.left,
           right: rect.right,
           top: rect.top,
@@ -132,10 +130,14 @@ fs.writeFileSync(e2ePath, `
     const snapshot = actionRequiredCardSnapshot(sessionId);
     expect(snapshot.card && snapshot.cardRect,
       context + ' should render the session-scoped Action Required card');
-    expect(snapshot.actionRects.length === 4,
-      context + ' should expose all four actions: ' + JSON.stringify(snapshot.actionRects));
-    expect(snapshot.actionRows.length === 2,
-      context + ' should arrange four actions in exactly two rows: ' + JSON.stringify(snapshot.actionRects));
+    expect(snapshot.actionRects.length >= 1 && snapshot.actionRects.length <= 3,
+      context + ' should expose only the compact actions supported by its currently visible reasons: '
+        + JSON.stringify(snapshot.actionRects));
+    expect(snapshot.actionRows.length >= 1 && snapshot.actionRows.length <= 2,
+      context + ' should keep each reason\\'s compact icons in one row: ' + JSON.stringify(snapshot.actionRects));
+    expect(snapshot.actionRects.every((rect) => (
+      Math.abs(rect.right - rect.left - 24) < .01 && Math.abs(rect.bottom - rect.top - 24) < .01
+    )), context + ' should render square 24px icon controls: ' + JSON.stringify(snapshot.actionRects));
     expect(snapshot.actionRects.every((rect) => (
       rect.left >= snapshot.cardRect.left - 1
       && rect.right <= snapshot.cardRect.right + 1
@@ -621,11 +623,19 @@ fs.writeFileSync(e2ePath, `
   'one session should combine all reasons into its highest-priority section');
   expect(apiCard.reasons[0].visibleKind === 'PERMISSION' && apiCard.reasons[1].visibleKind === 'QUEUE 1',
     'every reason should keep its action type visible beneath the card context');
-  expect(apiCard.reasons[0].actions.includes('FOCUS')
-    && apiCard.reasons[1].actions.includes('OPEN')
-    && apiCard.reasons[0].actions.includes('DONE')
-    && apiCard.reasons[1].actions.includes('SNOOZE'),
-  'inbox reasons should retain direct actions plus Done and Snooze triage');
+  expect(apiCard.reasons[0].actions.join(',') === 'snooze'
+    && apiCard.reasons[1].actions.join(',') === 'open,snooze',
+  'ordinary reasons should avoid duplicate Open actions while Queue retains its specialized action');
+  expect(apiCard.reasons.every((reason) => reason.actionDetails.every((action) => (
+    action.text === ''
+      && action.ariaLabel
+      && action.title
+      && action.svgAriaHidden === 'true'
+      && action.svgFocusable === 'false'
+      && action.width === 24
+      && action.height === 24
+  ))), 'icon actions should expose accessible labels, visible tooltips, decorative SVGs, and square geometry: '
+    + JSON.stringify(apiCard.reasons));
   expect(apiCard.reasons[1].summaryLines <= 2 && apiCard.reasons[1].summaryLines > 1,
     'long attention summaries should wrap to no more than two lines before truncation: ' + JSON.stringify(apiCard.reasons[1]));
   expect(rail.attentionCount() >= 2, 'badge should count ranked Threads cards, not ordinary Git obligations');
@@ -670,6 +680,11 @@ fs.writeFileSync(e2ePath, `
   expect(rail.activeId() === longContextSession,
     'keyboard Enter on the Action Required card should preserve session activation');
   rail.focus(holder);
+  rail.focusRow(longContextSession);
+  rail.pressInboxKey('o');
+  expect(rail.activeId() === longContextSession,
+    'keyboard o on the Action Required card should preserve session activation');
+  rail.focus(holder);
   const semanticReasons = rail.addSession({
     name: 'semantic-reasons',
     agent: 'codex',
@@ -686,10 +701,10 @@ fs.writeFileSync(e2ePath, `
     && semanticCard.reasons.map((reason) => reason.kind).join(',') === 'PERMISSION,COMPLETED',
   'mixed semantic reasons should combine into the highest-priority Action Required card: '
     + JSON.stringify(semanticCards));
-  expect(semanticCard.reasons[1].actions.includes('VIEW')
-    && semanticCard.reasons[1].actions.includes('DISMISS')
+  expect(semanticCard.reasons[0].actions.join(',') === 'snooze'
+    && semanticCard.reasons[1].actions.join(',') === 'dismiss,snooze'
     && semanticCard.reasons[1].color !== semanticCard.primaryColor,
-  'combined completion should retain its actions and green semantic color');
+  'combined completion should retain Dismiss and Snooze icons without duplicate Open and keep its green semantic color');
   const previewOverflow = rail.addTerminalSession({
     name: 'preview-overflow',
     agent: 'codex',
@@ -741,7 +756,7 @@ fs.writeFileSync(e2ePath, `
   const queuedUrlBeforeOpen = 'http://localhost:49151/api-preview';
   expect(rail.browserCollapsed(api) && rail.queuePanelHidden(api) && rail.queueCount(api) === 1,
     'queue attention fixture should begin collapsed, hidden, and unconsumed');
-  rail.clickAttentionAction(api, 'QUEUE 1', 'OPEN');
+  rail.clickAttentionAction(api, 'QUEUE 1', 'open');
   expect(!rail.preview() && rail.activeId() === api && !rail.browserCollapsed(api)
     && !rail.queuePanelHidden(api) && rail.queueCount(api) === 1
     && rail.queueUrls(api).join(',') === queuedUrlBeforeOpen,
@@ -1132,7 +1147,7 @@ fs.writeFileSync(e2ePath, `
   rail.focus(holder);
   rail.emit(attentionDouble, 'turn-start');
   rail.emit(attentionDouble, 'turn-end', 'Completed inline-action fixture');
-  expect(rail.doubleClickAttentionAction(attentionDouble, 'COMPLETED', 'DISMISS') === holder,
+  expect(rail.doubleClickAttentionAction(attentionDouble, 'COMPLETED', 'dismiss') === holder,
     'double-clicking an inline attention action should not activate its session row');
   expect(!rail.preview(), 'inline attention action double-clicks should not open a row preview');
 
@@ -1363,18 +1378,20 @@ fs.writeFileSync(e2ePath, `
   );
   const conflictReasonElement = [...conflictCardElement.querySelectorAll('.attention-reason')]
     .find((reason) => reason.dataset.attentionKind === 'CONFLICT');
-  const longActionButton = [...conflictReasonElement.querySelectorAll('.attention-actions .qi-btn')]
-    .find((button) => button.textContent === 'OPEN GIT SESSION');
+  const longActionButton = conflictReasonElement.querySelector('[data-inbox-action="open"]');
   const conflictCardRect = conflictCardElement.getBoundingClientRect();
   const longActionRect = longActionButton.getBoundingClientRect();
   expect(longActionRect.left >= conflictCardRect.left - 1
     && longActionRect.right <= conflictCardRect.right + 1
     && longActionRect.bottom <= conflictCardRect.bottom + 1,
-  'long primary action labels should remain fully inside the narrow Action Required card');
-  rail.clickAttentionAction(api, 'CONFLICT', 'DONE');
-  expect(!rail.attentionCards().find((card) => card.id === api)?.reasons
-    .some((reason) => reason.kind === 'CONFLICT'),
-  'live-associated conflict cards should honor explicit Done triage');
+  'specialized Git action icons should remain fully inside the narrow Action Required card');
+  const triageBeforeConflictShortcut = rail.inboxTriage().length;
+  rail.focusRow(api);
+  rail.pressInboxKey('d');
+  expect(rail.attentionCards().find((card) => card.id === api)?.reasons
+    .some((reason) => reason.kind === 'CONFLICT')
+    && rail.inboxTriage().length === triageBeforeConflictShortcut,
+  'd should do nothing for non-dismissible conflict cards and must not create Done triage');
   expect(!rail.inboxSections().some((section) => section.items.some((item) => item.id?.startsWith('git:')))
     && !document.querySelector('#thread-list .git-repository-card'),
   'ordinary Git obligations and large catalogs must remain entirely in Git mode');
@@ -1390,18 +1407,30 @@ fs.writeFileSync(e2ePath, `
   let triageItem = rail.inboxSections().find((section) => section.key === 'ready-finish')
     .items.find((item) => item.sessionId === triageSession);
   expect(triageItem, 'new completion should enter Ready to Finish');
-  rail.clickInboxAction(triageItem.id, 'DONE');
+  const triageCountBeforeDismiss = rail.inboxTriage().length;
+  rail.focusRow(triageSession);
+  rail.pressInboxKey('d');
   expect(!rail.inboxSections().find((section) => section.key === 'ready-finish')
     .items.some((item) => item.sessionId === triageSession)
-    && rail.inboxTriage().some((record) => record.id === triageItem.id && record.state === 'done'),
-  'Done should persist and remove the current inbox obligation');
+    && rail.inboxTriage().length === triageCountBeforeDismiss,
+  'd should Dismiss a supported completion without creating a Done triage record');
   rail.emit(triageSession, 'turn-start');
   rail.emit(triageSession, 'turn-end', 'A newer completion reopens the item');
   triageItem = rail.inboxSections().find((section) => section.key === 'ready-finish')
     .items.find((item) => item.sessionId === triageSession);
-  expect(triageItem, 'a newer turn should reopen a Done item');
-  rail.clickInboxAction(triageItem.id, 'SNOOZE');
-  rail.clickInboxAction(triageItem.id, '1 HOUR');
+  expect(triageItem, 'a newer turn should reopen a dismissed completion');
+  rail.seedLegacyDone(triageItem.id);
+  expect(!rail.inboxSections().find((section) => section.key === 'ready-finish')
+    .items.some((item) => item.sessionId === triageSession)
+    && rail.inboxTriage().some((record) => record.id === triageItem.id && record.state === 'done'),
+  'existing persisted Done records should remain readable and hide their matching obligation');
+  rail.emit(triageSession, 'turn-start');
+  rail.emit(triageSession, 'turn-end', 'A newer completion changes the legacy reopen token');
+  triageItem = rail.inboxSections().find((section) => section.key === 'ready-finish')
+    .items.find((item) => item.sessionId === triageSession);
+  expect(triageItem, 'a changed reopen token should reopen an item hidden by a legacy Done record');
+  rail.clickInboxAction(triageItem.id, 'snooze');
+  rail.clickInboxAction(triageItem.id, 'hour');
   expect(!rail.inboxSections().find((section) => section.key === 'ready-finish')
     .items.some((item) => item.sessionId === triageSession)
     && rail.inboxTriage().some((record) => record.id === triageItem.id && record.state === 'snoozed'),
@@ -1414,8 +1443,11 @@ fs.writeFileSync(e2ePath, `
   const keyboardItem = rail.pressInboxKey('ArrowDown');
   expect(keyboardItem, 'keyboard queue navigation should focus the next inbox item');
   rail.pressInboxKey('s');
-  expect(document.querySelector('.inbox-item.queue-focused .inbox-snooze-menu:not(.hidden)'),
-    'keyboard Snooze should open presets for the focused item');
+  const keyboardSnoozeMenu = document.querySelector('.inbox-item.queue-focused .inbox-snooze-menu:not(.hidden)');
+  expect(keyboardSnoozeMenu
+    && [...keyboardSnoozeMenu.querySelectorAll('[data-inbox-snooze-preset]')]
+      .map((button) => button.dataset.inboxSnoozePreset).join(',') === 'hour,tomorrow,week,custom',
+  'keyboard Snooze should open every stable preset for the focused item');
   rail.close(triageSession);
 
   return JSON.stringify({ ok: true, threadGroups, gitDiffs: rail.gitDiffs(), nav });
