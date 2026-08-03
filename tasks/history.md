@@ -1,5 +1,50 @@
 # Session History
 
+## 2026-08-03 — Chromux v0.79.3 terminal viewport preservation
+
+- **User goal:** Preserve the exact visible terminal scrollback row across
+  immediate native-scroll session switches and Chromux window focus changes.
+- **Changed files and per-file purpose:** `prototype/renderer/renderer.js`
+  synchronously maps the native xterm viewport to a clamped normal-buffer row,
+  snapshots the active session before it is hidden and on window blur, and
+  keeps deferred work limited to rendering the Skip to bottom control.
+  `prototype/scripts/test-terminal-scroll-bottom-renderer.js` covers immediate
+  downward and upward native-scroll switches plus blur/refit stability with
+  real xterm. Package metadata/lock, `RELEASES.md`, `tasks/todo.md`, and this
+  entry own v0.79.3 release and task bookkeeping.
+- **User-goal mapping:** Activation fits consume the synchronously saved
+  physical row and derive bottom-following from that row instead of potentially
+  stale `buffer.viewportY`. Alternate-screen handling, smooth scrolling,
+  inactive output, browser layout fitting, Composer behavior, and persistence
+  remain unchanged.
+- **Executable verification:** The red-phase terminal suite failed on the
+  blur/refit race before implementation. After the fix,
+  `npm run test:terminal-scroll-bottom-renderer`, startup-loader,
+  session-tab-groups, session-rail, Composer, and browser-collapse renderer
+  suites passed, followed by the complete `npm test` matrix including macOS
+  window behavior and Windows platform, setup, signing-configuration, and
+  artifact checks.
+- **Skipped tests:** Packaging and installer creation are skipped because this
+  renderer-only patch changes no packaged resource or native dependency; the
+  complete real-Electron suite exercises the production renderer and xterm.
+  Deploy is skipped because neither `deploy.md` nor `tasks/deploy.md` exists.
+- **Adversarial review:** Exact-diff review checked normal/alternate buffer
+  boundaries, zero/no-scrollback geometry, fractional native positions,
+  clamping, bottom-following, activation ordering, blur ordering, and deferred
+  disposal. One session-rail animation assertion failed only while five
+  Electron suites ran concurrently; its isolated rerun and complete-suite run
+  passed, so the timing-only result is accepted without unrelated changes.
+- **Residual risk:** Native scroll pixels are intentionally rounded to the
+  nearest logical xterm row; sub-row pixel offsets are not meaningful terminal
+  content positions. Platform compositor timing beyond the real-Electron race
+  coverage remains low risk.
+- **Rollback note:** Revert the v0.79.3 shipping commit and publish a newer
+  corrective patch; no IPC, public API, persisted schema, or migration changed.
+- **Ownership boundary:** The worktree was clean at start, and every changed
+  file belongs to this scoped patch.
+- **Next command:** Continue the next unblocked Chromux product task or begin
+  the pending daily-driver adoption record during the next real work session.
+
 ## 2026-07-30 — Chromux v0.76.1 Developer Inspect dropdown stability
 
 - **User goal:** Prevent one-second and event-driven diagnostics refreshes from

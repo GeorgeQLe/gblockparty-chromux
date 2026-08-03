@@ -148,6 +148,48 @@ fs.writeFileSync(e2ePath, `
 
   const second = terminal.addSession({ name: 'scroll-second', rows: 10, scrollback: 200 });
   await terminal.writeLines(second, 40, 'second');
+
+  terminal.scrollLines(first, -terminal.state(first).baseY);
+  await tick();
+  terminal.nativeScroll(first, terminal.state(first).physicalViewportMaximum * 0.55);
+  const firstImmediateDownwardViewport = terminal.state(first).savedViewportY;
+  expect(firstImmediateDownwardViewport > 0 && firstImmediateDownwardViewport < terminal.state(first).baseY,
+    'native downward fixture should land inside scrollback');
+  terminal.focus(second);
+  terminal.focus(first);
+  await tick();
+  expect(terminal.state(first).viewportY === firstImmediateDownwardViewport,
+    'immediate native downward scroll and tab switch should preserve the visible row');
+
+  terminal.scrollToBottom(second);
+  await tick();
+  terminal.nativeScroll(second, terminal.state(second).physicalViewportMaximum * 0.35);
+  const secondImmediateUpwardViewport = terminal.state(second).savedViewportY;
+  expect(secondImmediateUpwardViewport > 0 && secondImmediateUpwardViewport < terminal.state(second).baseY,
+    'native upward fixture should land inside scrollback');
+  terminal.focus(first);
+  terminal.focus(second);
+  await tick();
+  expect(terminal.state(second).viewportY === secondImmediateUpwardViewport,
+    'immediate native upward scroll and tab switch should preserve the visible row');
+
+  const beforeBlur = terminal.state(second);
+  const blurTargetRow = Math.floor(beforeBlur.baseY * 0.62);
+  terminal.nativeScroll(second, beforeBlur.physicalViewportMaximum * (blurTargetRow / beforeBlur.baseY));
+  const blurViewport = terminal.state(second).savedViewportY;
+  const blurPhysicalViewport = terminal.state(second).physicalViewportY;
+  terminal.blur();
+  terminal.refit(second);
+  await tick();
+  const blurState = terminal.state(second);
+  expect(blurState.viewportY === blurViewport,
+    'window blur followed by refit should preserve the logical viewport: before=' +
+      JSON.stringify({ blurViewport, blurPhysicalViewport }) + ' after=' + JSON.stringify(blurState));
+  expect(Math.abs(blurState.physicalViewportY - blurPhysicalViewport) < 1,
+    'window blur followed by refit should preserve the physical viewport');
+
+  terminal.scrollToBottom(first);
+  await tick();
   const inactiveBottomBefore = terminal.state(first);
   await terminal.writeLines(first, 3, 'inactive-following-bottom');
   await tick();

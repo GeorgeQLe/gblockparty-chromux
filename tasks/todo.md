@@ -6,6 +6,14 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Preserve each terminal's exact visible scrollback row across immediate
+  native-scroll tab switches and window blur/refit races while retaining
+  alternate-screen and bottom-following behavior; ship v0.79.3. _(source:
+  user-supplied Preserve Terminal Viewport During Focus Changes plan;
+  evidence: synchronous physical viewport snapshots, real-Electron upward,
+  downward, and blur/refit regressions, focused/full prototype coverage,
+  package metadata, `RELEASES.md`, tag, and GitHub Release)_
+
 - [x] Keep ordinary Electron tests hidden, present the native Streak
   pointer-boundary test without activation, hide Activity Lab smoke windows,
   enforce the three internal window modes, and ship v0.79.2. _(source:

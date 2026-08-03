@@ -9218,6 +9218,23 @@ function rememberTerminalViewport(session) {
   termState.viewportY = buffer.viewportY;
 }
 
+function rememberTerminalViewportFromNativeScroll(session, viewport = null) {
+  const termState = session && session.term;
+  const buffer = termState && termState.term && termState.term.buffer && termState.term.buffer.active;
+  if (!termState || termState.fitting || !buffer || buffer.type !== 'normal') return;
+  const nativeViewport = viewport || session.els?.termHost?.querySelector('.xterm-viewport');
+  if (!nativeViewport) {
+    rememberTerminalViewport(session);
+    return;
+  }
+  const maximum = Math.max(0, nativeViewport.scrollHeight - nativeViewport.clientHeight);
+  const physicalY = Math.max(0, Math.min(maximum, Number(nativeViewport.scrollTop) || 0));
+  const logicalY = maximum > 0 && buffer.baseY > 0
+    ? Math.round((physicalY / maximum) * buffer.baseY)
+    : buffer.viewportY;
+  termState.viewportY = Math.min(buffer.baseY, Math.max(0, logicalY));
+}
+
 function fitTerminalPreservingViewport(session, fit) {
   const termState = session && session.term;
   const term = termState && termState.term;
@@ -9227,7 +9244,7 @@ function fitTerminalPreservingViewport(session, fit) {
   const targetY = preservingNormal && Number.isFinite(termState.viewportY)
     ? termState.viewportY
     : (preservingNormal ? before.viewportY : null);
-  const followingBottom = Boolean(preservingNormal && before.viewportY === before.baseY);
+  const followingBottom = Boolean(preservingNormal && targetY === before.baseY);
 
   termState.fitting = true;
   try {
@@ -9369,10 +9386,11 @@ function installTerminalScrollToBottom(session, { reducedMotion = null } = {}) {
     renderTerminalScrollToBottom(session);
   };
   const updateFromViewport = () => {
+    rememberTerminalViewportFromNativeScroll(session, viewport);
     if (tracker.viewportUpdateTimer) return;
     tracker.viewportUpdateTimer = setTimeout(() => {
       tracker.viewportUpdateTimer = null;
-      if (!tracker.disposed) update();
+      if (!tracker.disposed) renderTerminalScrollToBottom(session);
     }, 0);
   };
   const cancelFromUser = () => cancelTerminalScrollAnimation(session);
@@ -9716,6 +9734,7 @@ function revealFocusedSessionTab(id) {
 function activateSession(id, { consumeRestoredCompletion = true } = {}) {
   const target = state.sessions.get(id);
   if (!target) return;
+  rememberTerminalViewportFromNativeScroll(state.sessions.get(state.activeId));
   if (state.ui.tabGroupsEnabled) {
     const groupId = sessionTabGroupId(target);
     state.ui.focusedTabGroupId = groupId;
@@ -15581,6 +15600,7 @@ if (window.chromuxTest) {
         viewport.scrollTop = Math.max(0, maximum - pageHeight);
       }
       else viewport.scrollTop = Math.max(0, Math.min(maximum, Number(position) || 0));
+      viewport.dispatchEvent(new Event('scroll'));
     },
     resize(id, cols, rows) { testSession(id).term.term.resize(cols, rows); },
     setHostHeight(id, height) {
@@ -15613,6 +15633,7 @@ if (window.chromuxTest) {
     pointer(id) {
       testSession(id).els.termHost.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
     },
+    blur() { window.dispatchEvent(new Event('blur')); },
     focus(id) { activateSession(id); flushRender(); },
     state(id) {
       const session = testSession(id);
@@ -15629,6 +15650,7 @@ if (window.chromuxTest) {
         ...terminalScrollState(session),
         hidden: control.classList.contains('hidden'),
         animating: Boolean(session.term.scrollToBottom.animationFrame),
+        savedViewportY: session.term.viewportY,
         fitCalls: session._fitCalls,
         fitViewportMoves: session._fitViewportMoves,
         scrollEvents: session._scrollEvents,
@@ -15998,6 +16020,7 @@ document.addEventListener('click', (event) => {
 document.addEventListener('focusin', () => invalidate('shortcutDebug'));
 document.addEventListener('focusout', () => setTimeout(() => invalidate('shortcutDebug'), 0));
 window.addEventListener('blur', () => {
+  rememberTerminalViewportFromNativeScroll(state.sessions.get(state.activeId));
   apply({ type: 'window-focus-changed', focused: false });
   closeSessionContextMenu();
   closeSessionSearch();

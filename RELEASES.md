@@ -1,5 +1,18 @@
 # Release Notes
 
+## GBlockParty Chromux v0.79.3
+
+Tag: `chromux-v0.79.3`
+
+- Preserve the exact visible terminal scrollback row when switching between
+  session tabs immediately after native viewport scrolling.
+- Snapshot the active terminal's physical viewport before hiding it and when
+  the Chromux window loses focus, preventing later refits from restoring a
+  stale top, bottom, or prior scroll position.
+- Keep alternate-screen and bottom-following behavior unchanged, and add
+  real-Electron coverage for upward and downward race cases plus blur/refit
+  stability.
+
 ## GBlockParty Chromux v0.79.2
 
 Tag: `chromux-v0.79.2`
