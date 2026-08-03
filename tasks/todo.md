@@ -6,6 +6,14 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Add session, agent, and project/folder context to session-scoped Action
+  Required cards; move each reason's actions into a bounded two-column grid;
+  cover long labels, multiple reasons, keyboard activation, default and Streak
+  rail widths; and ship v0.79.1. _(source: user-supplied Action Required Card
+  Context and Overflow Fix plan; evidence: renderer context/layout changes,
+  focused and complete prototype coverage, package metadata, `RELEASES.md`,
+  tag, and GitHub Release)_
+
 - [ ] Add a macOS Dock badge matching the visible, post-grouping Threads attention count; make selected-session completion consumption window-focus-aware, expose validated renderer-to-main IPC, show non-blocking Settings guidance when macOS rejects badging, document local aggregate-only privacy, verify macOS and protected Windows release paths, and ship v0.79.0. Implementation, macOS verification, candidate commit `b9ac0f7`, and annotated tag `chromux-v0.79.0` are complete. Publication is blocked because v0.78.0 and every prior GitHub Release have zero installer assets, the required `windows-signing` / `windows-release` environments do not exist, and no Windows 10/11 self-hosted runners are registered. _(source: user-supplied Ship macOS Dock Attention Badges plan)_
 
 - [x] Add Settings-launched Hotkey Training Grounds with four fixture-backed

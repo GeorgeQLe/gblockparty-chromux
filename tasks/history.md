@@ -2382,3 +2382,49 @@
   explicit manual deploy contract exists; the protected GitHub workflow is the
   required release path. Next command: supply or publish a signed v0.78.0
   installer URL, then dispatch `windows-release.yml` for `chromux-v0.79.0`.
+
+## 2026-08-02 — Action Required card context and overflow fix v0.79.1
+
+- Added a compact context header to session-scoped Action Required cards with
+  the live session display name, agent label, project/folder basename, full cwd
+  tooltip, and matching accessible context. Each grouped reason now keeps its
+  action type beside the existing detail.
+- Reflowed reason actions into a full-width two-column grid. Four-action
+  historical reasons form two rows, long primary labels wrap within their
+  cell, and all buttons remain inside the default 232px rail and Streak's 248px
+  rail without changing click, dismiss, Done, Snooze, preview, or grouping
+  behavior.
+- Ship manifest — User goal: fix missing Action Required card context and
+  narrow-rail action overflow, preserve behavior, add bounding regressions, and
+  ship the next patch release.
+- Changed files and per-file purpose: `prototype/renderer/renderer.js` builds
+  and synchronizes session/agent/project context and keeps every reason type
+  visible; `prototype/renderer/styles.css` defines compact context and bounded
+  two-column action geometry; the session-rail renderer test adds long-label,
+  multi-reason, four-action, keyboard, default-width, Streak-width, and long
+  primary-action assertions; package metadata and `RELEASES.md` define
+  v0.79.1; task files record completion and this manifest.
+- User-goal mapping: presentation-only renderer changes supply the omitted
+  identity, keep reason copy and full-path tooltips, and change only card
+  geometry. Attention objects, persistence, IPC, public APIs, action order,
+  action handlers, multi-reason ranking, and triage semantics are unchanged.
+- Executable verification: the focused session-rail, theme, and Streak click
+  target suites passed; changed JavaScript passed `node --check`; the complete
+  `npm test` matrix passed all renderer, service, platform, packaging, and
+  signing-configuration suites; `git diff --check` passed.
+- Adversarial review: checked both session-card render paths, live title and
+  agent synchronization, folder/path disambiguation, accessible status,
+  completion label semantics, all four action bounds, long action wrapping,
+  default and Streak widths, multiple reasons, keyboard opening, and unchanged
+  handler wiring. The review removed an unintended ordinary-row tooltip/ARIA
+  change and dead header CSS; no blocking finding remains.
+- Skipped tests and residual risk: no manual screenshot archive or packaged-app
+  smoke was required for this renderer-only patch because real-Electron layout
+  assertions exercise Chromium's computed geometry in every theme/mode and the
+  complete suite covers packaging contracts. Extremely narrow user-injected
+  CSS or future translations could require another responsive breakpoint.
+- Rollback note: revert the v0.79.1 shipping commit, delete GitHub Release and
+  tag `chromux-v0.79.1`, and restore v0.78.0 as latest if necessary. Deploy
+  skipped: no explicit manual deploy contract exists; the GitHub Release is
+  Chromux's required update channel. Next command: supply the signed Windows
+  installer and protected runner prerequisites tracked in `tasks/todo.md`.

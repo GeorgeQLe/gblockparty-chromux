@@ -7614,9 +7614,11 @@ function syncThreadSessionRowPresentation(row, session) {
   const status = sessionRailStatus(session);
   const label = sessionDisplayLabel(session);
   const attentionSummary = row.dataset.attentionSummary || '';
+  const agent = agentLabel(session.agent);
+  const hasAttentionContext = Boolean(row.querySelector('.attention-context'));
   row.dataset.sessionStatus = status.label;
-  row.title = `${label} — ${status.label}${attentionSummary ? ` — ${attentionSummary}` : ''}\n${session.cwd || '~'}`;
-  row.setAttribute('aria-label', `${label}. ${status.label}.${attentionSummary ? ` Needs attention: ${attentionSummary}.` : ''} ${session.cwd || '~'}`);
+  row.title = `${label} — ${status.label}${attentionSummary ? ` — ${attentionSummary}` : ''}\n${hasAttentionContext ? `${agent} · ` : ''}${session.cwd || '~'}`;
+  row.setAttribute('aria-label', `${label}.${hasAttentionContext ? ` ${agent}.` : ''} ${status.label}.${attentionSummary ? ` Needs attention: ${attentionSummary}.` : ''} ${session.cwd || '~'}`);
   const icon = row.querySelector('.rail-status');
   if (icon) {
     const nextClassName = `rail-status ${status.kind}`;
@@ -7627,6 +7629,15 @@ function syncThreadSessionRowPresentation(row, session) {
   }
   const name = row.querySelector('.rail-session-name');
   if (name && name.textContent !== label) name.textContent = label;
+  const contextAgent = row.querySelector('.attention-context-agent');
+  if (contextAgent && contextAgent.textContent !== agent) contextAgent.textContent = agent;
+  const contextProject = row.querySelector('.attention-context-project');
+  if (contextProject) {
+    const cwd = session.cwd || '~';
+    const project = directoryLabelParts(cwd).basename;
+    if (contextProject.textContent !== project) contextProject.textContent = project;
+    if (contextProject.title !== cwd) contextProject.title = cwd;
+  }
 }
 
 function syncThreadPreviewPresentation(session) {
@@ -7709,20 +7720,32 @@ function appendThreadSessionRow(host, session, { attention = null } = {}) {
     : null;
   row.dataset.attentionSummary = attentionSummary || '';
   const name = document.createElement('span');
-  name.className = attention ? 'rail-session-name attention-name' : 'rail-session-name';
+  name.className = attention
+    ? 'rail-session-name attention-name attention-context-name'
+    : 'rail-session-name';
   if (!attention) {
     const icon = document.createElement('span');
     icon.className = 'rail-status';
     row.append(icon);
+    row.append(name);
+  } else {
+    const context = document.createElement('span');
+    context.className = 'attention-context';
+    const meta = document.createElement('span');
+    meta.className = 'attention-context-meta';
+    const agent = document.createElement('span');
+    agent.className = 'attention-context-agent';
+    const separator = document.createElement('span');
+    separator.className = 'attention-context-separator';
+    separator.textContent = '·';
+    separator.setAttribute('aria-hidden', 'true');
+    const project = document.createElement('span');
+    project.className = 'attention-context-project';
+    meta.append(agent, separator, project);
+    context.append(name, meta);
+    row.append(context);
   }
-  row.append(name);
   if (attention) {
-    const primary = attention.items[0];
-    const reason = document.createElement('span');
-    reason.className = `attention-kind attention-row-reason ${primary.cls || ''}`;
-    reason.dataset.attentionKind = primary.kind;
-    reason.textContent = attentionHeaderKind(primary);
-    row.appendChild(reason);
     if (attention.items.length > 1) {
       const more = document.createElement('span'); more.className = 'attention-row-more'; more.textContent = `+${attention.items.length - 1}`;
       more.setAttribute('aria-label', `${attention.items.length - 1} additional attention item${attention.items.length === 2 ? '' : 's'}`);
@@ -7820,13 +7843,11 @@ function appendNeedsAttentionGroup(host, sessionRows) {
       reason.dataset.attentionKind = item.kind;
       const copy = document.createElement('div'); copy.className = 'attention-reason-copy';
       const detail = document.createElement('span'); detail.className = 'attention-detail'; detail.textContent = item.detail || attention.session.cwd; detail.title = detail.textContent;
-      if (index > 0) {
-        const kind = document.createElement('span');
-        kind.className = `attention-kind ${item.cls || ''}`;
-        kind.dataset.attentionKind = item.kind;
-        kind.textContent = item.kind;
-        copy.appendChild(kind);
-      }
+      const kind = document.createElement('span');
+      kind.className = `attention-kind ${item.cls || ''}`;
+      kind.dataset.attentionKind = item.kind;
+      kind.textContent = index === 0 ? attentionHeaderKind(item) : item.kind;
+      copy.appendChild(kind);
       copy.appendChild(detail);
       const actions = document.createElement('div'); actions.className = 'attention-actions'; appendAttentionActions(actions, item);
       reason.append(copy, actions); reasons.appendChild(reason);
@@ -7982,10 +8003,9 @@ function appendInboxItem(host, rowData) {
       reason.className = `attention-reason ${index === 0 ? 'primary ' : ''}${reasonItem.cls || ''}`.trim();
       reason.dataset.attentionKind = reasonItem.kind;
       const copy = document.createElement('div'); copy.className = 'attention-reason-copy';
-      if (index > 0) {
-        const kind = document.createElement('span'); kind.className = `attention-kind ${reasonItem.cls || ''}`;
-        kind.textContent = reasonItem.kind; copy.appendChild(kind);
-      }
+      const kind = document.createElement('span'); kind.className = `attention-kind ${reasonItem.cls || ''}`;
+      kind.textContent = index === 0 ? attentionHeaderKind(reasonItem) : reasonItem.kind;
+      copy.appendChild(kind);
       const detail = document.createElement('span'); detail.className = 'attention-detail';
       detail.textContent = reasonItem.detail || session.cwd || ''; detail.title = detail.textContent; copy.appendChild(detail);
       const actions = document.createElement('div'); actions.className = 'attention-actions';
@@ -13546,7 +13566,7 @@ if (window.chromuxTest) {
     heading: () => $('#rail-heading')?.textContent || '',
     attentionCount: () => Number($('#rail-thread-count')?.textContent || 0),
     attentionCards: () => [...document.querySelectorAll('.attention-thread')].map((card) => {
-      const primary = card.querySelector('.attention-row-reason');
+      const primary = card.querySelector('.attention-reason:first-child .attention-kind');
       return {
         id: card.dataset.sessionId,
         primaryKind: primary?.textContent || '',

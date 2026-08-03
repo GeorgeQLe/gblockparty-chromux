@@ -11,11 +11,12 @@ const homeDir = path.join(tmpDir, 'home');
 const repoDir = path.join(tmpDir, 'fleet-repo');
 const repoAppDir = path.join(repoDir, 'apps', 'web');
 const repoApiDir = path.join(repoDir, 'apps', 'api');
+const longProjectDir = path.join(repoDir, 'packages', 'an-extraordinarily-long-project-folder-name');
 const looseDir = path.join(tmpDir, 'scratch');
 const e2ePath = path.join(tmpDir, 'session-rail-e2e.js');
 const e2eOutPath = path.join(tmpDir, 'e2e.out');
 
-for (const directory of [homeDir, repoAppDir, repoApiDir, looseDir]) fs.mkdirSync(directory, { recursive: true });
+for (const directory of [homeDir, repoAppDir, repoApiDir, longProjectDir, looseDir]) fs.mkdirSync(directory, { recursive: true });
 execFileSync('/usr/bin/git', ['init', '-q', repoDir]);
 fs.writeFileSync(path.join(repoDir, 'tracked.txt'), 'staged\n');
 execFileSync('/usr/bin/git', ['-C', repoDir, 'add', 'tracked.txt']);
@@ -93,6 +94,56 @@ fs.writeFileSync(e2ePath, `
     expect(inset !== null && Math.abs(inset - 8) <= 0.5,
       context + ' should align the thread filter to the toolbar\\'s 8px left inset: '
         + JSON.stringify({ inset, toolbarLeft: toolbarRect?.left, controlLeft: controlRect?.left }));
+  };
+  const actionRequiredCardSnapshot = (sessionId) => {
+    const card = document.querySelector(
+      '.attention-thread[data-session-id="' + CSS.escape(sessionId) + '"]',
+    );
+    const fourActionReason = [...(card?.querySelectorAll('.attention-reason') || [])]
+      .find((reason) => reason.querySelectorAll('.attention-actions .qi-btn').length === 4);
+    const cardRect = card?.getBoundingClientRect();
+    const actionRects = [...(fourActionReason?.querySelectorAll('.attention-actions .qi-btn') || [])]
+      .map((button) => {
+        const rect = button.getBoundingClientRect();
+        return {
+          label: button.textContent,
+          left: rect.left,
+          right: rect.right,
+          top: rect.top,
+          bottom: rect.bottom,
+          focused: document.activeElement === button,
+        };
+      });
+    return {
+      card,
+      cardRect,
+      name: card?.querySelector('.attention-context-name')?.textContent || '',
+      agent: card?.querySelector('.attention-context-agent')?.textContent || '',
+      project: card?.querySelector('.attention-context-project')?.textContent || '',
+      projectTitle: card?.querySelector('.attention-context-project')?.title || '',
+      kinds: [...(card?.querySelectorAll('.attention-reason > .attention-reason-copy > .attention-kind') || [])]
+        .map((node) => node.textContent),
+      details: [...(card?.querySelectorAll('.attention-detail') || [])].map((node) => node.textContent),
+      actionRects,
+      actionRows: [...new Set(actionRects.map((rect) => Math.round(rect.top)))],
+    };
+  };
+  const expectActionRequiredCardLayout = (sessionId, context) => {
+    const snapshot = actionRequiredCardSnapshot(sessionId);
+    expect(snapshot.card && snapshot.cardRect,
+      context + ' should render the session-scoped Action Required card');
+    expect(snapshot.actionRects.length === 4,
+      context + ' should expose all four actions: ' + JSON.stringify(snapshot.actionRects));
+    expect(snapshot.actionRows.length === 2,
+      context + ' should arrange four actions in exactly two rows: ' + JSON.stringify(snapshot.actionRects));
+    expect(snapshot.actionRects.every((rect) => (
+      rect.left >= snapshot.cardRect.left - 1
+      && rect.right <= snapshot.cardRect.right + 1
+      && rect.top >= snapshot.cardRect.top - 1
+      && rect.bottom <= snapshot.cardRect.bottom + 1
+    )), context + ' should keep every action inside the card: '
+      + JSON.stringify({ card: snapshot.cardRect.toJSON(), actions: snapshot.actionRects }));
+    return snapshot;
   };
   await wait(100);
 
@@ -351,11 +402,11 @@ fs.writeFileSync(e2ePath, `
   const completionVisibleKinds = [...completionCard.querySelectorAll('.attention-kind')].map((node) => node.textContent);
   expect(completionHeader.querySelectorAll('.rail-status').length === 0,
     'completion-only card should omit the separate green session-status check');
-  expect(completionHeader.querySelector('.attention-row-reason')?.textContent === 'COMPLETE'
+  expect(!completionHeader.querySelector('.attention-row-reason')
     && completionVisibleKinds.join(',') === 'COMPLETE',
   'completion-only card should visibly contain exactly one COMPLETE status');
-  expect(!completionPrimary.querySelector('.attention-kind'),
-    'the primary completion summary should not repeat its status label');
+  expect(completionPrimary.querySelector('.attention-kind')?.textContent === 'COMPLETE',
+    'the primary completion summary should place its status beneath the session context');
   const completionTitleStyle = getComputedStyle(completionHeader.querySelector('.rail-session-name'));
   expect(completionTitleStyle.whiteSpace === 'nowrap' && completionTitleStyle.textOverflow === 'ellipsis',
     'attention-card titles should remain single-line and ellipsized');
@@ -568,8 +619,8 @@ fs.writeFileSync(e2ePath, `
   expect(apiCards.length === 1 && apiCard
     && apiCard.reasons.map((reason) => reason.kind).join(',') === 'PERMISSION,QUEUE 1',
   'one session should combine all reasons into its highest-priority section');
-  expect(apiCard.reasons[0].visibleKind === '' && apiCard.reasons[1].visibleKind === 'QUEUE 1',
-    'the primary reason should live in the card header while additional reasons stay labeled');
+  expect(apiCard.reasons[0].visibleKind === 'PERMISSION' && apiCard.reasons[1].visibleKind === 'QUEUE 1',
+    'every reason should keep its action type visible beneath the card context');
   expect(apiCard.reasons[0].actions.includes('FOCUS')
     && apiCard.reasons[1].actions.includes('OPEN')
     && apiCard.reasons[0].actions.includes('DONE')
@@ -578,6 +629,47 @@ fs.writeFileSync(e2ePath, `
   expect(apiCard.reasons[1].summaryLines <= 2 && apiCard.reasons[1].summaryLines > 1,
     'long attention summaries should wrap to no more than two lines before truncation: ' + JSON.stringify(apiCard.reasons[1]));
   expect(rail.attentionCount() >= 2, 'badge should count ranked Threads cards, not ordinary Git obligations');
+  const longContextSession = rail.addSession({
+    name: 'extremely-long-session-display-name-that-must-stay-inside-the-action-required-card',
+    agent: 'codex',
+    cwd: ${JSON.stringify(longProjectDir)},
+    attentionRecords: [
+      {
+        id: 'permission-long-context',
+        type: 'permission',
+        detail: 'Approve a deliberately long historical action reason without losing the project or agent context',
+        occurredAt: 30,
+      },
+      {
+        id: 'completed-long-context',
+        type: 'completed',
+        detail: 'A second grouped reason keeps its action type and detail visible',
+        occurredAt: 20,
+      },
+    ],
+  });
+  rail.focus(holder);
+  let longContextSnapshot = expectActionRequiredCardLayout(longContextSession, 'Default rail');
+  expect(longContextSnapshot.name === 'extremely-long-session-display-name-that-must-stay-inside-the-action-required-card'
+    && longContextSnapshot.agent === 'CODEX'
+    && longContextSnapshot.project === 'an-extraordinarily-long-project-folder-name'
+    && longContextSnapshot.projectTitle === ${JSON.stringify(longProjectDir)},
+  'Action Required context should expose the session name, agent, and full project/folder identity: '
+    + JSON.stringify(longContextSnapshot));
+  expect(longContextSnapshot.kinds.join(',') === 'PERMISSION,COMPLETED'
+    && longContextSnapshot.details.some((detail) => detail.includes('deliberately long historical action reason'))
+    && longContextSnapshot.details.some((detail) => detail.includes('second grouped reason')),
+  'Action Required reasons should keep every action type and reason detail visible beneath the context');
+  const longContextNameStyle = getComputedStyle(
+    longContextSnapshot.card.querySelector('.attention-context-name'),
+  );
+  expect(longContextNameStyle.whiteSpace === 'nowrap' && longContextNameStyle.textOverflow === 'ellipsis',
+    'long Action Required session labels should remain single-line and ellipsized');
+  rail.focusRow(longContextSession);
+  rail.pressInboxKey('Enter');
+  expect(rail.activeId() === longContextSession,
+    'keyboard Enter on the Action Required card should preserve session activation');
+  rail.focus(holder);
   const semanticReasons = rail.addSession({
     name: 'semantic-reasons',
     agent: 'codex',
@@ -1053,7 +1145,7 @@ fs.writeFileSync(e2ePath, `
   expect(await rail.resolveGitRoot('relative/path') === null, 'gitRoot should reject relative cwd values');
   expect(await rail.resolveGitRoot('x'.repeat(5000)) === null, 'gitRoot should reject oversized cwd values');
   expect(await rail.resolveGitRoot(${JSON.stringify(looseDir)}) === null, 'gitRoot should return null outside a repository');
-  expect(rail.gitCacheSize() === 3, 'renderer should cache Git lookup once per exact cwd');
+  expect(rail.gitCacheSize() === 4, 'renderer should cache Git lookup once per exact cwd');
   const gitDiffs = rail.gitDiffs();
   const repoDiff = gitDiffs.find((group) => group.title === ${JSON.stringify(canonicalRepoDir)});
   expect(repoDiff && repoDiff.count === 2, 'Git should count changed files rather than sessions');
@@ -1091,6 +1183,12 @@ fs.writeFileSync(e2ePath, `
         && themedFilter.geometry.right <= railRect.right,
       theme + ' ' + mode + ' should preserve compact Detect and the lower filter-icon layout');
       expectThreadSortLeftInset(theme + ' ' + mode);
+      if (theme === 'streak') {
+        longContextSnapshot = expectActionRequiredCardLayout(
+          longContextSession,
+          'Streak ' + mode + ' alternate-width rail',
+        );
+      }
       const attentionGeometry = rail.attentionGeometry();
       expect(attentionGeometry.cards.length >= 1 && attentionGeometry.gaps.every((gap) => gap >= 5.9)
         && attentionGeometry.firstInset >= 5.9 && attentionGeometry.lastInset >= 5.9,
@@ -1260,6 +1358,19 @@ fs.writeFileSync(e2ePath, `
   expect(apiConflictCards.length === 1
     && apiConflictCards[0].reasons.some((reason) => reason.kind === 'CONFLICT'),
   'only a conflict associated with a live session should enter its single highest-priority Threads card');
+  const conflictCardElement = document.querySelector(
+    '.attention-thread[data-session-id="' + CSS.escape(api) + '"]',
+  );
+  const conflictReasonElement = [...conflictCardElement.querySelectorAll('.attention-reason')]
+    .find((reason) => reason.dataset.attentionKind === 'CONFLICT');
+  const longActionButton = [...conflictReasonElement.querySelectorAll('.attention-actions .qi-btn')]
+    .find((button) => button.textContent === 'OPEN GIT SESSION');
+  const conflictCardRect = conflictCardElement.getBoundingClientRect();
+  const longActionRect = longActionButton.getBoundingClientRect();
+  expect(longActionRect.left >= conflictCardRect.left - 1
+    && longActionRect.right <= conflictCardRect.right + 1
+    && longActionRect.bottom <= conflictCardRect.bottom + 1,
+  'long primary action labels should remain fully inside the narrow Action Required card');
   rail.clickAttentionAction(api, 'CONFLICT', 'DONE');
   expect(!rail.attentionCards().find((card) => card.id === api)?.reasons
     .some((reason) => reason.kind === 'CONFLICT'),

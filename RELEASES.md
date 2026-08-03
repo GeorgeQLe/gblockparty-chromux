@@ -1,5 +1,19 @@
 # Release Notes
 
+## GBlockParty Chromux v0.79.1
+
+Tag: `chromux-v0.79.1`
+
+- Add compact session, agent, and project/folder context to every
+  session-scoped Action Required card while keeping the full working directory
+  available in its tooltip and accessible card label.
+- Keep each grouped action type beside its existing reason detail, then place
+  the reason's actions in a responsive two-column grid so all four controls and
+  long primary labels remain inside the narrow Threads rail.
+- Add real-Electron regression coverage for long session and folder labels,
+  multiple reasons, keyboard activation, four-action two-row geometry, button
+  bounds, and the Streak theme's alternate rail width.
+
 ## GBlockParty Chromux v0.79.0
 
 Tag: `chromux-v0.79.0`
