@@ -31,6 +31,8 @@ child.on('close', (code) => {
     const result = JSON.parse(fs.readFileSync(output, 'utf8'));
     assert.strictEqual(result.isolatedProfile, true);
     assert.strictEqual(result.normalChromuxBypassed, true);
+    assert.strictEqual(result.documentFocused, false);
+    assert.strictEqual(result.windowVisible, false);
     assert.strictEqual(result.explicitRunGate, true);
     assert.strictEqual(result.scenarioCount, 5);
     assert.strictEqual(result.onlyWorkingAnimates, true);

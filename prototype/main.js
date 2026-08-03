@@ -71,10 +71,11 @@ const {
 } = require('./shortcut-input');
 
 const SMOKE = process.argv.includes('--smoke');
-function isBackgroundE2E({ smoke, e2ePath, showE2EWindow }) {
-  return smoke && Boolean(e2ePath) && showE2EWindow !== '1';
+function resolveE2EWindowMode({ smoke, e2ePath, showE2EWindow }) {
+  if (!smoke || !e2ePath) return 'normal';
+  return showE2EWindow === '1' ? 'inactive' : 'hidden';
 }
-const BACKGROUND_E2E = isBackgroundE2E({
+const E2E_WINDOW_MODE = resolveE2EWindowMode({
   smoke: SMOKE,
   e2ePath: process.env.CHROMUX_E2E,
   showE2EWindow: process.env.CHROMUX_E2E_SHOW_WINDOW,
@@ -1974,7 +1975,7 @@ function createWindow() {
     minWidth: 1100,
     minHeight: 640,
     title: 'Chromux',
-    show: !BACKGROUND_E2E,
+    show: E2E_WINDOW_MODE === 'normal',
     paintWhenInitiallyHidden: true,
     acceptFirstMouse: true,
     backgroundColor: '#0b0e11',
@@ -2008,6 +2009,7 @@ function createWindow() {
       const e2ePath = process.env.CHROMUX_E2E;
       if (e2ePath && fs.existsSync(e2ePath)) {
         try {
+          if (E2E_WINDOW_MODE === 'inactive') win.showInactive();
           const result = await win.webContents.executeJavaScript(fs.readFileSync(e2ePath, 'utf8'));
           if (process.env.CHROMUX_E2E_OUT) fs.writeFileSync(process.env.CHROMUX_E2E_OUT, String(result));
           else console.log('E2E_RESULT:', result);

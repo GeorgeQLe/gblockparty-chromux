@@ -59,7 +59,10 @@ ipcMain.handle('activity-lab-export', async (_event, input) => {
 });
 ipcMain.handle('activity-lab-smoke-result', (_event, result) => {
   if (!process.env.CHROMUX_ACTIVITY_LAB_SMOKE_OUT) return { ok: false };
-  fs.writeFileSync(process.env.CHROMUX_ACTIVITY_LAB_SMOKE_OUT, JSON.stringify(result), { mode: 0o600 });
+  fs.writeFileSync(process.env.CHROMUX_ACTIVITY_LAB_SMOKE_OUT, JSON.stringify({
+    ...result,
+    windowVisible: win?.isVisible() ?? null,
+  }), { mode: 0o600 });
   setTimeout(() => app.quit(), 25);
   return { ok: true };
 });
@@ -69,6 +72,7 @@ app.whenReady().then(() => {
   win = new BrowserWindow({
     width: 1240,
     height: 820,
+    show: process.env.CHROMUX_ACTIVITY_LAB_SMOKE !== '1',
     title: 'Chromux Activity Indicator Lab',
     backgroundColor: '#0c1017',
     webPreferences: {

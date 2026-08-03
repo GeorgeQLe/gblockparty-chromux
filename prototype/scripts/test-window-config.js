@@ -4,35 +4,51 @@ const fs = require('fs');
 const path = require('path');
 
 const mainPath = path.resolve(__dirname, '..', 'main.js');
+const activityLabMainPath = path.resolve(__dirname, '..', 'activity-lab-main.js');
+const scriptsPath = path.resolve(__dirname);
 const preloadPath = path.resolve(__dirname, '..', 'preload.js');
 const source = fs.readFileSync(mainPath, 'utf8');
+const activityLabSource = fs.readFileSync(activityLabMainPath, 'utf8');
 const preloadSource = fs.readFileSync(preloadPath, 'utf8');
 const windowOptions = source.match(/new BrowserWindow\(\{([\s\S]*?)\n  \}\);/);
 
 if (!windowOptions) throw new Error('Could not locate Chromux BrowserWindow options');
-const backgroundE2EHelper = source.match(
-  /function isBackgroundE2E\(\{ smoke, e2ePath, showE2EWindow \}\) \{[\s\S]*?\n\}/,
+const e2eWindowModeHelper = source.match(
+  /function resolveE2EWindowMode\(\{ smoke, e2ePath, showE2EWindow \}\) \{[\s\S]*?\n\}/,
 );
-if (!backgroundE2EHelper) throw new Error('Could not locate background E2E visibility helper');
-const isBackgroundE2E = Function(`${backgroundE2EHelper[0]}; return isBackgroundE2E;`)();
-if (!isBackgroundE2E({ smoke: true, e2ePath: '/tmp/e2e.js' })) {
-  throw new Error('Scripted smoke E2E windows must start hidden');
+if (!e2eWindowModeHelper) throw new Error('Could not locate E2E window-mode helper');
+const resolveE2EWindowMode = Function(`${e2eWindowModeHelper[0]}; return resolveE2EWindowMode;`)();
+if (resolveE2EWindowMode({ smoke: true, e2ePath: '/tmp/e2e.js' }) !== 'hidden') {
+  throw new Error('Ordinary scripted smoke E2E windows must remain hidden');
 }
-if (isBackgroundE2E({ smoke: true, e2ePath: '' })) {
-  throw new Error('Manual smoke windows must remain visible');
+if (resolveE2EWindowMode({ smoke: true, e2ePath: '' }) !== 'normal') {
+  throw new Error('Manual smoke windows must remain normally visible');
 }
-if (isBackgroundE2E({ smoke: false, e2ePath: '/tmp/e2e.js' })) {
-  throw new Error('Production windows must remain visible');
+if (resolveE2EWindowMode({ smoke: false, e2ePath: '/tmp/e2e.js' }) !== 'normal') {
+  throw new Error('Production windows must remain normally visible');
 }
-if (isBackgroundE2E({
+if (resolveE2EWindowMode({
   smoke: true,
   e2ePath: '/tmp/e2e.js',
   showE2EWindow: '1',
-})) {
-  throw new Error('CHROMUX_E2E_SHOW_WINDOW=1 must show scripted E2E windows');
+}) !== 'inactive') {
+  throw new Error('CHROMUX_E2E_SHOW_WINDOW=1 must use non-activating presentation');
 }
-if (!/\bshow:\s*!BACKGROUND_E2E\b/.test(windowOptions[1])) {
-  throw new Error('Chromux BrowserWindow visibility must follow the background E2E flag');
+if (!/\bshow:\s*E2E_WINDOW_MODE\s*===\s*'normal'/.test(windowOptions[1])) {
+  throw new Error('Every scripted E2E BrowserWindow must be created hidden');
+}
+if (!/if\s*\(E2E_WINDOW_MODE\s*===\s*'inactive'\)\s*win\.showInactive\(\);\s*\n\s*const result = await win\.webContents\.executeJavaScript/.test(source)) {
+  throw new Error('Visible E2E windows must be shown without activation immediately before their script runs');
+}
+if (!/\bshow:\s*process\.env\.CHROMUX_ACTIVITY_LAB_SMOKE\s*!==\s*'1'/.test(activityLabSource)) {
+  throw new Error('Activity Lab smoke windows must be created hidden while manual labs remain visible');
+}
+const visibleOrdinaryTests = fs.readdirSync(scriptsPath)
+  .filter((file) => /^test-.*\.js$/.test(file))
+  .filter((file) => !['test-streak-attention-click-targets-renderer.js', 'test-window-config.js'].includes(file))
+  .filter((file) => fs.readFileSync(path.join(scriptsPath, file), 'utf8').includes('CHROMUX_E2E_SHOW_WINDOW'));
+if (visibleOrdinaryTests.length > 0) {
+  throw new Error(`Only the native pointer test may request a visible E2E window: ${visibleOrdinaryTests.join(', ')}`);
 }
 if (!/\bpaintWhenInitiallyHidden:\s*true\b/.test(windowOptions[1])) {
   throw new Error('Hidden scripted E2E windows must keep painting for layout and capture checks');
@@ -92,7 +108,8 @@ for (const invalid of [
 
 console.log(JSON.stringify({
   ok: true,
-  backgroundE2E: true,
+  e2eWindowModes: ['normal', 'hidden', 'inactive'],
+  activityLabSmokeHidden: true,
   acceptFirstMouse: true,
   trafficLightPosition: true,
 }));

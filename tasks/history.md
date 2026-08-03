@@ -2428,3 +2428,56 @@
   skipped: no explicit manual deploy contract exists; the GitHub Release is
   Chromux's required update channel. Next command: supply the signed Windows
   installer and protected runner prerequisites tracked in `tasks/todo.md`.
+
+## 2026-08-02 — Focus-safe automated Electron windows v0.79.2
+
+- Replaced the Boolean background-E2E decision with normal, hidden, and
+  inactive modes. Scripted windows are always created hidden; only the native
+  Streak pointer-boundary test requests `showInactive()` immediately before its
+  script, and its real mouse hover/click assertions now prove the document
+  never gains focus.
+- Kept Activity Lab smoke windows hidden while preserving normal manual lab
+  visibility. Removed three Linux-only ordinary-test visibility overrides and
+  added a regression that rejects future ordinary tests using the visible-E2E
+  escape hatch.
+- Ship manifest — User goal: prevent automated Chromux tests from stealing
+  focus while preserving native pointer-boundary coverage and production,
+  manual-smoke, Activity Lab, and Sidebar Lab behavior.
+- Changed files and per-file purpose: `prototype/main.js` owns the three-mode
+  policy and non-activating presentation timing; Activity Lab main/renderer and
+  smoke test prove native hidden state and renderer focus; the Streak test
+  proves focus safety around real host input; composer, session-rail, and
+  terminal-scroll tests remove ordinary visibility overrides; the window
+  configuration regression enforces modes, timing, Activity Lab policy, and
+  the sole visible-test allowlist; package metadata, `RELEASES.md`, and task
+  files define and record v0.79.2.
+- User-goal mapping: production and manual smoke resolve to normal visibility;
+  ordinary E2E resolves to hidden; the explicit native pointer mode starts
+  hidden and calls only `showInactive()` immediately before execution. No
+  public API, production IPC, renderer behavior, or Sidebar Lab path changed.
+- Executable verification: window configuration, Activity Lab, native Streak,
+  composer, session-rail, and terminal-scroll focused suites passed; changed
+  JavaScript passed `node --check`; the final complete `npm test` matrix passed
+  every renderer, Electron, service, platform, packaging, and signing-policy
+  check; `git diff --check` passed.
+- Adversarial review: the referenced `docs/quality-gate-contract.md`,
+  `quality-sweep`, and `expert-review` are absent, so an exact-diff and launcher
+  inventory served as the equivalent gate. It checked hidden-at-creation
+  semantics, `showInactive()` ordering, focus before and after native clicks,
+  manual/production fallbacks, authoritative Activity Lab visibility, hidden
+  Chromium painting, ordinary-test opt-ins, the already-headless Sidebar Lab,
+  and production API/IPC isolation. No blocking finding remains.
+- Skipped tests and residual risk: no manual focus-stealing observation was
+  archived because real-Electron focus and `BrowserWindow.isVisible()`
+  assertions directly exercise the required state. The removed Linux-only
+  overrides passed on macOS and are statically enforced, but Linux rendering
+  remains dependent on Electron's `paintWhenInitiallyHidden` behavior covered
+  by the window contract and should remain part of cross-platform CI.
+- Release-version note: the supplied plan named v0.79.1, but that tag and
+  GitHub Release were already public before implementation. The fix advanced
+  to the next safe patch, v0.79.2, instead of rewriting a published release.
+- Rollback note: revert the v0.79.2 shipping commit and remove its GitHub
+  Release and tag if necessary; v0.79.1 then becomes latest again. Deploy
+  skipped: no explicit manual deploy contract exists; the GitHub Release is
+  Chromux's required update channel. Next command: continue the blocked signed
+  Windows release prerequisite work tracked in `tasks/todo.md`.

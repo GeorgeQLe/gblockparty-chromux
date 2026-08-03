@@ -1,5 +1,18 @@
 # Release Notes
 
+## GBlockParty Chromux v0.79.2
+
+Tag: `chromux-v0.79.2`
+
+- Keep ordinary scripted Electron E2E windows hidden from creation through
+  completion, while preserving normal app and manual-smoke window behavior.
+- Show the native Streak pointer-boundary test with `showInactive()` only when
+  its script is ready, retaining real mouse hover, geometry, and click coverage
+  without focusing Chromux or stealing keyboard input.
+- Keep automated Activity Lab smoke coverage hidden while leaving manually
+  launched labs visible, and enforce all three visibility modes with focused
+  window-configuration and real-Electron regressions.
+
 ## GBlockParty Chromux v0.79.1
 
 Tag: `chromux-v0.79.1`

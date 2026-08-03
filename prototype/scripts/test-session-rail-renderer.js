@@ -1434,7 +1434,6 @@ const child = spawn(process.execPath, [electronCli, '.', '--smoke'], {
     PATH: '/usr/bin:/bin',
     CHROMUX_E2E: e2ePath,
     CHROMUX_E2E_OUT: e2eOutPath,
-    ...(process.platform === 'linux' ? { CHROMUX_E2E_SHOW_WINDOW: '1' } : {}),
   },
   stdio: ['ignore', 'pipe', 'pipe'],
 });

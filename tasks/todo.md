@@ -6,6 +6,12 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Keep ordinary Electron tests hidden, present the native Streak
+  pointer-boundary test without activation, hide Activity Lab smoke windows,
+  enforce the three internal window modes, and ship v0.79.2. _(source:
+  user-supplied Prevent Automated Chromux Tests from Stealing Focus plan,
+  advanced from v0.79.1 because that release was already public)_
+
 - [x] Add session, agent, and project/folder context to session-scoped Action
   Required cards; move each reason's actions into a bounded two-column grid;
   cover long labels, multiple reasons, keyboard activation, default and Streak

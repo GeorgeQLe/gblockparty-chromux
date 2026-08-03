@@ -57,6 +57,8 @@ fs.writeFileSync(e2ePath, `
     : bounds.y + bounds.height - 1;
 
   await wait(100);
+  expect(document.hasFocus() === false,
+    'non-activating visible E2E window must not focus the document before native input');
   themes.select('streak');
   themes.selectMode('light');
 
@@ -91,6 +93,8 @@ fs.writeFileSync(e2ePath, `
   expectRect(rect(viewButton), viewBefore, 'Streak attention-button hover');
   await clickAt(viewBefore.x + (viewBefore.width / 2), viewTargetY);
   expect(sig.activeId() === viewId, 'boundary VIEW click should activate the background session on the first click');
+  expect(document.hasFocus() === false,
+    'native VIEW input must not focus the non-activating E2E window');
 
   const dismissId = await sig.addFakeSession({ name: 'dismiss-target', agent: 'codex' });
   sig.emitSignal(dismissId, 'turn-end');
@@ -107,6 +111,8 @@ fs.writeFileSync(e2ePath, `
   await clickAt(dismissBefore.x + (dismissBefore.width / 2), dismissTargetY);
   expect(!attentionRow('COMPLETED', 'dismiss-target'),
     'boundary DISMISS click should remove the attention item on the first click');
+  expect(document.hasFocus() === false,
+    'native DISMISS input must not focus the non-activating E2E window');
 
   return JSON.stringify({ ok: true });
 })()

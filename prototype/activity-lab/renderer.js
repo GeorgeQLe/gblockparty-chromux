@@ -169,6 +169,7 @@ document.querySelector('#export').addEventListener('click', async () => {
     const result = {
       isolatedProfile: info.isolatedProfile,
       normalChromuxBypassed: info.normalChromuxBypassed,
+      documentFocused: document.hasFocus(),
       explicitRunGate: trace.length === 0 && cards.slice(1).every((card) => card.querySelector('.state').dataset.state === 'idle'),
       scenarioCount: cards.length,
       onlyWorkingAnimates: workingAnimation !== 'none' && launchingAnimation === 'none'
