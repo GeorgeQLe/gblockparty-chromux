@@ -1,5 +1,21 @@
 # Release Notes
 
+## GBlockParty Chromux v0.79.0
+
+Tag: `chromux-v0.79.0`
+
+- Mirror the visible, post-filtering and post-grouping Threads attention count
+  on the macOS Dock icon, count each session once even when it has multiple
+  reasons, and clear the badge when every item is opened, resolved, dismissed,
+  completed, or snoozed.
+- Treat the selected session as viewed only while the Chromux window is
+  focused, preserving completions produced in the background until that
+  session becomes visible without consuming attention from other sessions.
+- Add validated active-renderer IPC, a macOS-only Settings status row with
+  non-blocking Notifications guidance when Electron rejects badging, local
+  aggregate-only privacy documentation, and real-Electron platform, rejection,
+  focus, grouping, triage, and clearing coverage.
+
 ## GBlockParty Chromux v0.78.0
 
 Tag: `chromux-v0.78.0`

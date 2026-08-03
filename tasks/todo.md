@@ -6,6 +6,8 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [ ] Add a macOS Dock badge matching the visible, post-grouping Threads attention count; make selected-session completion consumption window-focus-aware, expose validated renderer-to-main IPC, show non-blocking Settings guidance when macOS rejects badging, document local aggregate-only privacy, verify macOS and protected Windows release paths, and ship v0.79.0. _(source: user-supplied Ship macOS Dock Attention Badges plan)_
+
 - [x] Add Settings-launched Hotkey Training Grounds with four fixture-backed
   workflow missions, real production-parsed keyboard input, strict isolation
   from live state and lifecycle, hints/reveals/timing/mastery, validated local

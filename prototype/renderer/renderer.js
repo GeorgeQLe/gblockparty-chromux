@@ -188,6 +188,13 @@ const state = {
     rafScheduled: false,
     lastQueueShortcutFocus: null,
     hoverTabSessionId: null,
+    windowFocused: window.chromuxTest ? true : document.hasFocus(),
+    dockBadge: {
+      lastRequestedCount: null,
+      requestSequence: 0,
+      result: null,
+      error: null,
+    },
     diagnosticSessionId: null,
     launcherMode: 'open',
     projectCreationPending: false,
@@ -1908,7 +1915,7 @@ function apply(event) {
           || (session.agent === 'codex' && event.signal === 'turn-end')) {
           promotePreviewCandidates(session);
         }
-        if (tabStateChanged && session.id === state.activeId && session.turn.state === 'completed') {
+        if (tabStateChanged && state.ui.windowFocused && session.id === state.activeId && session.turn.state === 'completed') {
           session.turn.attentionSeenAt = Math.max(session.turn.attentionSeenAt || 0, session.turn.since || 0);
           window.chromuxAttention.consumeCompletedTurn(session.turn, Date.now());
         }
@@ -1948,13 +1955,30 @@ function apply(event) {
       break;
     case 'session-focused':
       state.activeId = event.sessionId;
-      if (session && event.consumeRestoredCompletion !== false) {
+      if (state.ui.windowFocused && session && event.consumeRestoredCompletion !== false) {
         session.restoredAttentionRecords = session.restoredAttentionRecords
           .filter((record) => record.type !== 'completed');
       }
-      if (session && session.turn.state === 'completed') {
+      if (state.ui.windowFocused && session && session.turn.state === 'completed') {
         session.turn.attentionSeenAt = Math.max(session.turn.attentionSeenAt || 0, session.turn.since || 0);
         tabStateChanged = window.chromuxAttention.consumeCompletedTurn(session.turn, Date.now());
+      }
+      break;
+    case 'window-focus-changed':
+      state.ui.windowFocused = event.focused === true;
+      if (state.ui.windowFocused) {
+        const visible = state.sessions.get(state.activeId);
+        if (visible) {
+          visible.restoredAttentionRecords = visible.restoredAttentionRecords
+            .filter((record) => record.type !== 'completed');
+          if (visible.turn.state === 'completed') {
+            visible.turn.attentionSeenAt = Math.max(
+              visible.turn.attentionSeenAt || 0,
+              visible.turn.since || 0,
+            );
+            tabStateChanged = window.chromuxAttention.consumeCompletedTurn(visible.turn, Date.now());
+          }
+        }
       }
       break;
     case 'session-adopted':
@@ -7335,7 +7359,8 @@ function renderDeveloperDiagnostics() {
   }
 
   const projection = window.chromuxAttention.projectAttentionDiagnostic({
-    session: inspected, sessions, activeId: state.activeId, captures: state.captures.values(),
+    session: inspected, sessions, activeId: state.ui.windowFocused ? state.activeId : null,
+    captures: state.captures.values(),
     updateQueue: state.updateQueue, updateStatus: state.updateStatus,
     activityIndicators: state.ui.tabActivityIndicators,
   });
@@ -7347,10 +7372,12 @@ function renderDeveloperDiagnostics() {
     : [];
   const expectedItems = [
     ...window.chromuxAttention.projectAttentionItems({
-      sessions, activeId: state.activeId, captures: state.captures.values(),
+      sessions, activeId: state.ui.windowFocused ? state.activeId : null,
+      captures: state.captures.values(),
       updateQueue: state.updateQueue, updateStatus: state.updateStatus,
     }).filter((item) => item.sessionId === inspected.id),
-    ...(inspected.id !== state.activeId && inspected.lifecycle.alive ? restoredAttentionItems(inspected) : []),
+    ...((!state.ui.windowFocused || inspected.id !== state.activeId) && inspected.lifecycle.alive
+      ? restoredAttentionItems(inspected) : []),
   ].sort((a, b) => (a.priority - b.priority) || (a.createdAt - b.createdAt) || a.id.localeCompare(b.id));
   const expectedKinds = expectedItems.map((item) => item.kind);
   const indicator = actualTabIndicator(inspected);
@@ -7414,13 +7441,13 @@ function attentionItems() {
   const sessions = orderedSessions();
   const projected = window.chromuxAttention.projectAttentionItems({
     sessions,
-    activeId: state.activeId,
+    activeId: state.ui.windowFocused ? state.activeId : null,
     captures: state.captures.values(),
     updateQueue: state.updateQueue,
     updateStatus: state.updateStatus,
   });
   for (const session of sessions) {
-    if (session.id === state.activeId || !session.lifecycle.alive) continue;
+    if ((state.ui.windowFocused && session.id === state.activeId) || !session.lifecycle.alive) continue;
     projected.push(...restoredAttentionItems(session));
   }
   const sessionOrder = new Map(sessions.map((session, index) => [session.id, index]));
@@ -8084,7 +8111,9 @@ function renderAttentionQueue() {
   const rankedSessionIds = new Set([...actionSessionIds, ...readySessionIds, ...workingIds]);
   const allSessions = sortThreadSessions([...liveSessions.values()]
     .filter((session) => !rankedSessionIds.has(session.id)));
-  renderRailNavigation(actionRequired.length + ready.length);
+  const attentionCount = actionRequired.length + ready.length;
+  renderRailNavigation(attentionCount);
+  syncDockBadgeCount(attentionCount);
   if (state.ui.railMode === 'git') {
     renderGitDiffRail(host);
     return;
@@ -8118,6 +8147,42 @@ function renderAttentionQueue() {
   allBody.innerHTML = '';
   renderGroupedSessionRail(allBody, 'threads', rankedSessionIds);
   syncInboxQueueFocus();
+}
+
+function renderDockBadgeStatus() {
+  const row = $('#settings-dock-badge');
+  const divider = $('#settings-dock-badge-divider');
+  const status = $('#settings-dock-badge-status');
+  const guidance = $('#settings-dock-badge-guidance');
+  const visible = state.env?.hostPlatform === 'darwin';
+  row?.classList.toggle('hidden', !visible);
+  divider?.classList.toggle('hidden', !visible);
+  if (!visible || !status || !guidance) return;
+  const result = state.ui.dockBadge.result;
+  const rejected = Boolean(state.ui.dockBadge.error || (result?.supported && !result.applied));
+  status.classList.toggle('fail', rejected);
+  guidance.classList.toggle('hidden', !rejected);
+  if (state.ui.dockBadge.error) status.textContent = 'UNAVAILABLE';
+  else if (!result) status.textContent = 'CHECKING';
+  else if (result.applied) status.textContent = result.count > 0 ? `ACTIVE · ${result.count}` : 'READY';
+  else status.textContent = 'NOT ENABLED';
+}
+
+function syncDockBadgeCount(count) {
+  if (!Number.isSafeInteger(count) || count < 0 || state.ui.dockBadge.lastRequestedCount === count) return;
+  state.ui.dockBadge.lastRequestedCount = count;
+  const sequence = ++state.ui.dockBadge.requestSequence;
+  window.chromux.setDockBadgeCount(count).then((result) => {
+    if (sequence !== state.ui.dockBadge.requestSequence) return;
+    state.ui.dockBadge.result = result;
+    state.ui.dockBadge.error = null;
+    renderDockBadgeStatus();
+  }).catch((error) => {
+    if (sequence !== state.ui.dockBadge.requestSequence) return;
+    state.ui.dockBadge.result = null;
+    state.ui.dockBadge.error = error;
+    renderDockBadgeStatus();
+  });
 }
 
 function renderRailNavigation(attentionCount) {
@@ -10114,6 +10179,7 @@ function openSettings() {
   renderCustomTabGroups();
   readTrainingProgress();
   renderTrainingSettings();
+  renderDockBadgeStatus();
   $('#modal-settings').classList.remove('hidden');
   window.chromux.projectScaffolderConfig().then((config) => {
     state.scaffolderConfig = config;
@@ -10412,7 +10478,7 @@ function applyTerminalTitleUpdates(session, data) {
   for (const title of res.titles) {
     const previousState = session.turn.state;
     const applied = window.chromuxAttention.applyCodexTitleEvidence(
-      session, title.title, Date.now(), session.id === state.activeId,
+      session, title.title, Date.now(), state.ui.windowFocused && session.id === state.activeId,
     );
     lifecycleStateChanged = (applied && session.turn.state !== previousState) || lifecycleStateChanged;
   }
@@ -10447,7 +10513,7 @@ function recoverCodexCompletionFromRenderedTerminal(session, expectedGeneration,
     session, { ...rendered, output }, Date.now(),
   )) return false;
   session.lastActivityAt = Date.now();
-  if (session.id === state.activeId) {
+  if (state.ui.windowFocused && session.id === state.activeId) {
     session.turn.attentionSeenAt = Math.max(session.turn.attentionSeenAt || 0, session.turn.since || 0);
     window.chromuxAttention.consumeCompletedTurn(session.turn, Date.now());
   }
@@ -13378,6 +13444,15 @@ if (window.chromuxTest) {
     addSession: addRenderableTestSession,
     addTerminalSession: (options = {}) => addRenderableTestSession({ ...options, realTerminal: true }),
     focus(id) { activateSession(id); flushRender(); },
+    windowBlur() { apply({ type: 'window-focus-changed', focused: false }); flushRender(); },
+    windowFocus() { apply({ type: 'window-focus-changed', focused: true }); flushRender(); },
+    windowFocused: () => state.ui.windowFocused,
+    dockBadgeStatus: () => ({
+      rowHidden: $('#settings-dock-badge')?.classList.contains('hidden'),
+      status: $('#settings-dock-badge-status')?.textContent || '',
+      guidanceHidden: $('#settings-dock-badge-guidance')?.classList.contains('hidden'),
+      settingsVisible: !$('#modal-settings')?.classList.contains('hidden'),
+    }),
     emit(id, event, detail = null) { apply({ type: 'turn-signal', sessionId: id, signal: event, detail }); flushRender(); },
     submit(id, data = 'prompt\r') { handleTerminalInput(testSession(id), data); flushRender(); },
     async submitComposer(id, text = 'composed prompt') {
@@ -15903,9 +15978,13 @@ document.addEventListener('click', (event) => {
 document.addEventListener('focusin', () => invalidate('shortcutDebug'));
 document.addEventListener('focusout', () => setTimeout(() => invalidate('shortcutDebug'), 0));
 window.addEventListener('blur', () => {
+  apply({ type: 'window-focus-changed', focused: false });
   closeSessionContextMenu();
   closeSessionSearch();
   invalidate('shortcutDebug');
+});
+window.addEventListener('focus', () => {
+  apply({ type: 'window-focus-changed', focused: true });
 });
 window.addEventListener('resize', positionSessionSearch);
 window.addEventListener('resize', syncBrowserChromuxTopInset);
@@ -15939,6 +16018,7 @@ setInterval(() => {
   await state.favoritesReady;
   state.projects = await window.chromux.projectsRead().catch(() => []);
   state.env = await window.chromux.getEnv();
+  renderDockBadgeStatus();
   readTrainingProgress();
   renderTrainingSettings();
   state.windowsSetup = state.env?.runtime?.setupStatus || null;

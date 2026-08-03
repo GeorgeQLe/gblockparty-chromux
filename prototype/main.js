@@ -79,6 +79,10 @@ const BACKGROUND_E2E = isBackgroundE2E({
   e2ePath: process.env.CHROMUX_E2E,
   showE2EWindow: process.env.CHROMUX_E2E_SHOW_WINDOW,
 });
+const DOCK_BADGE_PLATFORM = SMOKE && ['darwin', 'win32', 'linux'].includes(process.env.CHROMUX_E2E_DOCK_BADGE_PLATFORM)
+  ? process.env.CHROMUX_E2E_DOCK_BADGE_PLATFORM
+  : process.platform;
+const dockBadgeTestState = { calls: [] };
 let squirrelStartup = false;
 if (process.platform === 'win32') {
   try { squirrelStartup = require('electron-squirrel-startup'); } catch { squirrelStartup = false; }
@@ -323,6 +327,7 @@ if (SMOKE) {
   ipcMain.handle('test-classify-pty-agent-descendants', (_e, { procs = [], roots = [] } = {}) => ({
     rows: classifyPtyAgentDescendants(procs, roots),
   }));
+  ipcMain.handle('test-dock-badge-state', () => ({ calls: dockBadgeTestState.calls.slice() }));
 }
 
 const hasSingleInstanceLock = !squirrelStartup && app.requestSingleInstanceLock();
@@ -3420,6 +3425,22 @@ ipcMain.handle('prevent-sleep-set', (event, enabled) => {
   }
   if (!preventSleepController) throw new Error('Prevent Sleep is not initialized');
   return preventSleepController.setEnabled(enabled);
+});
+
+ipcMain.handle('dock-badge-count-set', (event, count) => {
+  if (!win || win.isDestroyed() || event.sender !== win.webContents) {
+    throw new Error('Dock badging is only available to the active Chromux window');
+  }
+  if (!Number.isSafeInteger(count) || count < 0) {
+    throw new TypeError('Dock badge count must be a nonnegative safe integer');
+  }
+  const supported = DOCK_BADGE_PLATFORM === 'darwin';
+  if (!supported) return { supported: false, applied: false, count };
+  const applied = SMOKE && process.env.CHROMUX_E2E_DOCK_BADGE_RESULT === 'rejected'
+    ? false
+    : app.setBadgeCount(count);
+  dockBadgeTestState.calls.push(count);
+  return { supported: true, applied: Boolean(applied), count };
 });
 
 const restartWithDevMode = createDevModeRestart({

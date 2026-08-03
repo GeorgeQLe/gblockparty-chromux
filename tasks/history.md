@@ -2315,3 +2315,64 @@
   Chromux's required update channel. Next command: complete the dashboard-only
   Vercel OAuth app registration and live preview proof tracked in
   `tasks/todo.md`.
+
+## 2026-08-02 — macOS Dock attention badge v0.79.0 candidate
+
+- Added a macOS Dock badge derived from the visible post-filtering,
+  post-grouping Threads count. Multiple reasons in one session count once;
+  system rows and separate sessions count independently; open, resolve,
+  dismiss, Done, Snooze, and zero-clear transitions stay aligned with Threads.
+- Made completion consumption window-focus-aware across OSC signals, Codex
+  title and rendered-prompt recovery, restored attention, session activation,
+  and diagnostics. Bringing Chromux forward consumes only the completion in
+  the currently visible selected session.
+- Ship manifest — User goal: implement and ship macOS Dock attention badges as
+  v0.79.0 through macOS and protected signed-Windows verification.
+- Changed files and per-file purpose: `prototype/main.js` validates active
+  renderer badge IPC and calls Electron only on macOS; `prototype/preload.js`
+  exposes the narrow count API; renderer HTML/JS add focus-aware projection,
+  grouped badge synchronization, deduplication, and Settings status/guidance;
+  `prototype/scripts/test-dock-badge-renderer.js` covers source, packaged, and
+  installed Electron behavior plus platform/rejection seams;
+  `prototype/docs/privacy-and-local-data.md` documents aggregate-only local
+  data handling; package metadata and `RELEASES.md` define v0.79.0; task files
+  record the active release gate and this manifest.
+- User-goal mapping: the Dock count is computed only after inbox visibility and
+  session grouping, then sent as a nonnegative safe integer. The main process
+  accepts calls only from the current Chromux renderer. Rejection produces
+  non-blocking System Settings guidance without requesting permission.
+- Executable verification: new real-Electron source coverage passed; focused
+  turn-signal, session-rail, preview-queue, update-queue, and attention
+  diagnostics suites passed; the complete `npm test` matrix passed every
+  renderer/service/platform/artifact/signing suite; changed JavaScript passed
+  `node --check`; `git diff --check` passed. The arm64 package and installed
+  `/Applications/Chromux.app` both report 0.79.0, and the packaged and installed
+  executables passed the full Dock-badge suite, including isolated relaunch,
+  increments, decrements, clearing, rejection, and unsupported-platform paths.
+- Accepted warnings: electron-packager emitted its existing icon-format warning
+  and retained `electron.icns`; the app launches and badge coverage passes.
+  The existing Streak native pointer-boundary test missed an exact hover target
+  once in the full matrix and passed its built-in retry, then missed a different
+  exact boundary in a standalone run. This change does not touch pointer
+  geometry or Streak styles; no badge/focus executable check failed.
+- Adversarial review: the repository lacks the referenced
+  `docs/quality-gate-contract.md`, `quality-sweep`, and `expert-review`, so a
+  failure-oriented exact-diff review served as the equivalent gate. It checked
+  unauthorized and invalid IPC, test-only platform seams, async response
+  ordering, unchanged-count suppression, zero clearing, startup and blur/focus
+  order, active/background title and fallback completion, restored records,
+  grouped reasons, system rows, Done/Snooze expiry, Settings visibility, and
+  absence of content-bearing IPC. No blocking source finding remains.
+- Skipped tests and residual risk: no manual eyeball inspection of the Dock
+  artwork was archived; Electron's successful installed-app return values and
+  count traces are the executable proof. The protected Windows release could
+  not be dispatched: every published Chromux release, including v0.78.0, has
+  zero assets and there are no prior `windows-release.yml` runs, so the required
+  prior signed `Setup.exe` upgrade-UAT URL does not exist. Fabricating a release
+  URL would make the real-machine gate fail without testing an upgrade.
+- Rollback note: before publication, revert the v0.79.0 candidate commit and
+  remove tag `chromux-v0.79.0` if necessary. After publication, also remove the
+  matching GitHub Release and restore v0.78.0 as latest. Deploy skipped: no
+  explicit manual deploy contract exists; the protected GitHub workflow is the
+  required release path. Next command: supply or publish a signed v0.78.0
+  installer URL, then dispatch `windows-release.yml` for `chromux-v0.79.0`.

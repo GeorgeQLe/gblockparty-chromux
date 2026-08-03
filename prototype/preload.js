@@ -107,6 +107,7 @@ contextBridge.exposeInMainWorld('chromux', {
   getEnv: () => ipcRenderer.invoke('get-env'),
   restartWithDevMode: (opts) => ipcRenderer.invoke('restart-with-dev-mode', opts || {}),
   setPreventSleep: (enabled) => ipcRenderer.invoke('prevent-sleep-set', enabled),
+  setDockBadgeCount: (count) => ipcRenderer.invoke('dock-badge-count-set', count),
   onPreventSleepStatus: (cb) => ipcRenderer.on('prevent-sleep-status', (_e, status) => cb(status)),
   checkUpdates: (opts) => ipcRenderer.invoke('check-updates', opts || {}),
   checkCodexUpdate: (opts) => ipcRenderer.invoke('codex-update-check', opts || {}),
@@ -147,5 +148,6 @@ if (process.env.CHROMUX_E2E) {
     classifyPtyAgentDescendants: (payload) => ipcRenderer.invoke('test-classify-pty-agent-descendants', payload || {}),
     clipboardReadText: () => ipcRenderer.invoke('test-clipboard-read-text'),
     restorePayload: (payload) => ipcRenderer.invoke('test-restore-payload', payload || {}),
+    dockBadgeState: () => ipcRenderer.invoke('test-dock-badge-state'),
   });
 }

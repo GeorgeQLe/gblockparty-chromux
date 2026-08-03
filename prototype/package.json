@@ -1,6 +1,6 @@
 {
   "name": "chromux",
-  "version": "0.78.0",
+  "version": "0.79.0",
   "productName": "GBlockParty Chromux",
   "description": "OSS desktop front-end for local and GBlockParty-managed agent/browser workspaces.",
   "main": "main.js",
@@ -53,6 +53,7 @@
     "test:turn-signals-renderer": "node scripts/test-turn-signals-renderer.js",
     "test:tab-activity-indicators-renderer": "node scripts/test-tab-activity-indicators-renderer.js",
     "test:session-rail-renderer": "node scripts/test-session-rail-renderer.js",
+    "test:dock-badge-renderer": "node scripts/test-dock-badge-renderer.js",
     "test:git-worktree-service": "node scripts/test-git-worktree-service.js",
     "test:vercel-service": "node scripts/test-vercel-service.js",
     "test:vercel-shipping-service": "node scripts/test-vercel-shipping-service.js",
