@@ -16,13 +16,14 @@ fs.writeFileSync(e2ePath, `
 (async () => {
   const d = window.chromuxTestDiagnostics;
   const composer = window.chromuxTestComposer;
+  const shortcuts = window.chromuxTestShortcuts;
   const expect = (condition, message) => { if (!condition) throw new Error(message); };
   const settle = async () => { await new Promise((resolve) => setTimeout(resolve, 20)); d.flushRender(); };
   await settle();
   expect(d && composer && d.visible(), 'developer diagnostics and composer fixtures should be available with --dev-mode');
 
   const first = composer.addSession({ name: 'codex-working', agent: 'codex', rows: 16, cols: 48 });
-  const second = d.addSession({ name: 'native-complete', agent: 'claude' });
+  const second = composer.addSession({ name: 'native-complete', agent: 'claude', rows: 16, cols: 48 });
   d.select(first);
   d.focus(second);
   expect(d.selected() === first, 'inspected session must remain independent of focus');
@@ -38,6 +39,64 @@ fs.writeFileSync(e2ePath, `
     'timer-driven diagnostic rerenders must preserve unchanged option nodes');
   expect(d.selected() === first,
     'timer-driven diagnostic rerenders must preserve the selected background session');
+
+  const deferredExit = d.addSession({ name: 'deferred-exit', agent: 'codex' });
+  const deferredClose = d.addSession({ name: 'deferred-close', agent: 'claude' });
+  d.focus(second);
+  d.select(first);
+  await settle();
+  const focusedIds = d.selectorIds();
+  const focusedLabels = d.selectorLabels();
+  const focusedOptions = focusedIds.map((id) => d.selectorOption(id));
+  d.focusSelector();
+  expect(d.selectorFocused(), 'Inspect selector should receive focus');
+  expect(shortcuts.shortcutToggleBrowser() === null,
+    'normal Chromux hotkeys should remain guarded while the editable selector is focused');
+  d.beginSelectorMutationAudit();
+  d.setNativeSelection(second);
+  d.emit(first, 'turn-start');
+  expect(d.groupText().includes('TURNworking'),
+    'surrounding diagnostics should continue refreshing while the selector is focused');
+  d.windowFocus(false);
+  d.windowFocus(true);
+  const deferredAdd = d.addSession({ name: 'deferred-add', agent: 'codex' });
+  d.preserveActive(second);
+  d.exit(deferredExit, 9);
+  d.rename(first, 'renamed-while-focused');
+  d.reorder([deferredClose, second, deferredExit, first, deferredAdd]);
+  d.close(deferredClose);
+  await new Promise((resolve) => setTimeout(resolve, 1100));
+  await settle();
+  expect(d.selectorMutationCount() === 0,
+    'timer, diagnostic, window-focus, and session lifecycle refreshes must not mutate a focused selector');
+  expect(d.nativeSelection() === second,
+    'focused native selection state must not be programmatically reset before commit');
+  expect(d.selectorIds().join(',') === focusedIds.join(',')
+    && d.selectorLabels().join('|') === focusedLabels.join('|')
+    && focusedOptions.every((option, index) => d.selectorOption(focusedIds[index]) === option),
+  'added, exited, renamed, reordered, and closed sessions should remain deferred while focused');
+  d.endSelectorMutationAudit();
+  d.commitNativeSelection();
+  await settle();
+  expect(d.selected() === second && d.nativeSelection() === second,
+    'committed native selection should immediately change the inspected session');
+  expect(!d.selectorFocused() && d.terminalFocused(second),
+    'committed selection should close the selector interaction and restore active terminal focus: '
+      + JSON.stringify(d.focusState()));
+  expect(shortcuts.shortcutToggleBrowser()?.sessionId === second,
+    'normal Chromux hotkey routing should resume after the committed selection');
+  expect(d.selectorIds().join(',') === [second, deferredExit, first, deferredAdd].join(','),
+    'deferred session order, addition, and closure should reconcile after selector blur');
+  expect(d.selectorLabels().includes('deferred-exit (exited)')
+    && d.selectorLabels().includes('renamed-while-focused')
+    && d.selectorLabels().includes('deferred-add'),
+  'deferred exit and rename labels plus the added session should reconcile after blur');
+  d.close(deferredExit);
+  d.close(deferredAdd);
+  d.reorder([first, second]);
+  d.focus(second);
+  d.select(first);
+
   const third = d.addSession({ name: 'temporary-session', agent: 'codex' });
   expect(d.selectorOption(first) === firstOption && d.selectorOption(third),
     'adding a session should preserve existing options and append the new session');

@@ -6,6 +6,16 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Keep the Developer Inspect session selector mutation-free while focused,
+  defer option lifecycle/order changes until blur, preserve live surrounding
+  diagnostics and active-or-first fallback, restore active-terminal focus and
+  hotkey routing after commit, and ship v0.80.1. _(source: user-supplied Fix
+  the Developer Inspect Dropdown Flicker plan; evidence:
+  `prototype/renderer/renderer.js`,
+  `prototype/scripts/test-attention-diagnostics-renderer.js`, focused/dev-mode/
+  full prototype validation, package metadata, `RELEASES.md`, packaged smoke,
+  tag, and GitHub Release)_
+
 - [x] Replace Threads card text-action grids with compact icon controls; keep
   ordinary Open on the card, retain specialized Queue/Git/system actions,
   expose Dismiss only for supported reasons, keep universal Snooze, remap `d`

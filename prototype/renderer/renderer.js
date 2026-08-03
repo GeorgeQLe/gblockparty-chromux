@@ -7327,6 +7327,24 @@ function actualTabIndicator(session) {
     .find((kind) => session.els.dot.classList.contains(kind)) || 'unknown';
 }
 
+function syncDiagnosticSessionSelector(selector, sessions, inspected) {
+  if (document.activeElement === selector) return;
+  const existingOptions = new Map([...selector.options].map((option) => [option.value, option]));
+  const options = [];
+  for (const session of sessions) {
+    const option = existingOptions.get(session.id) || document.createElement('option');
+    const label = `${sessionDisplayLabel(session)}${session.lifecycle.alive ? '' : ' (exited)'}`;
+    if (option.value !== session.id) option.value = session.id;
+    if (option.textContent !== label) option.textContent = label;
+    options.push(option);
+  }
+  reconcileChildren(selector, options);
+  const selectedId = inspected ? inspected.id : '';
+  if (selector.value !== selectedId) selector.value = selectedId;
+  const disabled = sessions.length === 0;
+  if (selector.disabled !== disabled) selector.disabled = disabled;
+}
+
 function renderDeveloperDiagnostics() {
   const root = $('#developer-diagnostics');
   if (!root) return;
@@ -7340,17 +7358,7 @@ function renderDeveloperDiagnostics() {
   if (!inspected) inspected = state.sessions.get(state.activeId) || sessions[0] || null;
   state.ui.diagnosticSessionId = inspected ? inspected.id : null;
   const selector = $('#diagnostic-session');
-  const existingOptions = new Map([...selector.options].map((option) => [option.value, option]));
-  const options = [];
-  for (const session of sessions) {
-    const option = existingOptions.get(session.id) || document.createElement('option');
-    option.value = session.id;
-    option.textContent = `${sessionDisplayLabel(session)}${session.lifecycle.alive ? '' : ' (exited)'}`;
-    options.push(option);
-  }
-  reconcileChildren(selector, options);
-  selector.value = inspected ? inspected.id : '';
-  selector.disabled = sessions.length === 0;
+  syncDiagnosticSessionSelector(selector, sessions, inspected);
   const groups = $('#diagnostic-groups'); groups.innerHTML = '';
   const events = $('#diagnostic-events'); events.innerHTML = '';
   if (!inspected) {
@@ -12127,9 +12135,17 @@ $('#settings-developer-mode').addEventListener('change', (event) => {
   });
 });
 $('#diagnostic-session').addEventListener('change', (event) => {
-  if (state.sessions.has(event.target.value)) state.ui.diagnosticSessionId = event.target.value;
-  invalidate('diagnostics');
+  if (!state.sessions.has(event.target.value)) {
+    invalidate('diagnostics');
+    return;
+  }
+  state.ui.diagnosticSessionId = event.target.value;
+  event.currentTarget.blur();
+  const active = state.sessions.get(state.activeId);
+  if (active && active.term && active.term.term) active.term.term.focus();
+  invalidate('diagnostics', 'shortcutDebug');
 });
+$('#diagnostic-session').addEventListener('blur', () => invalidate('diagnostics'));
 $('#btn-update-ready').onclick = () => {
   if (updateAvailable() && state.updateQueue.phase === 'idle') installUpdate().catch(showUpdateInstallError);
   else openSettings();
@@ -15877,6 +15893,8 @@ if (window.chromuxTest) {
     events: () => state.events.map((event) => ({ ...event })),
   };
 
+  let selectorMutationObserver = null;
+  let selectorMutationRecords = [];
   window.chromuxTestDiagnostics = {
     addSession: addRenderableTestSession,
     focus(id) { activateSession(id); flushRender(); },
@@ -15910,6 +15928,74 @@ if (window.chromuxTest) {
     selectorLabels: () => [...$('#diagnostic-session').options].map((option) => option.textContent),
     selectorIds: () => [...$('#diagnostic-session').options].map((option) => option.value),
     selectorOption: (id) => [...$('#diagnostic-session').options].find((option) => option.value === id) || null,
+    focusSelector() { $('#diagnostic-session').focus(); },
+    selectorFocused: () => document.activeElement === $('#diagnostic-session'),
+    nativeSelection: () => $('#diagnostic-session').value,
+    setNativeSelection(id) { $('#diagnostic-session').value = id; },
+    commitNativeSelection() {
+      $('#diagnostic-session').dispatchEvent(new Event('change', { bubbles: true }));
+      flushRender();
+    },
+    beginSelectorMutationAudit() {
+      if (selectorMutationObserver) selectorMutationObserver.disconnect();
+      selectorMutationRecords = [];
+      selectorMutationObserver = new MutationObserver((records) => selectorMutationRecords.push(...records));
+      selectorMutationObserver.observe($('#diagnostic-session'), {
+        attributes: true, childList: true, characterData: true, subtree: true,
+      });
+    },
+    selectorMutationCount() {
+      if (selectorMutationObserver) selectorMutationRecords.push(...selectorMutationObserver.takeRecords());
+      return selectorMutationRecords.length;
+    },
+    endSelectorMutationAudit() {
+      if (selectorMutationObserver) selectorMutationRecords.push(...selectorMutationObserver.takeRecords());
+      selectorMutationObserver?.disconnect();
+      selectorMutationObserver = null;
+      return selectorMutationRecords.length;
+    },
+    terminalFocused(id) {
+      const session = testSession(id);
+      const helper = session.els.termHost.querySelector('.xterm-helper-textarea');
+      return Boolean(helper && document.activeElement === helper);
+    },
+    focusState: () => ({
+      activeId: state.activeId,
+      tag: document.activeElement?.tagName || null,
+      className: document.activeElement?.className || null,
+    }),
+    rename(id, name) {
+      const session = testSession(id);
+      session.name = String(name);
+      session.term.title = '';
+      invalidate('diagnostics');
+      flushRender();
+    },
+    reorder(ids) {
+      const reordered = new Map();
+      for (const id of ids) {
+        const session = state.sessions.get(id);
+        if (session) reordered.set(id, session);
+      }
+      for (const [id, session] of state.sessions) {
+        if (!reordered.has(id)) reordered.set(id, session);
+      }
+      state.sessions = reordered;
+      invalidate('diagnostics');
+      flushRender();
+    },
+    preserveActive(id) {
+      if (!state.sessions.has(id)) return;
+      state.activeId = id;
+      for (const session of state.sessions.values()) {
+        session.els.view.classList.toggle('offstage', session.id !== id);
+        session.els.tab.classList.toggle('active', session.id === id);
+      }
+    },
+    windowFocus(focused) {
+      window.dispatchEvent(new Event(focused ? 'focus' : 'blur'));
+      flushRender();
+    },
     clearFocus() { state.activeId = null; flushRender(); },
     enableRestartMock() { state.testDevModeRestart = { calls: [] }; },
     restartCalls: () => state.testDevModeRestart ? state.testDevModeRestart.calls.map((call) => ({ ...call })) : [],

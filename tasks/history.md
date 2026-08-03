@@ -1,5 +1,61 @@
 # Session History
 
+## 2026-08-03 — Chromux v0.80.1 Developer Inspect focus safety
+
+- **User goal:** Stop the Developer Inspect session selector from flickering
+  closed during live diagnostics refreshes, preserve its independent inspected
+  session, and resume active-terminal hotkeys after a committed selection.
+- **Changed files and per-file purpose:** `prototype/renderer/renderer.js`
+  extracts keyed selector synchronization, skips every selector mutation while
+  focused, reconciles only changed option state after blur, and restores active
+  xterm focus after valid selection. The attention-diagnostics real-Electron
+  test covers focused mutation observation, native selection state, timer and
+  event refreshes, window focus, session lifecycle/order deferral, fallback,
+  terminal focus, and hotkey guards. Package metadata/lock, `RELEASES.md`,
+  `tasks/todo.md`, and this entry own v0.80.1 bookkeeping.
+- **User-goal mapping:** Diagnostics groups and events continue rendering while
+  the selector is focused, but option addition, removal, ordering, labels,
+  disabled state, and programmatic selection wait until focus leaves. Closing
+  an inspected session still updates internal inspection immediately using the
+  active-or-first fallback. Valid native change blurs the selector, focuses the
+  active terminal, and coalesces deferred diagnostics reconciliation without
+  changing global shortcut policy or activating the inspected session.
+- **Executable verification:** The new focused-selector regression failed
+  against v0.80.0 before implementation and passed afterward.
+  `npm run test:attention-diagnostics`, `npm run test:dev-mode`, JavaScript
+  syntax checks, and `git diff --check` passed. The complete `npm test` matrix
+  passed every renderer, Electron, service, platform, packaging-policy,
+  Windows artifact, and signing-configuration suite. macOS arm64 packaging
+  completed; bundle version/icon metadata, packaged settings persistence, and
+  the isolated packaged `--smoke --dev-mode` executable all passed.
+- **Adversarial review:** The referenced `docs/quality-gate-contract.md`,
+  `quality-sweep`, and `expert-review` are absent, so an exact-diff and
+  failure-oriented event-order review served as the equivalent gate. It
+  checked focused no-op behavior for every selector property, background
+  diagnostics continuity, queued addition/removal/exit/rename/reorder,
+  inspected-session closure with and without an active session, stale native
+  selection preservation, invalid values, blur/change coalescing, active versus
+  inspected independence, terminal focus, editable-only shortcut guards, and
+  empty-session disabling. No blocking finding remains.
+- **Warnings, skipped tests, and residual risk:** `electron-packager` emitted
+  its existing secondary `.icon`-format warning while retaining the configured
+  `electron.icns`; bundle inspection and packaged execution passed. No physical
+  click was injected into the native macOS popup because ordinary automated
+  Electron windows intentionally remain hidden; the real-Electron test drives
+  the same focus, value, change, blur, xterm-focus, and shortcut paths and
+  observes all selector DOM mutations. Native AppKit presentation remains the
+  small residual platform risk.
+- **Rollback note:** Revert the v0.80.1 shipping commit and publish a newer
+  corrective release; no public API, IPC, persistence schema, or migration
+  changed.
+- **Deploy status:** Deploy skipped because neither `deploy.md` nor
+  `tasks/deploy.md` exists. The GitHub Release is Chromux's required update
+  channel.
+- **Ownership boundary:** The worktree was clean at start, and every changed
+  file belongs to this scoped implementation.
+- **Next command:** Continue the next unblocked Chromux product task or begin
+  the pending daily-driver adoption record during the next real work session.
+
 ## 2026-08-03 — Chromux v0.80.0 Threads icon actions
 
 - **User goal:** Replace the Threads 2×2 text-action grid with compact icon

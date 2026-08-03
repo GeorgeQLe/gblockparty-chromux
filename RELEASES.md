@@ -1,5 +1,19 @@
 # Release Notes
 
+## GBlockParty Chromux v0.80.1
+
+Tag: `chromux-v0.80.1`
+
+- Keep the Developer Inspect session selector mutation-free while its native
+  macOS menu is focused, without pausing the surrounding live diagnostics.
+- Defer added, exited, renamed, reordered, and closed session option changes
+  until the selector loses focus, then reconcile keyed options and preserve
+  the active-or-first fallback when the inspected session closes.
+- Commit a selection immediately, close the selector interaction, restore
+  focus to the active terminal, and resume normal Chromux hotkey routing.
+- Add real-Electron coverage for timer, diagnostic-event, window-focus,
+  lifecycle, native-selection, fallback, terminal-focus, and hotkey behavior.
+
 ## GBlockParty Chromux v0.80.0
 
 Tag: `chromux-v0.80.0`
