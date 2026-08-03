@@ -101,6 +101,31 @@ fs.writeFileSync(e2ePath, `
   const api = rail.addTerminalSession({ name: 'api-agent', agent: 'claude', cwd: ${JSON.stringify(repoApiDir)} });
   const webTwo = rail.addTerminalSession({ name: 'web-review', agent: 'grok', cwd: ${JSON.stringify(repoAppDir)}, cols: 54, rows: 14 });
   rail.focus(holder);
+  const contextMenuRow = document.querySelector(
+    '#thread-list .rail-session-row[data-session-id="' + CSS.escape(api) + '"]',
+  );
+  contextMenuRow.dispatchEvent(new MouseEvent('contextmenu', {
+    bubbles: true,
+    cancelable: true,
+    button: 2,
+    clientX: 72,
+    clientY: 96,
+  }));
+  const threadContextMenu = document.querySelector('.session-menu');
+  const threadContextLabels = [...(threadContextMenu?.querySelectorAll('.smi-label') || [])]
+    .map((label) => label.textContent.trim());
+  expect(threadContextMenu && rail.activeId() === api,
+    'right-clicking an inactive Threads session should activate it and open its session menu');
+  expect(threadContextLabels.includes('Duplicate session')
+    && threadContextLabels.some((label) => label.includes('Open in CODEX'))
+    && threadContextLabels.includes('Move to group…')
+    && threadContextLabels.includes('Close session'),
+  'Threads context menu should expose the same session actions as a tab context menu: '
+    + JSON.stringify(threadContextLabels));
+  document.body.click();
+  expect(!document.querySelector('.session-menu'),
+    'clicking outside should dismiss a Threads session context menu');
+  rail.focus(holder);
   expect(rail.threadSort() === 'recent' && rail.storedThreadSort() === 'recent',
     'Recent should be the validated and persisted default thread order');
   expect(JSON.stringify(rail.migrateThreadSort('invalid')) === JSON.stringify({ mode: 'recent', stored: 'recent' }),

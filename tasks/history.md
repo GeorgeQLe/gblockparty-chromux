@@ -2186,3 +2186,57 @@
   explicit manual deploy contract exists; the GitHub Release is Chromux's
   required update channel. Next command: complete the dashboard-only Vercel
   OAuth app registration and live preview proof tracked in `tasks/todo.md`.
+
+## 2026-08-02 — Threads session context menu and v0.77.0
+
+- Reused the established session-tab context menu for Threads sidebar session
+  rows. A right-click suppresses the native menu, cancels pending previews,
+  dismisses an open preview, activates an inactive target, and opens duplicate,
+  cross-agent, group, and close actions at the pointer.
+- Added a real-Electron regression that right-clicks an inactive Threads row,
+  verifies target activation and action parity, and proves outside-click
+  dismissal.
+- Ship manifest — User goal: add a context menu on right-click of sessions in
+  the Threads sidebar and publish the required feature release.
+- Changed files and per-file purpose: `prototype/renderer/renderer.js` attaches
+  the row context-menu interaction; `prototype/scripts/test-session-rail-renderer.js`
+  covers the production DOM event and resulting menu; `prototype/package.json`
+  and `prototype/package-lock.json` set 0.77.0; `RELEASES.md` documents the
+  release; `tasks/todo.md` records completion; this entry records validation,
+  review, residual risk, rollback, and next work.
+- User-goal mapping: Threads rows invoke the same `openSessionContextMenu()`
+  path as session tabs, so both surfaces expose one canonical action set and
+  existing group/Grok advisory behavior. Activation happens before menu
+  creation so actions always apply to the visible active target.
+- Executable verification: changed JavaScript passed `node --check`.
+  `npm run test:session-rail-renderer` passed the new real-Electron behavior;
+  `npm run test:session-tab-groups-renderer` passed existing group-picker
+  behavior; and `node scripts/test-themes-renderer.js` passed the established
+  context-menu theme matrix. All three suites and both syntax checks also
+  passed from a clean temporary clone with only the exact staged release diff
+  applied, proving the excluded hotkey-training work is not required.
+  Package/lock 0.77.0 consistency and `git diff --check` passed. One corrected
+  rail run transiently failed to exit; an immediate clean rerun completed in
+  13 seconds with `SESSION_RAIL_RENDERER_OK`.
+- Skipped tests: the complete prototype matrix was not repeated because this is
+  a localized renderer event binding with direct real-Electron coverage plus
+  both adjacent menu suites. No CSS, IPC, persistence schema, native module,
+  service, Windows-specific path, or packaging behavior changed.
+- Adversarial review: the repository lacks the referenced
+  `docs/quality-gate-contract.md`, `quality-sweep`, and `expert-review`, so a
+  failure-oriented exact-diff and event-order review served as the equivalent
+  gate. It checked active/inactive targets, native menu suppression, preview
+  timers, attention and ordinary row construction, activation-driven rerender,
+  pointer coordinates, menu dismissal, shared action parity, and accidental
+  interaction with tab or group menus. No blocking finding remains.
+- Residual risk: the shared custom menu retains its existing mouse-first
+  keyboard behavior; this change neither improves nor regresses that behavior.
+  Concurrent local hotkey-training work in the worktree is explicitly excluded
+  from this release commit and tag.
+- Rollback note: revert the v0.77.0 shipping commit, delete GitHub Release and
+  tag `chromux-v0.77.0`, and republish v0.76.4 as latest if needed. The exact
+  shipping boundary is the one renderer hunk, rail regression, two metadata
+  files, release notes, todo record, and this history entry. Deploy skipped: no
+  explicit manual deploy contract exists; the GitHub Release is Chromux's
+  required update channel. Next command: complete the dashboard-only Vercel
+  OAuth app registration and live preview proof tracked in `tasks/todo.md`.

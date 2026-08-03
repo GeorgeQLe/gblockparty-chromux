@@ -7475,6 +7475,13 @@ function appendThreadSessionRow(host, session, { attention = null } = {}) {
       activateSession(session.id);
     }
   };
+  row.oncontextmenu = (event) => {
+    event.preventDefault();
+    cancelThreadPreviewOpen();
+    dismissThreadPreview();
+    if (session.id !== state.activeId) activateSession(session.id);
+    openSessionContextMenu(session, event.clientX, event.clientY);
+  };
   syncThreadSessionRowPresentation(row, session);
   host.appendChild(row);
   return row;

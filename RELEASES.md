@@ -1,5 +1,18 @@
 # Release Notes
 
+## GBlockParty Chromux v0.77.0
+
+Tag: `chromux-v0.77.0`
+
+- Add the full session context menu to Threads sidebar rows on right-click,
+  matching the duplicate, cross-agent, group, and close actions available from
+  session tabs.
+- Activate an inactive session before opening its Threads context menu and
+  dismiss any pending or open terminal preview so the selected session and menu
+  actions stay aligned.
+- Add real-Electron regression coverage for menu activation, action parity,
+  and outside-click dismissal.
+
 ## GBlockParty Chromux v0.76.4
 
 Tag: `chromux-v0.76.4`

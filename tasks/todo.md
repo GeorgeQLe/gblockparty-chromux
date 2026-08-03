@@ -6,6 +6,14 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Add the existing full session context menu to Threads sidebar rows on
+  right-click, activate an inactive target before opening its actions, dismiss
+  pending/open terminal previews, preserve tab menu behavior, and ship
+  v0.77.0. _(source: user request; evidence:
+  `prototype/renderer/renderer.js`,
+  `prototype/scripts/test-session-rail-renderer.js`, related tab-group/theme
+  renderer coverage, package metadata, `RELEASES.md`, tag, and GitHub Release)_
+
 - [x] Recognize the Codex 0.146 percentage-based context footer in the shared
   rendered-prompt parser so normal PTY writes, offstage tab activation, and
   stalled startup recovery dismiss the loader only for a current prompt;
