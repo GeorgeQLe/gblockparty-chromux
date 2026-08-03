@@ -2370,6 +2370,12 @@
   zero assets and there are no prior `windows-release.yml` runs, so the required
   prior signed `Setup.exe` upgrade-UAT URL does not exist. Fabricating a release
   URL would make the real-machine gate fail without testing an upgrade.
+- Shipping status: candidate commit `b9ac0f7` is pushed to `main`, and annotated
+  tag `chromux-v0.79.0` is pushed. GitHub exposes only `Preview` and `Production`
+  environments, no self-hosted Windows runners, no prior signed-Windows runs,
+  and no release assets at any version. The protected workflow was not
+  dispatched with a fabricated installer URL; `/releases/latest` correctly
+  remains the asset-free v0.78.0 release until the prerequisites are supplied.
 - Rollback note: before publication, revert the v0.79.0 candidate commit and
   remove tag `chromux-v0.79.0` if necessary. After publication, also remove the
   matching GitHub Release and restore v0.78.0 as latest. Deploy skipped: no
