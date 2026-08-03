@@ -126,6 +126,8 @@ contextBridge.exposeInMainWorld('chromux', {
   shortcutAction: (input) => shortcutInput.chromuxShortcutAction(input || {}, process.platform),
   shortcutContextKind: (context) => shortcutInput.classifyShortcutFocusContext(context || {}),
   shortcutContextDisabledReason: (context) => shortcutInput.shortcutContextDisabledReason(context || {}),
+  setShortcutTrainingActive: (active) => ipcRenderer.invoke('shortcut-training-active-set', active === true),
+  onShortcutTrainingInput: (cb) => ipcRenderer.on('shortcut-training-input', (_e, m) => cb(m)),
   onShortcutDebugInput: (cb) => ipcRenderer.on('shortcut-debug-input', (_e, m) => cb(m)),
   onShortcutActivateSessionIndex: (cb) => ipcRenderer.on('shortcut-activate-session-index', (_e, m) => cb(m)),
   onShortcutFocusNextQueueItem: (cb) => ipcRenderer.on('shortcut-focus-next-queue-item', () => cb()),

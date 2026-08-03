@@ -340,6 +340,29 @@
           </label>
         </section>
         <div class="settings-divider" aria-hidden="true"></div>
+        <section class="training-settings" aria-labelledby="hotkey-training-heading">
+          <div class="settings-section-head">
+            <div>
+              <div id="hotkey-training-heading" class="microlabel">HOTKEY TRAINING GROUNDS</div>
+              <div class="settings-section-copy">Practice Chromux workflows with synthetic sessions, queues, browsers, and dialogs. Training never touches live work.</div>
+              <div id="training-settings-summary" class="settings-preference-status" aria-live="polite">0 OF 4 MISSIONS COMPLETE</div>
+            </div>
+            <div class="training-settings-actions">
+              <button id="training-launch" class="btn btn-amber" type="button">LAUNCH</button>
+              <button id="training-reset" class="btn" type="button">RESET PROGRESS</button>
+            </div>
+          </div>
+          <div id="training-settings-missions" class="training-settings-missions"></div>
+          <div id="training-reset-confirmation" class="training-reset-confirmation hidden" role="alertdialog" aria-labelledby="training-reset-title">
+            <div>
+              <strong id="training-reset-title">Reset Hotkey Training progress?</strong>
+              <span>This removes only local mission results.</span>
+            </div>
+            <button id="training-reset-cancel" class="btn" type="button">CANCEL</button>
+            <button id="training-reset-confirm" class="btn btn-red" type="button">RESET</button>
+          </div>
+        </section>
+        <div class="settings-divider" aria-hidden="true"></div>
         <div class="settings-block">
           <div class="settings-row">
             <span class="microlabel">CURRENT VERSION</span>
@@ -364,6 +387,66 @@
       </div>
     </div>
   </div>
+
+  <!-- ══ isolated hotkey training arena ══ -->
+  <section id="training-arena" class="training-arena hidden" role="dialog" aria-modal="true"
+    aria-labelledby="training-arena-title">
+    <header class="training-arena-head">
+      <div>
+        <span class="microlabel">SAFE SIMULATION</span>
+        <h1 id="training-arena-title">Hotkey Training Grounds</h1>
+      </div>
+      <button id="training-arena-close" class="btn" type="button" aria-label="Exit Hotkey Training Grounds">EXIT TRAINING</button>
+    </header>
+    <div id="training-selection" class="training-selection">
+      <div class="training-intro">
+        <div>
+          <span class="microlabel">MISSION SELECT</span>
+          <h2>Build workflow muscle memory.</h2>
+          <p>Use your real keyboard. Ordinary typing is ignored; only recognized Chromux shortcuts and Escape enter this simulation.</p>
+        </div>
+        <div id="training-selection-mastery" class="training-mastery"></div>
+      </div>
+      <div id="training-mission-grid" class="training-mission-grid"></div>
+    </div>
+    <div id="training-run" class="training-run hidden">
+      <div class="training-run-head">
+        <button id="training-back" class="btn" type="button">← MISSIONS</button>
+        <div>
+          <span id="training-step-label" class="microlabel"></span>
+          <h2 id="training-mission-title"></h2>
+        </div>
+        <div id="training-run-stats" class="training-run-stats"></div>
+      </div>
+      <div class="training-progress" aria-hidden="true"><span id="training-progress-fill"></span></div>
+      <div class="training-stage">
+        <div id="training-fixture" class="training-fixture" aria-label="Simulated Chromux workspace"></div>
+        <aside class="training-instruction">
+          <span class="microlabel">CURRENT TASK</span>
+          <h3 id="training-task"></h3>
+          <p id="training-hint-copy" class="training-hint-copy hidden"></p>
+          <kbd id="training-chord" class="training-chord hidden"></kbd>
+          <div id="training-auto-hint" class="training-auto-hint hidden">Two misses. Want a clue?</div>
+          <div class="training-instruction-actions">
+            <button id="training-hint" class="btn" type="button">HINT</button>
+            <button id="training-reveal" class="btn" type="button">REVEAL SHORTCUT</button>
+          </div>
+          <p class="training-input-note">Normal typing and modifier-only input do not count as attempts.</p>
+        </aside>
+      </div>
+      <div id="training-complete" class="training-complete hidden" tabindex="-1">
+        <span class="microlabel">MISSION COMPLETE</span>
+        <div id="training-stars" class="training-stars" aria-label="Mastery rating"></div>
+        <h2 id="training-complete-title"></h2>
+        <p id="training-complete-stats"></p>
+        <div>
+          <button id="training-replay" class="btn" type="button">REPLAY</button>
+          <button id="training-next" class="btn btn-amber" type="button">MISSION SELECT</button>
+        </div>
+      </div>
+      <div id="training-live-status" class="sr-only" role="status" aria-live="assertive" aria-atomic="true"></div>
+    </div>
+  </section>
 
   <!-- ══ Vercel project setup ══ -->
   <div id="modal-vercel" class="overlay hidden">
@@ -879,6 +962,7 @@
   <script src="../node_modules/@xterm/addon-serialize/lib/addon-serialize.js"></script>
   <script src="signals.js"></script>
   <script src="attention.js"></script>
+  <script src="../hotkey-training.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>

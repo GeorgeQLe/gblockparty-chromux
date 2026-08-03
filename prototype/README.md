@@ -168,6 +168,21 @@ Clicking anywhere in the preview is a secondary activation path, while clicking 
 the already-active Threads row confirms the connection with a linked row-to-terminal highlight. Choose
 **Settings → Thread Preview Size → Compact, Comfortable, or Large** to adjust effective preview text size
 without changing terminal wrapping; Comfortable is the default.
+
+### Hotkey Training Grounds
+
+Open **Settings → Hotkey Training Grounds → Launch** to practice four
+Chromux workflows in a full-window simulation. The missions cover session
+recovery, direct session switching, attention/browser review, Composer,
+project creation, and guarded exit. Only recognized Chromux shortcuts and
+Escape enter the arena; ordinary typing is ignored, and the simulated
+sessions, queues, browser, Composer, and dialogs never mutate live work.
+
+Hints, shortcut reveals, mistakes, elapsed time, and a one-to-three-star
+result provide feedback. Best results are stored locally in the stable
+Electron profile. **Reset Progress** removes only those local mission results
+after confirmation.
+
 **Git Changes** is a compact searchable repository/worktree navigator with Action, Stale, and All filters.
 Each row shows branch, staged, unstaged, untracked, conflict, ahead/behind, age, and associated-session state.
 Selecting a worktree creates or focuses one dedicated `Git · <branch>` agent session, seeds an editable

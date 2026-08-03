@@ -2,7 +2,7 @@
 // preview detection, review queue, element picker, capture → claude -p.
 'use strict';
 
-/* global Terminal, FitAddon, SerializeAddon */
+/* global Terminal, FitAddon, SerializeAddon, ChromuxHotkeyTraining */
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -266,6 +266,286 @@ const BOUNDS = {
   previewTurnCandidates: 24,
   previewFallbackMs: 1500,
 };
+
+const training = {
+  engine: ChromuxHotkeyTraining,
+  progress: ChromuxHotkeyTraining.emptyProgress(),
+  active: false,
+  run: null,
+  lastFocus: null,
+};
+
+function readTrainingProgress() {
+  try {
+    training.progress = training.engine.sanitizeProgress(
+      window.localStorage.getItem(training.engine.STORAGE_KEY),
+    );
+  } catch {
+    training.progress = training.engine.emptyProgress();
+  }
+  return training.progress;
+}
+
+function persistTrainingProgress() {
+  try {
+    window.localStorage.setItem(training.engine.STORAGE_KEY, JSON.stringify(training.progress));
+  } catch { /* local persistence is best-effort */ }
+}
+
+function trainingPlatform() {
+  return state.env && state.env.hostPlatform === 'win32' ? 'win32' : 'darwin';
+}
+
+function trainingStars(stars) {
+  return `${'★'.repeat(stars)}${'☆'.repeat(Math.max(0, 3 - stars))}`;
+}
+
+function formatTrainingTime(milliseconds) {
+  const seconds = Math.max(0, Number(milliseconds) || 0) / 1000;
+  return seconds < 60 ? `${seconds.toFixed(1)}s` : `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
+}
+
+function renderTrainingSettings() {
+  const records = training.progress.missions;
+  const completed = Object.keys(records).length;
+  const bestStars = Object.values(records).reduce((best, record) => Math.max(best, record.bestStars), 0);
+  $('#training-settings-summary').textContent = `${completed} OF ${training.engine.MISSIONS.length} MISSIONS COMPLETE`
+    + (bestStars ? ` · BEST MASTERY ${trainingStars(bestStars)}` : '');
+  const host = $('#training-settings-missions');
+  host.innerHTML = '';
+  training.engine.MISSIONS.forEach((mission) => {
+    const record = records[mission.id];
+    const row = document.createElement('div');
+    row.className = 'training-settings-mission';
+    const title = document.createElement('strong');
+    title.textContent = mission.title;
+    const rating = document.createElement('span');
+    rating.className = 'training-settings-rating';
+    rating.textContent = record ? trainingStars(record.bestStars) : 'NOT STARTED';
+    row.append(title, rating);
+    host.appendChild(row);
+  });
+}
+
+function renderTrainingSelection() {
+  const records = training.progress.missions;
+  const totalStars = Object.values(records).reduce((sum, record) => sum + record.bestStars, 0);
+  $('#training-selection-mastery').innerHTML = `<strong>${totalStars} / ${training.engine.MISSIONS.length * 3} ★</strong>MASTERY EARNED`;
+  const grid = $('#training-mission-grid');
+  grid.innerHTML = '';
+  training.engine.MISSIONS.forEach((mission, index) => {
+    const record = records[mission.id];
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'training-mission-card';
+    button.dataset.missionId = mission.id;
+    const number = document.createElement('span');
+    number.className = 'training-mission-number';
+    number.textContent = `MISSION ${index + 1}`;
+    const title = document.createElement('h3');
+    title.textContent = mission.title;
+    const copy = document.createElement('p');
+    copy.textContent = mission.summary;
+    const result = document.createElement('span');
+    result.className = 'training-card-result';
+    result.textContent = record
+      ? `${trainingStars(record.bestStars)} · BEST ${formatTrainingTime(record.bestTimeMs)} · ${record.fewestMistakes} MISSES`
+      : 'READY TO TRAIN';
+    button.append(number, title, copy, result);
+    button.onclick = () => startTrainingMission(mission.id);
+    grid.appendChild(button);
+  });
+}
+
+function trainingStepCompleted(actionId, occurrence = 1) {
+  if (!training.run) return false;
+  const mission = training.engine.missionById(training.run.missionId);
+  let seen = 0;
+  return mission.steps.some((step, index) => {
+    if (step.actionId === actionId) seen += 1;
+    return seen === occurrence && index < training.run.stepIndex;
+  });
+}
+
+function renderTrainingFixture() {
+  const run = training.run;
+  const mission = run && training.engine.missionById(run.missionId);
+  if (!mission) return;
+  let activeIndex = mission.fixture === 'switchboard' ? 2 : 0;
+  mission.steps.slice(0, run.stepIndex).forEach((step) => {
+    if (step.actionId === 'session-index') activeIndex = step.sessionIndex;
+  });
+  const detected = trainingStepCompleted('detect');
+  const browserOpen = trainingStepCompleted('browser-toggle');
+  const browserFull = trainingStepCompleted('browser-fullscreen', 1)
+    && !trainingStepCompleted('browser-fullscreen', 2);
+  const composerOpen = trainingStepCompleted('composer-open')
+    && !(mission.fixture === 'safe-exit' && trainingStepCompleted('escape', 1));
+  const createOpen = trainingStepCompleted('create-project')
+    && !trainingStepCompleted('composer-open');
+  const quitOpen = trainingStepCompleted('guarded-quit')
+    && !trainingStepCompleted('escape', 2);
+  const attentionFocused = trainingStepCompleted('queue-focus');
+  const fixture = $('#training-fixture');
+  fixture.innerHTML = `
+    <div class="training-fixture-tabs">
+      ${['API migration', 'Preview QA', 'Release notes'].map((name, index) => `<span class="training-fixture-tab${index === activeIndex ? ' active' : ''}${index === 1 && !attentionFocused ? ' attention' : ''}">${index + 1} · ${name}</span>`).join('')}
+    </div>
+    <div class="training-fixture-body">
+      <div class="training-terminal">
+        <span class="dim">Fixture workspace · no live sessions attached</span>
+        <span>✓ synthetic agent output ready</span>
+        <span class="dim">review requested for localhost:4173</span>
+        <div class="training-terminal-prompt">› Waiting for your shortcut…</div>
+        ${!attentionFocused ? '<div class="training-attention">1 ATTENTION ITEM · Preview QA</div>' : '<div class="training-attention">ATTENTION FOCUSED · Preview QA</div>'}
+      </div>
+      <div class="training-browser${browserOpen ? '' : ' closed'}${browserFull ? ' full' : ''}">
+        <div class="training-browser-bar">localhost:4173 / fixture</div>
+        <div class="training-browser-page"><strong>Fixture Preview</strong><p>Paired browser output is isolated inside the training arena.</p></div>
+      </div>
+    </div>
+    ${detected && !trainingStepCompleted('new-session') ? '<div class="training-sim-dialog"><h4>2 EXTERNAL SESSIONS FOUND</h4><p>Recovered fixtures are ready. Jump to the second session.</p></div>' : ''}
+    ${createOpen ? '<div class="training-sim-dialog"><h4>CREATE PROJECT</h4><p>Template, runtime, and destination are simulated.</p></div>' : ''}
+    ${composerOpen ? '<div class="training-sim-dialog"><h4>PROMPT COMPOSER</h4><p>Draft safely against a fixture session.</p></div>' : ''}
+    ${quitOpen ? '<div class="training-sim-dialog"><h4>LIVE SESSIONS WILL STOP</h4><p>This confirmation is simulated. Cancel it safely.</p></div>' : ''}
+  `;
+}
+
+function announceTraining(message) {
+  const live = $('#training-live-status');
+  live.textContent = '';
+  requestAnimationFrame(() => { live.textContent = message; });
+}
+
+function renderTrainingRun() {
+  const run = training.run;
+  const mission = run && training.engine.missionById(run.missionId);
+  if (!mission || run.completedAt !== null) return;
+  const step = training.engine.expectedStep(run);
+  $('#training-mission-title').textContent = mission.title;
+  $('#training-step-label').textContent = `STEP ${run.stepIndex + 1} OF ${mission.steps.length}`;
+  $('#training-task').textContent = step.task;
+  $('#training-run-stats').textContent = `${run.mistakes} MISTAKE${run.mistakes === 1 ? '' : 'S'}`
+    + (run.startedAt === null ? ' · TIMER READY' : ' · TIMER RUNNING');
+  $('#training-progress-fill').style.width = `${(run.stepIndex / mission.steps.length) * 100}%`;
+  $('#training-hint-copy').textContent = step.hint;
+  $('#training-hint-copy').classList.toggle('hidden', run.hintStepIndex !== run.stepIndex);
+  $('#training-chord').textContent = training.engine.chordLabel(step, trainingPlatform());
+  $('#training-chord').classList.toggle('hidden', run.chordRevealedStepIndex !== run.stepIndex);
+  $('#training-auto-hint').classList.toggle('hidden', !run.autoHintSuggested);
+  $('#training-complete').classList.add('hidden');
+  renderTrainingFixture();
+}
+
+function finishTrainingMission() {
+  const mission = training.engine.missionById(training.run.missionId);
+  const result = training.engine.resultForRun(training.run);
+  training.progress = training.engine.mergeResult(training.progress, mission.id, result);
+  persistTrainingProgress();
+  renderTrainingSettings();
+  renderTrainingSelection();
+  $('#training-progress-fill').style.width = '100%';
+  $('#training-stars').textContent = trainingStars(result.bestStars);
+  $('#training-stars').setAttribute('aria-label', `${result.bestStars} of 3 stars`);
+  $('#training-complete-title').textContent = mission.title;
+  $('#training-complete-stats').textContent = `${formatTrainingTime(result.bestTimeMs)} · ${result.fewestMistakes} mistake${result.fewestMistakes === 1 ? '' : 's'}`;
+  $('#training-complete').classList.remove('hidden');
+  $('#training-complete').focus();
+  announceTraining(`Mission complete. ${result.bestStars} of 3 stars.`);
+}
+
+function receiveShortcutTrainingInput(payload = {}) {
+  if (!training.active) return { ignored: true };
+  if (!training.run) {
+    if (payload.escape) exitTrainingArena();
+    return { ignored: true };
+  }
+  if (training.run.completedAt !== null) {
+    if (payload.escape) showTrainingSelection();
+    return { ignored: true, completed: true };
+  }
+  if (payload.escape && training.engine.expectedStep(training.run)?.actionId !== 'escape') {
+    showTrainingSelection();
+    announceTraining('Mission paused. Unfinished results were not saved.');
+    return { ignored: false, exitedMission: true };
+  }
+  const outcome = training.engine.attempt(training.run, {
+    actionId: payload.actionId,
+    sessionIndex: Number.isInteger(payload.sessionIndex) ? payload.sessionIndex : undefined,
+    escape: payload.escape === true,
+  }, Number.isFinite(payload.timestamp) ? payload.timestamp : Date.now());
+  training.run = outcome.run;
+  if (outcome.correct) {
+    if (outcome.completed) finishTrainingMission();
+    else {
+      renderTrainingRun();
+      announceTraining(`Correct. Step ${training.run.stepIndex + 1} of ${training.engine.missionById(training.run.missionId).steps.length}.`);
+    }
+  } else {
+    renderTrainingRun();
+    announceTraining(`Not that shortcut. ${training.run.mistakes} mistake${training.run.mistakes === 1 ? '' : 's'}.`);
+  }
+  return outcome;
+}
+
+function startTrainingMission(missionId) {
+  training.run = training.engine.createRun(missionId);
+  if (!training.run) return;
+  $('#training-selection').classList.add('hidden');
+  $('#training-run').classList.remove('hidden');
+  renderTrainingRun();
+  $('#training-back').focus();
+  announceTraining(`${training.engine.missionById(missionId).title}. Step 1.`);
+}
+
+function showTrainingSelection() {
+  training.run = null;
+  $('#training-run').classList.add('hidden');
+  $('#training-selection').classList.remove('hidden');
+  renderTrainingSelection();
+  $('#training-mission-grid .training-mission-card')?.focus();
+}
+
+async function launchTrainingArena() {
+  training.lastFocus = document.activeElement;
+  const result = await window.chromux.setShortcutTrainingActive(true);
+  if (!result || result.active !== true) return false;
+  training.active = true;
+  training.run = null;
+  $('#modal-settings').classList.add('hidden');
+  $('#training-arena').classList.remove('hidden');
+  $('#training-run').classList.add('hidden');
+  $('#training-selection').classList.remove('hidden');
+  readTrainingProgress();
+  renderTrainingSettings();
+  renderTrainingSelection();
+  $('#training-mission-grid .training-mission-card')?.focus();
+  return true;
+}
+
+async function exitTrainingArena() {
+  if (!training.active) return false;
+  const result = await window.chromux.setShortcutTrainingActive(false).catch(() => null);
+  if (!result || result.active !== false) return false;
+  training.active = false;
+  training.run = null;
+  $('#training-arena').classList.add('hidden');
+  $('#training-reset-confirmation').classList.add('hidden');
+  $('#modal-settings').classList.remove('hidden');
+  renderTrainingSettings();
+  $('#training-launch').focus();
+  return true;
+}
+
+function resetTrainingProgress() {
+  try { window.localStorage.removeItem(training.engine.STORAGE_KEY); } catch { /* unavailable */ }
+  training.progress = training.engine.emptyProgress();
+  $('#training-reset-confirmation').classList.add('hidden');
+  renderTrainingSettings();
+  renderTrainingSelection();
+  $('#training-reset').focus();
+  announceTraining('Training progress reset.');
+}
 
 function normalizeFavoriteUrl(rawUrl) {
   try {
@@ -9832,6 +10112,8 @@ function openSettings() {
   if (toggle) toggle.checked = Boolean(state.env && state.env.devMode);
   renderPreventSleepStatus();
   renderCustomTabGroups();
+  readTrainingProgress();
+  renderTrainingSettings();
   $('#modal-settings').classList.remove('hidden');
   window.chromux.projectScaffolderConfig().then((config) => {
     state.scaffolderConfig = config;
@@ -11586,6 +11868,34 @@ $('#settings-browser-fullscreen-behavior').addEventListener('change', (event) =>
 $('#settings-prevent-sleep').addEventListener('change', (event) => {
   changePreventSleep(event.target.checked);
 });
+$('#training-launch').addEventListener('click', () => launchTrainingArena());
+$('#training-reset').addEventListener('click', () => {
+  $('#training-reset-confirmation').classList.remove('hidden');
+  $('#training-reset-cancel').focus();
+});
+$('#training-reset-cancel').addEventListener('click', () => {
+  $('#training-reset-confirmation').classList.add('hidden');
+  $('#training-reset').focus();
+});
+$('#training-reset-confirm').addEventListener('click', resetTrainingProgress);
+$('#training-arena-close').addEventListener('click', () => exitTrainingArena());
+$('#training-back').addEventListener('click', showTrainingSelection);
+$('#training-hint').addEventListener('click', () => {
+  if (!training.run || training.run.completedAt !== null) return;
+  training.run = training.engine.useHint(training.run);
+  renderTrainingRun();
+  announceTraining(`Hint: ${training.engine.expectedStep(training.run).hint}`);
+});
+$('#training-reveal').addEventListener('click', () => {
+  if (!training.run || training.run.completedAt !== null) return;
+  training.run = training.engine.revealChord(training.run);
+  renderTrainingRun();
+  announceTraining(`Shortcut revealed: ${training.engine.chordLabel(training.engine.expectedStep(training.run), trainingPlatform())}.`);
+});
+$('#training-replay').addEventListener('click', () => {
+  if (training.run) startTrainingMission(training.run.missionId);
+});
+$('#training-next').addEventListener('click', showTrainingSelection);
 $('#settings-wsl-distro').addEventListener('change', async (event) => {
   const result = await window.chromux.wslSelectDistro(event.target.value);
   state.env.runtime.selectedDistro = result.selectedDistro;
@@ -11995,6 +12305,7 @@ window.chromux.onLifecycleConfirmClose(async (payload = {}) => {
 });
 
 window.chromux.onShortcutDebugInput(noteShortcutDebugInput);
+window.chromux.onShortcutTrainingInput(receiveShortcutTrainingInput);
 window.chromux.onShortcutActivateSessionIndex(handleShortcutActivateSessionIndex);
 window.chromux.onShortcutFocusNextQueueItem(handleShortcutFocusNextQueueItem);
 window.chromux.onShortcutToggleBrowser(handleShortcutToggleBrowser);
@@ -12098,6 +12409,7 @@ function focusNextQueuedPreview(now = Date.now()) {
 }
 
 function handleShortcutActivateSessionIndex(payload) {
+  if (training.active) return null;
   const index = Number(payload && payload.index);
   if (!Number.isInteger(index) || modalOpen() || editableFocused()) return null;
 
@@ -12124,11 +12436,13 @@ function handleShortcutActivateSessionIndex(payload) {
 }
 
 function handleShortcutFocusNextQueueItem(now = Date.now()) {
+  if (training.active) return null;
   if (modalOpen() || editableFocused()) return null;
   return focusNextQueuedPreview(now);
 }
 
 function handleShortcutToggleBrowser() {
+  if (training.active) return null;
   if (modalOpen() || editableFocused()) return null;
   const session = state.sessions.get(state.activeId);
   if (!session) return null;
@@ -12137,6 +12451,7 @@ function handleShortcutToggleBrowser() {
 }
 
 function handleShortcutBrowserFullscreen() {
+  if (training.active) return null;
   if (modalOpen() || editableFocused()) return null;
   const session = state.sessions.get(state.activeId);
   if (!session) return null;
@@ -12145,24 +12460,28 @@ function handleShortcutBrowserFullscreen() {
 }
 
 function handleShortcutOpenNewSession() {
+  if (training.active) return null;
   if (guardedShortcutDisabledReason(shortcutFocusContext())) return null;
   openNewSessionModal('open');
   return { opened: true, mode: 'open' };
 }
 
 function handleShortcutCreateProject() {
+  if (training.active) return null;
   if (guardedShortcutDisabledReason(shortcutFocusContext())) return null;
   openNewSessionModal('create');
   return { opened: true, mode: 'create' };
 }
 
 function handleShortcutOpenDetectModal() {
+  if (training.active) return null;
   if (guardedShortcutDisabledReason(shortcutFocusContext())) return null;
   openDetectModal();
   return { opened: true };
 }
 
 function handleShortcutOpenComposer() {
+  if (training.active) return null;
   if (guardedShortcutDisabledReason(shortcutFocusContext())) return null;
   const session = state.sessions.get(state.activeId);
   if (!session) return null;
@@ -12197,6 +12516,7 @@ function fallbackChromuxShortcutAction(input, primaryModifier = state.env && sta
   if (key === 'J' && !input.shift) return { id: 'queue-focus' };
   if (key === 'B' && input.shift) return { id: 'browser-toggle' };
   if (key === 'F' && input.shift) return { id: 'browser-fullscreen' };
+  if (key === 'Q' && !input.shift) return { id: 'guarded-quit' };
   if (String(input.key || '').toLowerCase() === 'enter' && input.shift) return { id: 'composer-open' };
   return null;
 }
@@ -12229,6 +12549,97 @@ function handleRendererShortcutKeydown(e) {
     noteShortcutDebugInput(shortcutDebugInputFromDomEvent(e, 'renderer'));
     e.preventDefault();
   }
+}
+
+function handleTrainingDomInput(event) {
+  if (!training.active || event.type !== 'keydown') return false;
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    receiveShortcutTrainingInput({
+      actionId: 'escape',
+      platformLabel: 'Escape',
+      timestamp: Date.now(),
+      escape: true,
+    });
+    return true;
+  }
+  const action = chromuxShortcutActionFromInput(shortcutInputFromDomEvent(event));
+  if (!action) return false;
+  event.preventDefault();
+  receiveShortcutTrainingInput({
+    actionId: action.id,
+    ...(Number.isInteger(action.index) ? { sessionIndex: action.index } : {}),
+    platformLabel: action.label || '',
+    timestamp: Date.now(),
+  });
+  return true;
+}
+
+function trapTrainingFocus(event) {
+  if (!training.active || event.type !== 'keydown' || event.key !== 'Tab') return false;
+  const arena = $('#training-arena');
+  const focusable = [...arena.querySelectorAll(
+    'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+  )].filter((element) => !element.closest('.hidden'));
+  if (focusable.length === 0) {
+    event.preventDefault();
+    return true;
+  }
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (!arena.contains(document.activeElement)) {
+    event.preventDefault();
+    first.focus();
+    return true;
+  }
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+    return true;
+  }
+  if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+    return true;
+  }
+  return false;
+}
+
+if (window.chromuxTest) {
+  window.chromuxTestTraining = {
+    launch: launchTrainingArena,
+    exit: exitTrainingArena,
+    start: startTrainingMission,
+    select: showTrainingSelection,
+    input: receiveShortcutTrainingInput,
+    hint: () => $('#training-hint').click(),
+    reveal: () => $('#training-reveal').click(),
+    replay: () => $('#training-replay').click(),
+    resetRequest: () => $('#training-reset').click(),
+    resetCancel: () => $('#training-reset-cancel').click(),
+    resetConfirm: () => $('#training-reset-confirm').click(),
+    openSettings,
+    state: () => ({
+      active: training.active,
+      run: training.run ? { ...training.run } : null,
+      progress: JSON.parse(JSON.stringify(training.progress)),
+      arenaHidden: $('#training-arena').classList.contains('hidden'),
+      selectionHidden: $('#training-selection').classList.contains('hidden'),
+      runHidden: $('#training-run').classList.contains('hidden'),
+      resetHidden: $('#training-reset-confirmation').classList.contains('hidden'),
+      activeElementId: document.activeElement && document.activeElement.id,
+      liveStatus: $('#training-live-status').textContent,
+    }),
+    safetySnapshot: () => ({
+      activeId: state.activeId,
+      sessionCount: state.sessions.size,
+      queueCounts: orderedSessions().map((session) => session.browser.queue.length),
+      layoutModes: orderedSessions().map((session) => session.browser.layoutMode),
+      detectHidden: $('#modal-detect').classList.contains('hidden'),
+      newHidden: $('#modal-new').classList.contains('hidden'),
+      lifecycleHidden: $('#modal-lifecycle').classList.contains('hidden'),
+    }),
+  };
 }
 
 if (window.chromuxTest) {
@@ -15428,6 +15839,8 @@ function fakeSessionEls() {
 }
 
 document.addEventListener('keydown', (e) => {
+  if (handleTrainingDomInput(e)) return;
+  if (trapTrainingFocus(e)) return;
   if (e.key === 'Tab' && !$('#windows-setup-overlay').classList.contains('hidden')) {
     const focusable = [...$('#windows-setup-overlay').querySelectorAll(
       'button:not([disabled]), select:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
@@ -15496,6 +15909,9 @@ window.addEventListener('blur', () => {
 });
 window.addEventListener('resize', positionSessionSearch);
 window.addEventListener('resize', syncBrowserChromuxTopInset);
+window.addEventListener('beforeunload', () => {
+  if (training.active) window.chromux.setShortcutTrainingActive(false).catch(() => {});
+});
 
 setInterval(() => {
   scanPtyAgentDescendants(false).catch(() => {});
@@ -15523,6 +15939,8 @@ setInterval(() => {
   await state.favoritesReady;
   state.projects = await window.chromux.projectsRead().catch(() => []);
   state.env = await window.chromux.getEnv();
+  readTrainingProgress();
+  renderTrainingSettings();
   state.windowsSetup = state.env?.runtime?.setupStatus || null;
   state.scaffolderConfig = await window.chromux.projectScaffolderConfig().catch(() => null);
   document.body.classList.toggle('host-win32', state.env.hostPlatform === 'win32');

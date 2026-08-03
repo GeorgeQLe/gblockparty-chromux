@@ -89,7 +89,7 @@ function chromuxShortcutAction(input = {}, platform = process.platform) {
   const primary = windows ? chord.control : chord.meta;
   const secondary = windows ? chord.meta : chord.control;
   if (!primary || chord.alt || secondary || !chord.key) return null;
-  const prefix = windows ? 'Ctrl' : 'Cmd';
+  const prefix = windows ? 'Ctrl' : '⌘';
 
   if (/^[1-9]$/.test(chord.key) && !chord.shift) {
     return {

@@ -2240,3 +2240,78 @@
   explicit manual deploy contract exists; the GitHub Release is Chromux's
   required update channel. Next command: complete the dashboard-only Vercel
   OAuth app registration and live preview proof tracked in `tasks/todo.md`.
+
+## 2026-08-02 — Hotkey Training Grounds and v0.78.0
+
+- Added a Settings-launched, full-window Hotkey Training Grounds with four
+  fixture-backed missions for recovery, direct session switching, attention
+  focus, paired-browser layouts, Composer, project creation, and guarded exit.
+  Missions include contextual hints, explicit shortcut reveal, elapsed timing,
+  replay, mistake tracking, one-to-three-star mastery, and confirmed progress
+  reset.
+- Routed physical host and renderer shortcut input through the production
+  parser while training is active, forwarding only bounded action IDs, session
+  indexes, timestamps, and Escape into the simulation. Main-process
+  authorization, navigation/window cleanup, renderer guards, and the
+  full-window modal keep live sessions, queues, browsers, projects, Composer,
+  and lifecycle actions unchanged. A final review added keyboard focus
+  containment to match the arena's modal semantics.
+- Ship manifest — User goal: complete and publish the isolated Hotkey Training
+  Grounds feature as v0.78.0.
+- Changed files and per-file purpose: `prototype/hotkey-training.js` defines
+  the immutable mission engine, scoring, bounded schema-v1 progress, and
+  platform chord labels; `prototype/main.js` and `prototype/preload.js` provide
+  the authorized training input bridge; `prototype/shortcut-input.js` aligns
+  production macOS labels with the displayed Command symbol;
+  `prototype/renderer/index.html`, `prototype/renderer/renderer.js`, and
+  `prototype/renderer/styles.css` implement the Settings entry, simulated
+  arena, progress UI, screen-reader feedback, reduced motion, focus containment,
+  and live-state isolation; the three changed/new test scripts cover parser,
+  engine, physical input, safety, persistence, focus, exit, and routing;
+  `prototype/README.md` and `prototype/docs/privacy-and-local-data.md` document
+  usage and local retention; package metadata sets 0.78.0 and exposes the
+  focused test command; `RELEASES.md` documents the release; `tasks/todo.md`
+  records completion; this entry records the release gate and rollback.
+- User-goal mapping: all mission steps use action IDs returned by the same
+  production shortcut parser as normal Chromux operation. Training state is
+  renderer-local, fixture rendering uses static synthetic content, and every
+  live mutation handler returns early while the main process captures physical
+  shortcuts for the arena. Exiting disables interception before restoring
+  Settings focus.
+- Executable verification: every changed/new JavaScript file passed
+  `node --check`; `npm run test:hotkey-training` passed deterministic engine
+  and real-Electron physical-input/isolation/focus coverage; and
+  `node scripts/test-shortcuts-renderer.js` passed production parser coverage.
+  The complete `npm test` matrix then passed all activity/sidebar labs,
+  renderer, shortcut/webview, session, theme, startup, capture/resource,
+  storage, Vercel, and Windows platform/setup/artifact/signing suites.
+  Package/lock 0.78.0 consistency and `git diff --check` passed.
+- Validation warning: the existing Streak attention click-target test missed a
+  native hover boundary on its first matrix attempt, then passed on the
+  runner's built-in retry. The changed feature does not touch that geometry or
+  pointer path; no unresolved test failure remains.
+- Skipped tests: no live agent/model turn, external account, or network UAT was
+  run because the product contract is deliberately synthetic and the
+  real-Electron suite drives physical host input while proving exact live-state
+  isolation. No separate screenshot baseline exists; the complete theme matrix
+  and renderer geometry/accessibility assertions cover the shipped UI.
+- Adversarial review: the repository lacks the referenced
+  `docs/quality-gate-contract.md`, `quality-sweep`, and `expert-review`, so a
+  failure-oriented exact-diff and event-order review served as the equivalent
+  gate. It checked unauthorized/stale IPC state, navigation and window cleanup,
+  host/renderer/webview input duplication, ordinary typing, modifier-only
+  input, wrong recognized shortcuts, Escape at each arena phase, live handler
+  suppression, queue/layout/session invariants, malformed and oversized local
+  progress, per-step hints, replay scoring, reduced motion, screen-reader
+  announcements, modal focus escape, reset scope, and normal routing after
+  exit. The modal focus leak found during review was fixed and regressed.
+- Residual risk: synthetic fixtures intentionally demonstrate Chromux workflow
+  state rather than exercising provider CLIs or real browser navigation.
+  Future shortcut additions require adding the matching bounded mission label
+  only when a mission adopts that action.
+- Rollback note: revert the v0.78.0 shipping commit, delete GitHub Release and
+  tag `chromux-v0.78.0`, and republish v0.77.0 as latest if needed. Deploy
+  skipped: no explicit manual deploy contract exists; the GitHub Release is
+  Chromux's required update channel. Next command: complete the dashboard-only
+  Vercel OAuth app registration and live preview proof tracked in
+  `tasks/todo.md`.

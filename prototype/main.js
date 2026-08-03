@@ -193,6 +193,7 @@ let windowsSetupStatus = null;
 let windowsHookWarning = null;
 const shortcutFocusContexts = new Map(); // webContentsId -> { focusKind }
 const shortcutRouteLog = [];
+let shortcutTrainingActive = false;
 const resourceClient = new BrokerClient({ client: {
   clientId: `chromux-app:${process.pid}`,
   displayName: 'Chromux desktop app',
@@ -974,6 +975,32 @@ ipcMain.on('shortcut-focus-context', (event, payload = {}) => {
   });
 });
 
+ipcMain.handle('shortcut-training-active-set', (event, requested) => {
+  const authorized = Boolean(win && !win.isDestroyed() && event.sender === win.webContents);
+  shortcutTrainingActive = authorized && requested === true;
+  return { active: shortcutTrainingActive };
+});
+
+function isEscapeShortcutInput(input = {}) {
+  if (String(input.type || 'keyDown') !== 'keyDown') return false;
+  return [input.key, input.keyCode, input.code]
+    .some((value) => ['escape', 'esc'].includes(String(value || '').toLowerCase()));
+}
+
+function forwardShortcutTrainingInput(event, input, action) {
+  if (!shortcutTrainingActive || (!action && !isEscapeShortcutInput(input))) return false;
+  event.preventDefault();
+  const escape = !action;
+  send('shortcut-training-input', {
+    actionId: escape ? 'escape' : action.id,
+    ...(Number.isInteger(action && action.index) ? { sessionIndex: action.index } : {}),
+    platformLabel: escape ? 'Escape' : action.label,
+    timestamp: Date.now(),
+    ...(escape ? { escape: true } : {}),
+  });
+  return true;
+}
+
 function validWindowButtonPosition(position) {
   return Boolean(position)
     && Number.isFinite(position.x)
@@ -998,6 +1025,10 @@ function handleShellShortcutInput(event, input, source = 'host', webContentsId =
   const action = chromuxShortcutAction(input || {}, process.platform);
   const context = shortcutFocusContextForSource(source, webContentsId);
   const focusKind = classifyShortcutFocusContext(context);
+  if (forwardShortcutTrainingInput(event, input || {}, action)) {
+    recordShortcutRoute(input || {}, source, webContentsId, action || { id: 'escape' }, true, 'training');
+    return true;
+  }
   if (!action || !shouldRouteChromuxShortcut(input || {}, context, process.platform)) {
     recordShortcutRoute(input || {}, source, webContentsId, action, false, focusKind);
     return false;
@@ -1958,6 +1989,9 @@ function createWindow() {
   win.webContents.on('before-input-event', (event, input) => {
     handleShellShortcutInput(event, input, 'host', win.webContents.id);
   });
+  win.webContents.on('did-start-navigation', (_event, _url, _inPlace, isMainFrame) => {
+    if (isMainFrame) shortcutTrainingActive = false;
+  });
 
   if (SMOKE) {
     win.webContents.on('console-message', (_e, level, message) => {
@@ -2012,6 +2046,7 @@ function createWindow() {
   });
 
   win.on('closed', () => {
+    shortcutTrainingActive = false;
     win = null;
   });
 }

@@ -6,6 +6,15 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Add Settings-launched Hotkey Training Grounds with four fixture-backed
+  workflow missions, real production-parsed keyboard input, strict isolation
+  from live state and lifecycle, hints/reveals/timing/mastery, validated local
+  progress and reset, macOS/Windows labels, accessible Electron coverage, and
+  ship v0.78.0. _(source: user-supplied Hotkey Training Grounds plan; evidence:
+  `prototype/hotkey-training.js`, main/preload training bridge,
+  renderer arena, focused/complete prototype and theme coverage, package
+  metadata, `RELEASES.md`, tag, and GitHub Release)_
+
 - [x] Add the existing full session context menu to Threads sidebar rows on
   right-click, activate an inactive target before opening its actions, dismiss
   pending/open terminal previews, preserve tab menu behavior, and ship

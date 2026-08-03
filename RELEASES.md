@@ -1,5 +1,25 @@
 # Release Notes
 
+## GBlockParty Chromux v0.78.0
+
+Tag: `chromux-v0.78.0`
+
+- Add Hotkey Training Grounds to Settings with four fixture-backed workflow
+  missions, mission selection and replay, contextual hints, full chord reveal,
+  accessible status announcements, elapsed timing, and one-to-three-star
+  mastery scoring.
+- Intercept only production-recognized Chromux shortcuts and Escape while
+  training is active, route sanitized action IDs into the simulation, and keep
+  live sessions, queues, browsers, projects, Composer, and app quit behavior
+  untouched.
+- Persist a bounded schema-v1 local progress record with best time, fewest
+  mistakes, best stars, and last completion time; reject malformed, oversized,
+  future-schema, and unknown-mission data, and provide a training-only
+  confirmed reset.
+- Use the production shortcut parser for mission parity, display ⌘ labels on
+  macOS and Ctrl labels on Windows, and contain keyboard focus within the
+  modal arena.
+
 ## GBlockParty Chromux v0.77.0
 
 Tag: `chromux-v0.77.0`

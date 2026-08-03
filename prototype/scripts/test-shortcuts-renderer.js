@@ -28,6 +28,8 @@ expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 't', meta: true }).
 expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'n', meta: true }).id === 'create-project', 'Command+N should be Chromux-owned');
 expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'n', control: true }, 'win32').id === 'create-project', 'Control+N should be Chromux-owned on Windows');
 expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'd', meta: true }).id === 'detect', 'Command+D should be Chromux-owned');
+expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'd', meta: true }).label === '⌘+D', 'macOS shortcut labels should use the Command symbol');
+expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'q', meta: true }).id === 'guarded-quit', 'Command+Q should be Chromux-owned');
 expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'Enter', meta: true, shift: true }).id === 'composer-open', 'Command+Shift+Enter should open composer');
 expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: 'f', meta: true, shift: true }).id === 'browser-fullscreen', 'Command+Shift+F should toggle browser fullscreen');
 expectShortcut(chromuxShortcutAction({ type: 'keyDown', key: '', code: 'KeyF', modifiers: ['command', 'shift'] }).id === 'browser-fullscreen', 'Command+Shift+F should accept Electron code/modifier input');
