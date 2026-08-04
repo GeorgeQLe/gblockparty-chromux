@@ -2692,3 +2692,52 @@
   skipped: no explicit manual deploy contract exists; the GitHub Release is
   Chromux's required update channel. Next command: continue the blocked signed
   Windows release prerequisite work tracked in `tasks/todo.md`.
+
+## 2026-08-04 — Persistent Settings update status v0.81.0
+
+- Moved the update status from the scrollable Settings body into a fixed,
+  accessible footer row above the existing actions. Version details, release
+  URL, and install/check diagnostics remain in the body.
+- Manual checks now immediately show neutral “Checking for updates…” feedback
+  and disable the check action until the unchanged update-check IPC completes.
+  Existing current, available, queued, blocked, installing, and failure
+  projection and install behavior remain intact.
+- Ship manifest — User goal: keep Chromux update results visible without
+  scrolling, add immediate check feedback, preserve updater behavior, support
+  narrow layouts, and publish v0.81.0.
+- Changed files and per-file purpose: `prototype/renderer/index.html` moves
+  the live status and groups footer actions; `prototype/renderer/styles.css`
+  supplies settings-only two-row, wrapping, responsive geometry;
+  `prototype/renderer/renderer.js` supplies synchronous manual-check feedback;
+  the update-queue renderer test covers placement, accessibility, update
+  phases, long copy, narrow geometry, and disabled/checking state; package
+  metadata and `RELEASES.md` define v0.81.0; task files record completion and
+  this manifest.
+- User-goal mapping: only presentation and manual-check feedback changed.
+  Updater APIs, persisted state, update queues, managed-install decisions,
+  lifecycle protection, restore snapshots, release links, and diagnostic
+  output are unchanged.
+- Executable verification: focused update-queue, GitHub update-check, and
+  theme renderer suites passed; the complete `npm test` matrix passed all
+  renderer, Electron, service, platform, packaging, and signing-configuration
+  tests; `git diff --check` passed. The full suite's first
+  `test-browser-collapse-renderer.js` attempt hit an unrelated WebView
+  readiness race and passed on its built-in retry.
+- Visual verification: isolated real-Electron captures with the Settings body
+  at both its top and bottom confirmed the status and actions remain fixed,
+  separated, fully visible, and unclipped.
+- Adversarial review: inspected the exact diff for scroll containment,
+  settings-only selector scope, theme inheritance, live-region semantics,
+  neutral-to-result class transitions, hidden install actions, long unbroken
+  copy, narrow action wrapping, and unchanged check/install wiring. No
+  blocking finding remains.
+- Skipped tests and residual risk: no packaged-app build was run because the
+  change is renderer-only and real-Electron source tests and screenshots
+  exercised Chromium layout directly. Future localization could create longer
+  action labels that need another breakpoint, although the action row already
+  wraps.
+- Rollback note: revert the v0.81.0 shipping commit and remove its GitHub
+  Release and tag if necessary; v0.80.2 then becomes latest again. Deploy
+  skipped: no explicit manual deploy contract exists; the GitHub Release is
+  Chromux's required update channel. Next command: continue the blocked signed
+  Windows release prerequisite work tracked in `tasks/todo.md`.

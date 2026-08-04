@@ -6,6 +6,16 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Keep Chromux update results visible without scrolling by moving the
+  update status into a fixed, accessible two-row Settings footer; show
+  immediate manual-check feedback; preserve update/install behavior and
+  scrollable diagnostics; cover narrow layouts; and ship v0.81.0. _(source:
+  user-supplied Persistent Settings Update Status plan; evidence:
+  `prototype/renderer/index.html`, `prototype/renderer/styles.css`,
+  `prototype/renderer/renderer.js`, focused/full prototype validation,
+  Electron visual smoke, package metadata, `RELEASES.md`, tag, and GitHub
+  Release)_
+
 - [x] Recognize Codex 0.146's one-key “Implement this plan?” options as logical
   turn submissions, immediately project Working across tabs and Threads,
   preserve exact-once PTY delivery and Composer-shadow suppression, keep

@@ -2419,11 +2419,13 @@ input[type="text"]:focus, input[type="password"]:focus, #cap-notes:focus, select
   text-align: left;
 }
 .settings-status {
+  box-sizing: border-box;
   border: 1px solid var(--line);
   background: var(--bg0);
   color: var(--dim);
   padding: 11px 12px;
   line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 .settings-status.ready {
   border-color: rgba(255, 180, 84, 0.45);
@@ -2449,6 +2451,27 @@ input[type="text"]:focus, input[type="password"]:focus, #cap-notes:focus, select
   user-select: all;
   overflow-x: auto;
   white-space: nowrap;
+}
+.modal-foot.settings-update-foot {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+.settings-update-foot .settings-status {
+  width: 100%;
+  min-width: 0;
+}
+.settings-update-foot-actions {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+@media (max-width: 520px) {
+  .settings-update-foot-actions .btn {
+    flex: 1 1 auto;
+  }
 }
 
 /* capture modal specifics */

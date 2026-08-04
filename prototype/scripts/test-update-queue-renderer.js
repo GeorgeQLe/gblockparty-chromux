@@ -56,6 +56,29 @@ fs.writeFileSync(e2ePath, `
   };
 
   await new Promise((resolve) => setTimeout(resolve, 100));
+  const settingsModal = document.querySelector('#modal-settings .modal-settings');
+  const settingsBody = settingsModal.querySelector('.modal-body');
+  const settingsFooter = settingsModal.querySelector('.modal-foot');
+  const updateStatus = document.querySelector('#settings-update-status');
+  const updateActions = settingsFooter.querySelector('.settings-update-foot-actions');
+  expect(settingsFooter.contains(updateStatus),
+    'update status should stay visible inside the fixed settings footer');
+  expect(!settingsBody.contains(updateStatus),
+    'update status should not scroll with the settings body');
+  expect(updateStatus.getAttribute('role') === 'status',
+    'update status should expose status semantics');
+  expect(updateStatus.getAttribute('aria-live') === 'polite',
+    'update status should announce completed checks politely');
+  expect(updateActions, 'settings footer should group update actions on their own row');
+
+  q.setStatus({
+    updateAvailable: false,
+    latestVersion: '0.80.2',
+    latestTag: 'chromux-v0.80.2',
+  });
+  expect(q.statusText() === 'Chromux is current. Latest release is chromux-v0.80.2.',
+    'current-version result should render in the footer');
+
   q.setStatus({
     updateAvailable: true,
     managedInstall: {
@@ -64,6 +87,8 @@ fs.writeFileSync(e2ePath, `
       command: 'npm run install-app',
     },
   });
+  expect(/Update available: chromux-v0\.0\.1 is newer than 0\.0\.0\./.test(q.statusText()),
+    'available-version result should render in the footer');
 
   // Explicit queue state, including a failed retry, must retain the protected
   // lifecycle/snapshot path even in an otherwise empty workspace.
@@ -88,6 +113,8 @@ fs.writeFileSync(e2ePath, `
   await answerWarning(true);
   await settle();
   expect(q.phase() === 'running', 'failed retry should install from its existing queue state');
+  expect(/Installing (the Chromux update|update)/.test(q.statusText()),
+    'installing result should render in the footer');
   expect(q.installTrace().lifecyclePrompts === 1, 'failed retry must not use the idle-workspace bypass');
   expect(q.installTrace().restoreSnapshots === 1, 'failed retry should retain snapshot protection');
 
@@ -303,6 +330,7 @@ fs.writeFileSync(e2ePath, `
   expect(q.attentionKinds().includes('UPDATE FAILED'), 'failed update should stay visible in the pinned Threads system row');
   expect(q.attentionButtons('UPDATE FAILED').includes('dismiss'), 'failed update should expose Dismiss');
   expect(q.installButtonText() === 'RETRY INSTALL', 'failed settings action should retry');
+  expect(q.statusText() === 'fixture failure', 'failure result should render in the footer');
   q.dismissItem('UPDATE FAILED');
   expect(q.phase() === 'failed', 'failed dismissal should wait for confirmation');
   await answerWarning(true);
@@ -369,6 +397,39 @@ fs.writeFileSync(e2ePath, `
   sig.focus(orderHolder);
   expect(sig.attentionItems().some((i) => i.kind === 'INPUT NEEDED' && i.name === 'order-input'),
     'blur keeps the still-actionable input-needed item visible');
+
+  q.setStatus({
+    updateAvailable: false,
+    error: 'The update service returned a deliberately long diagnostic message so the persistent footer can prove that status copy wraps without crowding or overlapping any settings action.',
+  });
+  document.querySelector('#modal-settings').classList.remove('hidden');
+  settingsModal.style.width = '360px';
+  settingsBody.scrollTop = settingsBody.scrollHeight;
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  const footerRect = settingsFooter.getBoundingClientRect();
+  const statusRect = updateStatus.getBoundingClientRect();
+  const actionsRect = updateActions.getBoundingClientRect();
+  const statusLineHeight = parseFloat(getComputedStyle(updateStatus).lineHeight);
+  expect(statusRect.width <= footerRect.width && statusRect.left >= footerRect.left && statusRect.right <= footerRect.right,
+    'long update status should stay inside the narrow settings footer');
+  expect(statusRect.height > statusLineHeight * 1.5,
+    'long update status should wrap to multiple lines');
+  expect(statusRect.bottom <= actionsRect.top,
+    'wrapped update status should occupy a separate row above settings actions');
+  for (const button of updateActions.querySelectorAll('button')) {
+    if (button.classList.contains('hidden')) continue;
+    const rect = button.getBoundingClientRect();
+    expect(rect.left >= footerRect.left && rect.right <= footerRect.right,
+      'narrow settings footer should keep ' + button.textContent.trim() + ' inside its bounds');
+  }
+
+  const checkButton = document.querySelector('#settings-check-updates');
+  checkButton.click();
+  expect(checkButton.disabled, 'manual update checks should disable the check button immediately');
+  expect(q.statusText() === 'Checking for updates…',
+    'manual update checks should render immediate footer feedback');
+  expect(updateStatus.className === 'settings-status',
+    'manual update checks should use the neutral footer status style');
 
   return JSON.stringify({
     ok: true,

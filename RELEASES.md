@@ -1,5 +1,19 @@
 # Release Notes
 
+## GBlockParty Chromux v0.81.0
+
+Tag: `chromux-v0.81.0`
+
+- Keep update results visible in a fixed, two-row Settings footer while
+  version details, release links, and install diagnostics remain scrollable.
+- Show neutral “Checking for updates…” feedback as soon as a manual check
+  begins, and disable the check action until the existing update check
+  completes.
+- Preserve current, available, queued, blocked, installing, and failed update
+  states with an accessible polite status announcement.
+- Wrap long status messages above responsive footer actions so Settings stays
+  usable in narrow Chromux windows.
+
 ## GBlockParty Chromux v0.80.2
 
 Tag: `chromux-v0.80.2`

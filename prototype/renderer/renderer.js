@@ -10009,7 +10009,12 @@ function renderUpdateStatus(status) {
 
 async function checkUpdates(manual = false) {
   const btn = $('#settings-check-updates');
+  const statusEl = $('#settings-update-status');
   if (btn) btn.disabled = true;
+  if (manual && statusEl) {
+    statusEl.className = 'settings-status';
+    statusEl.textContent = 'Checking for updates…';
+  }
   try {
     renderUpdateStatus(await window.chromux.checkUpdates({ manual }));
   } finally {

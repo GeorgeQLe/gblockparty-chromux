@@ -386,13 +386,15 @@
             <button id="settings-source-dir" class="pathlink settings-path">—</button>
           </div>
         </div>
-        <div id="settings-update-status" class="settings-status">Update status unknown.</div>
         <div class="settings-command hidden" id="settings-update-command"></div>
       </div>
-      <div class="modal-foot">
-        <button class="btn" data-close="modal-settings">CLOSE</button>
-        <button id="settings-install-update" class="btn hidden">INSTALL UPDATE</button>
-        <button id="settings-check-updates" class="btn btn-amber">CHECK FOR UPDATES</button>
+      <div class="modal-foot settings-update-foot">
+        <div id="settings-update-status" class="settings-status" role="status" aria-live="polite">Update status unknown.</div>
+        <div class="settings-update-foot-actions">
+          <button class="btn" data-close="modal-settings">CLOSE</button>
+          <button id="settings-install-update" class="btn hidden">INSTALL UPDATE</button>
+          <button id="settings-check-updates" class="btn btn-amber">CHECK FOR UPDATES</button>
+        </div>
       </div>
     </div>
   </div>
