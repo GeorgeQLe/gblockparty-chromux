@@ -1379,9 +1379,11 @@ const CODEX_PROMPT_PLACEHOLDER_RE = /^(?:ask codex(?: anything)?|type (?:a )?(?:
 const CODEX_PROMPT_CHROME_RE = /(?:\?\s+for shortcuts|\bcontext(?:\s+(?:100|[1-9]?\d)%)?\s+left\b|^\s*choose an option:)/iu;
 const CODEX_FRAME_EDGE_RE = /^\s*[╭╰┌└┏┗╔╚].*[╮╯┐┘┓┛╗╝]\s*$/u;
 const CODEX_FRAME_VERTICAL_RE = /^\s*[│┃║]\s?(.*?)(?:\s?[│┃║])?\s*$/u;
-const CODEX_NUMERIC_CHOOSER_SELECTED_RE = /^\s*[›❯]\s*([1-9])\.\s+\S/u;
-const CODEX_NUMERIC_CHOOSER_OPTION_RE = /^\s*(?:[›❯]\s*)?([1-9])\.\s+\S/u;
+const CODEX_NUMERIC_CHOOSER_SELECTED_RE = /^\s*[›❯]\s*([1-9])\.\s+(.+?)\s*$/u;
+const CODEX_NUMERIC_CHOOSER_OPTION_RE = /^\s*(?:[›❯]\s*)?([1-9])\.\s+(.+?)\s*$/u;
 const CODEX_NUMERIC_CHOOSER_FOOTER_RE = /\b(?:enter|return)\b.{0,80}\b(?:confirm|submit|select|continue|proceed)\b|\b(?:confirm|submit|select|continue|proceed)\b.{0,80}\b(?:enter|return)\b/iu;
+const CODEX_PLAN_HANDOFF_PROMPT_RE = /\b(?:implement this plan\?|implementation plan is complete\b)/iu;
+const CODEX_PLAN_HANDOFF_OPTION_RE = /^(?:yes,\s*)?(?:implement|clear context and implement|proceed with implementation)\b/iu;
 const AGENT_STARTUP_TIMEOUT_MS = 15_000;
 const AGENT_STARTUP_BUFFER_ROWS = 1024;
 const AGENT_STARTUP_PHASES = new Set(['starting', 'ready', 'stalled', 'revealed']);
@@ -1403,11 +1405,11 @@ function codexPromptRowContent(text, { trimEnd = true } = {}) {
   return trimEnd ? raw.replace(/\s+$/u, '') : raw;
 }
 
-function hasActiveCodexNumericChooser(session) {
-  if (!session || session.agent !== 'codex') return false;
+function readActiveCodexNumericChooser(session, selectionNumber = null) {
+  if (!session || session.agent !== 'codex') return null;
   const term = session.term && session.term.term;
   const buffer = term && term.buffer && term.buffer.active;
-  if (!buffer || !Number.isFinite(buffer.viewportY) || !Number.isFinite(buffer.length)) return false;
+  if (!buffer || !Number.isFinite(buffer.viewportY) || !Number.isFinite(buffer.length)) return null;
   const visibleStart = Math.max(0, buffer.viewportY);
   const visibleRows = Number.isFinite(term.rows) ? Math.max(1, term.rows) : 1;
   const visibleEnd = Math.min(buffer.length - 1, visibleStart + visibleRows - 1);
@@ -1429,17 +1431,34 @@ function hasActiveCodexNumericChooser(session) {
     const chooserRows = rows.filter((row) => row.index >= chooserStart && row.index < footer.index);
     const selectedRows = chooserRows.map((row) => {
       const match = row.text.match(CODEX_NUMERIC_CHOOSER_SELECTED_RE);
-      return match ? { ...row, number: match[1] } : null;
+      return match ? { ...row, number: match[1], label: match[2] } : null;
     }).filter(Boolean);
     const optionRows = chooserRows.map((row) => {
       const match = row.text.match(CODEX_NUMERIC_CHOOSER_OPTION_RE);
-      return match ? { ...row, number: match[1] } : null;
+      return match ? { ...row, number: match[1], label: match[2] } : null;
     }).filter(Boolean);
-    if (selectedRows.some((selected) => optionRows.some((option) => (
+    const activeSelected = selectedRows.filter((selected) => optionRows.some((option) => (
       option.number !== selected.number && Math.abs(option.index - selected.index) <= 5
-    )))) return true;
+    ))).at(-1);
+    if (!activeSelected) continue;
+    const activeOptions = optionRows.filter((option) => Math.abs(option.index - activeSelected.index) <= 5);
+    const requestedNumber = /^[1-9]$/.test(String(selectionNumber || ''))
+      ? String(selectionNumber)
+      : activeSelected.number;
+    const selectedOption = activeOptions
+      .filter((option) => option.number === requestedNumber)
+      .sort((a, b) => Math.abs(a.index - activeSelected.index) - Math.abs(b.index - activeSelected.index))[0]
+      || null;
+    const chooserText = chooserRows.map((row) => row.text).join('\n');
+    return {
+      selectedNumber: selectedOption ? selectedOption.number : requestedNumber,
+      selectedLabel: selectedOption ? selectedOption.label : '',
+      startsImplementation: Boolean(selectedOption
+        && CODEX_PLAN_HANDOFF_PROMPT_RE.test(chooserText)
+        && CODEX_PLAN_HANDOFF_OPTION_RE.test(selectedOption.label)),
+    };
   }
-  return false;
+  return null;
 }
 
 function readCodexRenderedPrompt(session) {
@@ -1585,7 +1604,7 @@ function trackTypedPreviewSuppressions(session, data) {
     // keystroke shadow when the rendered prompt is unavailable or ambiguous.
     resolveCurrentTerminalPrompt(session);
   }
-  if (/^[1-9]$/.test(raw) && hasActiveCodexNumericChooser(session)) {
+  if (/^[1-9]$/.test(raw) && readActiveCodexNumericChooser(session, raw)) {
     t.codexCompletionIntent = null;
     t.typedInputBuf = '';
     t.typedInputCursor = 0;
@@ -1925,7 +1944,8 @@ function apply(event) {
       // Only state-changing input is worth ring space — raw typing is noise.
       const submittedLine = session ? trackTypedPreviewSuppressions(session, event.data) : '';
       if (!session) return;
-      const submitted = /[\r\n]/.test(String(event.data || ''));
+      const submitted = event.logicalSubmission === true
+        || /[\r\n]/.test(String(event.data || ''));
       if (submitted) clearPreviewCandidates(session);
       if (submitted) session.lastActivityAt = Date.now();
       const inputTurnChanged = window.chromuxAttention.applyUserInputTurnTransition(
@@ -1933,6 +1953,7 @@ function apply(event) {
         event.data,
         Date.now(),
         submittedLine,
+        event.logicalSubmission === true,
       );
       if (!inputTurnChanged) {
         if (submitted) invalidate('attention');
@@ -9226,8 +9247,18 @@ function handleTerminalInput(session, data) {
   }
   const outgoing = rewrite ? rewrite.data : raw;
   const trackedInput = rewrite ? outgoing : userInput;
+  const numericChooser = /^[1-9]$/.test(trackedInput)
+    ? readActiveCodexNumericChooser(session, trackedInput)
+    : null;
   if (rewrite) adoptSessionAgent(session, rewrite.agent, 'rewrite', { command: rewrite.command });
-  if (trackedInput) apply({ type: 'user-input', sessionId: session.id, data: trackedInput });
+  if (trackedInput) {
+    apply({
+      type: 'user-input',
+      sessionId: session.id,
+      data: trackedInput,
+      logicalSubmission: Boolean(numericChooser && numericChooser.startsImplementation),
+    });
+  }
   writePtyInput(session, outgoing);
   return rewrite;
 }
@@ -13260,6 +13291,28 @@ if (window.chromuxTest) {
     },
     ptyInputs: (id) => (testSession(id)._ptyInputs || []).slice(),
     clearPtyInputs(id) { testSession(id)._ptyInputs = []; },
+    turnState: (id) => ({ ...testSession(id).turn }),
+    activityAt: (id) => testSession(id).lastActivityAt,
+    setActivity(id, value) { testSession(id).lastActivityAt = Number(value); },
+    addPreviewCandidate(id, url) {
+      rememberPreviewCandidate(testSession(id), String(url), 'TERM', { detectedText: String(url) });
+    },
+    previewCandidates: (id) => testSession(id).term.previewCandidates.map((item) => item.url),
+    activityPresentation(id) {
+      const session = testSession(id);
+      const row = document.querySelector(
+        `#thread-list .rail-session-row[data-session-id="${CSS.escape(id)}"]`,
+      );
+      return {
+        tab: session.els.dot.classList.contains('working') ? 'working' : session.els.dot.className,
+        threadClass: row?.querySelector('.rail-status')?.className || '',
+        threadAria: row?.querySelector('.rail-status')?.getAttribute('aria-label') || '',
+      };
+    },
+    emitSignal(id, signal, detail = null) {
+      apply({ type: 'turn-signal', sessionId: id, signal, detail });
+      flushRender();
+    },
     scrollLines(id, count) { testSession(id).term.term.scrollLines(count); rememberTerminalViewport(testSession(id)); },
     setBrowserCollapsed(id, collapsed) { setBrowserCollapsed(testSession(id), collapsed); },
     async history(id) { return loadComposerHistory(testSession(id), { force: true }); },

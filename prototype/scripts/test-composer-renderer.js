@@ -41,7 +41,7 @@ fs.writeFileSync(e2ePath, `
   const wait = (ms = 35) => new Promise((resolve) => setTimeout(resolve, ms));
   const tick = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   const assertChooserSelectionSuppressed = async ({
-    name, fixture, redrawFixture, digit, labels, seedShadow = '',
+    name, fixture, redrawFixture, digit, labels, seedShadow = '', startsTurn = false,
   }) => {
     for (const redraw of [false, true]) {
       const id = c.addSession({
@@ -59,6 +59,9 @@ fs.writeFileSync(e2ePath, `
         name + ' selection must reach the PTY exactly once: ' + JSON.stringify(c.ptyInputs(id)));
       expect(c.pendingInput(id) === '',
         name + ' selection must clear the pending-input shadow: ' + JSON.stringify(c.pendingInput(id)));
+      expect((c.turnState(id).state === 'pending') === startsTurn,
+        name + ' must ' + (startsTurn ? '' : 'not ') + 'start an agent turn: '
+          + JSON.stringify(c.turnState(id)));
       if (redraw) await c.renderPromptFixture(id, redrawFixture || fixture);
       c.open(id); await tick();
       const state = c.state(id);
@@ -398,7 +401,78 @@ fs.writeFileSync(e2ePath, `
     redrawFixture: '• Working (0s)\\r\\n' + planProgressChooser,
     digit: '1',
     labels: ['Proceed with implementation', 'Stay in Plan mode'],
+    startsTurn: true,
   });
+
+  const planHandoffChooser = [
+    '  Implement this plan?',
+    '',
+    '› 1. Yes, implement',
+    '  2. Yes, clear context and implement',
+    '  3. No, stay in Plan mode',
+    '',
+    '  Press enter to confirm or esc to go back',
+  ].join('\\r\\n');
+  for (const digit of ['1', '2']) {
+    const id = c.addSession({
+      name: 'plan handoff option ' + digit,
+      agent: 'codex',
+      cwd: ${JSON.stringify(projectDir)},
+      rows: 20,
+      cols: 72,
+    });
+    await c.renderPromptFixture(id, planHandoffChooser);
+    c.focus(first);
+    c.setActivity(id, 1);
+    c.addPreviewCandidate(id, 'http://localhost:4173');
+    c.clearPtyInputs(id);
+    c.nativeInput(id, digit);
+    await tick();
+    expect(c.ptyInputs(id).length === 1 && c.ptyInputs(id)[0] === digit,
+      'Plan handoff option ' + digit + ' must reach the PTY exactly once');
+    expect(c.pendingInput(id) === '',
+      'Plan handoff option ' + digit + ' must stay out of the Composer shadow');
+    expect(c.turnState(id).state === 'pending'
+      && c.turnState(id).generation === 1
+      && c.turnState(id).completionBlocked === false,
+    'Plan handoff option ' + digit + ' must immediately begin a completion-ready turn: '
+      + JSON.stringify(c.turnState(id)));
+    expect(c.activityAt(id) > 1,
+      'Plan handoff option ' + digit + ' must update recent activity');
+    expect(c.previewCandidates(id).length === 0,
+      'Plan handoff option ' + digit + ' must clear stale preview candidates');
+    expect(c.activityPresentation(id).tab === 'working'
+      && c.activityPresentation(id).threadClass.includes('working')
+      && c.activityPresentation(id).threadAria === 'Awaiting agent activity',
+    'Plan handoff option ' + digit + ' must immediately display Working across tab and Threads surfaces: '
+      + JSON.stringify(c.activityPresentation(id)));
+    c.emitSignal(id, 'turn-start');
+    expect(c.turnState(id).state === 'working',
+      'Plan handoff option ' + digit + ' must accept later activity');
+    c.emitSignal(id, 'turn-end');
+    expect(c.turnState(id).state === 'completed',
+      'Plan handoff option ' + digit + ' must accept later completion');
+  }
+
+  const stayInPlan = c.addSession({
+    name: 'stay in Plan mode',
+    agent: 'codex',
+    cwd: ${JSON.stringify(projectDir)},
+    rows: 20,
+    cols: 72,
+  });
+  await c.renderPromptFixture(stayInPlan, planHandoffChooser);
+  c.focus(first);
+  c.setActivity(stayInPlan, 1);
+  c.clearPtyInputs(stayInPlan);
+  c.nativeInput(stayInPlan, '3');
+  expect(c.turnState(stayInPlan).state === 'unknown'
+    && c.turnState(stayInPlan).generation === 0
+    && c.activityAt(stayInPlan) === 1,
+  'No, stay in Plan mode must not start a turn or update recent activity');
+  expect(c.ptyInputs(stayInPlan).length === 1 && c.ptyInputs(stayInPlan)[0] === '3'
+    && c.pendingInput(stayInPlan) === '',
+  'No, stay in Plan mode must retain one-key PTY delivery and Composer suppression');
 
   const singleQuestionChooser = [
     '  Deployment target',

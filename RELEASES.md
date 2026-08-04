@@ -1,5 +1,22 @@
 # Release Notes
 
+## GBlockParty Chromux v0.80.2
+
+Tag: `chromux-v0.80.2`
+
+- Treat Codex 0.146's one-key “Implement this plan?” choices as submitted
+  turns, so both implementation paths immediately display Working while the
+  original digit still reaches the PTY exactly once.
+- Keep “No, stay in Plan mode,” permission choices, ordinary Plan questions,
+  numbered prose, and non-Codex numeric input from starting agent activity.
+- Preserve Composer-shadow suppression for numeric choosers, clear stale
+  turn-scoped preview candidates, refresh recent activity, and allow normal
+  provider activity and completion signals without applying the `/clear`
+  completion barrier.
+- Add a real-Electron cross-surface regression covering chooser parsing, PTY
+  delivery, Composer state, tab and Threads activity, preview cleanup, and
+  subsequent lifecycle signals.
+
 ## GBlockParty Chromux v0.80.1
 
 Tag: `chromux-v0.80.1`

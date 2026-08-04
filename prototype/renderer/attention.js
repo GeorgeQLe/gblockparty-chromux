@@ -107,10 +107,10 @@
     return true;
   }
 
-  function applyUserInputTurnTransition(session, input, now, submittedLine = '') {
+  function applyUserInputTurnTransition(session, input, now, submittedLine = '', logicalSubmission = false) {
     const turn = session && session.turn;
     if (!turn) return false;
-    const submitted = /[\r\n]/.test(input || '');
+    const submitted = logicalSubmission || /[\r\n]/.test(input || '');
     if (!submitted) return false;
     if (session.agent === 'codex') {
       turn.state = 'pending';

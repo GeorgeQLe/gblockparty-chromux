@@ -6,6 +6,15 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Recognize Codex 0.146's one-key “Implement this plan?” options as logical
+  turn submissions, immediately project Working across tabs and Threads,
+  preserve exact-once PTY delivery and Composer-shadow suppression, keep
+  non-implementation numeric choices unchanged, and ship v0.80.2. _(source:
+  user-supplied Fix Plan-Handoff Working State plan; evidence: current
+  three-option fixture, cross-surface Composer/activity regression, focused and
+  complete prototype validation, package metadata, `RELEASES.md`, tag, and
+  GitHub Release)_
+
 - [x] Keep the Developer Inspect session selector mutation-free while focused,
   defer option lifecycle/order changes until blur, preserve live surrounding
   diagnostics and active-or-first fallback, restore active-terminal focus and

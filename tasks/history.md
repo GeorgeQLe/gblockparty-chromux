@@ -1,5 +1,58 @@
 # Session History
 
+## 2026-08-03 — Chromux v0.80.2 Plan-handoff Working state
+
+- **User goal:** Make Codex 0.146's one-key Plan-mode implementation handoff
+  immediately display Working without duplicating PTY input, polluting
+  Composer, or changing non-implementation numeric choices.
+- **Changed files and per-file purpose:** `prototype/renderer/renderer.js`
+  resolves the active numeric chooser's selected label, recognizes bounded
+  Plan-handoff choices, and carries an internal logical-submission flag through
+  the existing user-input event seam. `prototype/renderer/attention.js` accepts
+  that flag as an alternative to CR/LF for turn transition only. The Composer
+  real-Electron regression adds the current three-option fixture and
+  cross-surface state assertions. Package metadata/lock, `RELEASES.md`,
+  `tasks/todo.md`, and this entry own v0.80.2 bookkeeping.
+- **User-goal mapping:** Options 1 and 2 enter completion-ready Pending,
+  refresh recent activity, clear stale turn preview candidates, and project
+  the existing Working presentation across tabs and Threads. The original
+  digit follows the unchanged single PTY write. Option 3, permission choices,
+  ordinary Plan questions, numbered prose, and non-Codex terminals retain
+  their prior behavior and Composer-shadow policy. No public API, IPC,
+  persistence schema, or migration changed.
+- **Executable verification:** The new regression first failed against
+  v0.80.1 with an unchanged Unknown turn, then passed after implementation.
+  Composer, tab-activity, turn-signal, and session-rail focused suites passed;
+  changed JavaScript passed `node --check`; `git diff --check` passed. The
+  complete serial `npm test` matrix passed every renderer, Electron, service,
+  platform, packaging-policy, Windows artifact, and signing-configuration
+  suite.
+- **Adversarial review:** The referenced `docs/quality-gate-contract.md`,
+  `quality-sweep`, and `expert-review` are absent, so an exact-diff and
+  failure-oriented input-path review served as the equivalent gate. It checked
+  the live-Codex/visible-footer/selected-option bounds, multi-question chooser
+  proximity, Plan prompt and label gates, options 1/2/3, permission and Plan
+  questions, numbered prose, non-Codex input, shadow clearing, exactly one PTY
+  writer, preview cleanup, recent sorting, generation advance, normal later
+  activity/completion, and the untouched exact `/clear` text barrier. No
+  blocking finding remains.
+- **Warnings, skipped tests, and residual risk:** One session-rail run failed
+  only while three real-Electron suites competed in parallel for window
+  geometry; it passed immediately in isolation and again within the complete
+  serial matrix. No packaged-app smoke was required because this renderer-only
+  patch has real-Electron production-path coverage and does not change main
+  process, preload, packaging, or persistence. Future Codex copy or layout
+  changes outside the bounded fixture may require parser fixture updates.
+- **Rollback note:** Revert the v0.80.2 shipping commit and publish a newer
+  corrective release; no persisted data or external contract needs rollback.
+- **Deploy status:** Deploy skipped because neither `deploy.md` nor
+  `tasks/deploy.md` exists. The GitHub Release is Chromux's required update
+  channel.
+- **Ownership boundary:** The worktree was clean at start, and every changed
+  file belongs to this scoped implementation.
+- **Next command:** Continue the next unblocked Chromux product task or begin
+  the pending daily-driver adoption record during the next real work session.
+
 ## 2026-08-03 — Chromux v0.80.1 Developer Inspect focus safety
 
 - **User goal:** Stop the Developer Inspect session selector from flickering
