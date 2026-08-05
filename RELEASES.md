@@ -1,5 +1,26 @@
 # Release Notes
 
+## GBlockParty Chromux Next v0.1.0 (prerelease)
+
+Tag: `chromux-next-v0.1.0`
+
+- Add an isolated Electron Forge/Vite, React, and TypeScript successor app with
+  the independent `dev.georgele.chromux.next` identity and user-data path.
+- Define and runtime-validate canonical alignment documents, semantic items,
+  document/deck/canvas views, review responses, revisioned mutation batches,
+  provider requests/events/results, and typed IPC payloads.
+- Add atomic workspace JSON persistence, history, stale-revision rejection,
+  inverse mutations, undo, a native alignment editor, and deterministic demo
+  fixtures.
+- Add a structured agent composer with immutable context snapshots, streaming
+  events, cancellation, review-before-apply mutation proposals, deterministic
+  failure fixtures, and a read-only Codex reference adapter.
+- Add explicit-click HTTP(S) link detection and a popup-denying
+  main-process-owned browser view without queues or automatic navigation.
+- Document architecture, trust boundaries, UAT, the remaining successor
+  roadmap, and the prerelease convention that preserves legacy Chromux as
+  GitHub `/releases/latest`.
+
 ## GBlockParty Chromux v0.81.0
 
 Tag: `chromux-v0.81.0`

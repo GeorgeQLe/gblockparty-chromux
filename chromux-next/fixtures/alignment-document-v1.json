@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "id": "fixture-minimal",
+  "revision": 0,
+  "title": "Minimal alignment fixture",
+  "status": "draft",
+  "provenance": {
+    "kind": "human",
+    "actor": "Fixture author",
+    "createdAt": "2026-08-05T12:00:00.000Z"
+  },
+  "updatedAt": "2026-08-05T12:00:00.000Z",
+  "items": [
+    {
+      "id": "fixture-heading",
+      "kind": "heading",
+      "level": 1,
+      "text": "Alignment",
+      "provenance": {
+        "kind": "human",
+        "actor": "Fixture author",
+        "createdAt": "2026-08-05T12:00:00.000Z"
+      },
+      "review": {
+        "status": "unreviewed",
+        "feedback": ""
+      }
+    },
+    {
+      "id": "fixture-question",
+      "kind": "question",
+      "question": "Is this ready to approve?",
+      "answer": "",
+      "gate": true,
+      "provenance": {
+        "kind": "human",
+        "actor": "Fixture author",
+        "createdAt": "2026-08-05T12:00:00.000Z"
+      },
+      "review": {
+        "status": "unreviewed",
+        "feedback": ""
+      }
+    }
+  ],
+  "views": [
+    {
+      "kind": "document",
+      "sections": [
+        {
+          "id": "fixture-section",
+          "title": "Alignment",
+          "itemIds": ["fixture-heading", "fixture-question"]
+        }
+      ]
+    }
+  ],
+  "history": []
+}
