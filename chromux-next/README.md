@@ -5,7 +5,7 @@ separate Electron app from legacy Chromux in `../prototype/`: it has a distinct
 package, bundle identifier, user-data directory, architecture, and release
 line.
 
-## Current demo slice: v0.1.0
+## Current demo slice: v0.1.1
 
 This foundation prerelease includes:
 
@@ -42,6 +42,10 @@ npm start
 
 Use `npm run verify` for TypeScript, contract/unit tests, and an Electron Forge
 package build.
+
+The successor uses an upward-chevron variation of the Chromux mark. Run
+`npm run icons` after changing `build/icon.svg` to regenerate the packaged
+ICNS, ICO, and PNG assets.
 
 ## Data model and trust boundaries
 

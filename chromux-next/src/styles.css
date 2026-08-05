@@ -15,6 +15,8 @@ input, textarea, select { width: 100%; border: 1px solid #3b4042; border-radius:
 .rail, .composer { background: #171a1c; padding: 18px; min-width: 0; overflow-y: auto; }
 .rail { border-right: 1px solid #2c3132; }
 .composer { border-left: 1px solid #2c3132; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand img { width: 42px; height: 42px; flex: 0 0 42px; }
 .brand span { color: #e7af59; text-transform: uppercase; font-size: 10px; font-weight: 800; letter-spacing: .12em; }
 .brand h1 { margin: 5px 0 0; font-size: 22px; }
 .brand p, .topbar p { margin: 3px 0; color: #8f9997; font-size: 12px; }

@@ -10,6 +10,7 @@ const config: ForgeConfig = {
     appBundleId: "dev.georgele.chromux.next",
     name: "Chromux Next",
     executableName: "chromux-next",
+    icon: "build/icon",
     asar: true
   },
   rebuildConfig: {},

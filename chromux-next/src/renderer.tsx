@@ -209,7 +209,10 @@ function App() {
   return (
     <main className="app-shell">
       <aside className="rail">
-        <div className="brand"><span>Experimental</span><h1>Chromux Next</h1><p>Alignment workspace</p></div>
+        <div className="brand">
+          <img src="/mark.svg" alt="" />
+          <div><span>Experimental</span><h1>Chromux Next</h1><p>Alignment workspace</p></div>
+        </div>
         <div className="file-actions">
           <button onClick={async () => {
             const opened = await window.chromuxNext.documents.open();

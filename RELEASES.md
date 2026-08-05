@@ -1,5 +1,16 @@
 # Release Notes
 
+## GBlockParty Chromux Next v0.1.1 (prerelease)
+
+Tag: `chromux-next-v0.1.1`
+
+- Give Chromux Next a distinct upward-chevron version of the established
+  three-node Chromux mark while preserving the product family's colors and
+  dark app tile.
+- Display the successor mark in the workspace rail and use generated ICNS,
+  ICO, and PNG assets for packaged application identity.
+- Keep every legacy Chromux logo and package asset unchanged.
+
 ## GBlockParty Chromux Next v0.1.0 (prerelease)
 
 Tag: `chromux-next-v0.1.0`
