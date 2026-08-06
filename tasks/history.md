@@ -1,5 +1,74 @@
 # Session History
 
+## 2026-08-05 — Chromux Next v0.4.1 runner hardening
+
+- **User goal:** Complete the runner-first release gate with deterministic
+  subprocess fixtures, lifecycle cleanup, comprehensive protocol/Luna failure
+  coverage, and a packaged two-session restoration smoke; ship v0.4.1 only on
+  the Chromux Next prerelease channel.
+- **Changed files and per-file purpose:** `chromux-next/src/runner/protocol.ts`
+  owns incremental JSONL decoding, injectable production parameters, exact-once
+  pending rejection, bounded recovery, version/request timeouts, and awaited
+  TERM/KILL shutdown. `attention.ts` applies the same bounded subprocess
+  framing and cleanup to Luna; `manager.ts` cleans up failed initialization,
+  independently restores eligible sessions, and preserves bounded/redacted
+  last-good attention. `main.ts` awaits shutdown and owns explicit-only runner
+  smoke injection/restoration assertions. `forge.config.ts` packages the
+  fixture as a launchable resource. `fixtures/subprocess-fixture.cjs`,
+  `runner-protocol.integration.test.ts`,
+  `luna-subprocess.integration.test.ts`, `runner-manager.test.ts`, and
+  `scripts/smoke-runner-restoration.mjs` cover subprocess and wire behavior.
+  Package metadata/lock, README, architecture, v0.4.1 UAT, `RELEASES.md`,
+  `tasks/todo.md`, and this history entry own the prerelease and gate record.
+- **User-goal mapping:** Arbitrarily fragmented responses, notifications, and
+  server requests decode incrementally; malformed, schema-invalid, oversized,
+  wrong-ID, timed-out, incompatible, authentication, early-exit, and missing
+  CLI paths fail closed and clean up. Recovery observes the configured
+  1/2/5-second production order and exhaustion bound. Every open persisted
+  thread resumes independently without a turn; closed and individually failed
+  sessions remain isolated. Command, network, amendment, file, question,
+  decline/cancel, unknown, and cross-session approval behavior has exact
+  app-server response assertions. The packaged two-launch smoke retains two
+  original thread IDs, distinct drafts, group membership, and selection while
+  proving no turn request and both fixture-child exits.
+- **Executable verification:** `npm run typecheck` passed. The complete Vitest
+  suite passed 76/76 tests across 15 files, including 15 real app-server and 6
+  real Luna subprocess cases. Electron Forge packaged macOS arm64
+  successfully. `npm run smoke:packaged` passed. The new
+  `npm run smoke:runner-restoration` passed both packaged launches and its
+  process/request invariant audit. `git diff --check` passed.
+- **Adversarial review:** Exact-diff, failure-order, and packaging-boundary
+  review checked fragment/inter-message ordering, UTF-8 byte limits,
+  truncated lines, schema failures, unknown/wrong IDs, pending settlement,
+  timer cancellation, repeated stop, restart exhaustion, version hangs,
+  initialization/model cleanup, TERM/KILL races, stale evidence, redaction,
+  last-good retention, restore isolation, smoke-only injection, and quit
+  ordering. The review found and fixed a canceled-restart promise deadlock,
+  duplicate truncated-line crash emission, fixture message interleaving, an
+  `app.asar` executable boundary, and a false-positive second-launch restore
+  check that trusted persisted idle state before model initialization.
+- **Skipped checks, warnings, and residual risk:** Windows and Linux packaging
+  remain part of the separate cutover gate and were not attempted on macOS.
+  Visual qualification was skipped because no renderer layout or styling
+  changed; both packaged smokes exercise the production main/preload/renderer
+  boundary. `scripts/audit-task-docs.mjs` and `tasks/roadmap.md` are absent, so
+  their checks are unavailable. `npm install --package-lock-only` reported 26
+  existing dependency advisories; the lock diff changes only the app version,
+  so dependency upgrades are intentionally outside this lifecycle release.
+  Residual risk is platform-specific child signal behavior beyond macOS; the
+  injected deterministic lifecycle suite covers Node semantics and the
+  Windows/Linux package check remains an explicit cutover item.
+- **Rollback note:** Revert the v0.4.1 shipping commit and publish a newer
+  corrective Chromux Next prerelease. No persisted schema, renderer IPC, legacy
+  metadata, or stable update channel changed.
+- **Deploy status:** Deploy skipped because neither `deploy.md` nor
+  `tasks/deploy.md` exists; the GitHub prerelease is the only shipping channel.
+- **Ownership boundary:** The worktree was clean on `main` at start and all
+  changed files belong to this v0.4.1 gate. `prototype/package.json` and all
+  legacy Chromux behavior remain unchanged.
+- **Next command:** Begin successor-native project onboarding and settings,
+  the next active item in `tasks/todo.md`.
+
 ## 2026-08-03 — Chromux v0.80.2 Plan-handoff Working state
 
 - **User goal:** Make Codex 0.146's one-key Plan-mode implementation handoff

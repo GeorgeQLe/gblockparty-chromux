@@ -50,6 +50,9 @@ document transactions. `src/ipc` is the only renderer/main contract. Existing
 
 - The main process validates Codex CLI 0.146.0+, initializes one app-server,
   and verifies `model/list` before sessions are used.
+- Stdout passes through an incremental, 1 MiB-per-line JSONL decoder. Partial,
+  malformed, schema-invalid, and oversized messages compromise the child,
+  reject each pending request once, and enter bounded recovery.
 - A new session starts one persisted Codex thread. Restoration resumes stored
   thread IDs without starting a turn.
 - Idle composer submissions call `turn/start`; active submissions call
@@ -57,7 +60,12 @@ document transactions. `src/ipc` is the only renderer/main contract. Existing
 - Closing cancels pending interactions, interrupts active work, and
   unsubscribes without deleting Codex history.
 - App-server crashes use bounded 1/2/5-second restart attempts and resume open
-  threads after a compatible connection returns.
+  threads independently after a compatible connection returns. One failed
+  resume does not block another, closed sessions remain closed, and restoration
+  never starts or steers a turn.
+- Quit cancels restart timers, rejects pending requests, closes stdin, sends
+  TERM, escalates to KILL after the configured grace, awaits child exit, and
+  persists runner state before Electron exits.
 
 ## Trust boundaries
 
@@ -114,6 +122,12 @@ low reasoning, ignored user config/rules, a 90-second timeout, one active
 process, a 128 KiB snapshot cap, and validated source references. Deterministic
 approvals, questions, crashes, and failed turns always remain above model
 recommendations.
+
+App-server and Luna executable paths, prefix arguments, environments, timeouts,
+line limits, restart delays, shutdown grace, and client version are injectable
+at their main-process boundary. Production retains the documented defaults;
+executable injection is wired into Electron only behind the explicit packaged
+runner-restoration smoke argument.
 
 ## Navigation
 

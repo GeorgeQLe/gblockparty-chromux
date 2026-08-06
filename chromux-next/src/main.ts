@@ -45,13 +45,27 @@ app.setPath("userData", process.env.CHROMUX_NEXT_SMOKE_USER_DATA
 
 const documents = new DocumentStore();
 const localStore = new LocalStore(app.getPath("userData"));
+const runnerSmokeArgument = process.argv.find((argument) => argument.startsWith("--runner-restoration-smoke="));
+const runnerSmokePhase = runnerSmokeArgument?.slice("--runner-restoration-smoke=".length);
+const runnerSmokeScenario = process.env.CHROMUX_NEXT_FIXTURE_SCENARIO;
+const runnerFixturePath = app.isPackaged
+  ? path.join(process.resourcesPath, "subprocess-fixture.cjs")
+  : path.join(app.getAppPath(), "fixtures", "subprocess-fixture.cjs");
+const runnerSmokeOptions = runnerSmokePhase && runnerSmokeScenario ? {
+  command: process.execPath,
+  prefixArgs: [runnerFixturePath],
+  env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+  requestTimeoutMs: 2_000,
+  restartDelaysMs: [20, 40, 80],
+  shutdownGraceMs: 250
+} : undefined;
 const runner = new RunnerManager(
-  new CodexAppServer(),
+  new CodexAppServer(runnerSmokeOptions),
   localStore,
-  new LunaAnalyzer(path.join(app.getPath("userData"), "attention-analyzer"))
+  new LunaAnalyzer(path.join(app.getPath("userData"), "attention-analyzer"), runnerSmokeOptions)
 );
 const running = new Map<string, AbortController>();
-const isSmoke = process.argv.includes("--smoke");
+const isSmoke = process.argv.includes("--smoke") || Boolean(runnerSmokePhase);
 const visualSmokeArgument = process.argv.find((argument) => argument.startsWith("--visual-smoke-dir="));
 const visualSmokeDirectory = visualSmokeArgument?.slice("--visual-smoke-dir=".length);
 const isVisualSmoke = Boolean(visualSmokeDirectory);
@@ -90,6 +104,7 @@ function createWindow(): void {
   }
   if (isSmoke) {
     mainWindow.webContents.once("did-finish-load", async () => {
+      if (runnerSmokePhase) return;
       const ready = await mainWindow?.webContents.executeJavaScript(
         "Boolean(window.chromuxNext?.documents && window.chromuxNext?.runner && window.chromuxNext?.attention && window.chromuxNext?.browser)"
       );
@@ -101,6 +116,61 @@ function createWindow(): void {
       if (!passed) process.exitCode = 1;
       console.log(passed ? "Chromux Next smoke passed" : `Chromux Next smoke failed (approach: ${String(restoredApproach)})`);
       app.quit();
+    });
+  }
+  if (runnerSmokePhase) {
+    mainWindow.webContents.once("did-finish-load", async () => {
+      try {
+        if (runnerSmokePhase === "first") {
+          const result = await mainWindow?.webContents.executeJavaScript(`(async () => {
+            const deadline = Date.now() + 5000;
+            while ((await window.chromuxNext.runner.models()).length === 0) {
+              if (Date.now() >= deadline) throw new Error("Runner did not initialize");
+              await new Promise((resolve) => setTimeout(resolve, 25));
+            }
+            const first = await window.chromuxNext.runner.create({ projectPath: "/tmp", title: "First restored session" });
+            const second = await window.chromuxNext.runner.create({ projectPath: "/tmp", title: "Second restored session" });
+            await window.chromuxNext.runner.saveDraft(first.id, "first draft");
+            await window.chromuxNext.runner.saveDraft(second.id, "second draft");
+            await window.chromuxNext.runner.select(first.groupId, first.id);
+            return { first, second, state: await window.chromuxNext.runner.state() };
+          })()`);
+          if (!result?.first?.threadId || !result?.second?.threadId
+            || result.first.threadId === result.second.threadId
+            || result.state.selectedSessionId !== result.first.id) {
+            throw new Error("First launch did not create distinct persisted sessions");
+          }
+        } else {
+          const result = await mainWindow?.webContents.executeJavaScript(`(async () => {
+            const deadline = Date.now() + 5000;
+            let state;
+            do {
+              const models = await window.chromuxNext.runner.models();
+              state = await window.chromuxNext.runner.state();
+              if (models.length > 0 && state.sessions.length === 2
+                && state.sessions.every((item) => item.status === "idle")) break;
+              await new Promise((resolve) => setTimeout(resolve, 25));
+            } while (Date.now() < deadline);
+            return state;
+          })()`);
+          const drafts = result?.sessions?.map((item: any) => item.draft).sort();
+          const threadIds = result?.sessions?.map((item: any) => item.threadId);
+          if (result?.sessions?.length !== 2
+            || new Set(threadIds).size !== 2
+            || JSON.stringify(drafts) !== JSON.stringify(["first draft", "second draft"])
+            || result.selectedSessionId !== result.sessions.find((item: any) => item.title === "First restored session")?.id
+            || result.groups?.[0]?.sessionIds?.length !== 2
+            || result.sessions.some((item: any) => item.status !== "idle")) {
+            throw new Error(`Second launch restoration mismatch: ${JSON.stringify(result)}`);
+          }
+        }
+        console.log(`Chromux Next runner restoration smoke ${runnerSmokePhase} passed`);
+      } catch (error) {
+        process.exitCode = 1;
+        console.error("Chromux Next runner restoration smoke failed:", error instanceof Error ? error.message : String(error));
+      } finally {
+        app.quit();
+      }
     });
   }
   if (visualSmokeDirectory) {
@@ -312,7 +382,10 @@ app.whenReady().then(async () => {
   registerIpc();
   createWindow();
   await runner.initialize().catch((error) => {
-    console.error("Runner initialization failed:", error instanceof Error ? error.message : String(error));
+    const message = error instanceof Error ? error.message : String(error);
+    if (!isSmoke || !/is stopping|app-server stopped/.test(message)) {
+      console.error("Runner initialization failed:", message);
+    }
   });
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -323,6 +396,18 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
-app.on("before-quit", () => {
-  void runner.shutdown();
+let quitReady = false;
+let quitPromise: Promise<void> | undefined;
+app.on("before-quit", (event) => {
+  if (quitReady) return;
+  event.preventDefault();
+  quitPromise ??= runner.shutdown()
+    .catch((error) => {
+      process.exitCode = 1;
+      console.error("Runner shutdown failed:", error instanceof Error ? error.message : String(error));
+    })
+    .finally(() => {
+      quitReady = true;
+      app.quit();
+    });
 });

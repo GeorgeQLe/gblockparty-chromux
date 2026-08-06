@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -10,9 +10,17 @@ import {
   type AttentionSnapshotV1,
   type RunnerSessionV1
 } from "./contracts";
+import { IncrementalJsonlDecoder, terminateChild } from "./protocol";
 
 const MAX_SNAPSHOT_BYTES = 128 * 1024;
-const MAX_OUTPUT_BYTES = 1024 * 1024;
+export interface LunaAnalyzerOptions {
+  command?: string;
+  prefixArgs?: string[];
+  env?: NodeJS.ProcessEnv;
+  timeoutMs?: number;
+  maxLineBytes?: number;
+  shutdownGraceMs?: number;
+}
 
 export function redact(value: string): string {
   return value
@@ -104,11 +112,23 @@ export class AttentionCadence {
 
 export class LunaAnalyzer {
   private active = false;
+  private child: ChildProcessWithoutNullStreams | undefined;
+  private readonly options: Required<LunaAnalyzerOptions>;
 
   constructor(
     private readonly workingDirectory: string,
-    private readonly command = "codex"
-  ) {}
+    options: LunaAnalyzerOptions | string = {}
+  ) {
+    const normalized = typeof options === "string" ? { command: options } : options;
+    this.options = {
+      command: normalized.command ?? "codex",
+      prefixArgs: normalized.prefixArgs ?? [],
+      env: normalized.env ?? process.env,
+      timeoutMs: normalized.timeoutMs ?? 90_000,
+      maxLineBytes: normalized.maxLineBytes ?? 1024 * 1024,
+      shutdownGraceMs: normalized.shutdownGraceMs ?? 2_000
+    };
+  }
 
   async analyze(snapshot: AttentionSnapshotV1): Promise<AttentionAnalysisV1> {
     if (this.active) throw new Error("Attention analysis is already running");
@@ -123,33 +143,59 @@ export class LunaAnalyzer {
       "-c", 'model_reasoning_effort="low"', "--output-schema", schemaPath, "-"
     ];
     try {
-      const result = await new Promise<string>((resolve, reject) => {
-        const child = spawn(this.command, args, {
+      const result = await new Promise<unknown>((resolve, reject) => {
+        const child = spawn(this.options.command, [...this.options.prefixArgs, ...args], {
           cwd: this.workingDirectory,
-          env: process.env,
+          env: this.options.env,
           stdio: ["pipe", "pipe", "pipe"]
         });
-        let stdout = "";
+        this.child = child;
         let stderr = "";
         let timedOut = false;
+        let completed = false;
+        let candidate: unknown;
+        const decoder = new IncrementalJsonlDecoder(this.options.maxLineBytes, (value) => {
+          const envelope = value as {
+            type?: string;
+            item?: { type?: string; text?: string };
+            result?: unknown;
+          };
+          const next = envelope.result ?? envelope.item?.text;
+          if (next !== undefined) candidate = typeof next === "string" ? JSON.parse(next) : next;
+        });
+        const fail = async (error: Error) => {
+          if (completed) return;
+          completed = true;
+          clearTimeout(timer);
+          await terminateChild(child, this.options.shutdownGraceMs);
+          reject(error);
+        };
         const timer = setTimeout(() => {
           timedOut = true;
-          child.kill("SIGTERM");
-        }, 90_000);
-        child.stdout.setEncoding("utf8");
+          void fail(new Error("Luna analysis timed out"));
+        }, this.options.timeoutMs);
         child.stderr.setEncoding("utf8");
-        child.stdout.on("data", (chunk: string) => {
-          stdout += chunk;
-          if (Buffer.byteLength(stdout) > MAX_OUTPUT_BYTES) child.kill("SIGTERM");
+        child.stdout.on("data", (chunk: Buffer) => {
+          try { decoder.push(chunk); }
+          catch (error) {
+            void fail(new Error(`Luna emitted invalid JSONL: ${error instanceof Error ? error.message : String(error)}`));
+          }
         });
         child.stderr.on("data", (chunk: string) => stderr = `${stderr}${chunk}`.slice(-20_000));
-        child.on("error", reject);
-        child.on("close", (code) => {
+        child.once("error", (error) => void fail(new Error(`Luna process failed: ${error.message}`)));
+        child.once("close", (code) => {
+          if (completed) return;
           clearTimeout(timer);
+          completed = true;
+          try { decoder.finish(); }
+          catch (error) {
+            reject(new Error(`Luna emitted invalid JSONL: ${error instanceof Error ? error.message : String(error)}`));
+            return;
+          }
           if (timedOut) reject(new Error("Luna analysis timed out"));
-          else if (Buffer.byteLength(stdout) > MAX_OUTPUT_BYTES) reject(new Error("Luna output exceeded 1 MiB"));
           else if (code !== 0) reject(new Error(redact(stderr || `Luna exited with status ${code}`)));
-          else resolve(stdout);
+          else if (candidate === undefined) reject(new Error("Luna did not return a valid final JSON object"));
+          else resolve(candidate);
         });
         child.stdin.end([
           "Analyze the bounded Chromux attention snapshot.",
@@ -166,8 +212,7 @@ export class LunaAnalyzer {
       }
       snapshot.git.forEach((item) => sourceIds.add(item.sourceId));
       snapshot.alignment.forEach((item) => sourceIds.add(item.sourceId));
-      const parsed = parseFinalJson(result);
-      const validated = AttentionAnalysisV1Schema.parse(parsed);
+      const validated = AttentionAnalysisV1Schema.parse(result);
       for (const recommendation of validated.recommendations) {
         if (recommendation.sourceIds.some((id) => !sourceIds.has(id))) {
           throw new Error("Luna returned a stale or unknown source reference");
@@ -177,23 +222,8 @@ export class LunaAnalyzer {
       return validated;
     } finally {
       this.active = false;
+      this.child = undefined;
       await unlink(schemaPath).catch(() => undefined);
     }
   }
-}
-
-function parseFinalJson(output: string): unknown {
-  const lines = output.trim().split("\n").reverse();
-  for (const line of lines) {
-    try {
-      const value = JSON.parse(line) as {
-        type?: string;
-        item?: { type?: string; text?: string };
-        result?: unknown;
-      };
-      const candidate = value.result ?? value.item?.text;
-      if (candidate) return typeof candidate === "string" ? JSON.parse(candidate) : candidate;
-    } catch { /* continue */ }
-  }
-  throw new Error("Luna did not return a valid final JSON object");
 }

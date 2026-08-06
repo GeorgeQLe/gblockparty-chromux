@@ -5,10 +5,19 @@ separate Electron app from legacy Chromux in `../prototype/`: it has a distinct
 package, bundle identifier, user-data directory, architecture, and release
 line.
 
-## Current prerelease: v0.4.0
+## Current prerelease: v0.4.1
 
 This runner-first prerelease includes:
 
+- A hardened incremental app-server JSONL transport with deterministic
+  fragmented-message handling, 1 MiB framing limits, fail-closed protocol
+  validation, bounded 1/2/5-second recovery, and awaited TERM/KILL shutdown.
+- Independent restoration of every open persisted thread without starting a
+  turn, plus a packaged two-launch smoke that proves two thread IDs, drafts,
+  membership, and selection survive while both fixture processes exit.
+- Subprocess-tested Luna analysis with fragmented output, redacted failures,
+  timeout cleanup, stale-evidence rejection, deterministic fingerprints, and
+  last-valid-analysis retention.
 - A complete structured Alignment workspace with canonical JSON open/save,
   kind-aware editing for every schema-v1 item, human review/status controls,
   revision-safe insert/remove/reorder operations, session-local undo, and
@@ -55,8 +64,10 @@ npm install
 npm start
 ```
 
-Use `npm run verify` for TypeScript, contract/unit tests, and an Electron Forge
-package build. After packaging, `npm run visual:packaged -- /tmp/chromux-next-visual`
+Use `npm run verify` for TypeScript, contract/unit and subprocess integration
+tests, an Electron Forge package build, the baseline packaged smoke, and the
+two-launch runner restoration smoke. After packaging,
+`npm run visual:packaged -- /tmp/chromux-next-visual`
 captures standard and narrow screenshots of all five approaches.
 
 The successor uses an upward-chevron variation of the Chromux mark. Run

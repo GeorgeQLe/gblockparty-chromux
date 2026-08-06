@@ -1,5 +1,30 @@
 # Release Notes
 
+## GBlockParty Chromux Next v0.4.1 (prerelease)
+
+Tag: `chromux-next-v0.4.1`
+
+- Replace readline app-server parsing with bounded incremental JSONL decoding
+  that accepts fragmented chunks and terminates malformed, schema-invalid,
+  oversized, timed-out, or otherwise compromised children.
+- Make subprocess commands, prefix arguments, environments, request limits,
+  recovery delays, shutdown grace, and client version injectable while keeping
+  production defaults at Codex CLI 0.146.0+, 90 seconds, 1 MiB, and 1/2/5
+  seconds.
+- Await complete runner shutdown from Electron quit, including persistence,
+  restart cancellation, pending-request rejection, stdin close, TERM/KILL
+  escalation, and child exit.
+- Restore every eligible persisted thread independently after startup or
+  recovery without starting a turn; preserve closed sessions and isolate
+  individual resume failures.
+- Add one deterministic fixture CLI and real subprocess coverage for
+  app-server fragmentation, compatibility, authentication redaction, protocol
+  failures, timeout, wrong IDs, crashes, backoff/recovery/exhaustion, approvals,
+  and Luna output, cleanup, stale evidence, and fingerprinting.
+- Add a packaged two-launch Electron smoke that creates and restores two
+  sessions, distinct drafts, membership, and selection while proving no new
+  turn and clean fixture-process termination.
+
 ## GBlockParty Chromux Next v0.4.0 (prerelease)
 
 Tag: `chromux-next-v0.4.0`

@@ -11,7 +11,8 @@ const config: ForgeConfig = {
     name: "Chromux Next",
     executableName: "chromux-next",
     icon: "build/icon",
-    asar: true
+    asar: true,
+    extraResource: ["fixtures/subprocess-fixture.cjs"]
   },
   rebuildConfig: {},
   makers: [

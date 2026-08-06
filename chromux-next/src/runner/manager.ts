@@ -26,7 +26,7 @@ import {
   type RunnerSessionV1,
   type RunnerStateV1
 } from "./contracts";
-import { AttentionCadence, buildAttentionSnapshot, LunaAnalyzer, snapshotHash } from "./attention";
+import { AttentionCadence, buildAttentionSnapshot, LunaAnalyzer, redact, snapshotHash } from "./attention";
 import type { AppServerTransport } from "./protocol";
 
 type Envelope = { id?: string | number; method: string; params?: any };
@@ -37,7 +37,7 @@ export class RunnerManager extends EventEmitter {
   private models: ModelOptionV1[] = [];
   private readonly cadence = new AttentionCadence();
   private lastSnapshotHash = "";
-  private timer?: NodeJS.Timeout;
+  private timer: NodeJS.Timeout | undefined;
 
   constructor(
     private readonly server: AppServerTransport,
@@ -53,25 +53,16 @@ export class RunnerManager extends EventEmitter {
   async initialize(): Promise<void> {
     const local = await this.store.read();
     this.state = RunnerStateV1Schema.parse(local.runner ?? this.state);
-    await this.server.start();
-    this.models = await this.discoverModels();
-    for (const session of this.state.sessions.filter((item) => item.threadId && item.status !== "closed")) {
-      try {
-        await this.server.request("thread/resume", {
-          threadId: session.threadId,
-          cwd: session.projectPath,
-          ...permissionParams(session.permissionPreset),
-          model: session.model
-        });
-        session.status = "idle";
-        session.activeTurnId = undefined;
-      } catch (error) {
-        session.status = "failed";
-        this.appendEvent(session, "error", `Could not resume thread: ${String(error)}`);
-      }
+    try {
+      await this.server.start();
+      this.models = await this.discoverModels();
+      await this.restoreSessions("Could not resume thread");
+      await this.persist();
+      this.timer = setInterval(() => void this.tick(), 10_000);
+    } catch (error) {
+      await this.server.stop().catch(() => undefined);
+      throw error;
     }
-    await this.persist();
-    this.timer = setInterval(() => void this.tick(), 10_000);
   }
 
   getState(): RunnerStateV1 { return structuredClone(this.state); }
@@ -260,7 +251,7 @@ export class RunnerManager extends EventEmitter {
       this.lastSnapshotHash = snapshotHash(snapshot);
       this.cadence.ran();
     } catch (error) {
-      this.state.attentionFailure = String(error);
+      this.state.attentionFailure = redact(String(error)).slice(0, 2048);
     }
     await this.persist();
     this.emitState();
@@ -298,22 +289,7 @@ export class RunnerManager extends EventEmitter {
 
   private async onNotification(envelope: Envelope): Promise<void> {
     if (envelope.method === "chromux/server-restored") {
-      for (const restored of this.state.sessions.filter((item) => item.threadId && item.status !== "closed")) {
-        try {
-          await this.server.request("thread/resume", {
-            threadId: restored.threadId,
-            cwd: restored.projectPath,
-            model: restored.model,
-            ...permissionParams(restored.permissionPreset)
-          });
-          restored.status = "idle";
-          restored.activeTurnId = undefined;
-          this.appendEvent(restored, "system", "Codex app-server connection restored");
-        } catch (error) {
-          restored.status = "failed";
-          this.appendEvent(restored, "error", `Could not restore session: ${String(error)}`);
-        }
-      }
+      await this.restoreSessions("Could not restore session", true);
       await this.changed();
       return;
     }
@@ -405,8 +381,31 @@ export class RunnerManager extends EventEmitter {
       await this.refreshAttention();
     }
   }
+  private async restoreSessions(failurePrefix: string, recovered = false): Promise<void> {
+    await Promise.all(this.state.sessions
+      .filter((item) => item.threadId && item.status !== "closed")
+      .map(async (restored) => {
+        try {
+          await this.server.request("thread/resume", {
+            threadId: restored.threadId,
+            cwd: restored.projectPath,
+            model: restored.model,
+            ...permissionParams(restored.permissionPreset)
+          });
+          restored.status = "idle";
+          restored.activeTurnId = undefined;
+          if (recovered) this.appendEvent(restored, "system", "Codex app-server connection restored");
+        } catch (error) {
+          restored.status = "failed";
+          this.appendEvent(restored, "error", `${failurePrefix}: ${String(error)}`);
+        }
+      }));
+  }
   async shutdown(): Promise<void> {
-    if (this.timer) clearInterval(this.timer);
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = undefined;
+    }
     await this.persist();
     await this.server.stop();
   }

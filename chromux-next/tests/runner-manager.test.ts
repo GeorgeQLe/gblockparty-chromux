@@ -13,6 +13,7 @@ class FakeServer extends EventEmitter implements AppServerTransport {
   responses: Array<{ id: string | number; result: any }> = [];
   thread = 0;
   turn = 0;
+  failResume = new Set<string>();
   async start() {}
   async stop() {}
   async request(method: string, params: any): Promise<any> {
@@ -29,6 +30,7 @@ class FakeServer extends EventEmitter implements AppServerTransport {
     };
     if (method === "thread/start") return { thread: { id: `thread-${++this.thread}` } };
     if (method === "turn/start") return { turn: { id: `turn-${++this.turn}` } };
+    if (method === "thread/resume" && this.failResume.has(params.threadId)) throw new Error("resume failed");
     return {};
   }
   respond(id: string | number, result: unknown) {
@@ -96,6 +98,101 @@ describe("runner manager", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(server.responses).toContainEqual({ id: 8, result: { decision: "cancel" } });
     expect(manager.getState().sessions.find((session) => session.id === first.id)?.events.at(-1)?.kind).toBe("error");
+    await manager.shutdown();
+  });
+
+  it("normalizes every approval family and sends exact wire responses", async () => {
+    const { manager, server } = await setup();
+    const session = await manager.createSession({ projectPath: "/tmp", title: "Approval" });
+    const offer = async (id: number, method: string, params: Record<string, unknown>) => {
+      server.emit("request", { id, method, params: { threadId: session.threadId, ...params } });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      return manager.getState().sessions.find((item) => item.id === session.id)!.interactions.at(-1)!;
+    };
+
+    let interaction = await offer(10, "item/commandExecution/requestApproval", { command: "npm test" });
+    expect(interaction.offeredDecisions).toEqual(["accept", "accept-session", "decline", "cancel"]);
+    await manager.respond({ sessionId: session.id, interactionId: interaction.id, decision: "accept-session" });
+    expect(server.responses.at(-1)).toEqual({ id: 10, result: { decision: "acceptForSession" } });
+
+    interaction = await offer(11, "item/commandExecution/requestApproval", {
+      command: "curl example.com", networkApprovalContext: { host: "example.com" },
+      proposedExecpolicyAmendment: ["allow curl"]
+    });
+    expect(interaction.kind).toBe("network-approval");
+    expect(interaction.offeredDecisions).toContain("accept-amendment");
+    await manager.respond({ sessionId: session.id, interactionId: interaction.id, decision: "accept-amendment" });
+    expect(server.responses.at(-1)).toEqual({
+      id: 11,
+      result: { decision: { acceptWithExecpolicyAmendment: { execpolicy_amendment: ["allow curl"] } } }
+    });
+
+    interaction = await offer(12, "item/fileChange/requestApproval", { reason: "write file" });
+    expect(interaction.kind).toBe("file-approval");
+    await manager.respond({ sessionId: session.id, interactionId: interaction.id, decision: "decline" });
+    expect(server.responses.at(-1)).toEqual({ id: 12, result: { decision: "decline" } });
+
+    interaction = await offer(13, "item/tool/requestUserInput", {
+      questions: [{ id: "choice", header: "Choice", question: "Pick", options: [{ label: "A" }] }]
+    });
+    expect(interaction.kind).toBe("question");
+    await manager.respond({
+      sessionId: session.id, interactionId: interaction.id, decision: "accept", answers: { choice: ["A"] }
+    });
+    expect(server.responses.at(-1)).toEqual({ id: 13, result: { answers: { choice: { answers: ["A"] } } } });
+
+    interaction = await offer(14, "item/commandExecution/requestApproval", { command: "false" });
+    await manager.respond({ sessionId: session.id, interactionId: interaction.id, decision: "cancel" });
+    expect(server.responses.at(-1)).toEqual({ id: 14, result: { decision: "cancel" } });
+    await manager.shutdown();
+  });
+
+  it("marks crashes, restores eligible sessions independently, and never starts a turn", async () => {
+    const { manager, server } = await setup();
+    const first = await manager.createSession({ projectPath: "/tmp", title: "First" });
+    const second = await manager.createSession({ projectPath: "/tmp", title: "Second" });
+    const closed = await manager.createSession({ projectPath: "/tmp", title: "Closed" });
+    await manager.closeSession(closed.id);
+    server.emit("crash", new Error("fixture crash"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(manager.getState().sessions.filter((item) => item.id !== closed.id).every((item) => item.status === "failed")).toBe(true);
+    server.failResume.add(second.threadId!);
+    server.emit("notification", { method: "chromux/server-restored", params: {} });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const restored = manager.getState();
+    expect(restored.sessions.find((item) => item.id === first.id)?.status).toBe("idle");
+    expect(restored.sessions.find((item) => item.id === second.id)?.status).toBe("failed");
+    expect(restored.sessions.find((item) => item.id === closed.id)?.status).toBe("closed");
+    expect(server.requests.filter((request) => request.method === "thread/resume").map((request) => request.params.threadId).sort())
+      .toEqual([first.threadId, second.threadId].sort());
+    expect(server.requests.some((request) => request.method === "turn/start" || request.method === "turn/steer")).toBe(false);
+    await manager.shutdown();
+  });
+
+  it("preserves the last valid attention result and bounds/redacts later failure text", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "chromux-next-runner-attention-"));
+    const server = new FakeServer();
+    let fail = false;
+    const analyzer = {
+      async analyze() {
+        if (fail) throw new Error(`token=supersecret ${"x".repeat(5_000)}`);
+        return {
+          schemaVersion: 1 as const,
+          generatedAt: "2026-08-05T12:00:00.000Z",
+          recommendations: []
+        };
+      }
+    };
+    const manager = new RunnerManager(server, new LocalStore(directory), analyzer as unknown as LunaAnalyzer);
+    await manager.initialize();
+    await manager.refreshAttention();
+    fail = true;
+    await manager.refreshAttention();
+    const state = manager.getState();
+    expect(state.attention?.generatedAt).toBe("2026-08-05T12:00:00.000Z");
+    expect(state.attentionFailure).toContain("token=[REDACTED]");
+    expect(state.attentionFailure).not.toContain("supersecret");
+    expect(state.attentionFailure!.length).toBeLessThanOrEqual(2048);
     await manager.shutdown();
   });
 });

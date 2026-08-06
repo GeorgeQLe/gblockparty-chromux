@@ -17,12 +17,15 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
-- [ ] Complete the runner-first hardening matrix with deterministic fake
+- [x] Complete the runner-first hardening matrix with deterministic fake
   app-server and Luna processes for fragmented JSONL, crash/backoff/recovery,
   missing or incompatible CLI, authentication failure, malformed and
   oversized output, timeout, stale source references, interrupted shutdown,
   approval variants, and a real Electron two-session restore smoke.
-  _(replacement-editor release gate; successor scope: `chromux-next/`)_
+  _(replacement-editor release gate; successor scope: `chromux-next/`;
+  evidence: incremental bounded protocol lifecycle, deterministic fixture CLI,
+  subprocess integration matrix, approval wire-response coverage, packaged
+  two-session restoration smoke, v0.4.1 release documentation)_
 
 - [ ] Add successor-native project onboarding and settings for project/worktree
   selection, default model/reasoning/permission preferences, group management,
