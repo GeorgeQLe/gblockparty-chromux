@@ -1,6 +1,6 @@
 {
   "name": "chromux-next",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "productName": "GBlockParty Chromux Next",
   "description": "A structured local-first human and agent alignment workspace.",
   "main": ".vite/build/main.js",
@@ -21,6 +21,9 @@
     "verify": "npm run typecheck && npm test && npm run package && npm run smoke:packaged"
   },
   "dependencies": {
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/addon-search": "^0.15.0",
+    "@xterm/xterm": "^5.5.0",
     "electron-squirrel-startup": "^1.0.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",

@@ -1,6 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
+import { RunnerStateV1Schema } from "../runner/contracts";
 
 const LocalStateSchema = z.object({
   schemaVersion: z.literal(1),
@@ -15,7 +16,8 @@ const LocalStateSchema = z.object({
     provider: z.string(),
     status: z.string(),
     at: z.string().datetime()
-  })).max(100).default([])
+  })).max(100).default([]),
+  runner: RunnerStateV1Schema.optional()
 });
 export type LocalState = z.infer<typeof LocalStateSchema>;
 
@@ -29,6 +31,7 @@ const DEFAULT_STATE: LocalState = {
 
 export class LocalStore {
   private readonly filePath: string;
+  private writeQueue: Promise<void> = Promise.resolve();
 
   constructor(userDataPath: string) {
     this.filePath = path.join(userDataPath, "state-v1.json");
@@ -45,9 +48,13 @@ export class LocalStore {
 
   async write(state: LocalState): Promise<void> {
     const validated = LocalStateSchema.parse(state);
-    await mkdir(path.dirname(this.filePath), { recursive: true });
-    const temporaryPath = `${this.filePath}.${process.pid}.tmp`;
-    await writeFile(temporaryPath, `${JSON.stringify(validated, null, 2)}\n`, { mode: 0o600 });
-    await rename(temporaryPath, this.filePath);
+    const next = this.writeQueue.then(async () => {
+      await mkdir(path.dirname(this.filePath), { recursive: true });
+      const temporaryPath = `${this.filePath}.${process.pid}.tmp`;
+      await writeFile(temporaryPath, `${JSON.stringify(validated, null, 2)}\n`, { mode: 0o600 });
+      await rename(temporaryPath, this.filePath);
+    });
+    this.writeQueue = next.catch(() => undefined);
+    await next;
   }
 }

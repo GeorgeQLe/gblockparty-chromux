@@ -2741,3 +2741,62 @@
   skipped: no explicit manual deploy contract exists; the GitHub Release is
   Chromux's required update channel. Next command: continue the blocked signed
   Windows release prerequisite work tracked in `tasks/todo.md`.
+
+## 2026-08-05 — Chromux Next runner-first interface v0.2.0
+
+- Replaced the successor's document-first shell with grouped Codex sessions,
+  a display-only searchable xterm transcript, fixed session composer,
+  same-turn steering, interruption, structured approvals/questions, model and
+  permission selection, custom groups, restoration, and secondary Alignment,
+  Deck, Canvas, and Browser surfaces.
+- Added a main-process Codex CLI 0.146.0+ app-server facade with validated and
+  bounded JSONL, request correlation, compatibility probing, bounded restart,
+  thread resume/unsubscribe, exact session/request approval routing, and
+  workspace/read-only policies. Added isolated atomic state and fixed a
+  concurrent write race exposed by manager tests.
+- Added deterministic blockers plus bounded, redacted, source-validated
+  `gpt-5.6-luna` recommendations with read-only Git context, cadence limits,
+  last-good retention, snoozing, and evidence-fingerprint dismissal.
+- Ship manifest — User goal: make Codex sessions the primary Chromux Next
+  experience, add contextual Luna attention, preserve strict renderer/process
+  boundaries, restore state without new turns, and publish v0.2.0 as a
+  prerelease while legacy Chromux remains unchanged.
+- Changed files and per-file purpose: `chromux-next/src/runner/` defines
+  runtime contracts, protocol, lifecycle, normalization, persistence inputs,
+  and analyzer behavior; main/preload/IPC files expose the narrow validated
+  bridge; renderer/style files provide the runner-first interface; local store
+  serializes atomic writes; package metadata adds xterm and v0.2.0; the
+  compatibility fixture pins the 0.146.0 facade; focused tests cover contracts,
+  attention, manager security, and renderer isolation; README, architecture,
+  UAT, release notes, and task files document the shipped behavior.
+- User-goal mapping: Codex remains authoritative for history; Chromux stores
+  only bounded successor metadata/cache. Raw envelopes and process spawning
+  stay in main. Composer submissions select start versus steer from active
+  turn state. Hard blockers are immediate/non-dismissible, while Luna triage
+  is fingerprint-sensitive. The legacy package/version/release line is
+  untouched.
+- Executable verification: `npm run verify` passed TypeScript, 10 Vitest files
+  with 32 tests, Electron Forge production packaging, and packaged preload
+  smoke. `git diff --check` passed. A real packaged Electron visual pass
+  confirmed the runner layout and live Luna refresh; it found and led to a fix
+  for the packaged relative mark path before the final verification.
+- Adversarial review: checked request correlation registration before writes,
+  1 MiB protocol bounds, 64 KiB drafts/events, 128 KiB snapshots, credential
+  redaction, absolute canonical project paths, selected-project writable roots
+  with network disabled, cross-session request spoof rejection,
+  unoffered-decision rejection, question-specific cancellation,
+  unknown-request fail-closed behavior, xterm stdin isolation, explicit
+  HTTP(S) links, crash restoration, concurrent atomic persistence, stale
+  source rejection, and immutable legacy state. No blocking finding remains.
+- Skipped tests and residual risk: no real destructive approval was accepted
+  during UAT, and no Windows/Linux package was built in this macOS session.
+  The protocol fixture and fakes cover approval and failure variants, but
+  future Codex app-server schema changes still require updating the facade.
+  Luna quality varies by model output; deterministic blockers remain
+  independent and last-good analysis is preserved.
+- Rollback note: remove GitHub prerelease and tag `chromux-next-v0.2.0`, then
+  revert the runner-first commit. The independent v0.1.1 successor and stable
+  legacy Chromux release remain available. Deploy skipped: no explicit manual
+  deploy contract exists; the GitHub prerelease is the required publication.
+  Next command: begin the seven-day builder daily-driver record tracked in
+  `tasks/record-todo.md`.

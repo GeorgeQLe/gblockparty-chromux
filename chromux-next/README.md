@@ -5,35 +5,31 @@ separate Electron app from legacy Chromux in `../prototype/`: it has a distinct
 package, bundle identifier, user-data directory, architecture, and release
 line.
 
-## Current demo slice: v0.1.1
+## Current prerelease: v0.2.0
 
-This foundation prerelease includes:
+This runner-first prerelease includes:
 
-- Runtime-validated `AlignmentDocumentV1`, semantic item, presentation view,
-  review, mutation, provider, response, and IPC contracts.
-- Atomic canonical JSON reads and writes. The app never reads or mutates legacy
-  Chromux state.
-- Revision-checked mutation application, history, and inverse batches for
-  undo.
-- A React alignment editor with outline, direct text editing, review status,
-  insertion, document/deck/canvas projections, and save/open controls.
-- A structured agent composer with context selection, streaming events,
-  cancellation, result inspection, and review-before-apply proposals.
-- A deterministic fake provider and a read-only `codex exec` adapter. The
-  adapter inherits the CLI process environment and never reads or copies
-  authentication files.
-- Explicit-click HTTP(S) link detection and a popup-denying,
-  main-process-owned `WebContentsView`. There is no preview queue or automatic
-  navigation.
+- Project and custom group tabs with resumable Codex sessions backed by one
+  main-process-owned `codex app-server` over JSONL stdio.
+- A display-only xterm transcript, session-specific fixed composer, same-turn
+  steering, interruption, bounded drafts, explicit-click links, search, copy,
+  and scrollback.
+- Structured command/file/network approvals and agent questions that are
+  correlated to a single thread and fail closed for unknown request types.
+- Workspace and read-only permission presets, Codex model discovery, bounded
+  crash recovery, thread restoration, and isolated successor persistence.
+- A deterministic attention layer plus a bounded, redacted, read-only
+  `gpt-5.6-luna` analyzer with validated evidence references and persistent
+  snooze/dismiss triage.
+- Alignment, Deck, Canvas, and Browser secondary surfaces that preserve runner
+  session state.
 
-Later roadmap slices—including deterministic PPTX/portable HTML exports,
-editable canvas operations, qualified Claude/Gemini adapters, fan-out
-workflows, PTY, and curated legacy HTML migration—remain intentionally outside
-this prerelease.
+The runner uses structured app-server events rather than a raw PTY. xterm stdin
+is disabled; all user text enters through the composer.
 
 ## Run
 
-Requires Node.js 22.12 or newer.
+Requires Node.js 22.12 or newer and Codex CLI 0.146.0 or newer.
 
 ```sh
 npm install
@@ -49,15 +45,16 @@ ICNS, ICO, and PNG assets.
 
 ## Data model and trust boundaries
 
-Workspace `.json` files are authoritative. Provider processes receive an
-immutable snapshot and can only return proposed mutation batches. The main
-process validates every IPC payload and mutation, then performs the canonical
-write. Renderer isolation, context isolation, sandboxing, popup denial, and an
-HTTP(S)-only navigation allowlist are enabled.
+Codex remains authoritative for conversation history. Chromux Next stores only
+its own groups, thread IDs, bounded display cache, drafts, settings, and
+attention triage. Raw app-server envelopes remain in the main process; the
+renderer receives validated normalized events. Renderer isolation, context
+isolation, sandboxing, popup denial, and an HTTP(S)-only navigation allowlist
+are enabled.
 
-App-local settings and bounded run metadata live under the separate Electron
-user-data directory named `GBlockParty Chromux Next`. Credentials are not
-stored or logged.
+App-local state lives under the separate Electron user-data directory named
+`GBlockParty Chromux Next`. Codex processes inherit normal authentication, but
+Chromux Next never locates, copies, stores, or logs credentials.
 
 ## Release convention
 

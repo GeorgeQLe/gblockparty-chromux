@@ -6,6 +6,15 @@ import {
   AlignmentDocumentV1Schema,
   AlignmentMutationBatchV1Schema
 } from "../domain/schema";
+import {
+  ApprovalResponseInputSchema,
+  CreateSessionInputSchema,
+  DraftInputSchema,
+  GroupMutationInputSchema,
+  RunnerStateV1Schema,
+  TriageInputSchema,
+  TurnInputSchema
+} from "../runner/contracts";
 
 export const IpcChannels = {
   documentOpen: "document:open",
@@ -17,6 +26,19 @@ export const IpcChannels = {
   agentEvent: "agent:event",
   browserOpen: "browser:open",
   browserAction: "browser:action"
+  ,runnerState: "runner:state"
+  ,runnerStateChanged: "runner:state-changed"
+  ,runnerCreate: "runner:create"
+  ,runnerClose: "runner:close"
+  ,runnerSend: "runner:send"
+  ,runnerInterrupt: "runner:interrupt"
+  ,runnerDraft: "runner:draft"
+  ,runnerRespond: "runner:respond"
+  ,runnerModels: "runner:models"
+  ,runnerGroup: "runner:group"
+  ,runnerSelect: "runner:select"
+  ,attentionRefresh: "attention:refresh"
+  ,attentionTriage: "attention:triage"
 } as const;
 
 export const DocumentPayloadSchema = z.object({
@@ -48,5 +70,12 @@ export {
   AgentRunEventSchema,
   AgentRunRequestSchema,
   AgentRunResultSchema,
-  AlignmentDocumentV1Schema
+  AlignmentDocumentV1Schema,
+  ApprovalResponseInputSchema,
+  CreateSessionInputSchema,
+  DraftInputSchema,
+  GroupMutationInputSchema,
+  RunnerStateV1Schema,
+  TriageInputSchema,
+  TurnInputSchema
 };

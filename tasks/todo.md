@@ -6,6 +6,17 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Make Chromux Next runner-first with grouped resumable Codex app-server
+  sessions, display-only xterm transcripts, fixed session composers,
+  structured approvals/questions, isolated restoration, contextual Luna
+  attention, permission presets, bounded protocol/security contracts, and ship
+  v0.2.0 as a prerelease without changing legacy Chromux. _(source:
+  user-supplied Chromux Next Runner-First Interface plan; evidence:
+  `chromux-next/src/runner/`, typed IPC/preload integration, runner renderer,
+  compatibility fixture, 32 focused/unit tests, packaged smoke, visual
+  Electron qualification, release/UAT documentation, tag, and GitHub
+  prerelease)_
+
 - [x] Keep Chromux update results visible without scrolling by moving the
   update status into a fixed, accessible two-row Settings footer; show
   immediate manual-check feedback; preserve update/install behavior and

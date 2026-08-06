@@ -1,5 +1,27 @@
 # Release Notes
 
+## GBlockParty Chromux Next v0.2.0 (prerelease)
+
+Tag: `chromux-next-v0.2.0`
+
+- Make grouped, resumable Codex sessions the primary successor experience with
+  a display-only xterm transcript, fixed multiline composer, steering,
+  interruption, session-specific drafts, and model/reasoning selection.
+- Add a main-process-owned Codex CLI 0.146.0+ app-server client with validated
+  JSONL envelopes, request correlation, bounded crash restart, thread
+  restoration, workspace/read-only permission presets, and fail-closed
+  structured approvals and agent questions.
+- Add isolated persistence for project and custom groups, thread IDs, bounded
+  display caches, settings, drafts, and attention triage without reading or
+  mutating legacy Chromux state.
+- Add deterministic blockers and a bounded, redacted `gpt-5.6-luna` read-only
+  attention analyzer with source validation, cadence throttling, preserved
+  last-good results, snoozing, and evidence-fingerprint dismissal.
+- Keep Alignment, Deck, Canvas, and explicit-click HTTP(S) Browser views as
+  secondary surfaces, add the 0.146.0 protocol compatibility fixture, and
+  cover runner contracts, grouping, steering, spoof prevention, redaction,
+  bounds, cadence, xterm isolation, and concurrent atomic persistence.
+
 ## GBlockParty Chromux Next v0.1.1 (prerelease)
 
 Tag: `chromux-next-v0.1.1`

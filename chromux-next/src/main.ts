@@ -15,14 +15,24 @@ import {
   AgentRunRequestSchema,
   AlignmentDocumentV1Schema,
   BrowserActionSchema,
+  ApprovalResponseInputSchema,
+  CreateSessionInputSchema,
+  DraftInputSchema,
+  GroupMutationInputSchema,
   IpcChannels,
   MutationPayloadSchema,
-  SavePayloadSchema
+  SavePayloadSchema,
+  TriageInputSchema,
+  TurnInputSchema
 } from "./ipc/contracts";
 import { DocumentStore } from "./persistence/document-store";
 import { CodexProvider } from "./providers/codex-provider";
 import { FakeProvider } from "./providers/fake-provider";
 import type { AgentProvider } from "./providers/provider";
+import { LocalStore } from "./persistence/local-store";
+import { CodexAppServer } from "./runner/protocol";
+import { LunaAnalyzer } from "./runner/attention";
+import { RunnerManager } from "./runner/manager";
 
 if (started) app.quit();
 
@@ -30,6 +40,12 @@ app.setName("GBlockParty Chromux Next");
 app.setPath("userData", path.join(app.getPath("appData"), "GBlockParty Chromux Next"));
 
 const documents = new DocumentStore();
+const localStore = new LocalStore(app.getPath("userData"));
+const runner = new RunnerManager(
+  new CodexAppServer(),
+  localStore,
+  new LunaAnalyzer(path.join(app.getPath("userData"), "attention-analyzer"))
+);
 const running = new Map<string, AbortController>();
 const isSmoke = process.argv.includes("--smoke");
 let mainWindow: BrowserWindow | null = null;
@@ -39,7 +55,7 @@ let browserUrl = "";
 function resizeBrowser(): void {
   if (!mainWindow || !browserView) return;
   const [width = 1440, height = 900] = mainWindow.getContentSize();
-  browserView.setBounds({ x: 300, y: 52, width: Math.max(400, width - 300), height: Math.max(300, height - 52) });
+  browserView.setBounds({ x: 250, y: 104, width: Math.max(400, width - 570), height: Math.max(300, height - 104) });
 }
 
 function createWindow(): void {
@@ -68,7 +84,7 @@ function createWindow(): void {
   if (isSmoke) {
     mainWindow.webContents.once("did-finish-load", async () => {
       const ready = await mainWindow?.webContents.executeJavaScript(
-        "Boolean(window.chromuxNext?.documents && window.chromuxNext?.agents && window.chromuxNext?.browser)"
+        "Boolean(window.chromuxNext?.documents && window.chromuxNext?.runner && window.chromuxNext?.attention && window.chromuxNext?.browser)"
       );
       if (!ready) process.exitCode = 1;
       console.log(ready ? "Chromux Next smoke passed" : "Chromux Next preload bridge missing");
@@ -181,11 +197,49 @@ function registerIpc(): void {
     }
     return true;
   });
+  ipcMain.handle(IpcChannels.runnerState, () => runner.getState());
+  ipcMain.handle(IpcChannels.runnerModels, () => runner.getModels());
+  ipcMain.handle(IpcChannels.runnerCreate, (_event, input: unknown) =>
+    runner.createSession(CreateSessionInputSchema.parse(input)));
+  ipcMain.handle(IpcChannels.runnerClose, (_event, input: unknown) => {
+    if (typeof input !== "string") throw new Error("Invalid session id");
+    return runner.closeSession(input);
+  });
+  ipcMain.handle(IpcChannels.runnerSend, (_event, input: unknown) =>
+    runner.startOrSteer(TurnInputSchema.parse(input)));
+  ipcMain.handle(IpcChannels.runnerInterrupt, (_event, input: unknown) => {
+    if (typeof input !== "string") throw new Error("Invalid session id");
+    return runner.interrupt(input);
+  });
+  ipcMain.handle(IpcChannels.runnerDraft, (_event, input: unknown) =>
+    runner.saveDraft(DraftInputSchema.parse(input)));
+  ipcMain.handle(IpcChannels.runnerRespond, (_event, input: unknown) =>
+    runner.respond(ApprovalResponseInputSchema.parse(input)));
+  ipcMain.handle(IpcChannels.runnerGroup, (_event, input: unknown) =>
+    runner.mutateGroup(GroupMutationInputSchema.parse(input)));
+  ipcMain.handle(IpcChannels.runnerSelect, (_event, input: unknown) => {
+    const payload = input as { groupId?: unknown; sessionId?: unknown };
+    if (typeof payload?.groupId !== "string" || typeof payload?.sessionId !== "string") {
+      throw new Error("Invalid selection");
+    }
+    runner.select(payload.groupId, payload.sessionId);
+  });
+  ipcMain.handle(IpcChannels.attentionRefresh, () => runner.refreshAttention());
+  ipcMain.handle(IpcChannels.attentionTriage, (_event, input: unknown) =>
+    runner.triage(TriageInputSchema.parse(input)));
+  runner.on("state", (state) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(IpcChannels.runnerStateChanged, state);
+    }
+  });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   registerIpc();
   createWindow();
+  await runner.initialize().catch((error) => {
+    console.error("Runner initialization failed:", error instanceof Error ? error.message : String(error));
+  });
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -193,4 +247,8 @@ app.whenReady().then(() => {
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
+});
+
+app.on("before-quit", () => {
+  void runner.shutdown();
 });

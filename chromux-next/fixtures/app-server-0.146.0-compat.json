@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "codexCliVersion": "0.146.0",
+  "requiredMethods": [
+    "initialize",
+    "model/list",
+    "thread/start",
+    "thread/resume",
+    "thread/unsubscribe",
+    "turn/start",
+    "turn/steer",
+    "turn/interrupt"
+  ],
+  "serverRequests": {
+    "item/commandExecution/requestApproval": [
+      "accept",
+      "acceptForSession",
+      "decline",
+      "cancel",
+      "acceptWithExecpolicyAmendment"
+    ],
+    "item/fileChange/requestApproval": [
+      "accept",
+      "acceptForSession",
+      "decline",
+      "cancel"
+    ],
+    "item/tool/requestUserInput": ["answers"]
+  },
+  "requiredNotifications": [
+    "turn/started",
+    "turn/completed",
+    "item/started",
+    "item/completed",
+    "item/agentMessage/delta"
+  ]
+}
