@@ -11,6 +11,7 @@ import type {
   RunnerSessionV1,
   RunnerStateV1
 } from "../runner/contracts";
+import type { UiPreferencesPatchV1, UiPreferencesV1 } from "../settings/ui-preferences";
 
 export interface DocumentPayload {
   filePath: string;
@@ -70,6 +71,11 @@ export interface ChromuxNextApi {
       action: "snooze" | "dismiss";
       duration?: "15m" | "1h" | "4h" | "tomorrow";
     }): Promise<void>;
+  };
+  settings: {
+    getUiPreferences(): Promise<UiPreferencesV1>;
+    updateUiPreferences(patch: UiPreferencesPatchV1): Promise<UiPreferencesV1>;
+    onUiPreferencesChanged(listener: (preferences: UiPreferencesV1) => void): () => void;
   };
 }
 

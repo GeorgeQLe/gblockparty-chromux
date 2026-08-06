@@ -394,8 +394,7 @@ export class RunnerManager extends EventEmitter {
     this.emitState();
   }
   private async persist(): Promise<void> {
-    const local = await this.store.read();
-    await this.store.write({ ...local, runner: RunnerStateV1Schema.parse(this.state) });
+    await this.store.updateRunner(RunnerStateV1Schema.parse(this.state));
   }
   private emitState(): void { this.emit("state", this.getState()); }
   private async tick(): Promise<void> {

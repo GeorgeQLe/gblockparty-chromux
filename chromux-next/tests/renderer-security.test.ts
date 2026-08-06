@@ -15,4 +15,13 @@ describe("runner renderer security", () => {
     expect(source).toContain("cannot dismiss");
     expect(source).toContain('type CenterSurface = "runner" | "alignment" | "deck" | "canvas" | "browser"');
   });
+
+  it("keeps settings narrow and runtime validated across the preload boundary", async () => {
+    const preload = await readFile("src/preload.ts", "utf8");
+    const bridge = await readFile("src/ipc/bridge.ts", "utf8");
+    expect(preload).toContain("UiPreferencesPatchV1Schema.parse");
+    expect(preload).toContain("UiPreferencesV1Schema.parse");
+    expect(bridge).not.toContain("css:");
+    expect(bridge).not.toContain("filesystem");
+  });
 });

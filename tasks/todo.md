@@ -1,10 +1,72 @@
 # Task Queue
 
+## Current Product Direction
+
+Chromux Next in `chromux-next/` is the replacement editor and the only default
+target for new product work. Implement new runner, editing, attention,
+browser, shipping, and platform capabilities there.
+
+The legacy Electron app in `prototype/` is maintenance-only. Do not resume its
+deferred feature or release work unless a user explicitly reactivates a legacy
+task. Legacy state and `/releases/latest` remain unchanged until the Chromux
+Next cutover gates are complete.
+
 ## Priority Documentation Todo
 
 No active priority documentation items.
 
 ## Implementation And Documentation Todo
+
+- [ ] Restore the full structured Alignment editing workflow inside the
+  Chromux Next secondary surface: open/save canonical documents, semantic item
+  editing, review state, revision-safe mutations, undo, and review-before-apply
+  agent proposals, while keeping runner sessions mounted and preserving the
+  existing main-process trust boundary. _(replacement-editor priority;
+  successor scope: `chromux-next/`)_
+
+- [ ] Complete the runner-first hardening matrix with deterministic fake
+  app-server and Luna processes for fragmented JSONL, crash/backoff/recovery,
+  missing or incompatible CLI, authentication failure, malformed and
+  oversized output, timeout, stale source references, interrupted shutdown,
+  approval variants, and a real Electron two-session restore smoke.
+  _(replacement-editor release gate; successor scope: `chromux-next/`)_
+
+- [ ] Add successor-native project onboarding and settings for project/worktree
+  selection, default model/reasoning/permission preferences, group management,
+  and compatibility diagnostics without importing or mutating legacy state.
+  _(replacement-editor usability; successor scope: `chromux-next/`)_
+
+- [ ] Define and pass the Chromux Next cutover gates: macOS daily-driver and
+  clean-install evidence, Windows/Linux packages, signed/update-channel
+  strategy, explicit legacy-to-successor migration or coexistence policy,
+  rollback proof, and promotion from `chromux-next-v0.x.y` prereleases to the
+  stable `chromux-vX.Y.Z` line. _(replacement-editor cutover; do not change
+  `/releases/latest` before these gates pass)_
+
+## Deferred Legacy Chromux Work
+
+These are retained for historical traceability and are not active todo items:
+
+- Dock-attention v0.79.0 publication and its blocked Windows signing/release
+  prerequisites.
+- The legacy v0.73.0 OAuth-backed Vercel shipping release and dashboard-only
+  OAuth registration/UAT.
+- The legacy protected Windows 10/11 signed-candidate workflow, missing
+  environments, self-hosted runners, Azure configuration, and installer
+  lineage.
+
+If any capability is still valuable, re-scope it as a new Chromux Next task
+instead of resuming the `prototype/` implementation.
+
+## Completed Work
+
+- [x] Add five fully functional Chromux Next interface approaches selectable
+  live from Settings, with shared workflow primitives, strict persisted global
+  approach/density/motion preferences, draft and terminal viewport retention,
+  accessible Mission Board/Spatial Canvas equivalents, narrow layouts,
+  packaged visual qualification, release documentation, and v0.3.0 prerelease
+  metadata. _(replacement-editor feature; successor scope: `chromux-next/`;
+  legacy `prototype/` and `/releases/latest` unchanged)_
 
 - [x] Make Chromux Next runner-first with grouped resumable Codex app-server
   sessions, display-only xterm transcripts, fixed session composers,
@@ -77,8 +139,6 @@ No active priority documentation items.
   Context and Overflow Fix plan; evidence: renderer context/layout changes,
   focused and complete prototype coverage, package metadata, `RELEASES.md`,
   tag, and GitHub Release)_
-
-- [ ] Add a macOS Dock badge matching the visible, post-grouping Threads attention count; make selected-session completion consumption window-focus-aware, expose validated renderer-to-main IPC, show non-blocking Settings guidance when macOS rejects badging, document local aggregate-only privacy, verify macOS and protected Windows release paths, and ship v0.79.0. Implementation, macOS verification, candidate commit `b9ac0f7`, and annotated tag `chromux-v0.79.0` are complete. Publication is blocked because v0.78.0 and every prior GitHub Release have zero installer assets, the required `windows-signing` / `windows-release` environments do not exist, and no Windows 10/11 self-hosted runners are registered. _(source: user-supplied Ship macOS Dock Attention Badges plan)_
 
 - [x] Add Settings-launched Hotkey Training Grounds with four fixture-backed
   workflow missions, real production-parsed keyboard input, strict isolation
@@ -181,22 +241,6 @@ No active priority documentation items.
   evidence: `prototype/browser-queue.js`, MCP/control/renderer integration,
   preview/MCP/turn/restore coverage, package metadata, docs, and `RELEASES.md`)_
 
-- [ ] Complete the v0.73.0 OAuth-backed Vercel shipping release. Main-process
-  runtime discovery, encrypted CLI/token/OAuth profile primitives, canonical
-  linked-root/project persistence, narrow IPC, security documentation, and
-  deterministic service coverage are implemented, along with the
-  terminal-header button, project setup wizard, guarded stage-all commit/push
-  recovery, direct/Git-triggered deployment monitoring, mode-`0600` restart
-  recovery, owned loopback OAuth, two-step production confirmation, and
-  deterministic service/real-Electron coverage are implemented. Complete the
-  dashboard-only public OAuth app registration, commit its public client ID,
-  prove the OAuth credential can deploy the mapped preview project, archive the
-  direct/Git/cancel/restart live UAT, then publish the release. _(source:
-  user-supplied One-Button Vercel Shipping plan; blocker evidence:
-  `prototype/docs/testing/vercel-shipping-uat-0.73.0.md`; no controllable
-  signed-in browser is available, and Vercel documents API/team resource
-  permissions as private beta)_
-
 - [x] Redesign Threads as an Action Required / Ready to Finish / Working / All Sessions hybrid inbox with persisted Done/Snooze triage, and replace flat Git changes with a bounded repository catalog, ranked linked-worktree inventory, validated review/commit/sync actions, schema v10, documentation, and the v0.70.0 release. _(source: user-supplied implementation plan; evidence: `prototype/git-worktree-service.js`, main/preload discriminated IPC, renderer inbox/review drawer, parser/temp-repository/real-Electron coverage, package metadata, docs, and `RELEASES.md`)_
 
 - [x] Retry the complete Codex startup update check up to three times, keep restored Codex tabs queued without exposing intermediate errors, release them in saved order on retry success, preserve manual retry and install behavior, and ship v0.69.3. _(source: user-supplied implementation plan; evidence: `prototype/codex-update-service.js`, focused service/renderer-gate coverage, complete prototype suite, package metadata, and `RELEASES.md`)_
@@ -221,8 +265,6 @@ No active priority documentation items.
 - [x] Create and archive one induced failure-recovery transcript proving that artifacts persist through failure and the documented retry route restores the intended result without hidden intervention. _(source: `research/devtool-adoption.md`; proof gate: recovery proof; evidence: repeatable isolated Electron/fake-adapter UAT in `prototype/scripts/test-capture-delivery-recovery.js`, archived sanitized transcript at `docs/testing/capture-delivery-recovery-uat-0.69.4.md`, README/troubleshooting links, and v0.69.4 release metadata)_
 
 - [x] Add macOS-only, one-time-approved local MCP browser/window screenshots and bounded Chromux-window recording with system-audio fallback, private artifacts/resources, contact sheets, caller ownership, disconnect/deadline cleanup, tests, docs, and the v0.65.0 release. _(source: user-supplied implementation plan; evidence: `prototype/capture/`, main/preload/renderer capture flow, MCP contract, capture integration/renderer tests, packaging privacy metadata, capture/privacy/resource docs, `RELEASES.md`)_
-
-- [ ] Run the separate protected v0.73.0 signed-candidate workflow on Windows 10 Pro 22H2 build 19045 x64 and Windows 11 with current WSL2, complete the manual setup/restore checks, attach all five verified Squirrel assets to the matching release, and verify the Windows update feed. _(source: user-supplied signed-installer and first-run plan; implementation evidence: `.github/workflows/windows-release.yml`, `prototype/windows-setup.js`, setup renderer/main/preload integration, signing/artifact/UAT scripts, focused and complete local test coverage, and `docs/testing/windows-signed-installer-uat-0.73.0.md`; this remains a separate blocked task requiring the missing `windows-signing`/`windows-release` environments and Azure settings, two real-machine runners, a prior signed installer, protected approvals, exact signed candidate hashes, and real-machine PASS)_
 
 - [x] Keep Codex 0.145 syntax and diff colors inside Chromux palettes by applying process-scoped `TERM=xterm-color` plus `tui.theme="ansi"` to managed new/resumed sessions and bare adopted commands, while preserving explicit shell theme opt-outs; prepare v0.64.1 without tagging or publishing before the Windows UAT and Squirrel-asset gate. _(source: user-supplied implementation plan; evidence: macOS/WSL command quoting, shell-adoption, ANSI xterm theme, restore, update-gate, notifier, and complete prototype regressions)_
 

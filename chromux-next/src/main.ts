@@ -1,4 +1,5 @@
 import path from "node:path";
+import { mkdir, writeFile } from "node:fs/promises";
 import {
   app,
   BrowserWindow,
@@ -24,6 +25,7 @@ import {
   SavePayloadSchema,
   TriageInputSchema,
   TurnInputSchema
+  ,UiPreferencesPatchV1Schema
 } from "./ipc/contracts";
 import { DocumentStore } from "./persistence/document-store";
 import { CodexProvider } from "./providers/codex-provider";
@@ -37,7 +39,9 @@ import { RunnerManager } from "./runner/manager";
 if (started) app.quit();
 
 app.setName("GBlockParty Chromux Next");
-app.setPath("userData", path.join(app.getPath("appData"), "GBlockParty Chromux Next"));
+app.setPath("userData", process.env.CHROMUX_NEXT_SMOKE_USER_DATA
+  ? path.resolve(process.env.CHROMUX_NEXT_SMOKE_USER_DATA)
+  : path.join(app.getPath("appData"), "GBlockParty Chromux Next"));
 
 const documents = new DocumentStore();
 const localStore = new LocalStore(app.getPath("userData"));
@@ -48,6 +52,9 @@ const runner = new RunnerManager(
 );
 const running = new Map<string, AbortController>();
 const isSmoke = process.argv.includes("--smoke");
+const visualSmokeArgument = process.argv.find((argument) => argument.startsWith("--visual-smoke-dir="));
+const visualSmokeDirectory = visualSmokeArgument?.slice("--visual-smoke-dir=".length);
+const isVisualSmoke = Boolean(visualSmokeDirectory);
 let mainWindow: BrowserWindow | null = null;
 let browserView: WebContentsView | null = null;
 let browserUrl = "";
@@ -62,10 +69,10 @@ function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
-    minWidth: 1000,
-    minHeight: 680,
+    minWidth: 760,
+    minHeight: 600,
     title: "GBlockParty Chromux Next",
-    show: !isSmoke,
+    show: !isSmoke && !isVisualSmoke,
     backgroundColor: "#111315",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -86,9 +93,54 @@ function createWindow(): void {
       const ready = await mainWindow?.webContents.executeJavaScript(
         "Boolean(window.chromuxNext?.documents && window.chromuxNext?.runner && window.chromuxNext?.attention && window.chromuxNext?.browser)"
       );
-      if (!ready) process.exitCode = 1;
-      console.log(ready ? "Chromux Next smoke passed" : "Chromux Next preload bridge missing");
+      const expectedApproach = process.env.CHROMUX_NEXT_EXPECT_APPROACH;
+      const restoredApproach = expectedApproach
+        ? await mainWindow?.webContents.executeJavaScript("window.chromuxNext.settings.getUiPreferences().then((value) => value.approach)")
+        : undefined;
+      const passed = Boolean(ready) && (!expectedApproach || restoredApproach === expectedApproach);
+      if (!passed) process.exitCode = 1;
+      console.log(passed ? "Chromux Next smoke passed" : `Chromux Next smoke failed (approach: ${String(restoredApproach)})`);
       app.quit();
+    });
+  }
+  if (visualSmokeDirectory) {
+    mainWindow.webContents.once("did-finish-load", async () => {
+      try {
+        await mkdir(visualSmokeDirectory, { recursive: true });
+        const approaches = ["control-room", "ide-workbench", "focus-studio", "mission-board", "spatial-canvas"] as const;
+        const sizes = [{ name: "standard", width: 1440, height: 900 }, { name: "narrow", width: 820, height: 720 }];
+        for (const approach of approaches) {
+          const preferences = await localStore.updateUiPreferences({ approach });
+          mainWindow?.webContents.send(IpcChannels.settingsUiPreferencesChanged, preferences);
+          for (const size of sizes) {
+            mainWindow?.setContentSize(size.width, size.height);
+            await new Promise((resolve) => setTimeout(resolve, 180));
+            const actual = await mainWindow?.webContents.executeJavaScript("document.querySelector('.app-root')?.dataset.approach");
+            if (actual !== approach) throw new Error(`Expected ${approach}, rendered ${String(actual)}`);
+            const geometry = await mainWindow?.webContents.executeJavaScript(`(() => {
+              const rect = (selector) => {
+                const element = document.querySelector(selector);
+                if (!element) return null;
+                const value = element.getBoundingClientRect();
+                return { left: value.left, right: value.right, width: value.width };
+              };
+              return { viewport: innerWidth, composer: rect('.composer-row'), actions: rect('.composer-actions') };
+            })()`);
+            if (geometry?.actions && (geometry.actions.left < 0 || geometry.actions.right > geometry.viewport + 1)) {
+              throw new Error(`Composer actions clipped for ${approach} ${size.name}: ${JSON.stringify(geometry)}`);
+            }
+            const image = await mainWindow?.webContents.capturePage();
+            if (!image || image.isEmpty()) throw new Error(`Empty capture for ${approach} ${size.name}`);
+            await writeFile(path.join(visualSmokeDirectory, `${approach}-${size.name}.png`), image.toPNG());
+          }
+        }
+        console.log(`Chromux Next visual qualification captured ${approaches.length * sizes.length} views`);
+      } catch (error) {
+        process.exitCode = 1;
+        console.error("Chromux Next visual qualification failed:", error instanceof Error ? error.message : String(error));
+      } finally {
+        app.quit();
+      }
     });
   }
   mainWindow.on("resize", resizeBrowser);
@@ -227,6 +279,14 @@ function registerIpc(): void {
   ipcMain.handle(IpcChannels.attentionRefresh, () => runner.refreshAttention());
   ipcMain.handle(IpcChannels.attentionTriage, (_event, input: unknown) =>
     runner.triage(TriageInputSchema.parse(input)));
+  ipcMain.handle(IpcChannels.settingsGetUiPreferences, () => localStore.getUiPreferences());
+  ipcMain.handle(IpcChannels.settingsUpdateUiPreferences, async (_event, input: unknown) => {
+    const preferences = await localStore.updateUiPreferences(UiPreferencesPatchV1Schema.parse(input));
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) window.webContents.send(IpcChannels.settingsUiPreferencesChanged, preferences);
+    }
+    return preferences;
+  });
   runner.on("state", (state) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send(IpcChannels.runnerStateChanged, state);

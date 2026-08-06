@@ -1,4 +1,5 @@
-import { access, readdir } from "node:fs/promises";
+import { access, mkdtemp, readdir } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 
@@ -17,7 +18,11 @@ if (process.platform === "darwin") {
 }
 await access(executable);
 
-const child = spawn(executable, ["--smoke"], { stdio: ["ignore", "pipe", "pipe"] });
+const userData = await mkdtemp(path.join(os.tmpdir(), "chromux-next-smoke-state-"));
+const child = spawn(executable, ["--smoke"], {
+  env: { ...process.env, CHROMUX_NEXT_SMOKE_USER_DATA: userData },
+  stdio: ["ignore", "pipe", "pipe"]
+});
 let output = "";
 child.stdout.on("data", (chunk) => { output += chunk; });
 child.stderr.on("data", (chunk) => { output += chunk; });

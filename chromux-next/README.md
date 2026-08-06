@@ -5,9 +5,18 @@ separate Electron app from legacy Chromux in `../prototype/`: it has a distinct
 package, bundle identifier, user-data directory, architecture, and release
 line.
 
-## Current prerelease: v0.2.0
+## Current prerelease: v0.3.0
 
 This runner-first prerelease includes:
+
+- Five live, production-functional interface approaches: Control Room, IDE
+  Workbench, Focus Studio, Mission Board, and Spatial Canvas. They share one
+  workflow implementation and switch presentation without touching Codex
+  threads, active turns, selections, interactions, drafts, or attention.
+- A keyboard-accessible Settings overlay (`Cmd/Ctrl+,`) with persisted global
+  approach, comfortable/compact density, and system/full/reduced motion
+  preferences. Unknown preference values recover to Control Room defaults
+  without affecting runner state.
 
 - Project and custom group tabs with resumable Codex sessions backed by one
   main-process-owned `codex app-server` over JSONL stdio.
@@ -37,7 +46,8 @@ npm start
 ```
 
 Use `npm run verify` for TypeScript, contract/unit tests, and an Electron Forge
-package build.
+package build. After packaging, `npm run visual:packaged -- /tmp/chromux-next-visual`
+captures standard and narrow screenshots of all five approaches.
 
 The successor uses an upward-chevron variation of the Chromux mark. Run
 `npm run icons` after changing `build/icon.svg` to regenerate the packaged

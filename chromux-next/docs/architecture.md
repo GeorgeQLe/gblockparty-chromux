@@ -10,6 +10,33 @@ renderer → typed preload bridge → validated IPC → runner manager
                                                └─ explicit WebContentsView
 ```
 
+## Presentation approaches
+
+The renderer has one authoritative workflow composition: display-only runner,
+composer and structured interactions, session/group operations, attention,
+secondary surfaces, and session creation. Five shell components arrange those
+primitives without owning runner state:
+
+- Control Room uses top tabs and a persistent right attention rail.
+- IDE Workbench uses a project tree, editor tabs, and inspector.
+- Focus Studio uses breadcrumb/session switching and an attention drawer.
+- Mission Board provides four status lanes plus the full detail workspace.
+- Spatial Canvas provides project clusters and session nodes plus a docked
+  detail workspace. Its DOM tree remains the keyboard/screen-reader equivalent
+  of the visual map.
+
+Before an approach change, the renderer flushes the active draft and snapshots
+the xterm viewport. Selected group/session remain runner-owned; the active
+secondary surface and bounded viewport map remain renderer-owned. Shell changes
+never invoke start, steer, interrupt, resume, Luna, or thread lifecycle calls.
+
+`UiPreferencesV1` is stored in the isolated successor `state-v1.json` with
+strict approach, density, and motion enums. The bridge permits only get,
+validated partial update, and validated changed events. Malformed or future UI
+preferences recover independently to Control Room/comfortable/system so valid
+runner state survives. Serialized atomic store mutations prevent preference
+and runner writes from overwriting one another.
+
 `src/runner` owns the Codex protocol facade, normalized runner contracts,
 session/group lifecycle, and attention analysis. Raw app-server messages never
 cross IPC. `src/persistence` owns isolated atomic app state. `src/ipc` is the

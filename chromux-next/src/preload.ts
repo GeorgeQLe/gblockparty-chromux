@@ -5,7 +5,9 @@ import {
   AgentRunResultSchema,
   DocumentPayloadSchema,
   IpcChannels,
-  RunnerStateV1Schema
+  RunnerStateV1Schema,
+  UiPreferencesPatchV1Schema,
+  UiPreferencesV1Schema
 } from "./ipc/contracts";
 import type { ChromuxNextApi } from "./ipc/bridge";
 import { AlignmentDocumentV1Schema, AlignmentMutationBatchV1Schema } from "./domain/schema";
@@ -126,6 +128,24 @@ const api: ChromuxNextApi = {
     },
     async triage(input) {
       await ipcRenderer.invoke(IpcChannels.attentionTriage, TriageInputSchema.parse(input));
+    }
+  },
+  settings: {
+    async getUiPreferences() {
+      return UiPreferencesV1Schema.parse(await ipcRenderer.invoke(IpcChannels.settingsGetUiPreferences));
+    },
+    async updateUiPreferences(patch) {
+      return UiPreferencesV1Schema.parse(await ipcRenderer.invoke(
+        IpcChannels.settingsUpdateUiPreferences,
+        UiPreferencesPatchV1Schema.parse(patch)
+      ));
+    },
+    onUiPreferencesChanged(listener) {
+      const handler = (_event: Electron.IpcRendererEvent, value: unknown) => {
+        listener(UiPreferencesV1Schema.parse(value));
+      };
+      ipcRenderer.on(IpcChannels.settingsUiPreferencesChanged, handler);
+      return () => ipcRenderer.removeListener(IpcChannels.settingsUiPreferencesChanged, handler);
     }
   }
 };

@@ -1,5 +1,27 @@
 # Release Notes
 
+## GBlockParty Chromux Next v0.3.0 (prerelease)
+
+Tag: `chromux-next-v0.3.0`
+
+- Add five live interface approaches—Control Room, IDE Workbench, Focus
+  Studio, Mission Board, and Spatial Canvas—over shared runner, composer,
+  structured interaction, attention, session/group, and secondary-surface
+  primitives.
+- Add a visible, focus-contained Settings overlay with Cmd/Ctrl+`,` access,
+  miniature approach previews, live switching, comfortable/compact density,
+  system/full/reduced motion, reset behavior, and reduced-motion compliance.
+- Persist strict global UI preferences through narrow validated IPC, recover
+  malformed/future values without losing runner state, and serialize state
+  mutations so concurrent runner and preference writes cannot overwrite one
+  another.
+- Flush drafts and retain selection, active surface, pending interactions,
+  attention, thread ownership, and per-session terminal viewport while
+  switching without starting, steering, interrupting, resuming, or refreshing.
+- Add semantic list/tree navigation for Mission Board and Spatial Canvas,
+  narrow-window layouts, preference/parity/accessibility coverage, and a
+  packaged ten-screenshot visual qualification harness.
+
 ## GBlockParty Chromux Next v0.2.0 (prerelease)
 
 Tag: `chromux-next-v0.2.0`

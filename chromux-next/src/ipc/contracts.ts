@@ -15,6 +15,7 @@ import {
   TriageInputSchema,
   TurnInputSchema
 } from "../runner/contracts";
+import { UiPreferencesPatchV1Schema, UiPreferencesV1Schema } from "../settings/ui-preferences";
 
 export const IpcChannels = {
   documentOpen: "document:open",
@@ -39,6 +40,9 @@ export const IpcChannels = {
   ,runnerSelect: "runner:select"
   ,attentionRefresh: "attention:refresh"
   ,attentionTriage: "attention:triage"
+  ,settingsGetUiPreferences: "settings:get-ui-preferences"
+  ,settingsUpdateUiPreferences: "settings:update-ui-preferences"
+  ,settingsUiPreferencesChanged: "settings:ui-preferences-changed"
 } as const;
 
 export const DocumentPayloadSchema = z.object({
@@ -78,4 +82,6 @@ export {
   RunnerStateV1Schema,
   TriageInputSchema,
   TurnInputSchema
+  ,UiPreferencesPatchV1Schema
+  ,UiPreferencesV1Schema
 };

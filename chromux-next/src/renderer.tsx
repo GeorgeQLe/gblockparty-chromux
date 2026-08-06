@@ -11,10 +11,18 @@ import type {
   RunnerSessionV1,
   RunnerStateV1
 } from "./runner/contracts";
+import {
+  DEFAULT_UI_PREFERENCES,
+  type UiApproachV1,
+  type UiPreferencesPatchV1,
+  type UiPreferencesV1
+} from "./settings/ui-preferences";
 import { sampleDocument } from "./fixtures/sample-document";
 import "./styles.css";
 
 type CenterSurface = "runner" | "alignment" | "deck" | "canvas" | "browser";
+const SURFACES: CenterSurface[] = ["runner", "alignment", "deck", "canvas", "browser"];
+const terminalViewports = new Map<string, number>();
 
 const EMPTY_STATE: RunnerStateV1 = {
   schemaVersion: 1,
@@ -86,6 +94,7 @@ function RunnerTerminal({ session }: { session?: RunnerSessionV1 }) {
     const observer = new ResizeObserver(() => fitAddon.fit());
     observer.observe(host.current);
     return () => {
+      if (session?.id) terminalViewports.set(session.id, instance.buffer.active.viewportY);
       observer.disconnect();
       instance.dispose();
     };
@@ -102,7 +111,12 @@ function RunnerTerminal({ session }: { session?: RunnerSessionV1 }) {
     instance.writeln(`\x1b[1;38;5;151m${session.title}\x1b[0m  \x1b[38;5;245m${session.projectPath}\x1b[0m`);
     instance.writeln("");
     session.events.forEach((event) => instance.write(ansi(event)));
-    instance.scrollToBottom();
+    const viewport = terminalViewports.get(session.id);
+    if (viewport === undefined) instance.scrollToBottom();
+    else instance.scrollToLine(viewport);
+    return () => {
+      terminalViewports.set(session.id, instance.buffer.active.viewportY);
+    };
   }, [session?.id, session?.events]);
 
   return (
@@ -189,6 +203,13 @@ function Composer({ session }: { session?: RunnerSessionV1 }) {
   const [draft, setDraft] = useState("");
   const saveTimer = useRef<number | undefined>(undefined);
   useEffect(() => setDraft(session?.draft ?? ""), [session?.id]);
+  useEffect(() => {
+    const flush = () => {
+      if (session) void window.chromuxNext.runner.saveDraft(session.id, draft);
+    };
+    window.addEventListener("chromux:flush-drafts", flush);
+    return () => window.removeEventListener("chromux:flush-drafts", flush);
+  }, [session?.id, draft]);
 
   function update(value: string) {
     const bounded = value.slice(0, 64 * 1024);
@@ -349,171 +370,193 @@ function AttentionSidebar({ state }: { state: RunnerStateV1 }) {
   );
 }
 
+type ShellProps = {
+  state: RunnerStateV1;
+  models: ModelOptionV1[];
+  surface: CenterSurface;
+  selectedSession: RunnerSessionV1 | undefined;
+  error: string;
+  setSurface(surface: CenterSurface): void;
+  openSettings(): void;
+  openNewSession(): void;
+  clearError(): void;
+};
+
+function Brand({ approach, openSettings, openNewSession }: {
+  approach: UiApproachV1;
+  openSettings(): void;
+  openNewSession(): void;
+}) {
+  return <header className="shell-brand">
+    <div className="brand"><img src="./mark.svg" alt="" /><div><span>{approach.replaceAll("-", " ")}</span><h1>Chromux Next</h1></div></div>
+    <div className="brand-actions"><button aria-label="Create group" onClick={() => { const title = window.prompt("Custom group name"); if (title) void window.chromuxNext.runner.mutateGroup({ type: "create", title }); }}>+ Group</button><button aria-label="Open Settings" onClick={openSettings}>⚙ Settings</button><button className="new-session" onClick={openNewSession}>+ Session</button></div>
+  </header>;
+}
+
+function SurfaceTabs({ surface, setSurface, editor = false }: { surface: CenterSurface; setSurface(value: CenterSurface): void; editor?: boolean }) {
+  return <nav className={`surface-tabs ${editor ? "editor-tabs" : ""}`} aria-label="Workspace surfaces">
+    {SURFACES.map((item) => <button className={surface === item ? "active" : ""} key={item} onClick={() => setSurface(item)}>{item}</button>)}
+  </nav>;
+}
+
+function closeSession(session: RunnerSessionV1) {
+  if (session.activeTurnId && !window.confirm("This session is active. Interrupt and close it?")) return;
+  void window.chromuxNext.runner.close(session.id);
+}
+
+function SessionTree({ state, selectedSession, compact = false }: { state: RunnerStateV1; selectedSession: RunnerSessionV1 | undefined; compact?: boolean }) {
+  return <nav className={`session-tree ${compact ? "compact-tree" : ""}`} aria-label="Projects and sessions">
+    <header><span>Projects</span><button aria-label="Create group" onClick={() => {
+      const title = window.prompt("Custom group name");
+      if (title) void window.chromuxNext.runner.mutateGroup({ type: "create", title });
+    }}>＋</button></header>
+    {state.groups.map((group) => <section key={group.id}>
+      <h2 onDoubleClick={() => {
+        const title = window.prompt("Rename group", group.title);
+        if (title) void window.chromuxNext.runner.mutateGroup({ type: "rename", groupId: group.id, title });
+      }}>{group.title}</h2>
+      {group.sessionIds.map((id) => state.sessions.find((session) => session.id === id)).filter(Boolean).map((session) => session && <button
+        className={session.id === selectedSession?.id ? "active" : ""}
+        key={session.id}
+        onClick={() => void window.chromuxNext.runner.select(group.id, session.id)}
+      ><i className={session.status} /><span>{session.title}</span>{session.interactions.length > 0 && <b>{session.interactions.length}</b>}<em onClick={(event) => { event.stopPropagation(); closeSession(session); }}>×</em></button>)}
+    </section>)}
+  </nav>;
+}
+
+function TabNavigation({ state, selectedSession }: { state: RunnerStateV1; selectedSession: RunnerSessionV1 | undefined }) {
+  const selectedGroup = state.groups.find((group) => group.id === selectedSession?.groupId) ?? state.groups[0];
+  return <section className="session-navigation">
+    <div className="group-tabs">{state.groups.map((group) => <button className={selectedGroup?.id === group.id ? "active" : ""} key={group.id} onClick={() => {
+      const first = group.sessionIds[0];
+      if (first) void window.chromuxNext.runner.select(group.id, first);
+    }}>{group.title}</button>)}</div>
+    <div className="session-tabs">{selectedGroup?.sessionIds.map((id) => state.sessions.find((session) => session.id === id)).filter(Boolean).map((session) => session && <button className={selectedSession?.id === session.id ? "active" : ""} key={session.id} onClick={() => void window.chromuxNext.runner.select(session.groupId, session.id)}><i className={session.status} />{session.title}{session.interactions.length > 0 && <b>{session.interactions.length}</b>}<span onClick={(event) => { event.stopPropagation(); closeSession(session); }}>×</span></button>)}</div>
+  </section>;
+}
+
+function Workspace({ state, models, selectedSession, surface, setSurface, error, clearError, hideHeader = false }: Omit<ShellProps, "openSettings" | "openNewSession"> & { hideHeader?: boolean }) {
+  return <section className="center workflow-workspace">
+    {!hideHeader && <div className="center-header"><div><h2>{selectedSession?.title ?? "Codex sessions"}</h2><p>{selectedSession?.projectPath ?? "Create a session for a project or worktree"}</p></div>{selectedSession && <>
+      <select value={selectedSession.model ?? ""} disabled aria-label="Session model"><option>{models.find((item) => item.id === selectedSession.model)?.displayName ?? selectedSession.model ?? "Recommended"}</option></select>
+      <span className={`permission ${selectedSession.permissionPreset}`}>{selectedSession.permissionPreset === "workspace" ? "Workspace" : "Read only"}</span>
+      <select aria-label="Move session to group" value={selectedSession.groupId} onChange={(event) => void window.chromuxNext.runner.mutateGroup({ type: "move-session", groupId: event.target.value, sessionId: selectedSession.id })}>{state.groups.map((group) => <option key={group.id} value={group.id}>{group.title}</option>)}</select>
+      <button aria-label="Close selected session" onClick={() => closeSession(selectedSession)}>Close</button>
+    </>}</div>}
+    {surface === "runner" ? <RunnerTerminal {...(selectedSession ? { session: selectedSession } : {})} /> : <SecondarySurface mode={surface} />}
+    {surface === "runner" && <Composer {...(selectedSession ? { session: selectedSession } : {})} />}
+    {error && <button className="error-banner" onClick={clearError}>{error} ×</button>}
+  </section>;
+}
+
+function ControlRoomShell(props: ShellProps) {
+  return <main className="approach-shell control-room"><Brand approach="control-room" {...props} /><SurfaceTabs {...props} /><TabNavigation {...props} /><Workspace {...props} /><AttentionSidebar state={props.state} /></main>;
+}
+
+function IdeWorkbenchShell(props: ShellProps) {
+  return <main className="approach-shell ide-workbench"><Brand approach="ide-workbench" {...props} /><SessionTree {...props} /><SurfaceTabs {...props} editor /><Workspace {...props} /><aside className="inspector"><h2>Inspector</h2><dl><dt>Thread</dt><dd>{props.selectedSession?.threadId ?? "Not started"}</dd><dt>Status</dt><dd>{props.selectedSession?.status ?? "No selection"}</dd><dt>Surface</dt><dd>{props.surface}</dd></dl><AttentionSidebar state={props.state} /></aside></main>;
+}
+
+function FocusStudioShell(props: ShellProps) {
+  const [attentionOpen, setAttentionOpen] = useState(false);
+  const blockers = props.state.sessions.reduce((total, session) => total + session.interactions.length + (session.status === "failed" ? 1 : 0), 0);
+  return <main className="approach-shell focus-studio"><Brand approach="focus-studio" {...props} /><header className="focus-nav"><span>{props.state.groups.find((group) => group.id === props.selectedSession?.groupId)?.title ?? "Workspace"} /</span><select aria-label="Switch session" value={props.selectedSession?.id ?? ""} onChange={(event) => {
+    const session = props.state.sessions.find((item) => item.id === event.target.value);
+    if (session) void window.chromuxNext.runner.select(session.groupId, session.id);
+  }}>{props.state.sessions.filter((session) => session.status !== "closed").map((session) => <option value={session.id} key={session.id}>{session.title}</option>)}</select><SurfaceTabs {...props} /><button className={blockers ? "blocker-toggle has-blockers" : "blocker-toggle"} onClick={() => setAttentionOpen((open) => !open)}>{blockers ? `${blockers} blocker${blockers === 1 ? "" : "s"}` : "Attention"}</button></header>{blockers > 0 && <button className="blocker-banner" onClick={() => setAttentionOpen(true)}>Action required — open the attention drawer to resolve pending work.</button>}<Workspace {...props} />{attentionOpen && <div className="attention-drawer"><button className="drawer-close" onClick={() => setAttentionOpen(false)}>Close ×</button><AttentionSidebar state={props.state} /></div>}</main>;
+}
+
+type MissionLane = "Action Required" | "Working" | "Ready" | "Idle";
+function missionLane(session: RunnerSessionV1): MissionLane {
+  if (session.interactions.length || session.status === "failed") return "Action Required";
+  if (session.activeTurnId || session.status === "active" || session.status === "starting") return "Working";
+  if (session.events.at(-1)?.kind === "agent") return "Ready";
+  return "Idle";
+}
+function MissionBoard({ state, selectedSession }: { state: RunnerStateV1; selectedSession: RunnerSessionV1 | undefined }) {
+  const lanes: MissionLane[] = ["Action Required", "Working", "Ready", "Idle"];
+  return <section className="mission-board" aria-label="Session mission board">{lanes.map((lane) => <section key={lane}><h2>{lane}<b>{state.sessions.filter((session) => session.status !== "closed" && missionLane(session) === lane).length}</b></h2><div role="list">{state.sessions.filter((session) => session.status !== "closed" && missionLane(session) === lane).map((session) => <button role="listitem" key={session.id} className={session.id === selectedSession?.id ? "active" : ""} onClick={() => void window.chromuxNext.runner.select(session.groupId, session.id)}><i className={session.status} /><strong>{session.title}</strong><small>{state.groups.find((group) => group.id === session.groupId)?.title}</small></button>)}</div></section>)}</section>;
+}
+function MissionBoardShell(props: ShellProps) {
+  return <main className="approach-shell mission-board-shell"><Brand approach="mission-board" {...props} /><SurfaceTabs {...props} /><MissionBoard {...props} /><Workspace {...props} /></main>;
+}
+
+function SpatialMap({ state, selectedSession }: { state: RunnerStateV1; selectedSession: RunnerSessionV1 | undefined }) {
+  return <nav className="spatial-map" aria-label="Spatial session map">{state.groups.map((group, groupIndex) => <section className={`cluster cluster-${groupIndex % 4}`} key={group.id}><h2>{group.title}</h2><div role="tree">{group.sessionIds.map((id) => state.sessions.find((session) => session.id === id)).filter(Boolean).map((session) => session && <button role="treeitem" aria-selected={session.id === selectedSession?.id} className={`session-node ${session.status} ${session.id === selectedSession?.id ? "active" : ""}`} key={session.id} onClick={() => void window.chromuxNext.runner.select(group.id, session.id)}><i />{session.title}{session.interactions.length > 0 && <b>{session.interactions.length}</b>}</button>)}</div></section>)}</nav>;
+}
+function SpatialCanvasShell(props: ShellProps) {
+  return <main className="approach-shell spatial-canvas-shell"><Brand approach="spatial-canvas" {...props} /><SurfaceTabs {...props} /><SpatialMap {...props} /><section className="spatial-dock"><Workspace {...props} /></section><aside className="spatial-attention"><AttentionSidebar state={props.state} /></aside></main>;
+}
+
+const APPROACHES: Array<{ id: UiApproachV1; title: string; description: string }> = [
+  { id: "control-room", title: "Control Room", description: "Top tabs, central runner, fixed composer, and attention rail." },
+  { id: "ide-workbench", title: "IDE Workbench", description: "Project tree, editor tabs, interaction panel, and inspector." },
+  { id: "focus-studio", title: "Focus Studio", description: "Single-session flow with a collapsible attention drawer." },
+  { id: "mission-board", title: "Mission Board", description: "Status lanes paired with a full runner detail workspace." },
+  { id: "spatial-canvas", title: "Spatial Canvas", description: "Project clusters, session nodes, and a docked runner." }
+];
+
+function SettingsOverlay({ preferences, update, close }: { preferences: UiPreferencesV1; update(patch: UiPreferencesPatchV1): void; close(): void }) {
+  const dialog = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const root = dialog.current;
+    if (!root) return;
+    const focusable = () => [...root.querySelectorAll<HTMLElement>('button, input, [tabindex]:not([tabindex="-1"])')].filter((item) => !item.hasAttribute("disabled"));
+    focusable()[0]?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); close(); return; }
+      if (event.key !== "Tab") return;
+      const items = focusable();
+      if (!items.length) return;
+      const index = items.indexOf(document.activeElement as HTMLElement);
+      const next = event.shiftKey ? (index <= 0 ? items.length - 1 : index - 1) : (index >= items.length - 1 ? 0 : index + 1);
+      event.preventDefault(); items[next]?.focus();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [close]);
+  return <div className="modal-backdrop settings-backdrop" onMouseDown={close}><div ref={dialog} className="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title" onMouseDown={(event) => event.stopPropagation()}><header><div><span>Presentation preferences</span><h2 id="settings-title">Choose your workspace</h2></div><button aria-label="Close Settings" onClick={close}>×</button></header><div className="approach-grid" role="radiogroup" aria-label="Interface approach">{APPROACHES.map((approach) => <button role="radio" aria-checked={preferences.approach === approach.id} className={preferences.approach === approach.id ? "active" : ""} key={approach.id} onClick={() => update({ approach: approach.id })}><span className={`approach-preview preview-${approach.id}`}><i /><i /><i /></span><strong>{approach.title}</strong><small>{approach.description}</small></button>)}</div><section className="preference-controls"><fieldset><legend>Density</legend>{(["comfortable", "compact"] as const).map((density) => <label key={density}><input type="radio" name="density" checked={preferences.density === density} onChange={() => update({ density })} />{density}</label>)}</fieldset><fieldset><legend>Motion</legend>{(["system", "full", "reduced"] as const).map((motion) => <label key={motion}><input type="radio" name="motion" checked={preferences.motion === motion} onChange={() => update({ motion })} />{motion}</label>)}</fieldset></section><footer><button onClick={() => update({ approach: "control-room", density: "comfortable", motion: "system" })}>Reset to Control Room defaults</button><button className="primary" onClick={close}>Done</button></footer></div></div>;
+}
+
+function NewSessionDialog({ models, selectedSession, selectedGroupId, close, created, fail }: { models: ModelOptionV1[]; selectedSession: RunnerSessionV1 | undefined; selectedGroupId: string | undefined; close(): void; created(): void; fail(reason: unknown): void }) {
+  const recommended = models.find((model) => model.recommended) ?? models[0];
+  const [project, setProject] = useState(selectedSession?.projectPath ?? "");
+  const [title, setTitle] = useState("New session");
+  const [permission, setPermission] = useState<"workspace" | "read-only">("workspace");
+  const [model, setModel] = useState(recommended?.id ?? "");
+  const [effort, setEffort] = useState(recommended?.defaultReasoningEffort ?? "");
+  return <div className="modal-backdrop" onMouseDown={close}><form className="session-modal" onMouseDown={(event) => event.stopPropagation()} onSubmit={(event) => { event.preventDefault(); void window.chromuxNext.runner.create({ projectPath: project, title: title || "New session", permissionPreset: permission, ...(selectedGroupId ? { groupId: selectedGroupId } : {}), ...(model ? { model } : {}), ...(effort ? { reasoningEffort: effort } : {}) }).then(created).catch(fail); }}><header><div><span>Codex app-server</span><h2>New session</h2></div><button type="button" onClick={close}>×</button></header><label>Project or worktree path<input autoFocus value={project} onChange={(event) => setProject(event.target.value)} placeholder="/absolute/path/to/project" /></label><label>Session title<input value={title} onChange={(event) => setTitle(event.target.value)} /></label><div className="modal-grid"><label>Permissions<select value={permission} onChange={(event) => setPermission(event.target.value as "workspace" | "read-only")}><option value="workspace">Workspace</option><option value="read-only">Read only</option></select></label><label>Model<select value={model} onChange={(event) => { setModel(event.target.value); setEffort(models.find((item) => item.id === event.target.value)?.defaultReasoningEffort ?? ""); }}>{models.map((item) => <option value={item.id} key={item.id}>{item.displayName}{item.recommended ? " · recommended" : ""}</option>)}</select></label><label>Reasoning<select value={effort} onChange={(event) => setEffort(event.target.value)}>{(models.find((item) => item.id === model)?.reasoningEfforts ?? []).map((item) => <option key={item}>{item}</option>)}</select></label></div><p>{permission === "workspace" ? "Writes are limited to this workspace. Network is off by default and escalations require approval." : "Files are read-only. Network is off and approval prompts are never accepted."}</p><footer><button type="button" onClick={close}>Cancel</button><button className="primary" disabled={!project.trim()}>Create session</button></footer></form></div>;
+}
+
 function App() {
   const [state, setState] = useState<RunnerStateV1>(EMPTY_STATE);
   const [models, setModels] = useState<ModelOptionV1[]>([]);
+  const [preferences, setPreferences] = useState<UiPreferencesV1>({ ...DEFAULT_UI_PREFERENCES });
   const [surface, setSurface] = useState<CenterSurface>("runner");
   const [error, setError] = useState("");
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [newSessionOpen, setNewSessionOpen] = useState(false);
-  const [newProject, setNewProject] = useState("");
-  const [newTitle, setNewTitle] = useState("New session");
-  const [newPermission, setNewPermission] = useState<"workspace" | "read-only">("workspace");
-  const [newModel, setNewModel] = useState("");
-  const [newEffort, setNewEffort] = useState("");
-
   useEffect(() => {
-    void Promise.all([window.chromuxNext.runner.state(), window.chromuxNext.runner.models()])
-      .then(([nextState, nextModels]) => { setState(nextState); setModels(nextModels); })
-      .catch((reason) => setError(String(reason)));
-    return window.chromuxNext.runner.onState(setState);
+    void Promise.all([window.chromuxNext.runner.state(), window.chromuxNext.runner.models(), window.chromuxNext.settings.getUiPreferences()]).then(([nextState, nextModels, nextPreferences]) => { setState(nextState); setModels(nextModels); setPreferences(nextPreferences); }).catch((reason) => setError(String(reason)));
+    const offState = window.chromuxNext.runner.onState(setState);
+    const offPreferences = window.chromuxNext.settings.onUiPreferencesChanged(setPreferences);
+    return () => { offState(); offPreferences(); };
   }, []);
-
-  const selectedGroup = state.groups.find((group) => group.id === state.selectedGroupId) ?? state.groups[0];
-  const groupSessions = selectedGroup
-    ? selectedGroup.sessionIds.map((id) => state.sessions.find((session) => session.id === id)).filter(Boolean) as RunnerSessionV1[]
-    : [];
-  const selectedSession = state.sessions.find((session) => session.id === state.selectedSessionId) ?? groupSessions[0];
-  const groupAttention = useMemo(() => new Map(state.groups.map((group) => [
-    group.id,
-    group.sessionIds.reduce((total, sessionId) => {
-      const session = state.sessions.find((item) => item.id === sessionId);
-      return total + (session?.interactions.length ?? 0) + (session?.status === "failed" ? 1 : 0);
-    }, 0) + (state.attention?.recommendations ?? []).filter((recommendation) => {
-      const triage = [...state.triage].reverse().find((item) => item.fingerprint === recommendation.fingerprint);
-      if (triage?.action === "dismiss") return false;
-      if (triage?.until && Date.parse(triage.until) > Date.now()) return false;
-      return recommendation.sourceIds.some((sourceId) => group.sessionIds.some((sessionId) => {
-        const session = state.sessions.find((item) => item.id === sessionId);
-        return session?.id === sourceId
-          || session?.events.some((event) => event.id === sourceId)
-          || session?.interactions.some((interaction) => interaction.id === sourceId);
-      }));
-    }).length
-  ])), [state]);
-
-  async function createSession() {
-    if (!newProject) return;
-    try {
-      const groupId = selectedGroup?.kind === "custom" ? selectedGroup.id : undefined;
-      await window.chromuxNext.runner.create({
-        projectPath: newProject,
-        title: newTitle || "New session",
-        permissionPreset: newPermission,
-        ...(groupId ? { groupId } : {}),
-        ...(newModel ? { model: newModel } : {}),
-        ...(newEffort ? { reasoningEffort: newEffort } : {})
-      });
-      setNewSessionOpen(false);
-      setSurface("runner");
-    } catch (reason) { setError(String(reason)); }
-  }
-
-  return (
-    <main className="app-shell">
-      <header className="app-header">
-        <div className="brand"><img src="./mark.svg" alt="" /><div><span>Experimental</span><h1>Chromux Next</h1></div></div>
-        <nav className="surface-tabs" aria-label="Center surfaces">
-          {(["runner", "alignment", "deck", "canvas", "browser"] as const).map((item) => (
-            <button className={surface === item ? "active" : ""} key={item} onClick={() => setSurface(item)}>{item}</button>
-          ))}
-        </nav>
-        <button className="new-session" onClick={() => {
-          const recommended = models.find((model) => model.recommended) ?? models[0];
-          setNewProject(selectedSession?.projectPath ?? "");
-          setNewModel(recommended?.id ?? "");
-          setNewEffort(recommended?.defaultReasoningEffort ?? "");
-          setNewSessionOpen(true);
-        }}>+ Session</button>
-      </header>
-      <section className="session-navigation">
-        <div className="group-tabs">
-          {state.groups.map((group) => (
-            <button
-              className={selectedGroup?.id === group.id ? "active" : ""}
-              key={group.id}
-              onDoubleClick={() => {
-                const title = window.prompt("Rename group", group.title);
-                if (title) void window.chromuxNext.runner.mutateGroup({ type: "rename", groupId: group.id, title });
-              }}
-              onClick={() => {
-                const first = group.sessionIds[0];
-                if (first) void window.chromuxNext.runner.select(group.id, first);
-              }}
-            >
-              {group.title}{Boolean(groupAttention.get(group.id)) && <b>{groupAttention.get(group.id)}</b>}
-            </button>
-          ))}
-          <button onClick={() => {
-            const title = window.prompt("Custom group name");
-            if (title) void window.chromuxNext.runner.mutateGroup({ type: "create", title });
-          }}>＋</button>
-        </div>
-        <div className="session-tabs">
-          {groupSessions.map((session) => (
-            <button className={selectedSession?.id === session.id ? "active" : ""} key={session.id} onClick={() => void window.chromuxNext.runner.select(session.groupId, session.id)}>
-              <i className={session.status} />{session.title}
-              {session.interactions.length > 0 && <b>{session.interactions.length}</b>}
-              <span onClick={(event) => {
-                event.stopPropagation();
-                if (session.activeTurnId && !window.confirm("This session is active. Interrupt and close it?")) return;
-                void window.chromuxNext.runner.close(session.id);
-              }}>×</span>
-            </button>
-          ))}
-        </div>
-      </section>
-      <section className="center">
-        <div className="center-header">
-          <div><h2>{selectedSession?.title ?? "Codex sessions"}</h2><p>{selectedSession?.projectPath ?? "Create a session for a project or worktree"}</p></div>
-          {selectedSession && <>
-            <select value={selectedSession.model ?? ""} disabled aria-label="Session model">
-              <option>{models.find((item) => item.id === selectedSession.model)?.displayName ?? selectedSession.model ?? "Recommended"}</option>
-            </select>
-            <span className={`permission ${selectedSession.permissionPreset}`}>{selectedSession.permissionPreset === "workspace" ? "Workspace" : "Read only"}</span>
-            <select
-              aria-label="Move session to group"
-              value={selectedSession.groupId}
-              onChange={(event) => void window.chromuxNext.runner.mutateGroup({
-                type: "move-session",
-                groupId: event.target.value,
-                sessionId: selectedSession.id
-              })}
-            >
-              {state.groups.map((group) => <option key={group.id} value={group.id}>{group.title}</option>)}
-            </select>
-          </>}
-        </div>
-        {surface === "runner" ? <RunnerTerminal {...(selectedSession ? { session: selectedSession } : {})} /> : <SecondarySurface mode={surface} />}
-        {surface === "runner" && <Composer {...(selectedSession ? { session: selectedSession } : {})} />}
-        {error && <button className="error-banner" onClick={() => setError("")}>{error} ×</button>}
-      </section>
-      <AttentionSidebar state={state} />
-      {newSessionOpen && (
-        <div className="modal-backdrop" onMouseDown={() => setNewSessionOpen(false)}>
-          <form className="session-modal" onMouseDown={(event) => event.stopPropagation()} onSubmit={(event) => {
-            event.preventDefault();
-            void createSession();
-          }}>
-            <header><div><span>Codex app-server</span><h2>New session</h2></div><button type="button" onClick={() => setNewSessionOpen(false)}>×</button></header>
-            <label>Project or worktree path<input autoFocus value={newProject} onChange={(event) => setNewProject(event.target.value)} placeholder="/absolute/path/to/project" /></label>
-            <label>Session title<input value={newTitle} onChange={(event) => setNewTitle(event.target.value)} /></label>
-            <div className="modal-grid">
-              <label>Permissions<select value={newPermission} onChange={(event) => setNewPermission(event.target.value as "workspace" | "read-only")}><option value="workspace">Workspace</option><option value="read-only">Read only</option></select></label>
-              <label>Model<select value={newModel} onChange={(event) => {
-                setNewModel(event.target.value);
-                setNewEffort(models.find((model) => model.id === event.target.value)?.defaultReasoningEffort ?? "");
-              }}>{models.map((model) => <option value={model.id} key={model.id}>{model.displayName}{model.recommended ? " · recommended" : ""}</option>)}</select></label>
-              <label>Reasoning<select value={newEffort} onChange={(event) => setNewEffort(event.target.value)}>
-                {(models.find((model) => model.id === newModel)?.reasoningEfforts ?? []).map((effort) => <option key={effort}>{effort}</option>)}
-              </select></label>
-            </div>
-            <p>{newPermission === "workspace" ? "Writes are limited to this workspace. Network is off by default and escalations require approval." : "Files are read-only. Network is off and approval prompts are never accepted."}</p>
-            <footer><button type="button" onClick={() => setNewSessionOpen(false)}>Cancel</button><button className="primary" disabled={!newProject.trim()}>Create session</button></footer>
-          </form>
-        </div>
-      )}
-    </main>
-  );
+  useEffect(() => {
+    const shortcut = (event: KeyboardEvent) => {
+      if (event.key === "," && (event.metaKey || event.ctrlKey)) { event.preventDefault(); setSettingsOpen(true); }
+    };
+    window.addEventListener("keydown", shortcut);
+    return () => window.removeEventListener("keydown", shortcut);
+  }, []);
+  const selectedSession = state.sessions.find((session) => session.id === state.selectedSessionId) ?? state.sessions.find((session) => session.status !== "closed");
+  const updatePreferences = (patch: UiPreferencesPatchV1) => {
+    window.dispatchEvent(new Event("chromux:flush-drafts"));
+    void window.chromuxNext.settings.updateUiPreferences(patch).then(setPreferences).catch((reason) => setError(String(reason)));
+  };
+  const shellProps: ShellProps = { state, models, surface, selectedSession, error, setSurface, openSettings: () => setSettingsOpen(true), openNewSession: () => setNewSessionOpen(true), clearError: () => setError("") };
+  const Shell = preferences.approach === "ide-workbench" ? IdeWorkbenchShell : preferences.approach === "focus-studio" ? FocusStudioShell : preferences.approach === "mission-board" ? MissionBoardShell : preferences.approach === "spatial-canvas" ? SpatialCanvasShell : ControlRoomShell;
+  return <div className={`app-root density-${preferences.density} motion-${preferences.motion}`} data-approach={preferences.approach}><Shell {...shellProps} />{settingsOpen && <SettingsOverlay preferences={preferences} update={updatePreferences} close={() => setSettingsOpen(false)} />}{newSessionOpen && <NewSessionDialog models={models} selectedSession={selectedSession} selectedGroupId={state.groups.find((group) => group.id === selectedSession?.groupId)?.kind === "custom" ? selectedSession?.groupId : undefined} close={() => setNewSessionOpen(false)} created={() => { setNewSessionOpen(false); setSurface("runner"); }} fail={(reason) => setError(String(reason))} />}</div>;
 }
 
 createRoot(document.getElementById("root")!).render(<App />);
