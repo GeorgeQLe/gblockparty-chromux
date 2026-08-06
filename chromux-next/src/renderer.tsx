@@ -17,6 +17,22 @@ import {
   type UiPreferencesPatchV1,
   type UiPreferencesV1
 } from "./settings/ui-preferences";
+import type {
+  AgentRunEvent,
+  AlignmentDocumentV1,
+  AlignmentItem,
+  AlignmentMutationBatchV1,
+  AlignmentMutationOperation
+} from "./domain/schema";
+import {
+  createItem,
+  humanReview,
+  isProposalStale,
+  itemLabel,
+  mutationBatch,
+  normalizeTable,
+  type AlignmentItemKind
+} from "./alignment/editor-model";
 import { sampleDocument } from "./fixtures/sample-document";
 import "./styles.css";
 
@@ -268,22 +284,140 @@ function Composer({ session }: { session?: RunnerSessionV1 }) {
   );
 }
 
-function SecondarySurface({ mode }: { mode: CenterSurface }) {
-  if (mode === "alignment") return (
-    <section className="secondary-surface">
-      <h2>{sampleDocument.title}</h2>
-      <p className="muted">Alignment remains available as a secondary surface.</p>
-      {sampleDocument.items.slice(0, 5).map((item) => (
-        <article key={item.id}><span>{item.kind}</span><p>{"text" in item ? item.text : "question" in item ? item.question : item.kind}</p></article>
-      ))}
-    </section>
-  );
-  if (mode === "deck") {
-    const deck = sampleDocument.views.find((view) => view.kind === "deck");
-    return <section className="secondary-surface deck">{deck?.slides.map((slide) => <article key={slide.id}><span>Slide</span><h2>{slide.title}</h2></article>)}</section>;
-  }
-  if (mode === "canvas") return <section className="secondary-surface canvas"><h2>Canvas</h2><p>Spatial alignment projection stays mounted independently of runner state.</p></section>;
-  return <section className="secondary-surface browser-placeholder"><h2>Browser</h2><p>HTTP(S) links open here only after an explicit click in the runner.</p></section>;
+type AlignmentWorkspaceProps = {
+  document: AlignmentDocumentV1;
+  filePath: string | undefined;
+  selectedItemId: string | undefined;
+  mutationStatus: string;
+  undoDepth: number;
+  runStatus: "idle" | "running" | "completed" | "cancelled" | "failed";
+  runId: string | undefined;
+  events: AgentRunEvent[];
+  response: string;
+  proposals: AlignmentMutationBatchV1[];
+  select(itemId: string): void;
+  open(): void;
+  save(): void;
+  saveAs(): void;
+  apply(summary: string, operations: AlignmentMutationOperation[]): void;
+  undo(): void;
+  run(provider: "fake" | "codex", prompt: string): void;
+  cancel(): void;
+  applyProposal(index: number): void;
+  rejectProposal(index: number): void;
+};
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return <label className="alignment-field"><span>{label}</span>{children}</label>;
+}
+
+function KindEditor({ item, update }: { item: AlignmentItem; update(next: AlignmentItem): void }) {
+  const commit = (patch: Partial<AlignmentItem>) => update({ ...item, ...patch } as AlignmentItem);
+  if (item.kind === "heading") return <div className="kind-editor two-column">
+    <Field label="Level"><select defaultValue={item.level} onChange={(event) => commit({ level: Number(event.target.value) })}>{[1, 2, 3, 4, 5, 6].map((level) => <option key={level}>{level}</option>)}</select></Field>
+    <Field label="Text"><input defaultValue={item.text} onBlur={(event) => commit({ text: event.target.value })} /></Field>
+  </div>;
+  if (item.kind === "text") return <Field label="Body"><textarea rows={8} defaultValue={item.text} onBlur={(event) => commit({ text: event.target.value })} /></Field>;
+  if (item.kind === "list") return <div className="kind-editor">
+    <Field label="Style"><select defaultValue={item.style} onChange={(event) => commit({ style: event.target.value as "bullet" | "numbered" })}><option value="bullet">Bullet</option><option value="numbered">Numbered</option></select></Field>
+    <Field label="Entries (one per line)"><textarea rows={8} defaultValue={item.items.join("\n")} onBlur={(event) => commit({ items: event.target.value.split("\n") })} /></Field>
+  </div>;
+  if (item.kind === "table") return <div className="kind-editor">
+    <Field label="Columns (tab separated)"><input defaultValue={item.columns.join("\t")} onBlur={(event) => {
+      const columns = event.target.value.split("\t");
+      commit({ columns, rows: normalizeTable(columns, item.rows) });
+    }} /></Field>
+    <Field label="Rows (tabs and newlines)"><textarea rows={8} defaultValue={item.rows.map((row) => row.join("\t")).join("\n")} onBlur={(event) => commit({ rows: normalizeTable(item.columns, event.target.value.split("\n").map((row) => row.split("\t"))) })} /></Field>
+  </div>;
+  if (item.kind === "media") return <div className="kind-editor">
+    <Field label="URL"><input type="url" defaultValue={item.url} onBlur={(event) => commit({ url: event.target.value })} /></Field>
+    <Field label="Alt text"><input defaultValue={item.alt} onBlur={(event) => commit({ alt: event.target.value })} /></Field>
+    <Field label="Caption"><textarea rows={3} defaultValue={item.caption ?? ""} onBlur={(event) => commit({ caption: event.target.value })} /></Field>
+  </div>;
+  if (item.kind === "code") return <div className="kind-editor">
+    <Field label="Language"><input defaultValue={item.language} onBlur={(event) => commit({ language: event.target.value })} /></Field>
+    <Field label="Code"><textarea className="code-input" rows={12} defaultValue={item.code} onBlur={(event) => commit({ code: event.target.value })} /></Field>
+  </div>;
+  if (item.kind === "decision" || item.kind === "question") return <div className="kind-editor">
+    <Field label="Prompt"><textarea rows={3} defaultValue={item.question} onBlur={(event) => commit({ question: event.target.value })} /></Field>
+    <Field label="Answer"><textarea rows={6} defaultValue={item.answer} onBlur={(event) => commit({ answer: event.target.value })} /></Field>
+    <label className="check-field"><input type="checkbox" defaultChecked={item.gate} onChange={(event) => commit({ gate: event.target.checked })} /> Required gate</label>
+  </div>;
+  return <div className="kind-editor">
+    <Field label="Label"><input defaultValue={item.label} onBlur={(event) => commit({ label: event.target.value })} /></Field>
+    <div className="two-column"><Field label="Value type"><select defaultValue={typeof item.value} onChange={(event) => commit({ value: event.target.value === "number" ? Number(item.value) || 0 : String(item.value) })}><option value="string">String</option><option value="number">Number</option></select></Field>
+      <Field label="Value"><input type={typeof item.value === "number" ? "number" : "text"} defaultValue={item.value} onBlur={(event) => commit({ value: typeof item.value === "number" ? Number(event.target.value) : event.target.value })} /></Field></div>
+    <Field label="Unit"><input defaultValue={item.unit ?? ""} onBlur={(event) => commit({ unit: event.target.value })} /></Field>
+  </div>;
+}
+
+function LinkedText({ text }: { text: string }) {
+  const parts = text.split(/(https?:\/\/[^\s<>"')\]]+)/g);
+  return <p className="agent-response">{parts.map((part, index) => /^https?:\/\//.test(part)
+    ? <button className="text-link" key={`${part}-${index}`} onClick={() => void window.chromuxNext.browser.open(part)}>{part}</button>
+    : <React.Fragment key={index}>{part}</React.Fragment>)}</p>;
+}
+
+function ContributorPanel({ alignment }: { alignment: AlignmentWorkspaceProps }) {
+  const [provider, setProvider] = useState<"fake" | "codex">("fake");
+  const [prompt, setPrompt] = useState("Review the selected item and suggest a concrete improvement.");
+  return <aside className="contributor-panel">
+    <header><div><span>Read-only contributor</span><h3>Agent contribution</h3></div><strong className={`run-${alignment.runStatus}`}>{alignment.runStatus}</strong></header>
+    <Field label="Adapter"><select value={provider} disabled={alignment.runStatus === "running"} onChange={(event) => setProvider(event.target.value as "fake" | "codex")}><option value="fake">Fake</option><option value="codex">Codex</option></select></Field>
+    <Field label="Request"><textarea rows={4} value={prompt} onChange={(event) => setPrompt(event.target.value)} /></Field>
+    <div className="button-row"><button className="primary" disabled={!prompt.trim() || alignment.runStatus === "running"} onClick={() => alignment.run(provider, prompt)}>Contribute</button><button disabled={alignment.runStatus !== "running"} onClick={alignment.cancel}>Cancel</button></div>
+    <div className="agent-events" role="log" aria-live="polite">{alignment.events.map((event, index) => <small key={`${event.runId}-${index}`}>{event.type}{event.type === "progress" ? ` · ${event.message}` : event.type === "failed" ? ` · ${event.message}` : ""}</small>)}</div>
+    {alignment.response && <LinkedText text={alignment.response} />}
+    <section className="proposal-list"><h4>Unapplied proposals</h4>{alignment.proposals.map((proposal, index) => {
+      const stale = isProposalStale(proposal, alignment.document);
+      return <article className={stale ? "stale" : ""} key={`${proposal.baseRevision}-${index}`}><strong>{proposal.summary}</strong><small>{proposal.operations.length} operation{proposal.operations.length === 1 ? "" : "s"} · revision {proposal.baseRevision}{stale ? " · stale, rerun required" : ""}</small><div><button className="primary" disabled={stale || alignment.runStatus === "running"} onClick={() => alignment.applyProposal(index)}>Apply</button><button onClick={() => alignment.rejectProposal(index)}>Reject</button></div></article>;
+    })}{!alignment.proposals.length && <p className="empty">No proposals awaiting review.</p>}</section>
+  </aside>;
+}
+
+function AlignmentSurface({ alignment }: { alignment: AlignmentWorkspaceProps }) {
+  const selected = alignment.document.items.find((item) => item.id === alignment.selectedItemId) ?? alignment.document.items[0];
+  const [insertKind, setInsertKind] = useState<AlignmentItemKind>("text");
+  const selectedIndex = selected ? alignment.document.items.findIndex((item) => item.id === selected.id) : -1;
+  const updateItem = (item: AlignmentItem) => alignment.apply(`Edit ${item.kind} item`, [{ type: "item.update", itemId: item.id, item }]);
+  return <section className="alignment-workspace" aria-label="Alignment document editor">
+    <header className="alignment-toolbar">
+      <div><h2>{alignment.document.title}</h2><p title={alignment.filePath}>{alignment.filePath ?? "Unsaved sample · first edit opens Save As"}</p></div>
+      <div className="button-row"><button onClick={alignment.open}>Open</button><button onClick={alignment.save}>Save</button><button onClick={alignment.saveAs}>Save As</button><button disabled={!alignment.undoDepth} onClick={alignment.undo}>Undo ({alignment.undoDepth})</button></div>
+      <div className="document-state"><span>Revision {alignment.document.revision}</span><select aria-label="Document status" value={alignment.document.status} onChange={(event) => alignment.apply("Change document status", [{ type: "status.set", status: event.target.value as AlignmentDocumentV1["status"] }])}><option value="draft">Draft</option><option value="in-review">In review</option><option value="approved">Approved</option><option value="archived">Archived</option></select><output aria-live="polite">{alignment.mutationStatus}</output></div>
+    </header>
+    <nav className="item-outline" aria-label="Document items"><div className="insert-row"><select aria-label="New item kind" value={insertKind} onChange={(event) => setInsertKind(event.target.value as AlignmentItemKind)}>{(["heading", "text", "list", "table", "media", "code", "decision", "question", "metric"] as const).map((kind) => <option value={kind} key={kind}>{kind}</option>)}</select><button onClick={() => {
+      const item = createItem(insertKind, `${insertKind}-${crypto.randomUUID()}`);
+      alignment.apply(`Insert ${insertKind}`, [{ type: "item.insert", index: Math.max(0, selectedIndex + 1), item }]);
+      alignment.select(item.id);
+    }}>Insert</button></div>{alignment.document.items.map((item, index) => <button key={item.id} className={item.id === selected?.id ? "active" : ""} aria-current={item.id === selected?.id ? "true" : undefined} onClick={() => alignment.select(item.id)}><span>{index + 1}</span><strong>{itemLabel(item)}</strong><i className={`review-${item.review.status}`} /></button>)}</nav>
+    <main className="item-editor">{selected ? <React.Fragment key={`${selected.id}-${alignment.document.revision}`}><header><div><span>{selected.kind}</span><h3>{itemLabel(selected)}</h3><small>{selected.id}</small></div><div className="button-row"><button disabled={selectedIndex <= 0} onClick={() => alignment.apply("Move item up", [{ type: "item.move", itemId: selected.id, toIndex: selectedIndex - 1 }])}>↑</button><button disabled={selectedIndex >= alignment.document.items.length - 1} onClick={() => alignment.apply("Move item down", [{ type: "item.move", itemId: selected.id, toIndex: selectedIndex + 1 }])}>↓</button><button className="danger" onClick={() => alignment.apply(`Remove ${selected.kind}`, [{ type: "item.remove", itemId: selected.id }])}>Remove</button></div></header><KindEditor item={selected} update={updateItem} /><fieldset className="review-editor"><legend>Human review</legend><Field label="Status"><select value={selected.review.status} onChange={(event) => alignment.apply("Update item review", [{ type: "review.update", itemId: selected.id, review: humanReview(event.target.value as AlignmentItem["review"]["status"], selected.review.feedback, "Human editor") }])}><option value="unreviewed">Unreviewed</option><option value="changes-requested">Changes requested</option><option value="approved">Approved</option></select></Field><Field label="Feedback"><textarea rows={4} defaultValue={selected.review.feedback} onBlur={(event) => alignment.apply("Update review feedback", [{ type: "review.update", itemId: selected.id, review: humanReview(selected.review.status, event.target.value, "Human editor") }])} /></Field>{selected.review.reviewer && <small>Reviewed by {selected.review.reviewer} · {new Date(selected.review.reviewedAt!).toLocaleString()}</small>}</fieldset></React.Fragment> : <p className="empty">Insert an item to begin.</p>}</main>
+    <ContributorPanel alignment={alignment} />
+  </section>;
+}
+
+function ItemProjection({ item }: { item: AlignmentItem }) {
+  if (item.kind === "heading") return React.createElement(`h${item.level}`, {}, item.text);
+  if (item.kind === "text") return <p>{item.text}</p>;
+  if (item.kind === "list") { const List = item.style === "numbered" ? "ol" : "ul"; return <List>{item.items.map((entry, index) => <li key={index}>{entry}</li>)}</List>; }
+  if (item.kind === "table") return <table><thead><tr>{item.columns.map((column, index) => <th key={index}>{column}</th>)}</tr></thead><tbody>{item.rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, index) => <td key={index}>{cell}</td>)}</tr>)}</tbody></table>;
+  if (item.kind === "media") return <figure>{item.url && <img src={item.url} alt={item.alt} />}<figcaption>{item.caption}</figcaption></figure>;
+  if (item.kind === "code") return <pre><code>{item.code}</code></pre>;
+  if (item.kind === "metric") return <p><strong>{item.label}</strong> {item.value} {item.unit}</p>;
+  return <blockquote><strong>{item.question}</strong><p>{item.answer || "Unanswered"}</p>{item.gate && <small>Required gate</small>}</blockquote>;
+}
+
+function DeckSurface({ document }: { document: AlignmentDocumentV1 }) {
+  const deck = document.views.find((view) => view.kind === "deck");
+  return <section className="secondary-surface deck">{deck?.slides.map((slide) => <article key={slide.id}><span>Slide · {slide.layout}</span><h2>{slide.title}</h2>{slide.itemIds.map((id) => document.items.find((item) => item.id === id)).filter(Boolean).map((item) => item && <ItemProjection key={item.id} item={item} />)}</article>) ?? <p className="empty">No deck view.</p>}</section>;
+}
+
+function CanvasSurface({ document }: { document: AlignmentDocumentV1 }) {
+  const canvas = document.views.find((view) => view.kind === "canvas");
+  return <section className="secondary-surface canvas"><div className="canvas-stage">{canvas?.nodes.map((node) => {
+    const item = node.itemId ? document.items.find((candidate) => candidate.id === node.itemId) : undefined;
+    return <article key={node.id} style={{ left: node.x, top: node.y, width: node.width, minHeight: node.height }}><span>{node.shape}</span>{item ? <ItemProjection item={item} /> : node.text}</article>;
+  })}</div></section>;
 }
 
 function AttentionSidebar({ state }: { state: RunnerStateV1 }) {
@@ -376,6 +510,7 @@ type ShellProps = {
   surface: CenterSurface;
   selectedSession: RunnerSessionV1 | undefined;
   error: string;
+  alignment: AlignmentWorkspaceProps;
   setSurface(surface: CenterSurface): void;
   openSettings(): void;
   openNewSession(): void;
@@ -435,7 +570,7 @@ function TabNavigation({ state, selectedSession }: { state: RunnerStateV1; selec
   </section>;
 }
 
-function Workspace({ state, models, selectedSession, surface, setSurface, error, clearError, hideHeader = false }: Omit<ShellProps, "openSettings" | "openNewSession"> & { hideHeader?: boolean }) {
+function Workspace({ state, models, selectedSession, surface, setSurface, error, clearError, alignment, hideHeader = false }: Omit<ShellProps, "openSettings" | "openNewSession"> & { hideHeader?: boolean }) {
   return <section className="center workflow-workspace">
     {!hideHeader && <div className="center-header"><div><h2>{selectedSession?.title ?? "Codex sessions"}</h2><p>{selectedSession?.projectPath ?? "Create a session for a project or worktree"}</p></div>{selectedSession && <>
       <select value={selectedSession.model ?? ""} disabled aria-label="Session model"><option>{models.find((item) => item.id === selectedSession.model)?.displayName ?? selectedSession.model ?? "Recommended"}</option></select>
@@ -443,8 +578,14 @@ function Workspace({ state, models, selectedSession, surface, setSurface, error,
       <select aria-label="Move session to group" value={selectedSession.groupId} onChange={(event) => void window.chromuxNext.runner.mutateGroup({ type: "move-session", groupId: event.target.value, sessionId: selectedSession.id })}>{state.groups.map((group) => <option key={group.id} value={group.id}>{group.title}</option>)}</select>
       <button aria-label="Close selected session" onClick={() => closeSession(selectedSession)}>Close</button>
     </>}</div>}
-    {surface === "runner" ? <RunnerTerminal {...(selectedSession ? { session: selectedSession } : {})} /> : <SecondarySurface mode={surface} />}
-    {surface === "runner" && <Composer {...(selectedSession ? { session: selectedSession } : {})} />}
+    <div className={`surface-pane runner-pane ${surface === "runner" ? "active" : ""}`} aria-hidden={surface !== "runner"}>
+      <RunnerTerminal {...(selectedSession ? { session: selectedSession } : {})} />
+      <Composer {...(selectedSession ? { session: selectedSession } : {})} />
+    </div>
+    <div className={`surface-pane ${surface === "alignment" ? "active" : ""}`} aria-hidden={surface !== "alignment"}><AlignmentSurface alignment={alignment} /></div>
+    <div className={`surface-pane ${surface === "deck" ? "active" : ""}`} aria-hidden={surface !== "deck"}><DeckSurface document={alignment.document} /></div>
+    <div className={`surface-pane ${surface === "canvas" ? "active" : ""}`} aria-hidden={surface !== "canvas"}><CanvasSurface document={alignment.document} /></div>
+    <div className={`surface-pane ${surface === "browser" ? "active" : ""}`} aria-hidden={surface !== "browser"}><section className="secondary-surface browser-placeholder"><h2>Browser</h2><p>HTTP(S) links open here only after an explicit click in a runner transcript or contributor response.</p></section></div>
     {error && <button className="error-banner" onClick={clearError}>{error} ×</button>}
   </section>;
 }
@@ -486,6 +627,32 @@ function SpatialMap({ state, selectedSession }: { state: RunnerStateV1; selected
 }
 function SpatialCanvasShell(props: ShellProps) {
   return <main className="approach-shell spatial-canvas-shell"><Brand approach="spatial-canvas" {...props} /><SurfaceTabs {...props} /><SpatialMap {...props} /><section className="spatial-dock"><Workspace {...props} /></section><aside className="spatial-attention"><AttentionSidebar state={props.state} /></aside></main>;
+}
+
+function UnifiedApproachShell({ approach, ...props }: ShellProps & { approach: UiApproachV1 }) {
+  const [attentionOpen, setAttentionOpen] = useState(false);
+  const blockers = props.state.sessions.reduce((total, session) => total + session.interactions.length + (session.status === "failed" ? 1 : 0), 0);
+  const shellClass = approach === "mission-board" ? "mission-board-shell"
+    : approach === "spatial-canvas" ? "spatial-canvas-shell"
+      : approach;
+  return <main className={`approach-shell ${shellClass}`}>
+    <Brand approach={approach} {...props} />
+    {approach === "ide-workbench" && <SessionTree {...props} />}
+    {approach === "control-room" && <React.Fragment><SurfaceTabs {...props} /><TabNavigation {...props} /></React.Fragment>}
+    {approach === "ide-workbench" && <SurfaceTabs {...props} editor />}
+    {approach === "focus-studio" && <header className="focus-nav"><span>{props.state.groups.find((group) => group.id === props.selectedSession?.groupId)?.title ?? "Workspace"} /</span><select aria-label="Switch session" value={props.selectedSession?.id ?? ""} onChange={(event) => {
+      const session = props.state.sessions.find((item) => item.id === event.target.value);
+      if (session) void window.chromuxNext.runner.select(session.groupId, session.id);
+    }}>{props.state.sessions.filter((session) => session.status !== "closed").map((session) => <option value={session.id} key={session.id}>{session.title}</option>)}</select><SurfaceTabs {...props} /><button className={blockers ? "blocker-toggle has-blockers" : "blocker-toggle"} onClick={() => setAttentionOpen((open) => !open)}>{blockers ? `${blockers} blocker${blockers === 1 ? "" : "s"}` : "Attention"}</button></header>}
+    {approach === "focus-studio" && blockers > 0 && <button className="blocker-banner" onClick={() => setAttentionOpen(true)}>Action required — open the attention drawer to resolve pending work.</button>}
+    {approach === "mission-board" && <React.Fragment><SurfaceTabs {...props} /><MissionBoard {...props} /></React.Fragment>}
+    {approach === "spatial-canvas" && <React.Fragment><SurfaceTabs {...props} /><SpatialMap {...props} /></React.Fragment>}
+    <section className={`workspace-host ${approach === "spatial-canvas" ? "spatial-dock" : ""}`}><Workspace key="persistent-workspace" {...props} /></section>
+    {approach === "control-room" && <AttentionSidebar state={props.state} />}
+    {approach === "ide-workbench" && <aside className="inspector"><h2>Inspector</h2><dl><dt>Thread</dt><dd>{props.selectedSession?.threadId ?? "Not started"}</dd><dt>Status</dt><dd>{props.selectedSession?.status ?? "No selection"}</dd><dt>Surface</dt><dd>{props.surface}</dd></dl><AttentionSidebar state={props.state} /></aside>}
+    {approach === "focus-studio" && attentionOpen && <div className="attention-drawer"><button className="drawer-close" onClick={() => setAttentionOpen(false)}>Close ×</button><AttentionSidebar state={props.state} /></div>}
+    {approach === "spatial-canvas" && <aside className="spatial-attention"><AttentionSidebar state={props.state} /></aside>}
+  </main>;
 }
 
 const APPROACHES: Array<{ id: UiApproachV1; title: string; description: string }> = [
@@ -536,12 +703,31 @@ function App() {
   const [error, setError] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [newSessionOpen, setNewSessionOpen] = useState(false);
+  const [alignmentDocument, setAlignmentDocument] = useState<AlignmentDocumentV1>(() => structuredClone(sampleDocument));
+  const alignmentDocumentRef = useRef(alignmentDocument);
+  const [alignmentPath, setAlignmentPath] = useState<string>();
+  const alignmentPathRef = useRef<string | undefined>(undefined);
+  const [selectedItemId, setSelectedItemId] = useState<string | undefined>(sampleDocument.items[0]?.id);
+  const [mutationStatus, setMutationStatus] = useState("Ready");
+  const [undoStack, setUndoStack] = useState<AlignmentMutationBatchV1[]>([]);
+  const undoStackRef = useRef<AlignmentMutationBatchV1[]>([]);
+  const mutationQueue = useRef<Promise<void>>(Promise.resolve());
+  const [runStatus, setRunStatus] = useState<AlignmentWorkspaceProps["runStatus"]>("idle");
+  const [runId, setRunId] = useState<string>();
+  const runIdRef = useRef<string | undefined>(undefined);
+  const [agentEvents, setAgentEvents] = useState<AgentRunEvent[]>([]);
+  const [agentResponse, setAgentResponse] = useState("");
+  const [proposals, setProposals] = useState<AlignmentMutationBatchV1[]>([]);
   useEffect(() => {
     void Promise.all([window.chromuxNext.runner.state(), window.chromuxNext.runner.models(), window.chromuxNext.settings.getUiPreferences()]).then(([nextState, nextModels, nextPreferences]) => { setState(nextState); setModels(nextModels); setPreferences(nextPreferences); }).catch((reason) => setError(String(reason)));
     const offState = window.chromuxNext.runner.onState(setState);
     const offPreferences = window.chromuxNext.settings.onUiPreferencesChanged(setPreferences);
     return () => { offState(); offPreferences(); };
   }, []);
+  useEffect(() => window.chromuxNext.agents.onEvent((event) => {
+    if (event.runId !== runIdRef.current) return;
+    setAgentEvents((current) => [...current, event].slice(-100));
+  }), []);
   useEffect(() => {
     const shortcut = (event: KeyboardEvent) => {
       if (event.key === "," && (event.metaKey || event.ctrlKey)) { event.preventDefault(); setSettingsOpen(true); }
@@ -554,9 +740,147 @@ function App() {
     window.dispatchEvent(new Event("chromux:flush-drafts"));
     void window.chromuxNext.settings.updateUiPreferences(patch).then(setPreferences).catch((reason) => setError(String(reason)));
   };
-  const shellProps: ShellProps = { state, models, surface, selectedSession, error, setSurface, openSettings: () => setSettingsOpen(true), openNewSession: () => setNewSessionOpen(true), clearError: () => setError("") };
-  const Shell = preferences.approach === "ide-workbench" ? IdeWorkbenchShell : preferences.approach === "focus-studio" ? FocusStudioShell : preferences.approach === "mission-board" ? MissionBoardShell : preferences.approach === "spatial-canvas" ? SpatialCanvasShell : ControlRoomShell;
-  return <div className={`app-root density-${preferences.density} motion-${preferences.motion}`} data-approach={preferences.approach}><Shell {...shellProps} />{settingsOpen && <SettingsOverlay preferences={preferences} update={updatePreferences} close={() => setSettingsOpen(false)} />}{newSessionOpen && <NewSessionDialog models={models} selectedSession={selectedSession} selectedGroupId={state.groups.find((group) => group.id === selectedSession?.groupId)?.kind === "custom" ? selectedSession?.groupId : undefined} close={() => setNewSessionOpen(false)} created={() => { setNewSessionOpen(false); setSurface("runner"); }} fail={(reason) => setError(String(reason))} />}</div>;
+
+  const replaceAlignment = (filePath: string | undefined, document: AlignmentDocumentV1) => {
+    const copy = structuredClone(document);
+    alignmentDocumentRef.current = copy;
+    alignmentPathRef.current = filePath;
+    setAlignmentDocument(copy);
+    setAlignmentPath(filePath);
+    setSelectedItemId(copy.items[0]?.id);
+    undoStackRef.current = [];
+    setUndoStack([]);
+    setMutationStatus("Ready");
+  };
+  const addUndo = (inverse: AlignmentMutationBatchV1) => {
+    const next = [...undoStackRef.current, inverse].slice(-100);
+    undoStackRef.current = next;
+    setUndoStack(next);
+  };
+  const applyAuthoritative = async (batch: AlignmentMutationBatchV1, recordUndo = true) => {
+    let filePath = alignmentPathRef.current;
+    let current = alignmentDocumentRef.current;
+    if (!filePath) {
+      setMutationStatus("Choose a location to continue…");
+      const saved = await window.chromuxNext.documents.saveAs(current);
+      if (!saved) { setMutationStatus("Save As cancelled · no changes applied"); return false; }
+      filePath = saved.filePath;
+      current = saved.document;
+      alignmentPathRef.current = filePath;
+      setAlignmentPath(filePath);
+    }
+    const authoritativeBatch = { ...batch, documentId: current.id, baseRevision: current.revision };
+    setMutationStatus("Applying…");
+    try {
+      const result = await window.chromuxNext.documents.apply(filePath, authoritativeBatch);
+      alignmentDocumentRef.current = result.document;
+      setAlignmentDocument(result.document);
+      if (recordUndo) addUndo(result.inverseBatch);
+      setMutationStatus(`Saved revision ${result.document.revision}`);
+      setSelectedItemId((selected) => result.document.items.some((item) => item.id === selected) ? selected : result.document.items[0]?.id);
+      return true;
+    } catch (reason) {
+      undoStackRef.current = [];
+      setUndoStack([]);
+      setMutationStatus(`Conflict · ${String(reason)}`);
+      setError(`Alignment mutation rejected: ${String(reason)}`);
+      try {
+        const latest = await window.chromuxNext.documents.read(filePath);
+        alignmentDocumentRef.current = latest.document;
+        setAlignmentDocument(latest.document);
+        setMutationStatus(`External change loaded · revision ${latest.document.revision}`);
+      } catch {
+        // Keep the last validated in-memory document available for inspection.
+      }
+      return false;
+    }
+  };
+  const enqueueMutation = (summary: string, operations: AlignmentMutationOperation[]) => {
+    mutationQueue.current = mutationQueue.current.then(async () => {
+      const batch = mutationBatch(alignmentDocumentRef.current, summary, operations);
+      await applyAuthoritative(batch);
+    }).catch((reason) => setError(String(reason)));
+  };
+  const alignment: AlignmentWorkspaceProps = {
+    document: alignmentDocument,
+    filePath: alignmentPath,
+    selectedItemId,
+    mutationStatus,
+    undoDepth: undoStack.length,
+    runStatus,
+    runId,
+    events: agentEvents,
+    response: agentResponse,
+    proposals,
+    select: setSelectedItemId,
+    open: () => void window.chromuxNext.documents.open().then((payload) => {
+      if (payload) replaceAlignment(payload.filePath, payload.document);
+    }).catch((reason) => setError(String(reason))),
+    save: () => void (alignmentPathRef.current
+      ? window.chromuxNext.documents.save(alignmentPathRef.current, alignmentDocumentRef.current).then((payload) => {
+        alignmentDocumentRef.current = payload.document; setAlignmentDocument(payload.document); setMutationStatus("Saved");
+      })
+      : window.chromuxNext.documents.saveAs(alignmentDocumentRef.current).then((payload) => {
+        if (payload) { alignmentPathRef.current = payload.filePath; setAlignmentPath(payload.filePath); setMutationStatus("Saved"); }
+        else setMutationStatus("Save As cancelled");
+      })).catch((reason) => setError(String(reason))),
+    saveAs: () => void window.chromuxNext.documents.saveAs(alignmentDocumentRef.current).then((payload) => {
+      if (payload) { alignmentPathRef.current = payload.filePath; setAlignmentPath(payload.filePath); setMutationStatus("Saved"); }
+      else setMutationStatus("Save As cancelled");
+    }).catch((reason) => setError(String(reason))),
+    apply: enqueueMutation,
+    undo: () => {
+      const inverse = undoStackRef.current.at(-1);
+      if (!inverse) return;
+      mutationQueue.current = mutationQueue.current.then(async () => {
+        const ok = await applyAuthoritative(inverse, false);
+        if (ok) {
+          const next = undoStackRef.current.slice(0, -1);
+          undoStackRef.current = next;
+          setUndoStack(next);
+        }
+      }).catch((reason) => setError(String(reason)));
+    },
+    run: (provider, prompt) => {
+      const id = `contribution-${crypto.randomUUID()}`;
+      runIdRef.current = id;
+      setRunId(id);
+      setRunStatus("running");
+      setAgentEvents([]);
+      setAgentResponse("");
+      const snapshot = structuredClone(alignmentDocumentRef.current);
+      void window.chromuxNext.agents.run({
+        id,
+        provider,
+        prompt,
+        projectPath: selectedSession?.projectPath ?? "/tmp",
+        contextItemIds: selectedItemId ? [selectedItemId] : [],
+        document: snapshot,
+        timeoutMs: 120_000
+      }).then((result) => {
+        if (runIdRef.current !== id) return;
+        setRunStatus(result.status);
+        if (result.contribution) {
+          setAgentResponse(result.contribution.response.slice(0, 500_000));
+          setProposals((current) => [...current, ...result.contribution!.proposedBatches].slice(-100));
+        }
+        if (result.error) setError(result.error.message);
+      }).catch((reason) => { setRunStatus("failed"); setError(String(reason)); });
+    },
+    cancel: () => {
+      if (runIdRef.current) void window.chromuxNext.agents.cancel(runIdRef.current);
+    },
+    applyProposal: (index) => {
+      const proposal = proposals[index];
+      if (!proposal || isProposalStale(proposal, alignmentDocumentRef.current)) return;
+      mutationQueue.current = mutationQueue.current.then(async () => {
+        if (await applyAuthoritative(proposal)) setProposals((current) => current.filter((_, proposalIndex) => proposalIndex !== index));
+      }).catch((reason) => setError(String(reason)));
+    },
+    rejectProposal: (index) => setProposals((current) => current.filter((_, proposalIndex) => proposalIndex !== index))
+  };
+  const shellProps: ShellProps = { state, models, surface, selectedSession, error, alignment, setSurface, openSettings: () => setSettingsOpen(true), openNewSession: () => setNewSessionOpen(true), clearError: () => setError("") };
+  return <div className={`app-root density-${preferences.density} motion-${preferences.motion}`} data-approach={preferences.approach}><UnifiedApproachShell approach={preferences.approach} {...shellProps} />{settingsOpen && <SettingsOverlay preferences={preferences} update={updatePreferences} close={() => setSettingsOpen(false)} />}{newSessionOpen && <NewSessionDialog models={models} selectedSession={selectedSession} selectedGroupId={state.groups.find((group) => group.id === selectedSession?.groupId)?.kind === "custom" ? selectedSession?.groupId : undefined} close={() => setNewSessionOpen(false)} created={() => { setNewSessionOpen(false); setSurface("runner"); }} fail={(reason) => setError(String(reason))} />}</div>;
 }
 
 createRoot(document.getElementById("root")!).render(<App />);

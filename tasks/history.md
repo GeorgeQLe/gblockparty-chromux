@@ -2800,3 +2800,66 @@
   deploy contract exists; the GitHub prerelease is the required publication.
   Next command: begin the seven-day builder daily-driver record tracked in
   `tasks/record-todo.md`.
+
+## 2026-08-05 — Chromux Next structured Alignment v0.4.0
+
+- Restored Alignment as a complete persistent secondary workspace with
+  canonical open/save/Save As, every schema-v1 semantic editor, stable item
+  selection and ordering, document and human-review status, live Deck/Canvas
+  projections, and session-local inverse-batch Undo.
+- Moved mutation authority fully into the main process: the renderer sends only
+  path plus batch; the document store serializes by canonical path, rereads
+  disk, validates document and revision, applies transactionally, atomically
+  persists, and returns the updated document and validated inverse.
+- Restored dedicated bounded fake/Codex document contribution with immutable
+  snapshots, selected-item context, cancellation, response links, explicit
+  Apply/Reject, and preserved-but-disabled stale proposals. Unified the five
+  presentation approaches around one mounted workspace so runner terminal,
+  Composer, drafts, pending interactions, viewport, and secondary surfaces
+  survive switching.
+- Ship manifest — User goal: restore structured Alignment editing in Chromux
+  Next without weakening the canonical mutation/contributor contracts or
+  disturbing live runner state, then publish v0.4.0 as an experimental
+  prerelease while keeping the legacy stable update channel unchanged.
+- Changed files and per-file purpose: `src/alignment/editor-model.ts` owns
+  editor mappings, defaults, reviews, batches, tables, and staleness;
+  domain/persistence/IPC/preload/main files implement the authoritative
+  serialized mutation boundary and inverse result; renderer/styles implement
+  the application-level editor, projections, contributors, mounted surfaces,
+  accessibility, and responsive layouts; provider prompt includes selected
+  context; tests cover every kind, reviews, mutations, inverse restoration,
+  malformed/stale/external/concurrent disk state, and interface contracts;
+  package metadata, README, architecture, UAT, release notes, and task records
+  define and record v0.4.0.
+- User-goal mapping: a cancelled first-edit Save As performs no mutation;
+  accepted batches increment exactly once; Undo is another canonical revision;
+  external conflicts reload the latest valid file and clear Undo; stale
+  proposals remain inspectable but cannot Apply; agent runs never reuse runner
+  threads; inactive surfaces use mounted hidden containers; only
+  `chromux-next/package.json` and its lockfile changed version metadata.
+- Executable verification: `npm run verify` passed TypeScript, all 13 Vitest
+  files with 52 tests, Electron Forge arm64 packaging, and packaged smoke.
+  `npm run visual:packaged -- /tmp/chromux-next-visual-0.4.0-recheck` captured
+  all five approaches at standard and narrow sizes. Visual inspection found an
+  initial narrow contributor overlay; the responsive layout was corrected,
+  rebuilt, and all ten views requalified.
+- Adversarial review: checked renderer-supplied document removal from mutation
+  IPC, disk reread before every batch, per-path concurrency serialization,
+  atomic replacement, document/revision mismatch rejection, stable IDs,
+  inverse ordering and view restoration, unsaved cancellation, conflict reload
+  and Undo clearing, stale proposal blocking, bounded events/results, Codex
+  read-only/ephemeral/schema flags, explicit links, review metadata clearing,
+  mounted workspace identity, hidden-surface focus behavior, and standard/
+  narrow clipping. No blocking finding remains.
+- Skipped tests and residual risk: optional live Codex contribution and manual
+  native file-dialog UAT were not automated because they depend on local
+  authentication and interactive user path choices; fake-provider,
+  schema/provider, persistence, packaged smoke, and visual qualifications cover
+  the deterministic contracts. Windows/Linux packages remain part of the
+  separate successor cutover gate, not this macOS prerelease.
+- Rollback note: remove GitHub prerelease and tag `chromux-next-v0.4.0`, then
+  revert the v0.4.0 shipping commit. The v0.3.0 successor prerelease and legacy
+  stable Chromux release remain available. Deploy skipped: no explicit manual
+  deploy contract exists; GitHub prerelease publication is the requested
+  release action. Next command: continue the runner-first hardening matrix in
+  `tasks/todo.md`.

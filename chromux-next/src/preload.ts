@@ -5,6 +5,7 @@ import {
   AgentRunResultSchema,
   DocumentPayloadSchema,
   IpcChannels,
+  MutationResultSchema,
   RunnerStateV1Schema,
   UiPreferencesPatchV1Schema,
   UiPreferencesV1Schema
@@ -29,6 +30,10 @@ const api: ChromuxNextApi = {
       const value: unknown = await ipcRenderer.invoke(IpcChannels.documentOpen);
       return value === null ? null : DocumentPayloadSchema.parse(value);
     },
+    async read(filePath) {
+      const value: unknown = await ipcRenderer.invoke(IpcChannels.documentRead, filePath);
+      return DocumentPayloadSchema.parse(value);
+    },
     async save(filePath, document) {
       const value: unknown = await ipcRenderer.invoke(IpcChannels.documentSave, {
         filePath,
@@ -43,13 +48,12 @@ const api: ChromuxNextApi = {
       );
       return value === null ? null : DocumentPayloadSchema.parse(value);
     },
-    async apply(filePath, document, batch) {
+    async apply(filePath, batch) {
       const value: unknown = await ipcRenderer.invoke(IpcChannels.mutationApply, {
         filePath,
-        document: AlignmentDocumentV1Schema.parse(document),
         batch: AlignmentMutationBatchV1Schema.parse(batch)
       });
-      return DocumentPayloadSchema.parse(value);
+      return MutationResultSchema.parse(value);
     }
   },
   agents: {

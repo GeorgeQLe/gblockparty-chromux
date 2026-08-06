@@ -18,12 +18,17 @@ export interface DocumentPayload {
   document: AlignmentDocumentV1;
 }
 
+export interface MutationResult extends DocumentPayload {
+  inverseBatch: AlignmentMutationBatchV1;
+}
+
 export interface ChromuxNextApi {
   documents: {
     open(): Promise<DocumentPayload | null>;
+    read(filePath: string): Promise<DocumentPayload>;
     save(filePath: string, document: AlignmentDocumentV1): Promise<DocumentPayload>;
     saveAs(document: AlignmentDocumentV1): Promise<DocumentPayload | null>;
-    apply(filePath: string, document: AlignmentDocumentV1, batch: AlignmentMutationBatchV1): Promise<DocumentPayload>;
+    apply(filePath: string, batch: AlignmentMutationBatchV1): Promise<MutationResult>;
   };
   agents: {
     run(request: AgentRunRequest): Promise<AgentRunResult>;

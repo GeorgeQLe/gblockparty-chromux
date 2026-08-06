@@ -25,6 +25,7 @@ export class CodexProvider implements AgentProvider {
       "You are contributing to a structured alignment document.",
       "Do not edit files or execute commands. Return only a JSON object matching the supplied schema.",
       `User request:\n${request.prompt}`,
+      `Selected item context IDs:\n${request.contextItemIds.join(", ") || "(whole document)"}`,
       `Immutable document snapshot:\n${JSON.stringify(request.document)}`
     ].join("\n\n");
     const finalSchema = z.toJSONSchema(AgentContributionSchema);

@@ -63,4 +63,37 @@ describe("mutation engine", () => {
     const restoredView = restored.document.views.find((view) => view.kind === "document");
     expect(restoredView?.sections[0]?.itemIds).toContain("text-purpose");
   });
+
+  it("inserts, moves, removes, and changes status one revision per batch", () => {
+    const item = {
+      ...sampleDocument.items[1]!,
+      id: "stable-inserted",
+      text: "Inserted"
+    };
+    const inserted = applyMutationBatch(sampleDocument, batch({
+      summary: "Insert and reorder",
+      operations: [
+        { type: "item.insert", index: 1, item },
+        { type: "item.move", itemId: "stable-inserted", toIndex: 3 },
+        { type: "status.set", status: "in-review" }
+      ]
+    }));
+    expect(inserted.document.revision).toBe(1);
+    expect(inserted.document.items[3]?.id).toBe("stable-inserted");
+    expect(inserted.document.status).toBe("in-review");
+    const undone = applyMutationBatch(inserted.document, inserted.inverseBatch);
+    expect(undone.document.revision).toBe(2);
+    expect(undone.document.items.some((candidate) => candidate.id === "stable-inserted")).toBe(false);
+    expect(undone.document.status).toBe("draft");
+  });
+
+  it("rejects duplicate insertion and invalid move bounds transactionally", () => {
+    expect(() => applyMutationBatch(sampleDocument, batch({
+      operations: [{ type: "item.insert", index: 0, item: sampleDocument.items[0]! }]
+    }))).toThrow("Duplicate item");
+    expect(() => applyMutationBatch(sampleDocument, batch({
+      operations: [{ type: "item.move", itemId: "text-purpose", toIndex: 99 }]
+    }))).toThrow("bounds");
+    expect(sampleDocument.revision).toBe(0);
+  });
 });

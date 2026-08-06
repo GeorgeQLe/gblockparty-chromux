@@ -29,6 +29,23 @@ describe("five-approach shared interface system", () => {
     expect(source).toContain('new Event("chromux:flush-drafts")');
     expect(source).toContain("terminalViewports.set");
     expect(source).toContain("scrollToLine(viewport)");
+    expect(source).toContain('key="persistent-workspace"');
+    expect(source).toContain("surface-pane runner-pane");
+    expect(source).not.toContain('surface === "runner" && <Composer');
+  });
+
+  it("restores the complete structured Alignment workspace and authoritative IPC", async () => {
+    const renderer = await readFile("src/renderer.tsx", "utf8");
+    const preload = await readFile("src/preload.ts", "utf8");
+    const main = await readFile("src/main.ts", "utf8");
+    for (const feature of [
+      "AlignmentSurface", "KindEditor", "ContributorPanel", "applyProposal",
+      "humanReview", "item.insert", "item.remove", "item.move", "status.set"
+    ]) expect(renderer).toContain(feature);
+    expect(preload).toContain("async apply(filePath, batch)");
+    expect(preload).not.toContain("async apply(filePath, document, batch)");
+    expect(main).toContain("documents.apply(payload.filePath, payload.batch)");
+    expect(main).not.toContain("applyMutationBatch(payload.document");
   });
 
   it("exposes accessible board/tree equivalents and modal keyboard containment", async () => {

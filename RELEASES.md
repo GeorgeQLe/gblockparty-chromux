@@ -1,5 +1,28 @@
 # Release Notes
 
+## GBlockParty Chromux Next v0.4.0 (prerelease)
+
+Tag: `chromux-next-v0.4.0`
+
+- Restore Alignment as a complete persistent secondary workspace with
+  canonical JSON open/save, revision and status feedback, item outline,
+  selection, insertion, removal, reordering, and session-local undo.
+- Add kind-aware editing for headings, text, lists, tables, media, code,
+  decisions, questions, and typed metrics plus complete human review status,
+  feedback, reviewer, and timestamp handling.
+- Make mutation IPC authoritative in the main process: reread canonical disk
+  state, reject document/revision conflicts, apply transactionally, persist
+  atomically, and return the updated document with a validated inverse batch.
+- Detect external changes, preserve stale agent proposals for inspection, and
+  require contributors to rerun before Apply; render Deck and Canvas from the
+  currently loaded document.
+- Restore bounded, cancellable fake/Codex document contributions from immutable
+  read-only snapshots with selected-item context, explicit Apply/Reject, and
+  response links.
+- Keep runner terminals, Composer drafts, transcript viewports, pending
+  interactions, and all secondary surfaces mounted across surface and
+  interface-approach changes, with accessible responsive Alignment layouts.
+
 ## GBlockParty Chromux Next v0.3.0 (prerelease)
 
 Tag: `chromux-next-v0.3.0`

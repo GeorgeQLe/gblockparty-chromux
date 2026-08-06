@@ -1,8 +1,12 @@
 import { mkdir, open, readFile, rename } from "node:fs/promises";
 import path from "node:path";
 import { AlignmentDocumentV1Schema, type AlignmentDocumentV1 } from "../domain/schema";
+import { applyMutationBatch, type AppliedMutation } from "../domain/mutations";
+import type { AlignmentMutationBatchV1 } from "../domain/schema";
 
 export class DocumentStore {
+  private readonly mutationQueues = new Map<string, Promise<void>>();
+
   async read(filePath: string): Promise<AlignmentDocumentV1> {
     this.assertJsonPath(filePath);
     const contents = await readFile(filePath, { encoding: "utf8" });
@@ -26,6 +30,24 @@ export class DocumentStore {
       await handle.close();
     }
     await rename(temporaryPath, filePath);
+  }
+
+  async apply(filePath: string, batch: AlignmentMutationBatchV1): Promise<AppliedMutation> {
+    const previous = this.mutationQueues.get(filePath) ?? Promise.resolve();
+    let release: () => void = () => {};
+    const turn = new Promise<void>((resolve) => { release = resolve; });
+    const queued = previous.catch(() => undefined).then(() => turn);
+    this.mutationQueues.set(filePath, queued);
+    await previous.catch(() => undefined);
+    try {
+      const current = await this.read(filePath);
+      const applied = applyMutationBatch(current, batch);
+      await this.write(filePath, applied.document);
+      return applied;
+    } finally {
+      release();
+      if (this.mutationQueues.get(filePath) === queued) this.mutationQueues.delete(filePath);
+    }
   }
 
   private assertJsonPath(filePath: string): void {

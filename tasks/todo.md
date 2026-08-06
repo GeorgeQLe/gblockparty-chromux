@@ -17,13 +17,6 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
-- [ ] Restore the full structured Alignment editing workflow inside the
-  Chromux Next secondary surface: open/save canonical documents, semantic item
-  editing, review state, revision-safe mutations, undo, and review-before-apply
-  agent proposals, while keeping runner sessions mounted and preserving the
-  existing main-process trust boundary. _(replacement-editor priority;
-  successor scope: `chromux-next/`)_
-
 - [ ] Complete the runner-first hardening matrix with deterministic fake
   app-server and Luna processes for fragmented JSONL, crash/backoff/recovery,
   missing or incompatible CLI, authentication failure, malformed and
@@ -59,6 +52,16 @@ If any capability is still valuable, re-scope it as a new Chromux Next task
 instead of resuming the `prototype/` implementation.
 
 ## Completed Work
+
+- [x] Restore full structured Alignment editing as a persistent Chromux Next
+  secondary workspace with canonical open/save, all schema-v1 editors, human
+  review metadata, document status and ordering controls, authoritative
+  on-disk transactional mutations, inverse-batch undo, external-change and
+  stale-proposal protection, dedicated fake/Codex contributors, live
+  Deck/Canvas projections, responsive five-approach styling, and v0.4.0
+  prerelease qualification. _(source: user-supplied Restore Structured
+  Alignment Editing plan; successor scope: `chromux-next/`; legacy
+  `prototype/` and stable update channel unchanged)_
 
 - [x] Add five fully functional Chromux Next interface approaches selectable
   live from Settings, with shared workflow primitives, strict persisted global

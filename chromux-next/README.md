@@ -5,10 +5,20 @@ separate Electron app from legacy Chromux in `../prototype/`: it has a distinct
 package, bundle identifier, user-data directory, architecture, and release
 line.
 
-## Current prerelease: v0.3.0
+## Current prerelease: v0.4.0
 
 This runner-first prerelease includes:
 
+- A complete structured Alignment workspace with canonical JSON open/save,
+  kind-aware editing for every schema-v1 item, human review/status controls,
+  revision-safe insert/remove/reorder operations, session-local undo, and
+  Deck/Canvas projections from the currently loaded document.
+- Main-process-authoritative mutations that reread and atomically replace the
+  canonical file, reject external changes, and return validated inverse
+  batches. Dedicated fake/Codex contributors use immutable read-only snapshots
+  with selected-item context, bounded events, cancellation, and explicit
+  review-before-apply proposals; stale proposals remain inspectable but cannot
+  be applied.
 - Five live, production-functional interface approaches: Control Room, IDE
   Workbench, Focus Studio, Mission Board, and Spatial Canvas. They share one
   workflow implementation and switch presentation without touching Codex
@@ -63,8 +73,9 @@ isolation, sandboxing, popup denial, and an HTTP(S)-only navigation allowlist
 are enabled.
 
 App-local state lives under the separate Electron user-data directory named
-`GBlockParty Chromux Next`. Codex processes inherit normal authentication, but
-Chromux Next never locates, copies, stores, or logs credentials.
+`GBlockParty Chromux Next`. Alignment documents live only at user-selected JSON
+paths. Codex processes inherit normal authentication, but Chromux Next never
+locates, copies, stores, or logs credentials.
 
 ## Release convention
 

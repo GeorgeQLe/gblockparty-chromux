@@ -19,6 +19,7 @@ import { UiPreferencesPatchV1Schema, UiPreferencesV1Schema } from "../settings/u
 
 export const IpcChannels = {
   documentOpen: "document:open",
+  documentRead: "document:read",
   documentSave: "document:save",
   documentSaveAs: "document:save-as",
   mutationApply: "mutation:apply",
@@ -55,10 +56,17 @@ export const SavePayloadSchema = z.object({
   document: AlignmentDocumentV1Schema
 });
 
+export const DocumentPathSchema = z.string().min(1);
+
 export const MutationPayloadSchema = z.object({
   filePath: z.string().min(1),
-  document: AlignmentDocumentV1Schema,
   batch: AlignmentMutationBatchV1Schema
+});
+
+export const MutationResultSchema = z.object({
+  filePath: z.string().min(1),
+  document: AlignmentDocumentV1Schema,
+  inverseBatch: AlignmentMutationBatchV1Schema
 });
 
 export const BrowserActionSchema = z.discriminatedUnion("type", [

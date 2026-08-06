@@ -10,7 +10,6 @@ import {
   WebContentsView
 } from "electron";
 import started from "electron-squirrel-startup";
-import { applyMutationBatch } from "./domain/mutations";
 import { isSafeNavigation } from "./domain/links";
 import {
   AgentRunRequestSchema,
@@ -19,6 +18,7 @@ import {
   ApprovalResponseInputSchema,
   CreateSessionInputSchema,
   DraftInputSchema,
+  DocumentPathSchema,
   GroupMutationInputSchema,
   IpcChannels,
   MutationPayloadSchema,
@@ -112,6 +112,11 @@ function createWindow(): void {
         for (const approach of approaches) {
           const preferences = await localStore.updateUiPreferences({ approach });
           mainWindow?.webContents.send(IpcChannels.settingsUiPreferencesChanged, preferences);
+          await mainWindow?.webContents.executeJavaScript(`(() => {
+            const button = [...document.querySelectorAll('.surface-tabs button')].find((item) => item.textContent === 'alignment');
+            if (!button) throw new Error('Alignment surface control was not found');
+            button.click();
+          })()`);
           for (const size of sizes) {
             mainWindow?.setContentSize(size.width, size.height);
             await new Promise((resolve) => setTimeout(resolve, 180));
@@ -124,10 +129,16 @@ function createWindow(): void {
                 const value = element.getBoundingClientRect();
                 return { left: value.left, right: value.right, width: value.width };
               };
-              return { viewport: innerWidth, composer: rect('.composer-row'), actions: rect('.composer-actions') };
+              return {
+                viewport: innerWidth,
+                alignment: rect('.surface-pane.active .alignment-workspace'),
+                toolbar: rect('.surface-pane.active .alignment-toolbar')
+              };
             })()`);
-            if (geometry?.actions && (geometry.actions.left < 0 || geometry.actions.right > geometry.viewport + 1)) {
-              throw new Error(`Composer actions clipped for ${approach} ${size.name}: ${JSON.stringify(geometry)}`);
+            if (!geometry?.alignment || !geometry?.toolbar
+              || geometry.alignment.left < 0 || geometry.alignment.right > geometry.viewport + 1
+              || geometry.toolbar.left < 0 || geometry.toolbar.right > geometry.viewport + 1) {
+              throw new Error(`Alignment workspace clipped for ${approach} ${size.name}: ${JSON.stringify(geometry)}`);
             }
             const image = await mainWindow?.webContents.capturePage();
             if (!image || image.isEmpty()) throw new Error(`Empty capture for ${approach} ${size.name}`);
@@ -183,6 +194,10 @@ function registerIpc(): void {
     const filePath = result.filePaths[0];
     return result.canceled || !filePath ? null : { filePath, document: await documents.read(filePath) };
   });
+  ipcMain.handle(IpcChannels.documentRead, async (_event, input: unknown) => {
+    const filePath = DocumentPathSchema.parse(input);
+    return { filePath, document: await documents.read(filePath) };
+  });
   ipcMain.handle(IpcChannels.documentSave, async (_event, input: unknown) => {
     const payload = SavePayloadSchema.parse(input);
     await documents.write(payload.filePath, payload.document);
@@ -201,9 +216,8 @@ function registerIpc(): void {
   });
   ipcMain.handle(IpcChannels.mutationApply, async (_event, input: unknown) => {
     const payload = MutationPayloadSchema.parse(input);
-    const applied = applyMutationBatch(payload.document, payload.batch);
-    await documents.write(payload.filePath, applied.document);
-    return { filePath: payload.filePath, document: applied.document };
+    const applied = await documents.apply(payload.filePath, payload.batch);
+    return { filePath: payload.filePath, document: applied.document, inverseBatch: applied.inverseBatch };
   });
   ipcMain.handle(IpcChannels.agentRun, async (ipcEvent, input: unknown) => {
     const request = AgentRunRequestSchema.parse(input);
