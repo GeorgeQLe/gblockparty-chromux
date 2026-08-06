@@ -3,6 +3,28 @@ import { createRoot } from "react-dom/client";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
+import {
+  AlertTriangle,
+  AlignLeft,
+  ArrowDown,
+  ArrowUp,
+  Boxes,
+  Check,
+  CirclePlus,
+  Copy,
+  FileText,
+  FolderPlus,
+  Globe2,
+  MessagesSquare,
+  PanelTop,
+  Plus,
+  Search,
+  Send,
+  Settings,
+  Square,
+  TerminalSquare,
+  X
+} from "lucide-react";
 import "@xterm/xterm/css/xterm.css";
 import type {
   ModelOptionV1,
@@ -40,10 +62,17 @@ import {
   type AlignmentItemKind
 } from "./alignment/editor-model";
 import { sampleDocument } from "./fixtures/sample-document";
+import {
+  Badge,
+  Button,
+  Dialog,
+  EmptyState,
+  IconButton,
+  Tabs
+} from "./ui/components";
 import "./styles.css";
 
 type CenterSurface = "runner" | "alignment" | "deck" | "canvas" | "browser";
-const SURFACES: CenterSurface[] = ["runner", "alignment", "deck", "canvas", "browser"];
 const terminalViewports = new Map<string, number>();
 
 const EMPTY_STATE: RunnerStateV1 = {
@@ -144,19 +173,22 @@ function RunnerTerminal({ session }: { session?: RunnerSessionV1 }) {
   return (
     <section className="terminal-shell" aria-label="Display-only Codex runner">
       <div className="terminal-tools">
-        <span>DISPLAY ONLY</span>
-        <input
-          aria-label="Search transcript"
-          placeholder="Search"
-          value={needle}
-          onChange={(event) => setNeedle(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") search.current?.findNext(needle);
-          }}
-        />
-        <button onClick={() => search.current?.findPrevious(needle)}>↑</button>
-        <button onClick={() => search.current?.findNext(needle)}>↓</button>
-        <button onClick={() => navigator.clipboard.writeText(terminal.current?.getSelection() ?? "")}>Copy</button>
+        <Badge tone="sage">Display only</Badge>
+        <label className="transcript-search">
+          <Search aria-hidden="true" size={15} />
+          <input
+            aria-label="Search transcript"
+            placeholder="Search transcript"
+            value={needle}
+            onChange={(event) => setNeedle(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") search.current?.findNext(needle);
+            }}
+          />
+        </label>
+        <IconButton label="Previous transcript match" icon={ArrowUp} onClick={() => search.current?.findPrevious(needle)} />
+        <IconButton label="Next transcript match" icon={ArrowDown} onClick={() => search.current?.findNext(needle)} />
+        <Button icon={Copy} tone="quiet" onClick={() => navigator.clipboard.writeText(terminal.current?.getSelection() ?? "")}>Copy</Button>
       </div>
       <div className="terminal-host" ref={host} />
     </section>
@@ -278,12 +310,12 @@ function Composer({ session }: { session?: RunnerSessionV1 }) {
           }}
         />
         <div className="composer-actions">
-          <button className="primary" disabled={!session || !draft.trim()} onClick={() => void send()}>
+          <Button icon={Send} tone="primary" disabled={!session || !draft.trim()} onClick={() => void send()}>
             {session?.activeTurnId ? "Steer" : "Send"}
-          </button>
-          <button disabled={!session?.activeTurnId} onClick={() => session && void window.chromuxNext.runner.interrupt(session.id)}>
+          </Button>
+          <Button icon={Square} disabled={!session?.activeTurnId} onClick={() => session && void window.chromuxNext.runner.interrupt(session.id)}>
             Stop
-          </button>
+          </Button>
         </div>
       </div>
     </section>
@@ -397,7 +429,7 @@ function AlignmentSurface({ alignment }: { alignment: AlignmentWorkspaceProps })
       alignment.apply(`Insert ${insertKind}`, [{ type: "item.insert", index: Math.max(0, selectedIndex + 1), item }]);
       alignment.select(item.id);
     }}>Insert</button></div>{alignment.document.items.map((item, index) => <button key={item.id} className={item.id === selected?.id ? "active" : ""} aria-current={item.id === selected?.id ? "true" : undefined} onClick={() => alignment.select(item.id)}><span>{index + 1}</span><strong>{itemLabel(item)}</strong><i className={`review-${item.review.status}`} /></button>)}</nav>
-    <main className="item-editor">{selected ? <React.Fragment key={`${selected.id}-${alignment.document.revision}`}><header><div><span>{selected.kind}</span><h3>{itemLabel(selected)}</h3><small>{selected.id}</small></div><div className="button-row"><button disabled={selectedIndex <= 0} onClick={() => alignment.apply("Move item up", [{ type: "item.move", itemId: selected.id, toIndex: selectedIndex - 1 }])}>↑</button><button disabled={selectedIndex >= alignment.document.items.length - 1} onClick={() => alignment.apply("Move item down", [{ type: "item.move", itemId: selected.id, toIndex: selectedIndex + 1 }])}>↓</button><button className="danger" onClick={() => alignment.apply(`Remove ${selected.kind}`, [{ type: "item.remove", itemId: selected.id }])}>Remove</button></div></header><KindEditor item={selected} update={updateItem} /><fieldset className="review-editor"><legend>Human review</legend><Field label="Status"><select value={selected.review.status} onChange={(event) => alignment.apply("Update item review", [{ type: "review.update", itemId: selected.id, review: humanReview(event.target.value as AlignmentItem["review"]["status"], selected.review.feedback, "Human editor") }])}><option value="unreviewed">Unreviewed</option><option value="changes-requested">Changes requested</option><option value="approved">Approved</option></select></Field><Field label="Feedback"><textarea rows={4} defaultValue={selected.review.feedback} onBlur={(event) => alignment.apply("Update review feedback", [{ type: "review.update", itemId: selected.id, review: humanReview(selected.review.status, event.target.value, "Human editor") }])} /></Field>{selected.review.reviewer && <small>Reviewed by {selected.review.reviewer} · {new Date(selected.review.reviewedAt!).toLocaleString()}</small>}</fieldset></React.Fragment> : <p className="empty">Insert an item to begin.</p>}</main>
+    <main className="item-editor">{selected ? <React.Fragment key={`${selected.id}-${alignment.document.revision}`}><header><div><span>{selected.kind}</span><h3>{itemLabel(selected)}</h3><small>{selected.id}</small></div><div className="button-row"><IconButton label="Move item up" icon={ArrowUp} disabled={selectedIndex <= 0} onClick={() => alignment.apply("Move item up", [{ type: "item.move", itemId: selected.id, toIndex: selectedIndex - 1 }])} /><IconButton label="Move item down" icon={ArrowDown} disabled={selectedIndex >= alignment.document.items.length - 1} onClick={() => alignment.apply("Move item down", [{ type: "item.move", itemId: selected.id, toIndex: selectedIndex + 1 }])} /><Button tone="danger" onClick={() => alignment.apply(`Remove ${selected.kind}`, [{ type: "item.remove", itemId: selected.id }])}>Remove</Button></div></header><KindEditor item={selected} update={updateItem} /><fieldset className="review-editor"><legend>Human review</legend><Field label="Status"><select value={selected.review.status} onChange={(event) => alignment.apply("Update item review", [{ type: "review.update", itemId: selected.id, review: humanReview(event.target.value as AlignmentItem["review"]["status"], selected.review.feedback, "Human editor") }])}><option value="unreviewed">Unreviewed</option><option value="changes-requested">Changes requested</option><option value="approved">Approved</option></select></Field><Field label="Feedback"><textarea rows={4} defaultValue={selected.review.feedback} onBlur={(event) => alignment.apply("Update review feedback", [{ type: "review.update", itemId: selected.id, review: humanReview(selected.review.status, event.target.value, "Human editor") }])} /></Field>{selected.review.reviewer && <small>Reviewed by {selected.review.reviewer} · {new Date(selected.review.reviewedAt!).toLocaleString()}</small>}</fieldset></React.Fragment> : <EmptyState icon={FileText} title="No document items" description="Insert an item to begin editing the Alignment document." />}</main>
     <ContributorPanel alignment={alignment} />
   </section>;
 }
@@ -520,24 +552,37 @@ type ShellProps = {
   setSurface(surface: CenterSurface): void;
   openSettings(): void;
   openNewSession(): void;
+  openGroupDialog(group?: RunnerStateV1["groups"][number]): void;
   clearError(): void;
 };
 
-function Brand({ approach, openSettings, openNewSession }: {
+const SURFACE_ITEMS = [
+  { value: "runner", label: "Runner", icon: TerminalSquare },
+  { value: "alignment", label: "Alignment", icon: AlignLeft },
+  { value: "deck", label: "Deck", icon: PanelTop },
+  { value: "canvas", label: "Canvas", icon: Boxes },
+  { value: "browser", label: "Browser", icon: Globe2 }
+] satisfies Array<{ value: CenterSurface; label: string; icon: typeof TerminalSquare }>;
+
+function Brand({ approach, surface, setSurface, openSettings, openNewSession }: {
   approach: UiApproachV1;
+  surface: CenterSurface;
+  setSurface(value: CenterSurface): void;
   openSettings(): void;
   openNewSession(): void;
 }) {
   return <header className="shell-brand">
     <div className="brand"><img src="./mark.svg" alt="" /><div><span>{approach.replaceAll("-", " ")}</span><h1>Chromux Next</h1></div></div>
-    <div className="brand-actions"><button aria-label="Create group" onClick={() => { const title = window.prompt("Custom group name"); if (title) void window.chromuxNext.runner.mutateGroup({ type: "create", title }); }}>+ Group</button><button aria-label="Open Settings" onClick={openSettings}>⚙ Settings</button><button className="new-session" onClick={openNewSession}>+ Session</button></div>
+    <SurfaceTabs surface={surface} setSurface={setSurface} />
+    <div className="brand-actions">
+      <Button className="settings-button" icon={Settings} tone="quiet" aria-label="Open Settings" onClick={openSettings}>Settings</Button>
+      <Button className="new-session" icon={Plus} tone="primary" onClick={openNewSession}>New Session</Button>
+    </div>
   </header>;
 }
 
 function SurfaceTabs({ surface, setSurface, editor = false }: { surface: CenterSurface; setSurface(value: CenterSurface): void; editor?: boolean }) {
-  return <nav className={`surface-tabs ${editor ? "editor-tabs" : ""}`} aria-label="Workspace surfaces">
-    {SURFACES.map((item) => <button className={surface === item ? "active" : ""} key={item} onClick={() => setSurface(item)}>{item}</button>)}
-  </nav>;
+  return <Tabs label="Workspace surfaces" value={surface} items={SURFACE_ITEMS} onChange={setSurface} className={`surface-tabs ${editor ? "editor-tabs" : ""}`} />;
 }
 
 function closeSession(session: RunnerSessionV1) {
@@ -545,34 +590,33 @@ function closeSession(session: RunnerSessionV1) {
   void window.chromuxNext.runner.close(session.id);
 }
 
-function SessionTree({ state, selectedSession, compact = false }: { state: RunnerStateV1; selectedSession: RunnerSessionV1 | undefined; compact?: boolean }) {
+function SessionTree({ state, selectedSession, openGroupDialog, compact = false }: { state: RunnerStateV1; selectedSession: RunnerSessionV1 | undefined; openGroupDialog(group?: RunnerStateV1["groups"][number]): void; compact?: boolean }) {
   return <nav className={`session-tree ${compact ? "compact-tree" : ""}`} aria-label="Projects and sessions">
-    <header><span>Projects</span><button aria-label="Create group" onClick={() => {
-      const title = window.prompt("Custom group name");
-      if (title) void window.chromuxNext.runner.mutateGroup({ type: "create", title });
-    }}>＋</button></header>
+    <header><span>Sessions</span><IconButton label="Create session group" icon={FolderPlus} onClick={() => openGroupDialog()} /></header>
     {state.groups.map((group) => <section key={group.id}>
-      <h2 onDoubleClick={() => {
-        const title = window.prompt("Rename group", group.title);
-        if (title) void window.chromuxNext.runner.mutateGroup({ type: "rename", groupId: group.id, title });
-      }}>{group.title}</h2>
-      {group.sessionIds.map((id) => state.sessions.find((session) => session.id === id)).filter(Boolean).map((session) => session && <button
-        className={session.id === selectedSession?.id ? "active" : ""}
-        key={session.id}
-        onClick={() => void window.chromuxNext.runner.select(group.id, session.id)}
-      ><i className={session.status} /><span>{session.title}</span>{session.interactions.length > 0 && <b>{session.interactions.length}</b>}<em onClick={(event) => { event.stopPropagation(); closeSession(session); }}>×</em></button>)}
+      <header className="tree-group-header"><h2>{group.title}</h2>{group.kind === "custom" && <IconButton label={`Rename ${group.title}`} icon={Settings} onClick={() => openGroupDialog(group)} />}</header>
+      {group.sessionIds.map((id) => state.sessions.find((session) => session.id === id)).filter(Boolean).map((session) => session && <div className="tree-session-row" key={session.id}>
+        <button
+          className={session.id === selectedSession?.id ? "active" : ""}
+          onClick={() => void window.chromuxNext.runner.select(group.id, session.id)}
+        ><i className={session.status} /><span>{session.title}</span>{session.interactions.length > 0 && <b>{session.interactions.length}</b>}</button>
+        <IconButton label={`Close ${session.title}`} icon={X} onClick={() => closeSession(session)} />
+      </div>)}
     </section>)}
+    {!state.groups.length && <EmptyState icon={MessagesSquare} title="No sessions yet" description="Create a new session to start working with Codex." />}
   </nav>;
 }
 
-function TabNavigation({ state, selectedSession }: { state: RunnerStateV1; selectedSession: RunnerSessionV1 | undefined }) {
+function TabNavigation({ state, selectedSession, openGroupDialog }: { state: RunnerStateV1; selectedSession: RunnerSessionV1 | undefined; openGroupDialog(group?: RunnerStateV1["groups"][number]): void }) {
   const selectedGroup = state.groups.find((group) => group.id === selectedSession?.groupId) ?? state.groups[0];
   return <section className="session-navigation">
-    <div className="group-tabs">{state.groups.map((group) => <button className={selectedGroup?.id === group.id ? "active" : ""} key={group.id} onClick={() => {
-      const first = group.sessionIds[0];
-      if (first) void window.chromuxNext.runner.select(group.id, first);
-    }}>{group.title}</button>)}</div>
-    <div className="session-tabs">{selectedGroup?.sessionIds.map((id) => state.sessions.find((session) => session.id === id)).filter(Boolean).map((session) => session && <button className={selectedSession?.id === session.id ? "active" : ""} key={session.id} onClick={() => void window.chromuxNext.runner.select(session.groupId, session.id)}><i className={session.status} />{session.title}{session.interactions.length > 0 && <b>{session.interactions.length}</b>}<span onClick={(event) => { event.stopPropagation(); closeSession(session); }}>×</span></button>)}</div>
+    <select aria-label="Session group" value={selectedGroup?.id ?? ""} onChange={(event) => {
+      const group = state.groups.find((item) => item.id === event.target.value);
+      const first = group?.sessionIds[0];
+      if (group && first) void window.chromuxNext.runner.select(group.id, first);
+    }}>{state.groups.map((group) => <option key={group.id} value={group.id}>{group.title}</option>)}</select>
+    <IconButton label="Create session group" icon={FolderPlus} onClick={() => openGroupDialog()} />
+    <div className="session-tabs">{selectedGroup?.sessionIds.map((id) => state.sessions.find((session) => session.id === id)).filter(Boolean).map((session) => session && <div className={`session-tab ${selectedSession?.id === session.id ? "active" : ""}`} key={session.id}><button onClick={() => void window.chromuxNext.runner.select(session.groupId, session.id)}><i className={session.status} /><span>{session.title}</span>{session.interactions.length > 0 && <b>{session.interactions.length}</b>}</button><IconButton className="session-close" label={`Close ${session.title}`} icon={X} onClick={() => closeSession(session)} /></div>)}</div>
   </section>;
 }
 
@@ -592,7 +636,7 @@ function Workspace({ state, models, selectedSession, surface, setSurface, error,
     <div className={`surface-pane ${surface === "deck" ? "active" : ""}`} aria-hidden={surface !== "deck"}><DeckSurface document={alignment.document} /></div>
     <div className={`surface-pane ${surface === "canvas" ? "active" : ""}`} aria-hidden={surface !== "canvas"}><CanvasSurface document={alignment.document} /></div>
     <div className={`surface-pane ${surface === "browser" ? "active" : ""}`} aria-hidden={surface !== "browser"}><section className="secondary-surface browser-placeholder"><h2>Browser</h2><p>HTTP(S) links open here only after an explicit click in a runner transcript or contributor response.</p></section></div>
-    {error && <button className="error-banner" onClick={clearError}>{error} ×</button>}
+    {error && <button className="error-banner" onClick={clearError}><AlertTriangle aria-hidden="true" size={16} /><span>{error}</span><X aria-hidden="true" size={16} /></button>}
   </section>;
 }
 
@@ -610,7 +654,7 @@ function FocusStudioShell(props: ShellProps) {
   return <main className="approach-shell focus-studio"><Brand approach="focus-studio" {...props} /><header className="focus-nav"><span>{props.state.groups.find((group) => group.id === props.selectedSession?.groupId)?.title ?? "Workspace"} /</span><select aria-label="Switch session" value={props.selectedSession?.id ?? ""} onChange={(event) => {
     const session = props.state.sessions.find((item) => item.id === event.target.value);
     if (session) void window.chromuxNext.runner.select(session.groupId, session.id);
-  }}>{props.state.sessions.filter((session) => session.status !== "closed").map((session) => <option value={session.id} key={session.id}>{session.title}</option>)}</select><SurfaceTabs {...props} /><button className={blockers ? "blocker-toggle has-blockers" : "blocker-toggle"} onClick={() => setAttentionOpen((open) => !open)}>{blockers ? `${blockers} blocker${blockers === 1 ? "" : "s"}` : "Attention"}</button></header>{blockers > 0 && <button className="blocker-banner" onClick={() => setAttentionOpen(true)}>Action required — open the attention drawer to resolve pending work.</button>}<Workspace {...props} />{attentionOpen && <div className="attention-drawer"><button className="drawer-close" onClick={() => setAttentionOpen(false)}>Close ×</button><AttentionSidebar state={props.state} /></div>}</main>;
+  }}>{props.state.sessions.filter((session) => session.status !== "closed").map((session) => <option value={session.id} key={session.id}>{session.title}</option>)}</select><SurfaceTabs {...props} /><button className={blockers ? "blocker-toggle has-blockers" : "blocker-toggle"} onClick={() => setAttentionOpen((open) => !open)}>{blockers ? `${blockers} blocker${blockers === 1 ? "" : "s"}` : "Attention"}</button></header>{blockers > 0 && <button className="blocker-banner" onClick={() => setAttentionOpen(true)}>Action required — open the attention drawer to resolve pending work.</button>}<Workspace {...props} />{attentionOpen && <div className="attention-drawer"><IconButton className="drawer-close" label="Close attention drawer" icon={X} onClick={() => setAttentionOpen(false)} /><AttentionSidebar state={props.state} /></div>}</main>;
 }
 
 type MissionLane = "Action Required" | "Working" | "Ready" | "Idle";
@@ -644,19 +688,18 @@ function UnifiedApproachShell({ approach, ...props }: ShellProps & { approach: U
   return <main className={`approach-shell ${shellClass}`}>
     <Brand approach={approach} {...props} />
     {approach === "ide-workbench" && <SessionTree {...props} />}
-    {approach === "control-room" && <React.Fragment><SurfaceTabs {...props} /><TabNavigation {...props} /></React.Fragment>}
-    {approach === "ide-workbench" && <SurfaceTabs {...props} editor />}
+    {approach === "control-room" && <TabNavigation {...props} />}
     {approach === "focus-studio" && <header className="focus-nav"><span>{props.state.groups.find((group) => group.id === props.selectedSession?.groupId)?.title ?? "Workspace"} /</span><select aria-label="Switch session" value={props.selectedSession?.id ?? ""} onChange={(event) => {
       const session = props.state.sessions.find((item) => item.id === event.target.value);
       if (session) void window.chromuxNext.runner.select(session.groupId, session.id);
     }}>{props.state.sessions.filter((session) => session.status !== "closed").map((session) => <option value={session.id} key={session.id}>{session.title}</option>)}</select><SurfaceTabs {...props} /><button className={blockers ? "blocker-toggle has-blockers" : "blocker-toggle"} onClick={() => setAttentionOpen((open) => !open)}>{blockers ? `${blockers} blocker${blockers === 1 ? "" : "s"}` : "Attention"}</button></header>}
     {approach === "focus-studio" && blockers > 0 && <button className="blocker-banner" onClick={() => setAttentionOpen(true)}>Action required — open the attention drawer to resolve pending work.</button>}
-    {approach === "mission-board" && <React.Fragment><SurfaceTabs {...props} /><MissionBoard {...props} /></React.Fragment>}
-    {approach === "spatial-canvas" && <React.Fragment><SurfaceTabs {...props} /><SpatialMap {...props} /></React.Fragment>}
+    {approach === "mission-board" && <MissionBoard {...props} />}
+    {approach === "spatial-canvas" && <SpatialMap {...props} />}
     <section className={`workspace-host ${approach === "spatial-canvas" ? "spatial-dock" : ""}`}><Workspace key="persistent-workspace" {...props} /></section>
     {approach === "control-room" && <AttentionSidebar state={props.state} />}
     {approach === "ide-workbench" && <aside className="inspector"><h2>Inspector</h2><dl><dt>Thread</dt><dd>{props.selectedSession?.threadId ?? "Not started"}</dd><dt>Status</dt><dd>{props.selectedSession?.status ?? "No selection"}</dd><dt>Surface</dt><dd>{props.surface}</dd></dl><AttentionSidebar state={props.state} /></aside>}
-    {approach === "focus-studio" && attentionOpen && <div className="attention-drawer"><button className="drawer-close" onClick={() => setAttentionOpen(false)}>Close ×</button><AttentionSidebar state={props.state} /></div>}
+    {approach === "focus-studio" && attentionOpen && <div className="attention-drawer"><IconButton className="drawer-close" label="Close attention drawer" icon={X} onClick={() => setAttentionOpen(false)} /><AttentionSidebar state={props.state} /></div>}
     {approach === "spatial-canvas" && <aside className="spatial-attention"><AttentionSidebar state={props.state} /></aside>}
   </main>;
 }
@@ -671,6 +714,41 @@ const APPROACHES: Array<{ id: UiApproachV1; title: string; description: string }
 
 type SettingsSection = "appearance" | "projects" | "defaults" | "groups" | "diagnostics";
 
+function GroupDialog({
+  group,
+  close
+}: {
+  group?: RunnerStateV1["groups"][number];
+  close(): void;
+}) {
+  const [title, setTitle] = useState(group?.title ?? "");
+  const input = useRef<HTMLInputElement>(null);
+  const submit = () => {
+    const normalized = title.trim();
+    if (!normalized) return;
+    void window.chromuxNext.runner.mutateGroup(group
+      ? { type: "rename", groupId: group.id, title: normalized }
+      : { type: "create", title: normalized }).then(close);
+  };
+  return <Dialog
+    title={group ? "Rename group" : "New session group"}
+    eyebrow="Session navigation"
+    description="Custom groups organize sessions across projects without changing their working folders."
+    close={close}
+    initialFocus={input}
+    className="group-dialog"
+    footer={<><Button tone="quiet" onClick={close}>Cancel</Button><Button icon={Check} tone="primary" disabled={!title.trim()} onClick={submit}>{group ? "Save name" : "Create group"}</Button></>}
+  >
+    <label className="ui-field">
+      <span>Group name</span>
+      <input ref={input} value={title} maxLength={80} onChange={(event) => setTitle(event.target.value)} onKeyDown={(event) => {
+        if (event.key === "Enter") { event.preventDefault(); submit(); }
+      }} />
+      <small>Use a short name that describes the work or project.</small>
+    </label>
+  </Dialog>;
+}
+
 function SettingsOverlay({
   preferences,
   workspace,
@@ -680,6 +758,7 @@ function SettingsOverlay({
   updateWorkspace,
   chooseProject,
   removeProject,
+  openGroupDialog,
   close
 }: {
   preferences: UiPreferencesV1;
@@ -690,6 +769,7 @@ function SettingsOverlay({
   updateWorkspace(patch: WorkspacePreferencesPatchV1): void;
   chooseProject(): void;
   removeProject(projectId: string): void;
+  openGroupDialog(group?: RunnerStateV1["groups"][number]): void;
   close(): void;
 }) {
   const dialog = useRef<HTMLDivElement>(null);
@@ -725,13 +805,13 @@ function SettingsOverlay({
   const selectedModel = models.find((model) => model.id === workspace.defaultModel)
     ?? models.find((model) => model.recommended) ?? models[0];
   return <div className="modal-backdrop settings-backdrop" onMouseDown={close}><div ref={dialog} className="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title" onMouseDown={(event) => event.stopPropagation()}>
-    <header><div><span>Successor-native preferences</span><h2 id="settings-title">Chromux Next Settings</h2></div><button aria-label="Close Settings" onClick={close}>×</button></header>
+    <header><div><span>Successor-native preferences</span><h2 id="settings-title">Chromux Next Settings</h2></div><IconButton label="Close Settings" icon={X} onClick={close} /></header>
     <nav className="settings-tabs" aria-label="Settings sections">{(["projects", "defaults", "groups", "appearance", "diagnostics"] as SettingsSection[]).map((item) => <button key={item} className={section === item ? "active" : ""} onClick={() => setSection(item)}>{item}</button>)}</nav>
     <div className="settings-content">
       {section === "appearance" && <><div className="approach-grid" role="radiogroup" aria-label="Interface approach">{APPROACHES.map((approach) => <button role="radio" aria-checked={preferences.approach === approach.id} className={preferences.approach === approach.id ? "active" : ""} key={approach.id} onClick={() => update({ approach: approach.id })}><span className={`approach-preview preview-${approach.id}`}><i /><i /><i /></span><strong>{approach.title}</strong><small>{approach.description}</small></button>)}</div><section className="preference-controls"><fieldset><legend>Density</legend>{(["comfortable", "compact"] as const).map((density) => <label key={density}><input type="radio" name="density" checked={preferences.density === density} onChange={() => update({ density })} />{density}</label>)}</fieldset><fieldset><legend>Motion</legend>{(["system", "full", "reduced"] as const).map((motion) => <label key={motion}><input type="radio" name="motion" checked={preferences.motion === motion} onChange={() => update({ motion })} />{motion}</label>)}</fieldset></section></>}
       {section === "projects" && <section className="settings-section"><header><div><h3>Projects and worktrees</h3><p>Folders registered only in Chromux Next. A Git worktree is identified when its <code>.git</code> entry is a file.</p></div><button className="primary" onClick={chooseProject}>Add folder…</button></header><div className="managed-list">{workspace.projects.map((project) => <article key={project.id}><div><strong>{project.name}</strong><small>{project.kind} · {project.path}</small></div><label><input type="radio" name="default-project" checked={workspace.defaultProjectId === project.id} onChange={() => updateWorkspace({ defaultProjectId: project.id })} /> Default</label><button disabled={state.sessions.some((session) => session.status !== "closed" && session.canonicalProjectPath === project.path)} onClick={() => removeProject(project.id)}>Remove</button></article>)}{!workspace.projects.length && <p className="empty">No projects yet. Add a project or Git worktree to use it from the session picker.</p>}</div></section>}
       {section === "defaults" && <section className="settings-section defaults-grid"><h3>New session defaults</h3><label>Permissions<select value={workspace.defaultPermissionPreset} onChange={(event) => updateWorkspace({ defaultPermissionPreset: event.target.value as "workspace" | "read-only" })}><option value="workspace">Workspace</option><option value="read-only">Read only</option></select></label><label>Model<select value={workspace.defaultModel ?? selectedModel?.id ?? ""} onChange={(event) => { const next = models.find((item) => item.id === event.target.value); updateWorkspace({ defaultModel: event.target.value || null, defaultReasoningEffort: next?.defaultReasoningEffort ?? null }); }}><option value="">Recommended</option>{models.map((model) => <option key={model.id} value={model.id}>{model.displayName}</option>)}</select></label><label>Reasoning<select value={workspace.defaultReasoningEffort ?? selectedModel?.defaultReasoningEffort ?? ""} onChange={(event) => updateWorkspace({ defaultReasoningEffort: event.target.value || null })}><option value="">Model default</option>{selectedModel?.reasoningEfforts.map((effort) => <option key={effort}>{effort}</option>)}</select></label><p>These values seed new sessions and remain editable before creation.</p></section>}
-      {section === "groups" && <section className="settings-section"><header><div><h3>Session groups</h3><p>Project groups are created automatically. Custom groups can organize sessions across projects.</p></div><button className="primary" onClick={() => { const title = window.prompt("Custom group name"); if (title) void window.chromuxNext.runner.mutateGroup({ type: "create", title }); }}>New custom group</button></header><div className="managed-list">{state.groups.map((group) => <article key={group.id}><div><strong>{group.title}</strong><small>{group.kind} · {group.sessionIds.length} session{group.sessionIds.length === 1 ? "" : "s"}</small></div><button onClick={() => { const title = window.prompt("Rename group", group.title); if (title) void window.chromuxNext.runner.mutateGroup({ type: "rename", groupId: group.id, title }); }}>Rename</button><button disabled={group.sessionIds.length > 0} onClick={() => void window.chromuxNext.runner.mutateGroup({ type: "delete", groupId: group.id })}>Delete</button></article>)}{!state.groups.length && <p className="empty">Groups appear when you create a session or add a custom group.</p>}</div></section>}
+      {section === "groups" && <section className="settings-section"><header><div><h3>Session groups</h3><p>Project groups are created automatically. Custom groups can organize sessions across projects.</p></div><Button icon={FolderPlus} tone="primary" onClick={() => openGroupDialog()}>New custom group</Button></header><div className="managed-list">{state.groups.map((group) => <article key={group.id}><div><strong>{group.title}</strong><small>{group.kind} · {group.sessionIds.length} session{group.sessionIds.length === 1 ? "" : "s"}</small></div><Button tone="quiet" disabled={group.kind !== "custom"} onClick={() => openGroupDialog(group)}>Rename</Button><Button tone="danger" disabled={group.kind !== "custom" || group.sessionIds.length > 0} onClick={() => void window.chromuxNext.runner.mutateGroup({ type: "delete", groupId: group.id })}>Delete</Button></article>)}{!state.groups.length && <EmptyState icon={FolderPlus} title="No groups yet" description="Groups appear when you create a session or add a custom group." />}</div></section>}
       {section === "diagnostics" && <section className="settings-section diagnostics"><header><div><h3>Compatibility diagnostics</h3><p>Live checks from this successor process. Credential values are never displayed.</p></div><button onClick={refreshDiagnostics}>Refresh</button></header>{diagnosticsError && <p className="diagnostic-error">{diagnosticsError}</p>}{diagnostics && <><div className="diagnostic-summary"><span>Chromux Next {diagnostics.appVersion}</span><span>{diagnostics.platform}</span><span>successor-only state</span></div><div className="managed-list">{diagnostics.checks.map((check) => <article key={check.id}><i className={`diagnostic-${check.status}`} aria-label={check.status} /><div><strong>{check.label}</strong><small>{check.detail}</small></div></article>)}</div></>}</section>}
     </div>
     <footer><button onClick={() => { update({ approach: "control-room", density: "comfortable", motion: "system" }); updateWorkspace({ defaultProjectId: null, defaultPermissionPreset: "workspace", defaultModel: null, defaultReasoningEffort: null }); }}>Reset defaults</button><button className="primary" onClick={close}>Done</button></footer>
@@ -740,7 +820,18 @@ function SettingsOverlay({
 
 function OnboardingOverlay({ workspace, models, chooseProject, update, done }: { workspace: WorkspacePreferencesV1; models: ModelOptionV1[]; chooseProject(): void; update(patch: WorkspacePreferencesPatchV1): void; done(): void }) {
   const selectedModel = models.find((model) => model.id === workspace.defaultModel) ?? models.find((model) => model.recommended) ?? models[0];
-  return <div className="modal-backdrop onboarding-backdrop"><section className="onboarding-modal" role="dialog" aria-modal="true" aria-labelledby="onboarding-title"><span>Welcome to the successor</span><h2 id="onboarding-title">Set up Chromux Next</h2><p>Choose a project or Git worktree and defaults for new Codex sessions. This setup uses only Chromux Next storage and does not import or modify legacy Chromux state.</p><div className="onboarding-step"><b>1</b><div><h3>Add your first folder</h3><p>{workspace.projects.length ? `${workspace.projects.length} folder${workspace.projects.length === 1 ? "" : "s"} ready.` : "You can also continue and add one later from Settings."}</p></div><button className="primary" onClick={chooseProject}>Choose folder…</button></div><div className="onboarding-step"><b>2</b><div><h3>Session defaults</h3><div className="modal-grid"><label>Permissions<select value={workspace.defaultPermissionPreset} onChange={(event) => update({ defaultPermissionPreset: event.target.value as "workspace" | "read-only" })}><option value="workspace">Workspace</option><option value="read-only">Read only</option></select></label><label>Model<select value={workspace.defaultModel ?? selectedModel?.id ?? ""} onChange={(event) => update({ defaultModel: event.target.value || null })}><option value="">Recommended</option>{models.map((model) => <option value={model.id} key={model.id}>{model.displayName}</option>)}</select></label><label>Reasoning<select value={workspace.defaultReasoningEffort ?? selectedModel?.defaultReasoningEffort ?? ""} onChange={(event) => update({ defaultReasoningEffort: event.target.value || null })}><option value="">Model default</option>{selectedModel?.reasoningEfforts.map((effort) => <option key={effort}>{effort}</option>)}</select></label></div></div></div><footer><small>Requires Codex CLI 0.146.0 or newer.</small><button className="primary" onClick={done}>Enter Chromux Next</button></footer></section></div>;
+  return <Dialog
+    title="Set up Chromux Next"
+    eyebrow="Welcome to the successor"
+    description="Choose a project or Git worktree and defaults for new Codex sessions. This setup uses only Chromux Next storage and does not import or modify legacy Chromux state."
+    close={() => undefined}
+    dismissible={false}
+    className="onboarding-modal"
+    footer={<><small>Requires Codex CLI 0.146.0 or newer.</small><Button icon={Check} tone="primary" onClick={done}>Enter Chromux Next</Button></>}
+  >
+    <div className="onboarding-step"><b>1</b><div><h3>Add your first folder</h3><p>{workspace.projects.length ? `${workspace.projects.length} folder${workspace.projects.length === 1 ? "" : "s"} ready.` : "You can also continue and add one later from Settings."}</p></div><Button icon={FolderPlus} tone="primary" onClick={chooseProject}>Choose folder</Button></div>
+    <div className="onboarding-step"><b>2</b><div><h3>Session defaults</h3><div className="modal-grid"><label>Permissions<select value={workspace.defaultPermissionPreset} onChange={(event) => update({ defaultPermissionPreset: event.target.value as "workspace" | "read-only" })}><option value="workspace">Workspace</option><option value="read-only">Read only</option></select></label><label>Model<select value={workspace.defaultModel ?? selectedModel?.id ?? ""} onChange={(event) => update({ defaultModel: event.target.value || null })}><option value="">Recommended</option>{models.map((model) => <option value={model.id} key={model.id}>{model.displayName}</option>)}</select></label><label>Reasoning<select value={workspace.defaultReasoningEffort ?? selectedModel?.defaultReasoningEffort ?? ""} onChange={(event) => update({ defaultReasoningEffort: event.target.value || null })}><option value="">Model default</option>{selectedModel?.reasoningEfforts.map((effort) => <option key={effort}>{effort}</option>)}</select></label></div></div></div>
+  </Dialog>;
 }
 
 function NewSessionDialog({ models, workspace, selectedSession, selectedGroupId, chooseProject, close, created, fail }: { models: ModelOptionV1[]; workspace: WorkspacePreferencesV1; selectedSession: RunnerSessionV1 | undefined; selectedGroupId: string | undefined; chooseProject(): void; close(): void; created(): void; fail(reason: unknown): void }) {
@@ -758,7 +849,31 @@ function NewSessionDialog({ models, workspace, selectedSession, selectedGroupId,
     }
     projectCount.current = workspace.projects.length;
   }, [workspace.projects]);
-  return <div className="modal-backdrop" onMouseDown={close}><form className="session-modal" onMouseDown={(event) => event.stopPropagation()} onSubmit={(event) => { event.preventDefault(); void window.chromuxNext.runner.create({ projectPath: project, title: title || "New session", permissionPreset: permission, ...(selectedGroupId ? { groupId: selectedGroupId } : {}), ...(model ? { model } : {}), ...(effort ? { reasoningEffort: effort } : {}) }).then(created).catch(fail); }}><header><div><span>Codex app-server</span><h2>New session</h2></div><button type="button" onClick={close}>×</button></header><label>Project or worktree<div className="path-picker"><select autoFocus value={project} onChange={(event) => setProject(event.target.value)}><option value="">Choose a registered folder</option>{workspace.projects.map((item) => <option value={item.path} key={item.id}>{item.name} · {item.kind}</option>)}{project && !workspace.projects.some((item) => item.path === project) && <option value={project}>{project}</option>}</select><button type="button" onClick={chooseProject}>Add folder…</button></div></label><label>Session title<input value={title} onChange={(event) => setTitle(event.target.value)} /></label><div className="modal-grid"><label>Permissions<select value={permission} onChange={(event) => setPermission(event.target.value as "workspace" | "read-only")}><option value="workspace">Workspace</option><option value="read-only">Read only</option></select></label><label>Model<select value={model} onChange={(event) => { setModel(event.target.value); setEffort(models.find((item) => item.id === event.target.value)?.defaultReasoningEffort ?? ""); }}><option value="">Recommended</option>{models.map((item) => <option value={item.id} key={item.id}>{item.displayName}{item.recommended ? " · recommended" : ""}</option>)}</select></label><label>Reasoning<select value={effort} onChange={(event) => setEffort(event.target.value)}><option value="">Model default</option>{(models.find((item) => item.id === model)?.reasoningEfforts ?? recommended?.reasoningEfforts ?? []).map((item) => <option key={item}>{item}</option>)}</select></label></div><p>{permission === "workspace" ? "Writes are limited to this workspace. Network is off by default and escalations require approval." : "Files are read-only. Network is off and approval prompts are never accepted."}</p><footer><button type="button" onClick={close}>Cancel</button><button className="primary" disabled={!project.trim() || !models.length}>Create session</button></footer></form></div>;
+  return <Dialog
+    title="New session"
+    eyebrow="Codex app-server"
+    description="Start a structured Codex session in a registered project or worktree."
+    close={close}
+    className="session-dialog"
+    footer={<><Button tone="quiet" onClick={close}>Cancel</Button><Button form="new-session-form" type="submit" icon={CirclePlus} tone="primary" disabled={!project.trim() || !models.length}>Create session</Button></>}
+  >
+    <form id="new-session-form" className="session-form" onSubmit={(event) => {
+      event.preventDefault();
+      void window.chromuxNext.runner.create({
+        projectPath: project,
+        title: title || "New session",
+        permissionPreset: permission,
+        ...(selectedGroupId ? { groupId: selectedGroupId } : {}),
+        ...(model ? { model } : {}),
+        ...(effort ? { reasoningEffort: effort } : {})
+      }).then(created).catch(fail);
+    }}>
+      <label>Project or worktree<div className="path-picker"><select autoFocus value={project} onChange={(event) => setProject(event.target.value)}><option value="">Choose a registered folder</option>{workspace.projects.map((item) => <option value={item.path} key={item.id}>{item.name} · {item.kind}</option>)}{project && !workspace.projects.some((item) => item.path === project) && <option value={project}>{project}</option>}</select><Button type="button" icon={FolderPlus} onClick={chooseProject}>Add folder</Button></div></label>
+      <label>Session title<input value={title} onChange={(event) => setTitle(event.target.value)} /></label>
+      <div className="modal-grid"><label>Permissions<select value={permission} onChange={(event) => setPermission(event.target.value as "workspace" | "read-only")}><option value="workspace">Workspace</option><option value="read-only">Read only</option></select></label><label>Model<select value={model} onChange={(event) => { setModel(event.target.value); setEffort(models.find((item) => item.id === event.target.value)?.defaultReasoningEffort ?? ""); }}><option value="">Recommended</option>{models.map((item) => <option value={item.id} key={item.id}>{item.displayName}{item.recommended ? " · recommended" : ""}</option>)}</select></label><label>Reasoning<select value={effort} onChange={(event) => setEffort(event.target.value)}><option value="">Model default</option>{(models.find((item) => item.id === model)?.reasoningEfforts ?? recommended?.reasoningEfforts ?? []).map((item) => <option key={item}>{item}</option>)}</select></label></div>
+      <p className="permission-help">{permission === "workspace" ? "Writes are limited to this workspace. Network is off by default and escalations require approval." : "Files are read-only. Network is off and approval prompts are never accepted."}</p>
+    </form>
+  </Dialog>;
 }
 
 function App() {
@@ -773,6 +888,7 @@ function App() {
   const [error, setError] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [newSessionOpen, setNewSessionOpen] = useState(false);
+  const [groupDialog, setGroupDialog] = useState<{ open: boolean; group?: RunnerStateV1["groups"][number] }>({ open: false });
   const [alignmentDocument, setAlignmentDocument] = useState<AlignmentDocumentV1>(() => structuredClone(sampleDocument));
   const alignmentDocumentRef = useRef(alignmentDocument);
   const [alignmentPath, setAlignmentPath] = useState<string>();
@@ -976,11 +1092,16 @@ function App() {
     },
     rejectProposal: (index) => setProposals((current) => current.filter((_, proposalIndex) => proposalIndex !== index))
   };
-  const shellProps: ShellProps = { state, models, surface, selectedSession, error, alignment, setSurface, openSettings: () => setSettingsOpen(true), openNewSession: () => setNewSessionOpen(true), clearError: () => setError("") };
+  const openGroupDialog = (group?: RunnerStateV1["groups"][number]) => {
+    setSettingsOpen(false);
+    setGroupDialog({ open: true, ...(group ? { group } : {}) });
+  };
+  const shellProps: ShellProps = { state, models, surface, selectedSession, error, alignment, setSurface, openSettings: () => setSettingsOpen(true), openNewSession: () => setNewSessionOpen(true), openGroupDialog, clearError: () => setError("") };
   return <div className={`app-root density-${preferences.density} motion-${preferences.motion}`} data-approach={preferences.approach}>
     <UnifiedApproachShell approach={preferences.approach} {...shellProps} />
-    {settingsOpen && <SettingsOverlay preferences={preferences} workspace={workspacePreferences} models={models} state={state} update={updatePreferences} updateWorkspace={updateWorkspacePreferences} chooseProject={chooseProject} removeProject={removeProject} close={() => setSettingsOpen(false)} />}
+    {settingsOpen && <SettingsOverlay preferences={preferences} workspace={workspacePreferences} models={models} state={state} update={updatePreferences} updateWorkspace={updateWorkspacePreferences} chooseProject={chooseProject} removeProject={removeProject} openGroupDialog={openGroupDialog} close={() => setSettingsOpen(false)} />}
     {newSessionOpen && <NewSessionDialog models={models} workspace={workspacePreferences} selectedSession={selectedSession} selectedGroupId={state.groups.find((group) => group.id === selectedSession?.groupId)?.kind === "custom" ? selectedSession?.groupId : undefined} chooseProject={chooseProject} close={() => setNewSessionOpen(false)} created={() => { setNewSessionOpen(false); setSurface("runner"); }} fail={(reason) => setError(String(reason))} />}
+    {groupDialog.open && <GroupDialog {...(groupDialog.group ? { group: groupDialog.group } : {})} close={() => setGroupDialog({ open: false })} />}
     {settingsReady && !workspacePreferences.onboardingComplete && <OnboardingOverlay workspace={workspacePreferences} models={models} chooseProject={chooseProject} update={updateWorkspacePreferences} done={() => updateWorkspacePreferences({ onboardingComplete: true })} />}
   </div>;
 }

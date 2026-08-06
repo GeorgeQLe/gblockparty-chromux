@@ -2932,3 +2932,58 @@
   deploy contract exists; GitHub prerelease publication is the requested
   release action. Next command: continue the runner-first hardening matrix in
   `tasks/todo.md`.
+
+## 2026-08-06 — Chromux Next production UI polish v0.6.0
+
+- Reworked all five Chromux Next approaches into one calm premium-dark
+  graphite/sage visual system while preserving their distinct arrangements,
+  runner actions, persistent workspace, Alignment editing, preferences, and
+  successor-only trust boundaries.
+- Ship manifest — User goal: implement the supplied v0.6.0 production polish
+  plan completely, verify it in the packaged app, and publish the experimental
+  prerelease without changing legacy Chromux or `/releases/latest`.
+- Changed files and per-file purpose: `src/ui/components.tsx` adds Button,
+  IconButton, Tabs, Field, Badge, EmptyState, Dialog, Toolbar, and Panel;
+  `src/styles/{tokens,components,layouts,legacy}.css` separates semantic
+  foundations, reusable states, layout arrangements, and workflow styling;
+  `src/styles.css` is the import boundary; `src/renderer.tsx` adds Lucide
+  controls, unified header/session navigation, group and session dialogs,
+  adaptive runner/Alignment/onboarding states, and focus restoration;
+  `src/main.ts` and `scripts/visual-qualify.mjs` expand packaged qualification
+  to 20 views; package/lock and runner protocol metadata advance to 0.6.0;
+  interface/protocol tests enforce the new structure and version; README, UAT,
+  release notes, and task records document the release.
+- User-goal mapping: surface switching now lives in one global header; group
+  creation lives in contextual session navigation; prompt, emoji, arrow, and
+  raw close-glyph controls are absent; icon-only controls expose names and
+  tooltips; dialogs trap focus, handle Escape where dismissal is valid, and
+  restore focus; narrow modal fields stack; comfortable/compact and
+  system/full/reduced preferences retain their schema; five approaches still
+  share one mounted workspace and unchanged runner/document IPC.
+- Executable verification: `npm run typecheck` passed; all 16 Vitest files and
+  85 tests passed; Electron Forge packaged the macOS arm64 app; baseline
+  packaged smoke passed; two-launch/two-session restoration smoke passed; and
+  packaged visual qualification captured 20 views. Representative onboarding,
+  New Session, Settings, Control Room, and Mission Board standard/narrow
+  captures were visually inspected after the final build. `git diff --check`
+  passed. `npm audit --omit=dev` reported zero production vulnerabilities.
+- Adversarial review: checked for prompt/glyph regression, nested action
+  controls, inaccessible icon-only actions, modal focus escape and restoration,
+  nondismissible onboarding behavior, reduced-motion overrides, narrow modal
+  stacking, header and toolbar clipping, persistent-workspace identity,
+  retained runner IPC action strings, all five semantic board/tree
+  equivalents, version consistency, exact capture count, and preservation of
+  legacy release metadata. No blocking finding remains.
+- Warnings and residual risk: the existing development packaging dependency
+  tree still reports npm audit findings when dev dependencies are included;
+  production dependencies report zero findings, and applying breaking
+  toolchain upgrades is outside this renderer-only release. Windows/Linux
+  packaging, real signed distribution, manual native folder/file dialogs, and
+  live authenticated Codex contribution remain part of the separate cutover
+  gate; deterministic tests and macOS packaged runs cover this prerelease.
+- Rollback note: remove GitHub prerelease and tag `chromux-next-v0.6.0`, then
+  revert the v0.6.0 shipping commit. Chromux Next v0.5.0 and the stable legacy
+  Chromux release remain available. Deploy skipped: no explicit manual deploy
+  contract exists; the GitHub prerelease is the required publication. Next
+  command: begin the macOS daily-driver and clean-install evidence tracked by
+  the Chromux Next cutover gate in `tasks/todo.md`.

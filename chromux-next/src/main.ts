@@ -181,15 +181,22 @@ function createWindow(): void {
         const visualWindow = mainWindow;
         if (!visualWindow || visualWindow.isDestroyed()) throw new Error("Visual window is unavailable");
         await mkdir(visualSmokeDirectory, { recursive: true });
+        let captureCount = 0;
+        const capture = async (name: string, width = 1440, height = 900) => {
+          visualWindow.setContentSize(width, height);
+          await new Promise((resolve) => setTimeout(resolve, 140));
+          const image = await visualWindow.webContents.capturePage();
+          if (!image || image.isEmpty()) throw new Error(`Empty capture for ${name}`);
+          await writeFile(path.join(visualSmokeDirectory, `${name}.png`), image.toPNG());
+          captureCount += 1;
+        };
         await new Promise((resolve) => setTimeout(resolve, 180));
         const onboardingVisible = await visualWindow.webContents.executeJavaScript(
           "Boolean(document.querySelector('.onboarding-modal'))"
         );
         if (!onboardingVisible) throw new Error("Successor onboarding was not visible");
-        await writeFile(
-          path.join(visualSmokeDirectory, "onboarding-standard.png"),
-          (await visualWindow.webContents.capturePage()).toPNG()
-        );
+        await capture("onboarding-standard");
+        await capture("onboarding-narrow", 820, 720);
         const visualProjectAt = new Date().toISOString();
         await localStore.addProject({
           schemaVersion: 1,
@@ -207,15 +214,31 @@ function createWindow(): void {
         });
         visualWindow.webContents.send(IpcChannels.settingsWorkspacePreferencesChanged, workspacePreferences);
         await visualWindow.webContents.executeJavaScript(`(() => {
+          const button = [...document.querySelectorAll('button')].find((item) => item.textContent?.includes('New Session'));
+          if (!button) throw new Error("New Session button was not found");
+          button.click();
+        })()`);
+        await capture("new-session-standard");
+        await capture("new-session-narrow", 820, 720);
+        await visualWindow.webContents.executeJavaScript(
+          "document.querySelector('[aria-label=\"Close New session\"]')?.click()"
+        );
+        await visualWindow.webContents.executeJavaScript(`(() => {
           const button = document.querySelector('[aria-label="Open Settings"]');
           if (!button) throw new Error("Settings button was not found");
           button.click();
         })()`);
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        await writeFile(
-          path.join(visualSmokeDirectory, "settings-projects-standard.png"),
-          (await visualWindow.webContents.capturePage()).toPNG()
-        );
+        await capture("settings-projects-standard");
+        await capture("settings-projects-narrow", 820, 720);
+        for (const section of ["groups", "appearance"]) {
+          await visualWindow.webContents.executeJavaScript(`(() => {
+            const button = [...document.querySelectorAll('.settings-tabs button')]
+              .find((item) => item.textContent?.trim() === '${section}');
+            if (!button) throw new Error("${section} settings tab was not found");
+            button.click();
+          })()`);
+          await capture(`settings-${section}-standard`);
+        }
         const diagnosticsDeadline = Date.now() + 3_000;
         while (Date.now() < diagnosticsDeadline) {
           const diagnostics = runner.getCompatibilityDiagnostics(app.getVersion(), `${process.platform} ${process.arch}`);
@@ -229,10 +252,8 @@ function createWindow(): void {
           button.click();
         })()`);
         await new Promise((resolve) => setTimeout(resolve, 100));
-        await writeFile(
-          path.join(visualSmokeDirectory, "settings-diagnostics-standard.png"),
-          (await visualWindow.webContents.capturePage()).toPNG()
-        );
+        await capture("settings-diagnostics-standard");
+        await capture("settings-diagnostics-narrow", 820, 720);
         await visualWindow.webContents.executeJavaScript(
           "document.querySelector('[aria-label=\"Close Settings\"]')?.click()"
         );
@@ -242,7 +263,7 @@ function createWindow(): void {
           const preferences = await localStore.updateUiPreferences({ approach });
           mainWindow?.webContents.send(IpcChannels.settingsUiPreferencesChanged, preferences);
           await mainWindow?.webContents.executeJavaScript(`(() => {
-            const button = [...document.querySelectorAll('.surface-tabs button')].find((item) => item.textContent === 'alignment');
+            const button = [...document.querySelectorAll('.surface-tabs button')].find((item) => item.textContent?.trim().toLowerCase() === 'alignment');
             if (!button) throw new Error('Alignment surface control was not found');
             button.click();
           })()`);
@@ -269,12 +290,11 @@ function createWindow(): void {
               || geometry.toolbar.left < 0 || geometry.toolbar.right > geometry.viewport + 1) {
               throw new Error(`Alignment workspace clipped for ${approach} ${size.name}: ${JSON.stringify(geometry)}`);
             }
-            const image = await mainWindow?.webContents.capturePage();
-            if (!image || image.isEmpty()) throw new Error(`Empty capture for ${approach} ${size.name}`);
-            await writeFile(path.join(visualSmokeDirectory, `${approach}-${size.name}.png`), image.toPNG());
+            await capture(`${approach}-${size.name}`, size.width, size.height);
           }
         }
-        console.log(`Chromux Next visual qualification captured ${approaches.length * sizes.length + 3} views`);
+        if (captureCount !== 20) throw new Error(`Expected 20 visual captures, received ${captureCount}`);
+        console.log(`Chromux Next visual qualification captured ${captureCount} views`);
       } catch (error) {
         process.exitCode = 1;
         console.error("Chromux Next visual qualification failed:", error instanceof Error ? error.message : String(error));

@@ -104,7 +104,7 @@ export class CodexAppServer extends EventEmitter implements AppServerTransport {
       prefixArgs: normalized.prefixArgs ?? [],
       env: normalized.env ?? process.env,
       minimumVersion: normalized.minimumVersion ?? "0.146.0",
-      clientVersion: normalized.clientVersion ?? "0.5.0",
+      clientVersion: normalized.clientVersion ?? "0.6.0",
       requestTimeoutMs: normalized.requestTimeoutMs ?? 90_000,
       maxLineBytes: normalized.maxLineBytes ?? 1024 * 1024,
       restartDelaysMs: normalized.restartDelaysMs ?? [1000, 2000, 5000],

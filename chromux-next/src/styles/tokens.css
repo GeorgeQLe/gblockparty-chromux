@@ -1,0 +1,44 @@
+:root {
+  color-scheme: dark;
+  --graphite-950: #0b0e0d;
+  --graphite-925: #0f1211;
+  --graphite-900: #131716;
+  --graphite-850: #181d1b;
+  --graphite-800: #202623;
+  --graphite-700: #303934;
+  --graphite-600: #465149;
+  --graphite-400: #8d9991;
+  --graphite-300: #aeb8b1;
+  --graphite-100: #e6ebe7;
+  --white: #f7faf8;
+  --sage-700: #4f725e;
+  --sage-600: #638a72;
+  --sage-500: #7ea68c;
+  --sage-300: #acd0b7;
+  --sage-soft: #6f9b7d22;
+  --success: #73b38b;
+  --warning: #d6aa62;
+  --danger: #dc817b;
+  --info: #7da4bd;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --radius-sm: 6px;
+  --radius-md: 9px;
+  --radius-lg: 13px;
+  --shadow-1: 0 1px 2px #0007;
+  --shadow-2: 0 18px 56px #0009;
+  --control-height: 36px;
+  --body-size: 14px;
+  --transition-fast: 130ms ease;
+}
+
+.density-compact {
+  --control-height: 32px;
+  --body-size: 13px;
+  --space-4: 12px;
+  --space-5: 18px;
+}

@@ -10,8 +10,50 @@ describe("five-approach shared interface system", () => {
     ]) expect(source).toContain(`function ${shell}`);
     for (const primitive of [
       "RunnerTerminal", "Composer", "InteractionCard", "AttentionSidebar",
-      "Workspace", "NewSessionDialog", "SurfaceTabs"
+      "Workspace", "NewSessionDialog", "GroupDialog", "SurfaceTabs"
     ]) expect(source).toContain(`function ${primitive}`);
+  });
+
+  it("splits semantic tokens, reusable components, and layout rules", async () => {
+    const [tokens, components, layouts, primitives] = await Promise.all([
+      readFile("src/styles/tokens.css", "utf8"),
+      readFile("src/styles/components.css", "utf8"),
+      readFile("src/styles/layouts.css", "utf8"),
+      readFile("src/ui/components.tsx", "utf8")
+    ]);
+    for (const token of ["--graphite-950", "--sage-500", "--space-2", "--control-height", "--success", "--warning", "--danger"]) {
+      expect(tokens).toContain(token);
+    }
+    for (const primitive of ["Button", "IconButton", "Tabs", "Field", "Badge", "EmptyState", "Dialog", "Toolbar", "Panel"]) {
+      expect(primitives).toContain(`function ${primitive}`);
+    }
+    expect(components).toContain(":focus-visible");
+    expect(tokens).toContain(".density-compact");
+    expect(layouts).toContain("@media (max-width: 700px)");
+  });
+
+  it("uses one product header and internal icons without prompt or glyph controls", async () => {
+    const [renderer, primitives, packageJson] = await Promise.all([
+      readFile("src/renderer.tsx", "utf8"),
+      readFile("src/ui/components.tsx", "utf8"),
+      readFile("package.json", "utf8")
+    ]);
+    expect(renderer).toContain("<SurfaceTabs surface={surface} setSurface={setSurface}");
+    expect(renderer).toContain('icon={Settings}');
+    expect(renderer).toContain('icon={Plus}');
+    expect(renderer).not.toContain("window.prompt");
+    expect(renderer).not.toMatch(/[×⚙＋↑↓]/u);
+    expect(primitives).toContain('title={props.title ?? label}');
+    expect(packageJson).toContain('"lucide-react"');
+  });
+
+  it("provides focus-contained dialogs with escape handling and restoration", async () => {
+    const primitives = await readFile("src/ui/components.tsx", "utf8");
+    expect(primitives).toContain('aria-modal="true"');
+    expect(primitives).toContain('event.key === "Escape"');
+    expect(primitives).toContain('event.key !== "Tab"');
+    expect(primitives).toContain("returnFocus.current?.focus()");
+    expect(primitives).toContain("initialFocus?.current");
   });
 
   it("keeps workflow actions and every surface in shared components", async () => {
@@ -50,9 +92,10 @@ describe("five-approach shared interface system", () => {
 
   it("exposes accessible board/tree equivalents and modal keyboard containment", async () => {
     const source = await readFile("src/renderer.tsx", "utf8");
+    const primitives = await readFile("src/ui/components.tsx", "utf8");
     expect(source).toContain('aria-label="Session mission board"');
     expect(source).toContain('role="treeitem"');
-    expect(source).toContain('aria-modal="true"');
+    expect(`${source}\n${primitives}`).toContain('aria-modal="true"');
     expect(source).toContain('event.key !== "Tab"');
     expect(source).toContain('event.key === "Escape"');
     expect(source).toContain('event.metaKey || event.ctrlKey');

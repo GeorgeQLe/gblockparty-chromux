@@ -5,10 +5,21 @@ separate Electron app from legacy Chromux in `../prototype/`: it has a distinct
 package, bundle identifier, user-data directory, architecture, and release
 line.
 
-## Current prerelease: v0.5.0
+## Current prerelease: v0.6.0
 
 This runner-first prerelease includes:
 
+- A calm premium-dark interface system shared by all five layouts, with
+  semantic graphite/sage tokens, comfortable and compact density, consistent
+  controls and states, Lucide icons, responsive navigation, and reduced-motion
+  support.
+- One global product header for surfaces, Settings, and New Session plus a
+  contextual session strip. Accessible in-app dialogs replace native prompts
+  for custom-group creation and rename, with focus containment, Escape
+  handling, and focus restoration.
+- Polished runner, transcript, Composer, approval, attention, onboarding,
+  Settings, New Session, empty/error, and Alignment states. Packaged visual
+  qualification now reviews 20 standard and narrow captures.
 - First-run successor-native onboarding with a native project/worktree folder
   chooser, a persisted project registry, and editable default permission,
   model, and reasoning preferences for new sessions.

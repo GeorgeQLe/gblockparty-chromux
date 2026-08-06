@@ -59,6 +59,15 @@ instead of resuming the `prototype/` implementation.
 
 ## Completed Work
 
+- [x] Rework Chromux Next into a calm premium-dark production interface with
+  semantic graphite/sage tokens, shared accessible primitives and Lucide
+  icons, one global surface header, contextual session navigation, in-app
+  group dialogs, polished responsive states, retained comfortable/compact and
+  motion preferences, 20-capture packaged qualification, and v0.6.0
+  prerelease documentation. _(source: user-supplied Chromux Next Production UI
+  Polish plan; successor scope: `chromux-next/`; runner, document, persistence,
+  app-server, legacy Chromux, and `/releases/latest` behavior unchanged)_
+
 - [x] Restore full structured Alignment editing as a persistent Chromux Next
   secondary workspace with canonical open/save, all schema-v1 editors, human
   review metadata, document status and ordering controls, authoritative

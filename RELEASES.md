@@ -1,5 +1,32 @@
 # Release Notes
 
+## GBlockParty Chromux Next v0.6.0 (prerelease)
+
+Tag: `chromux-next-v0.6.0`
+
+- Unify Control Room, IDE Workbench, Focus Studio, Mission Board, and Spatial
+  Canvas under one calm premium-dark graphite/sage design system while
+  retaining each layout and every runner and Alignment capability.
+- Split renderer styling into semantic tokens, shared component rules,
+  layout-specific rules, and workflow styles; add reusable Button, IconButton,
+  Tabs, Field, Badge, EmptyState, Dialog, Toolbar, and Panel primitives.
+- Add Lucide icons and consistent accessible names/tooltips throughout
+  navigation, transcript tools, Composer, and document actions, removing
+  emoji, arrow, raw close-glyph, and prompt-based controls.
+- Consolidate global chrome into one product header and combine Control Room
+  group/session navigation into a contextual strip with group creation close
+  to session navigation.
+- Replace group creation and rename prompts with focus-contained in-app
+  dialogs that support Escape, predictable focus restoration, and keyboard
+  submission.
+- Rebalance workspace panels, selected states, toolbars, empty/error states,
+  modal fields, comfortable/compact density, narrow layouts, and reduced
+  motion without changing persistence, runner, document, IPC, or app-server
+  contracts.
+- Expand packaged visual qualification to 20 reviewed captures covering
+  onboarding, New Session, Settings sections, populated Alignment, and
+  standard/narrow views of every interface approach.
+
 ## GBlockParty Chromux Next v0.5.0 (prerelease)
 
 Tag: `chromux-next-v0.5.0`
