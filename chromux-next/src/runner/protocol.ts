@@ -15,6 +15,13 @@ export interface AppServerTransport {
   stop(): Promise<void>;
   request(method: string, params: unknown): Promise<unknown>;
   respond(id: string | number, result: unknown): void;
+  getCompatibilityStatus?(): {
+    minimumVersion: string;
+    detectedVersion?: string;
+    userAgent?: string;
+    ready: boolean;
+    failure?: string;
+  };
   on(event: "notification" | "request" | "crash", listener: (value: any) => void): this;
 }
 
@@ -83,6 +90,9 @@ export class CodexAppServer extends EventEmitter implements AppServerTransport {
   private restartTimer: NodeJS.Timeout | undefined;
   private restartResolve: (() => void) | undefined;
   private restartPromise: Promise<void> | undefined;
+  private detectedVersion: string | undefined;
+  private userAgent: string | undefined;
+  private compatibilityFailure: string | undefined;
   private readonly processFailures = new WeakMap<ChildProcessWithoutNullStreams, Error>();
   private readonly options: Required<CodexAppServerOptions>;
 
@@ -94,7 +104,7 @@ export class CodexAppServer extends EventEmitter implements AppServerTransport {
       prefixArgs: normalized.prefixArgs ?? [],
       env: normalized.env ?? process.env,
       minimumVersion: normalized.minimumVersion ?? "0.146.0",
-      clientVersion: normalized.clientVersion ?? "0.4.1",
+      clientVersion: normalized.clientVersion ?? "0.5.0",
       requestTimeoutMs: normalized.requestTimeoutMs ?? 90_000,
       maxLineBytes: normalized.maxLineBytes ?? 1024 * 1024,
       restartDelaysMs: normalized.restartDelaysMs ?? [1000, 2000, 5000],
@@ -104,13 +114,30 @@ export class CodexAppServer extends EventEmitter implements AppServerTransport {
 
   async start(): Promise<void> {
     this.stopping = false;
-    await this.checkVersion();
+    this.compatibilityFailure = undefined;
+    try {
+      await this.checkVersion();
+    } catch (error) {
+      this.compatibilityFailure = error instanceof Error ? error.message : String(error);
+      throw error;
+    }
     try {
       await this.spawnAndInitialize();
     } catch (error) {
+      this.compatibilityFailure = error instanceof Error ? error.message : String(error);
       await this.stop();
       throw error;
     }
+  }
+
+  getCompatibilityStatus() {
+    return {
+      minimumVersion: this.options.minimumVersion,
+      ...(this.detectedVersion ? { detectedVersion: this.detectedVersion } : {}),
+      ...(this.userAgent ? { userAgent: this.userAgent } : {}),
+      ready: this.ready,
+      ...(this.compatibilityFailure ? { failure: this.compatibilityFailure } : {})
+    };
   }
 
   private spawnOptions(): SpawnOptionsWithoutStdio {
@@ -145,6 +172,7 @@ export class CodexAppServer extends EventEmitter implements AppServerTransport {
       child.once("close", (code) => finish(code === 0 ? undefined : new Error("Codex CLI is unavailable")));
     });
     const match = value.match(/(\d+\.\d+\.\d+)/);
+    this.detectedVersion = match?.[1];
     if (!match || compareVersions(match[1]!, this.options.minimumVersion) < 0) {
       throw new Error(`Chromux Next requires Codex CLI ${this.options.minimumVersion}+ (found ${match?.[1] ?? "unknown"})`);
     }
@@ -210,16 +238,19 @@ export class CodexAppServer extends EventEmitter implements AppServerTransport {
     if (!result || typeof result !== "object" || typeof result.userAgent !== "string") {
       throw new Error("Incompatible Codex app-server initialize response");
     }
+    this.userAgent = result.userAgent;
     this.notify("initialized", {});
     await this.request("model/list", {});
     this.restartAttempts = 0;
     this.ready = true;
+    this.compatibilityFailure = undefined;
   }
 
   private handleExit(child: ChildProcessWithoutNullStreams, error: Error): void {
     if (this.process !== child) return;
     this.process = undefined;
     this.ready = false;
+    this.compatibilityFailure = error.message;
     this.rejectPending(error);
     if (!this.stopping) {
       this.emit("crash", error);

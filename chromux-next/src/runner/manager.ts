@@ -19,6 +19,7 @@ import {
   TriageInputSchema,
   TurnInputSchema,
   type AttentionAnalysisV1,
+  type CompatibilityDiagnosticsV1,
   type ModelOptionV1,
   type PendingInteractionV1,
   type RunnerEventV1,
@@ -67,6 +68,58 @@ export class RunnerManager extends EventEmitter {
 
   getState(): RunnerStateV1 { return structuredClone(this.state); }
   getModels(): ModelOptionV1[] { return structuredClone(this.models); }
+
+  getCompatibilityDiagnostics(appVersion: string, platform: string): CompatibilityDiagnosticsV1 {
+    const status = this.server.getCompatibilityStatus?.();
+    const failure = status?.failure;
+    const authenticationFailure = failure && /auth|login|credential/i.test(failure);
+    const incompatibleVersion = failure && /requires Codex CLI/i.test(failure);
+    return {
+      schemaVersion: 1,
+      generatedAt: new Date().toISOString(),
+      appVersion,
+      platform,
+      stateScope: "successor-only",
+      checks: [
+        {
+          id: "codex-cli",
+          label: "Codex CLI",
+          status: status?.detectedVersion && !incompatibleVersion ? "pass" : "fail",
+          detail: status?.detectedVersion
+            ? `Version ${status.detectedVersion} detected; ${status.minimumVersion}+ required.`
+            : failure ?? "Codex CLI version could not be detected."
+        },
+        {
+          id: "app-server",
+          label: "App-server protocol",
+          status: status?.ready ? "pass" : "fail",
+          detail: status?.ready
+            ? `Compatible connection${status.userAgent ? ` · ${status.userAgent.slice(0, 512)}` : ""}.`
+            : failure ?? "App-server is not connected."
+        },
+        {
+          id: "authentication",
+          label: "Authentication",
+          status: authenticationFailure ? "fail" : status?.ready ? "pass" : "warn",
+          detail: authenticationFailure
+            ? "Codex reported an authentication failure. Sign in with the Codex CLI and refresh."
+            : status?.ready ? "Accepted by Codex app-server." : "Not checked because app-server is unavailable."
+        },
+        {
+          id: "models",
+          label: "Model discovery",
+          status: this.models.length ? "pass" : "warn",
+          detail: this.models.length ? `${this.models.length} compatible model${this.models.length === 1 ? "" : "s"} available.` : "No models discovered."
+        },
+        {
+          id: "state-isolation",
+          label: "State isolation",
+          status: "pass",
+          detail: "Using Chromux Next successor storage only; legacy Chromux state is not imported or modified."
+        }
+      ]
+    };
+  }
 
   async createSession(input: unknown): Promise<RunnerSessionV1> {
     const value = CreateSessionInputSchema.parse(input);
@@ -222,13 +275,25 @@ export class RunnerManager extends EventEmitter {
     } else if (value.type === "move-session") {
       const session = this.session(value.sessionId);
       const target = this.group(value.groupId);
-      this.group(session.groupId).sessionIds = this.group(session.groupId).sessionIds.filter((id) => id !== session.id);
+      const source = this.group(session.groupId);
+      source.sessionIds = source.sessionIds.filter((id) => id !== session.id);
+      source.updatedAt = now;
       target.sessionIds.push(session.id);
+      target.updatedAt = now;
       session.groupId = target.id;
+      session.updatedAt = now;
+      if (this.state.selectedSessionId === session.id) this.state.selectedGroupId = target.id;
     } else {
       const group = this.group(value.groupId);
       if (group.sessionIds.length) throw new Error("Move or close sessions before deleting this group");
       this.state.groups = this.state.groups.filter((item) => item.id !== group.id);
+      if (this.state.selectedGroupId === group.id) {
+        const selected = this.state.sessions.find((session) =>
+          session.id === this.state.selectedSessionId && session.status !== "closed");
+        const fallback = selected ?? this.state.sessions.find((session) => session.status !== "closed");
+        this.state.selectedGroupId = fallback?.groupId;
+        this.state.selectedSessionId = fallback?.id;
+      }
     }
     await this.changed();
   }

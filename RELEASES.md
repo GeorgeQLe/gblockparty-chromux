@@ -1,5 +1,26 @@
 # Release Notes
 
+## GBlockParty Chromux Next v0.5.0 (prerelease)
+
+Tag: `chromux-next-v0.5.0`
+
+- Add first-run Chromux Next onboarding with an explicit successor-only data
+  promise, native folder selection, project/worktree identification, and
+  optional session-default setup.
+- Persist a bounded, validated project registry plus default project,
+  permission preset, model, and reasoning effort independently from runner
+  and presentation state, with malformed-slice recovery and serialized writes.
+- Replace free-form session paths with registered project/worktree selection,
+  an Add Folder action, and saved defaults while retaining per-session edits.
+- Expand Settings into Projects, Defaults, Groups, Appearance, and Diagnostics
+  sections with project removal safeguards and complete custom/project group
+  administration.
+- Add redacted live compatibility checks for the Codex CLI minimum version,
+  app-server protocol, authentication readiness, model discovery, platform,
+  app version, and successor storage isolation.
+- Serialize subprocess test files so intentionally tight compatibility-fixture
+  deadlines remain deterministic under host CPU contention.
+
 ## GBlockParty Chromux Next v0.4.1 (prerelease)
 
 Tag: `chromux-next-v0.4.1`

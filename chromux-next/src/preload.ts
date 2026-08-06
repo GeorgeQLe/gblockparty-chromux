@@ -7,8 +7,11 @@ import {
   IpcChannels,
   MutationResultSchema,
   RunnerStateV1Schema,
+  CompatibilityDiagnosticsV1Schema,
   UiPreferencesPatchV1Schema,
   UiPreferencesV1Schema
+  ,WorkspacePreferencesPatchV1Schema
+  ,WorkspacePreferencesV1Schema
 } from "./ipc/contracts";
 import type { ChromuxNextApi } from "./ipc/bridge";
 import { AlignmentDocumentV1Schema, AlignmentMutationBatchV1Schema } from "./domain/schema";
@@ -150,6 +153,38 @@ const api: ChromuxNextApi = {
       };
       ipcRenderer.on(IpcChannels.settingsUiPreferencesChanged, handler);
       return () => ipcRenderer.removeListener(IpcChannels.settingsUiPreferencesChanged, handler);
+    },
+    async getWorkspacePreferences() {
+      return WorkspacePreferencesV1Schema.parse(
+        await ipcRenderer.invoke(IpcChannels.settingsGetWorkspacePreferences)
+      );
+    },
+    async updateWorkspacePreferences(patch) {
+      return WorkspacePreferencesV1Schema.parse(await ipcRenderer.invoke(
+        IpcChannels.settingsUpdateWorkspacePreferences,
+        WorkspacePreferencesPatchV1Schema.parse(patch)
+      ));
+    },
+    async chooseProject() {
+      const value: unknown = await ipcRenderer.invoke(IpcChannels.settingsChooseProject);
+      return value === null ? null : WorkspacePreferencesV1Schema.parse(value);
+    },
+    async removeProject(projectId) {
+      return WorkspacePreferencesV1Schema.parse(
+        await ipcRenderer.invoke(IpcChannels.settingsRemoveProject, projectId)
+      );
+    },
+    async compatibilityDiagnostics() {
+      return CompatibilityDiagnosticsV1Schema.parse(
+        await ipcRenderer.invoke(IpcChannels.settingsCompatibilityDiagnostics)
+      );
+    },
+    onWorkspacePreferencesChanged(listener) {
+      const handler = (_event: Electron.IpcRendererEvent, value: unknown) => {
+        listener(WorkspacePreferencesV1Schema.parse(value));
+      };
+      ipcRenderer.on(IpcChannels.settingsWorkspacePreferencesChanged, handler);
+      return () => ipcRenderer.removeListener(IpcChannels.settingsWorkspacePreferencesChanged, handler);
     }
   }
 };

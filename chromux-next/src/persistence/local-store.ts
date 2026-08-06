@@ -9,6 +9,15 @@ import {
   type UiPreferencesPatchV1,
   type UiPreferencesV1
 } from "../settings/ui-preferences";
+import {
+  DEFAULT_WORKSPACE_PREFERENCES,
+  ProjectEntryV1Schema,
+  WorkspacePreferencesV1Schema,
+  recoverWorkspacePreferences,
+  type ProjectEntryV1,
+  type WorkspacePreferencesPatchV1,
+  type WorkspacePreferencesV1
+} from "../settings/workspace-preferences";
 
 const LocalStateSchema = z.object({
   schemaVersion: z.literal(1),
@@ -27,7 +36,10 @@ const LocalStateSchema = z.object({
   runner: RunnerStateV1Schema.optional(),
   // Invalid or future preference values recover independently so runner state
   // is never discarded because presentation metadata was malformed.
-  uiPreferences: z.unknown().optional().transform(recoverUiPreferences)
+  uiPreferences: z.unknown().optional().transform(recoverUiPreferences),
+  // Successor-native onboarding data is recovered independently and never
+  // consults the legacy Chromux user-data directory.
+  workspacePreferences: z.unknown().optional().transform(recoverWorkspacePreferences)
 });
 export type LocalState = z.infer<typeof LocalStateSchema>;
 
@@ -37,7 +49,8 @@ const DEFAULT_STATE: LocalState = {
   lastProjectPath: "",
   window: { width: 1440, height: 900 },
   runLogs: [],
-  uiPreferences: { ...DEFAULT_UI_PREFERENCES }
+  uiPreferences: { ...DEFAULT_UI_PREFERENCES },
+  workspacePreferences: structuredClone(DEFAULT_WORKSPACE_PREFERENCES)
 };
 
 export class LocalStore {
@@ -77,6 +90,65 @@ export class LocalStore {
         schemaVersion: 1
       });
       return { ...state, uiPreferences: result };
+    });
+    return result;
+  }
+
+  async getWorkspacePreferences(): Promise<WorkspacePreferencesV1> {
+    return recoverWorkspacePreferences((await this.read()).workspacePreferences);
+  }
+
+  async updateWorkspacePreferences(patch: WorkspacePreferencesPatchV1): Promise<WorkspacePreferencesV1> {
+    let result = structuredClone(DEFAULT_WORKSPACE_PREFERENCES);
+    await this.update((state) => {
+      const current = recoverWorkspacePreferences(state.workspacePreferences);
+      result = WorkspacePreferencesV1Schema.parse({
+        ...current,
+        ...patch,
+        defaultProjectId: patch.defaultProjectId === null ? undefined : patch.defaultProjectId ?? current.defaultProjectId,
+        defaultModel: patch.defaultModel === null ? undefined : patch.defaultModel ?? current.defaultModel,
+        defaultReasoningEffort: patch.defaultReasoningEffort === null
+          ? undefined
+          : patch.defaultReasoningEffort ?? current.defaultReasoningEffort,
+        schemaVersion: 1
+      });
+      return { ...state, workspacePreferences: result };
+    });
+    return result;
+  }
+
+  async addProject(project: ProjectEntryV1): Promise<WorkspacePreferencesV1> {
+    const validated = ProjectEntryV1Schema.parse(project);
+    let result = structuredClone(DEFAULT_WORKSPACE_PREFERENCES);
+    await this.update((state) => {
+      const current = recoverWorkspacePreferences(state.workspacePreferences);
+      const existing = current.projects.find((item) => item.path === validated.path);
+      const projects = existing
+        ? current.projects.map((item) => item.id === existing.id
+          ? { ...validated, id: existing.id, addedAt: existing.addedAt }
+          : item)
+        : [...current.projects, validated];
+      result = WorkspacePreferencesV1Schema.parse({
+        ...current,
+        projects,
+        defaultProjectId: current.defaultProjectId ?? existing?.id ?? validated.id
+      });
+      return { ...state, workspacePreferences: result };
+    });
+    return result;
+  }
+
+  async removeProject(projectId: string): Promise<WorkspacePreferencesV1> {
+    let result = structuredClone(DEFAULT_WORKSPACE_PREFERENCES);
+    await this.update((state) => {
+      const current = recoverWorkspacePreferences(state.workspacePreferences);
+      const projects = current.projects.filter((item) => item.id !== projectId);
+      result = WorkspacePreferencesV1Schema.parse({
+        ...current,
+        projects,
+        defaultProjectId: current.defaultProjectId === projectId ? projects[0]?.id : current.defaultProjectId
+      });
+      return { ...state, workspacePreferences: result };
     });
     return result;
   }

@@ -57,4 +57,18 @@ describe("five-approach shared interface system", () => {
     expect(source).toContain('event.key === "Escape"');
     expect(source).toContain('event.metaKey || event.ctrlKey');
   });
+
+  it("provides successor-native onboarding, managed settings, and folder selection", async () => {
+    const renderer = await readFile("src/renderer.tsx", "utf8");
+    const main = await readFile("src/main.ts", "utf8");
+    const store = await readFile("src/persistence/local-store.ts", "utf8");
+    for (const feature of [
+      "OnboardingOverlay", "Projects and worktrees", "New session defaults",
+      "Session groups", "Compatibility diagnostics", "chooseProject"
+    ]) expect(renderer).toContain(feature);
+    expect(main).toContain('properties: ["openDirectory", "createDirectory"]');
+    expect(main).toContain("getCompatibilityDiagnostics");
+    expect(store).toContain("workspacePreferences");
+    expect(store).not.toContain("prototype");
+  });
 });

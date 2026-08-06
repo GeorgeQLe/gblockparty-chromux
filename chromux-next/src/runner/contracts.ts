@@ -98,6 +98,21 @@ export const ModelOptionV1Schema = z.object({
 });
 export type ModelOptionV1 = z.infer<typeof ModelOptionV1Schema>;
 
+export const CompatibilityDiagnosticsV1Schema = z.object({
+  schemaVersion: z.literal(1),
+  generatedAt: Timestamp,
+  appVersion: z.string().min(1).max(64),
+  platform: z.string().min(1).max(64),
+  stateScope: z.literal("successor-only"),
+  checks: z.array(z.object({
+    id: Id,
+    label: z.string().min(1).max(128),
+    status: z.enum(["pass", "warn", "fail"]),
+    detail: z.string().min(1).max(2048)
+  })).max(20)
+});
+export type CompatibilityDiagnosticsV1 = z.infer<typeof CompatibilityDiagnosticsV1Schema>;
+
 export const AttentionSourceV1Schema = z.object({
   id: Id,
   sessionId: Id.optional(),

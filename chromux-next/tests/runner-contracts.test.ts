@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   PendingInteractionV1Schema,
   RunnerEventV1Schema,
-  RunnerSessionV1Schema
+  RunnerSessionV1Schema,
+  CompatibilityDiagnosticsV1Schema
 } from "../src/runner/contracts";
 import { compareVersions } from "../src/runner/protocol";
 import { permissionParams } from "../src/runner/manager";
@@ -70,5 +71,17 @@ describe("runner contracts and compatibility", () => {
       rawMethod: "item/commandExecution/requestApproval"
     });
     expect(interaction.offeredDecisions).not.toContain("accept-amendment");
+  });
+
+  it("bounds and labels successor-only compatibility diagnostics", () => {
+    const diagnostics = CompatibilityDiagnosticsV1Schema.parse({
+      schemaVersion: 1,
+      generatedAt: "2026-08-06T12:00:00.000Z",
+      appVersion: "0.5.0",
+      platform: "darwin arm64",
+      stateScope: "successor-only",
+      checks: [{ id: "codex-cli", label: "Codex CLI", status: "pass", detail: "0.146.0" }]
+    });
+    expect(diagnostics.stateScope).toBe("successor-only");
   });
 });

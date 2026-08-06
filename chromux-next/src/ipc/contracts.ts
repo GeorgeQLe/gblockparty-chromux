@@ -12,10 +12,15 @@ import {
   DraftInputSchema,
   GroupMutationInputSchema,
   RunnerStateV1Schema,
+  CompatibilityDiagnosticsV1Schema,
   TriageInputSchema,
   TurnInputSchema
 } from "../runner/contracts";
 import { UiPreferencesPatchV1Schema, UiPreferencesV1Schema } from "../settings/ui-preferences";
+import {
+  WorkspacePreferencesPatchV1Schema,
+  WorkspacePreferencesV1Schema
+} from "../settings/workspace-preferences";
 
 export const IpcChannels = {
   documentOpen: "document:open",
@@ -44,6 +49,12 @@ export const IpcChannels = {
   ,settingsGetUiPreferences: "settings:get-ui-preferences"
   ,settingsUpdateUiPreferences: "settings:update-ui-preferences"
   ,settingsUiPreferencesChanged: "settings:ui-preferences-changed"
+  ,settingsGetWorkspacePreferences: "settings:get-workspace-preferences"
+  ,settingsUpdateWorkspacePreferences: "settings:update-workspace-preferences"
+  ,settingsWorkspacePreferencesChanged: "settings:workspace-preferences-changed"
+  ,settingsChooseProject: "settings:choose-project"
+  ,settingsRemoveProject: "settings:remove-project"
+  ,settingsCompatibilityDiagnostics: "settings:compatibility-diagnostics"
 } as const;
 
 export const DocumentPayloadSchema = z.object({
@@ -90,6 +101,9 @@ export {
   RunnerStateV1Schema,
   TriageInputSchema,
   TurnInputSchema
+  ,CompatibilityDiagnosticsV1Schema
   ,UiPreferencesPatchV1Schema
   ,UiPreferencesV1Schema
+  ,WorkspacePreferencesPatchV1Schema
+  ,WorkspacePreferencesV1Schema
 };

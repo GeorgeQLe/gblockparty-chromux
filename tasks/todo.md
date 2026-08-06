@@ -27,10 +27,13 @@ No active priority documentation items.
   subprocess integration matrix, approval wire-response coverage, packaged
   two-session restoration smoke, v0.4.1 release documentation)_
 
-- [ ] Add successor-native project onboarding and settings for project/worktree
+- [x] Add successor-native project onboarding and settings for project/worktree
   selection, default model/reasoning/permission preferences, group management,
   and compatibility diagnostics without importing or mutating legacy state.
-  _(replacement-editor usability; successor scope: `chromux-next/`)_
+  _(replacement-editor usability; successor scope: `chromux-next/`; evidence:
+  native folder onboarding, validated successor-only project/default
+  persistence, managed session picker and groups, redacted live compatibility
+  checks, recovery/concurrency coverage, v0.5.0 prerelease documentation)_
 
 - [ ] Define and pass the Chromux Next cutover gates: macOS daily-driver and
   clean-install evidence, Windows/Linux packages, signed/update-channel

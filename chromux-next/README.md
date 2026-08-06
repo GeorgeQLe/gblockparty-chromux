@@ -5,10 +5,18 @@ separate Electron app from legacy Chromux in `../prototype/`: it has a distinct
 package, bundle identifier, user-data directory, architecture, and release
 line.
 
-## Current prerelease: v0.4.1
+## Current prerelease: v0.5.0
 
 This runner-first prerelease includes:
 
+- First-run successor-native onboarding with a native project/worktree folder
+  chooser, a persisted project registry, and editable default permission,
+  model, and reasoning preferences for new sessions.
+- Expanded Settings for project/default management, custom and project group
+  administration, appearance, and live CLI/app-server/authentication/model
+  compatibility diagnostics. All onboarding and preference data remains in
+  the independent Chromux Next user-data directory; no legacy state is read,
+  imported, or changed.
 - A hardened incremental app-server JSONL transport with deterministic
   fragmented-message handling, 1 MiB framing limits, fail-closed protocol
   validation, bounded 1/2/5-second recovery, and awaited TERM/KILL shutdown.

@@ -1,5 +1,6 @@
 import path from "node:path";
-import { mkdir, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { mkdir, realpath, stat, writeFile } from "node:fs/promises";
 import {
   app,
   BrowserWindow,
@@ -26,6 +27,7 @@ import {
   TriageInputSchema,
   TurnInputSchema
   ,UiPreferencesPatchV1Schema
+  ,WorkspacePreferencesPatchV1Schema
 } from "./ipc/contracts";
 import { DocumentStore } from "./persistence/document-store";
 import { CodexProvider } from "./providers/codex-provider";
@@ -176,7 +178,64 @@ function createWindow(): void {
   if (visualSmokeDirectory) {
     mainWindow.webContents.once("did-finish-load", async () => {
       try {
+        const visualWindow = mainWindow;
+        if (!visualWindow || visualWindow.isDestroyed()) throw new Error("Visual window is unavailable");
         await mkdir(visualSmokeDirectory, { recursive: true });
+        await new Promise((resolve) => setTimeout(resolve, 180));
+        const onboardingVisible = await visualWindow.webContents.executeJavaScript(
+          "Boolean(document.querySelector('.onboarding-modal'))"
+        );
+        if (!onboardingVisible) throw new Error("Successor onboarding was not visible");
+        await writeFile(
+          path.join(visualSmokeDirectory, "onboarding-standard.png"),
+          (await visualWindow.webContents.capturePage()).toPNG()
+        );
+        const visualProjectAt = new Date().toISOString();
+        await localStore.addProject({
+          schemaVersion: 1,
+          id: "visual-project",
+          name: "chromux-next-long-project-name",
+          path: "/Users/example/Projects/chromux-next-long-project-name",
+          kind: "worktree",
+          addedAt: visualProjectAt,
+          lastUsedAt: visualProjectAt
+        });
+        const workspacePreferences = await localStore.updateWorkspacePreferences({
+          onboardingComplete: true,
+          defaultProjectId: "visual-project",
+          defaultPermissionPreset: "workspace"
+        });
+        visualWindow.webContents.send(IpcChannels.settingsWorkspacePreferencesChanged, workspacePreferences);
+        await visualWindow.webContents.executeJavaScript(`(() => {
+          const button = document.querySelector('[aria-label="Open Settings"]');
+          if (!button) throw new Error("Settings button was not found");
+          button.click();
+        })()`);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        await writeFile(
+          path.join(visualSmokeDirectory, "settings-projects-standard.png"),
+          (await visualWindow.webContents.capturePage()).toPNG()
+        );
+        const diagnosticsDeadline = Date.now() + 3_000;
+        while (Date.now() < diagnosticsDeadline) {
+          const diagnostics = runner.getCompatibilityDiagnostics(app.getVersion(), `${process.platform} ${process.arch}`);
+          if (diagnostics.checks.find((check) => check.id === "app-server")?.status === "pass") break;
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        await visualWindow.webContents.executeJavaScript(`(() => {
+          const button = [...document.querySelectorAll('.settings-tabs button')]
+            .find((item) => item.textContent === 'diagnostics');
+          if (!button) throw new Error("Diagnostics tab was not found");
+          button.click();
+        })()`);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        await writeFile(
+          path.join(visualSmokeDirectory, "settings-diagnostics-standard.png"),
+          (await visualWindow.webContents.capturePage()).toPNG()
+        );
+        await visualWindow.webContents.executeJavaScript(
+          "document.querySelector('[aria-label=\"Close Settings\"]')?.click()"
+        );
         const approaches = ["control-room", "ide-workbench", "focus-studio", "mission-board", "spatial-canvas"] as const;
         const sizes = [{ name: "standard", width: 1440, height: 900 }, { name: "narrow", width: 820, height: 720 }];
         for (const approach of approaches) {
@@ -215,7 +274,7 @@ function createWindow(): void {
             await writeFile(path.join(visualSmokeDirectory, `${approach}-${size.name}.png`), image.toPNG());
           }
         }
-        console.log(`Chromux Next visual qualification captured ${approaches.length * sizes.length} views`);
+        console.log(`Chromux Next visual qualification captured ${approaches.length * sizes.length + 3} views`);
       } catch (error) {
         process.exitCode = 1;
         console.error("Chromux Next visual qualification failed:", error instanceof Error ? error.message : String(error));
@@ -371,6 +430,57 @@ function registerIpc(): void {
     }
     return preferences;
   });
+  const broadcastWorkspacePreferences = (preferences: Awaited<ReturnType<LocalStore["getWorkspacePreferences"]>>) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) {
+        window.webContents.send(IpcChannels.settingsWorkspacePreferencesChanged, preferences);
+      }
+    }
+  };
+  ipcMain.handle(IpcChannels.settingsGetWorkspacePreferences, () => localStore.getWorkspacePreferences());
+  ipcMain.handle(IpcChannels.settingsUpdateWorkspacePreferences, async (_event, input: unknown) => {
+    const preferences = await localStore.updateWorkspacePreferences(
+      WorkspacePreferencesPatchV1Schema.parse(input)
+    );
+    broadcastWorkspacePreferences(preferences);
+    return preferences;
+  });
+  ipcMain.handle(IpcChannels.settingsChooseProject, async () => {
+    const result = await dialog.showOpenDialog({
+      title: "Add a project or worktree",
+      buttonLabel: "Add to Chromux Next",
+      properties: ["openDirectory", "createDirectory"]
+    });
+    const selectedPath = result.filePaths[0];
+    if (result.canceled || !selectedPath) return null;
+    const canonicalPath = await realpath(selectedPath);
+    let kind: "project" | "worktree" = "project";
+    try {
+      if ((await stat(path.join(canonicalPath, ".git"))).isFile()) kind = "worktree";
+    } catch {
+      // Non-Git folders remain valid projects.
+    }
+    const now = new Date().toISOString();
+    const preferences = await localStore.addProject({
+      schemaVersion: 1,
+      id: randomUUID(),
+      name: path.basename(canonicalPath) || canonicalPath,
+      path: canonicalPath,
+      kind,
+      addedAt: now,
+      lastUsedAt: now
+    });
+    broadcastWorkspacePreferences(preferences);
+    return preferences;
+  });
+  ipcMain.handle(IpcChannels.settingsRemoveProject, async (_event, input: unknown) => {
+    if (typeof input !== "string") throw new Error("Invalid project id");
+    const preferences = await localStore.removeProject(input);
+    broadcastWorkspacePreferences(preferences);
+    return preferences;
+  });
+  ipcMain.handle(IpcChannels.settingsCompatibilityDiagnostics, () =>
+    runner.getCompatibilityDiagnostics(app.getVersion(), `${process.platform} ${process.arch}`));
   runner.on("state", (state) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send(IpcChannels.runnerStateChanged, state);

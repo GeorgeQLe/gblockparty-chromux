@@ -4,6 +4,10 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["tests/**/*.test.ts"],
+    // Subprocess compatibility fixtures use intentionally tight deadlines.
+    // Run files serially so host CPU contention cannot turn protocol evidence
+    // into unrelated timeout failures.
+    fileParallelism: false,
     coverage: {
       reporter: ["text", "html"]
     }

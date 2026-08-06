@@ -7,11 +7,16 @@ import type {
 } from "../domain/schema";
 import type {
   AttentionAnalysisV1,
+  CompatibilityDiagnosticsV1,
   ModelOptionV1,
   RunnerSessionV1,
   RunnerStateV1
 } from "../runner/contracts";
 import type { UiPreferencesPatchV1, UiPreferencesV1 } from "../settings/ui-preferences";
+import type {
+  WorkspacePreferencesPatchV1,
+  WorkspacePreferencesV1
+} from "../settings/workspace-preferences";
 
 export interface DocumentPayload {
   filePath: string;
@@ -81,6 +86,12 @@ export interface ChromuxNextApi {
     getUiPreferences(): Promise<UiPreferencesV1>;
     updateUiPreferences(patch: UiPreferencesPatchV1): Promise<UiPreferencesV1>;
     onUiPreferencesChanged(listener: (preferences: UiPreferencesV1) => void): () => void;
+    getWorkspacePreferences(): Promise<WorkspacePreferencesV1>;
+    updateWorkspacePreferences(patch: WorkspacePreferencesPatchV1): Promise<WorkspacePreferencesV1>;
+    chooseProject(): Promise<WorkspacePreferencesV1 | null>;
+    removeProject(projectId: string): Promise<WorkspacePreferencesV1>;
+    compatibilityDiagnostics(): Promise<CompatibilityDiagnosticsV1>;
+    onWorkspacePreferencesChanged(listener: (preferences: WorkspacePreferencesV1) => void): () => void;
   };
 }
 
