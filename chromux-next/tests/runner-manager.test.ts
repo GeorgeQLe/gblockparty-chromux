@@ -14,6 +14,9 @@ class FakeServer extends EventEmitter implements AppServerTransport {
   thread = 0;
   turn = 0;
   failResume = new Set<string>();
+  failStart = false;
+  listedThreads: any[] = [];
+  threadReads = new Map<string, any>();
   async start() {}
   async stop() {}
   async request(method: string, params: any): Promise<any> {
@@ -28,7 +31,12 @@ class FakeServer extends EventEmitter implements AppServerTransport {
         supportedReasoningEfforts: [{ reasoningEffort: "low" }, { reasoningEffort: "medium" }]
       }]
     };
-    if (method === "thread/start") return { thread: { id: `thread-${++this.thread}` } };
+    if (method === "thread/start") {
+      if (this.failStart) throw new Error("start failed");
+      return { thread: { id: `thread-${++this.thread}` } };
+    }
+    if (method === "thread/list") return { data: this.listedThreads };
+    if (method === "thread/read") return this.threadReads.get(params.threadId) ?? {};
     if (method === "turn/start") return { turn: { id: `turn-${++this.turn}` } };
     if (method === "thread/resume" && this.failResume.has(params.threadId)) throw new Error("resume failed");
     return {};
@@ -63,6 +71,95 @@ describe("runner manager", () => {
     expect(server.requests.filter((request) => request.method === "turn/start")).toHaveLength(1);
     expect(server.requests.filter((request) => request.method === "turn/steer")).toHaveLength(1);
     expect(server.requests.find((request) => request.method === "turn/steer")?.params.expectedTurnId).toBe("turn-1");
+    await manager.closeSession(second.id);
+    await expect(manager.select(second.groupId, second.id)).rejects.toThrow("Closed sessions");
+    await manager.shutdown();
+  });
+
+  it("enriches only exact-cwd Codex rows and marks already-open threads", async () => {
+    const { manager, server } = await setup();
+    const canonicalTmp = await (await import("node:fs/promises")).realpath("/tmp");
+    const open = await manager.createSession({ projectPath: canonicalTmp, title: "Open" });
+    server.listedThreads = [
+      { id: open.threadId, cwd: canonicalTmp, updatedAt: "2026-08-06T12:00:00.000Z" },
+      { id: "other", cwd: "/private", type: "agentMessage", text: "wrong folder" }
+    ];
+    server.threadReads.set(open.threadId!, {
+      thread: {
+        turns: [{ items: [{ type: "agentMessage", content: [{ type: "text", text: `${"x".repeat(3_000)}\u0000` }] }] }]
+      }
+    });
+    const rows = await manager.enrichDetection([{
+      pid: 10, ppid: 1, tty: "ttys001", command: "codex", args: "codex",
+      cwd: canonicalTmp, terminal: "Terminal", agent: "codex"
+    }, {
+      pid: 11, ppid: 1, tty: "ttys002", command: "claude", args: "claude",
+      cwd: canonicalTmp, terminal: "Terminal", agent: "claude"
+    }]);
+    expect(rows[0]).toMatchObject({
+      threadId: open.threadId,
+      alreadyOpenSessionId: open.id,
+      resumePreview: "x".repeat(2048)
+    });
+    expect(rows[0]?.resumePreview).toHaveLength(2048);
+    expect(rows[1]?.threadId).toBeUndefined();
+    server.requests = [];
+    await manager.enrichDetection(Array.from({ length: 25 }, (_, index) => ({
+      pid: 100 + index,
+      ppid: 1,
+      tty: `ttys${index}`,
+      command: "codex",
+      args: "codex",
+      cwd: canonicalTmp,
+      terminal: "Terminal" as const,
+      agent: "codex" as const
+    })));
+    expect(server.requests.filter((request) => request.method === "thread/read")).toHaveLength(20);
+    await manager.shutdown();
+  });
+
+  it("creates detected sessions transactionally and leaves no partial state on failure", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "chromux-next-detected-"));
+    const server = new FakeServer();
+    const store = new LocalStore(directory);
+    const manager = new RunnerManager(server, store, new LunaAnalyzer(directory, "missing-codex"));
+    await manager.initialize();
+    const canonicalTmp = await (await import("node:fs/promises")).realpath("/tmp");
+    server.failStart = true;
+    await expect(manager.createDetectedSession({
+      cwd: canonicalTmp,
+      mode: "fresh",
+      title: "Failed",
+      permissionPreset: "workspace"
+    })).rejects.toThrow("start failed");
+    expect(manager.getState().sessions).toHaveLength(0);
+    expect(manager.getState().groups).toHaveLength(0);
+    expect((await store.getWorkspacePreferences()).projects).toHaveLength(0);
+
+    server.failStart = false;
+    const created = await manager.createDetectedSession({
+      cwd: canonicalTmp,
+      mode: "resume",
+      threadId: "saved-thread",
+      title: "Resumed",
+      permissionPreset: "read-only"
+    });
+    expect(created.session).toMatchObject({ threadId: "saved-thread", status: "idle" });
+    expect((await store.getWorkspacePreferences()).projects[0]?.path).toBe(canonicalTmp);
+    expect(server.requests).toContainEqual({
+      method: "thread/resume",
+      params: expect.objectContaining({ threadId: "saved-thread", cwd: canonicalTmp })
+    });
+
+    const fresh = await manager.createDetectedSession({
+      cwd: canonicalTmp,
+      mode: "fresh",
+      threadId: "saved-thread",
+      title: "Actually fresh",
+      permissionPreset: "workspace"
+    });
+    expect(fresh.session.threadId).not.toBe("saved-thread");
+    expect(server.requests.filter((request) => request.method === "thread/start")).toHaveLength(2);
     await manager.shutdown();
   });
 

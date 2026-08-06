@@ -1,5 +1,34 @@
 # Release Notes
 
+## GBlockParty Chromux Next v0.7.0 (prerelease)
+
+Tag: `chromux-next-v0.7.0`
+
+- Make DETECT the first-launch experience: automatically scan open macOS
+  Terminal and iTerm tabs for shell, Claude, Codex, and Grok workspaces while
+  leaving every external process untouched.
+- Use bounded `ps`/`lsof` inspection plus optional Automation tab metadata,
+  excluding Chromux descendants, sanitizing renderer-visible text, tolerating
+  exited processes, timeouts, and title denial, and retaining scan authority
+  only in a short-lived main-process cache.
+- Enrich exact-directory Codex rows through the existing app-server with
+  bounded previews and Resume availability; mark already-open threads for
+  Focus Existing instead of creating duplicates.
+- Add strict detect/create IPC schemas whose creation input contains only
+  opaque scan and target IDs plus user configuration—never a
+  renderer-supplied cwd or thread ID.
+- Add a transactional fresh/resume path that registers the detected folder
+  and persists the successful session together, leaving no partial state and
+  not completing onboarding after validation, start, resume, or persistence
+  failure.
+- Add searchable scanning, populated, empty, denied-title, failed, and
+  configuration states; retain Choose Folder and Continue Without Session
+  fallbacks; warn that resuming an active external Codex thread creates a
+  separate continuation that may diverge.
+- Keep DETECT permanently available beside Settings and New Session, preserve
+  all five layouts and runner/Alignment behavior, and expand packaged visual
+  qualification from 20 to 26 captures.
+
 ## GBlockParty Chromux Next v0.6.0 (prerelease)
 
 Tag: `chromux-next-v0.6.0`

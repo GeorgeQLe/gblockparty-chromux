@@ -18,6 +18,7 @@ import {
   MessagesSquare,
   PanelTop,
   Plus,
+  RefreshCw,
   Search,
   Send,
   Settings,
@@ -34,6 +35,11 @@ import type {
   RunnerSessionV1,
   RunnerStateV1
 } from "./runner/contracts";
+import type {
+  CreateFromDetectionInput,
+  DetectionResultV1,
+  DetectedTerminalV1
+} from "./detection/contracts";
 import {
   DEFAULT_UI_PREFERENCES,
   type UiApproachV1,
@@ -552,6 +558,7 @@ type ShellProps = {
   setSurface(surface: CenterSurface): void;
   openSettings(): void;
   openNewSession(): void;
+  openDetect(): void;
   openGroupDialog(group?: RunnerStateV1["groups"][number]): void;
   clearError(): void;
 };
@@ -564,18 +571,20 @@ const SURFACE_ITEMS = [
   { value: "browser", label: "Browser", icon: Globe2 }
 ] satisfies Array<{ value: CenterSurface; label: string; icon: typeof TerminalSquare }>;
 
-function Brand({ approach, surface, setSurface, openSettings, openNewSession }: {
+function Brand({ approach, surface, setSurface, openSettings, openNewSession, openDetect }: {
   approach: UiApproachV1;
   surface: CenterSurface;
   setSurface(value: CenterSurface): void;
   openSettings(): void;
   openNewSession(): void;
+  openDetect(): void;
 }) {
   return <header className="shell-brand">
     <div className="brand"><img src="./mark.svg" alt="" /><div><span>{approach.replaceAll("-", " ")}</span><h1>Chromux Next</h1></div></div>
     <SurfaceTabs surface={surface} setSurface={setSurface} />
     <div className="brand-actions">
       <Button className="settings-button" icon={Settings} tone="quiet" aria-label="Open Settings" onClick={openSettings}>Settings</Button>
+      <Button className="detect-button" icon={Search} tone="quiet" onClick={openDetect}>Detect</Button>
       <Button className="new-session" icon={Plus} tone="primary" onClick={openNewSession}>New Session</Button>
     </div>
   </header>;
@@ -818,19 +827,126 @@ function SettingsOverlay({
   </div></div>;
 }
 
-function OnboardingOverlay({ workspace, models, chooseProject, update, done }: { workspace: WorkspacePreferencesV1; models: ModelOptionV1[]; chooseProject(): void; update(patch: WorkspacePreferencesPatchV1): void; done(): void }) {
-  const selectedModel = models.find((model) => model.id === workspace.defaultModel) ?? models.find((model) => model.recommended) ?? models[0];
+function DetectionDialog({
+  onboarding,
+  workspace,
+  models,
+  state,
+  chooseProject,
+  close,
+  complete,
+  fail
+}: {
+  onboarding: boolean;
+  workspace: WorkspacePreferencesV1;
+  models: ModelOptionV1[];
+  state: RunnerStateV1;
+  chooseProject(): void;
+  close(): void;
+  complete(): void;
+  fail(reason: unknown): void;
+}) {
+  const [result, setResult] = useState<DetectionResultV1>();
+  const [loading, setLoading] = useState(true);
+  const [scanError, setScanError] = useState("");
+  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState<DetectedTerminalV1>();
+  const [mode, setMode] = useState<CreateFromDetectionInput["mode"]>("fresh");
+  const recommended = models.find((model) => model.id === workspace.defaultModel)
+    ?? models.find((model) => model.recommended) ?? models[0];
+  const [title, setTitle] = useState("");
+  const [permission, setPermission] = useState<"workspace" | "read-only">(workspace.defaultPermissionPreset);
+  const [model, setModel] = useState(recommended?.id ?? "");
+  const [effort, setEffort] = useState(workspace.defaultReasoningEffort ?? recommended?.defaultReasoningEffort ?? "");
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
+
+  const scan = () => {
+    setLoading(true);
+    setScanError("");
+    setResult(undefined);
+    setSelected(undefined);
+    void window.chromuxNext.runner.detectExternal()
+      .then(setResult)
+      .catch((reason) => setScanError(String(reason)))
+      .finally(() => setLoading(false));
+  };
+  useEffect(scan, []);
+  const rows = (result?.rows ?? []).filter((row) =>
+    `${row.title ?? ""} ${row.directory} ${row.agent} ${row.command}`.toLowerCase().includes(query.toLowerCase())
+  );
+  const pick = (row: DetectedTerminalV1, nextMode: CreateFromDetectionInput["mode"]) => {
+    if (row.alreadyOpenSessionId) {
+      const session = state.sessions.find((item) => item.id === row.alreadyOpenSessionId);
+      if (session) {
+        void window.chromuxNext.runner.select(session.groupId, session.id)
+          .then(complete)
+          .catch((reason) => {
+            setScanError(String(reason));
+            fail(reason);
+          });
+        return;
+      }
+    }
+    setSelected(row);
+    setMode(nextMode);
+    setTitle(row.title || `${nextMode === "resume" ? "Resume" : "Codex"} · ${row.directory.split("/").at(-1) || "session"}`);
+  };
+  const create = () => {
+    if (!result || !selected || !title.trim()) return;
+    setCreating(true);
+    setCreateError("");
+    void window.chromuxNext.runner.createFromDetection({
+      scanId: result.scanId,
+      targetId: selected.targetId,
+      mode,
+      title: title.trim(),
+      permissionPreset: permission,
+      ...(model ? { model } : {}),
+      ...(effort ? { reasoningEffort: effort } : {})
+    }).then(() => complete()).catch((reason) => {
+      fail(reason);
+      setCreateError(String(reason));
+      setCreating(false);
+    });
+  };
+
   return <Dialog
-    title="Set up Chromux Next"
-    eyebrow="Welcome to the successor"
-    description="Choose a project or Git worktree and defaults for new Codex sessions. This setup uses only Chromux Next storage and does not import or modify legacy Chromux state."
-    close={() => undefined}
-    dismissible={false}
-    className="onboarding-modal"
-    footer={<><small>Requires Codex CLI 0.146.0 or newer.</small><Button icon={Check} tone="primary" onClick={done}>Enter Chromux Next</Button></>}
+    title={selected ? "Configure detected session" : onboarding ? "Find your work" : "Detect terminal sessions"}
+    eyebrow={onboarding ? "Welcome · DETECT first" : "DETECT"}
+    description={selected
+      ? `Start Codex in ${selected.directory}. The original ${selected.terminal} process remains untouched.`
+      : "Scan open macOS terminal tabs for agents and working folders. Detection never attaches to, types into, or stops those processes."}
+    close={close}
+    dismissible={!onboarding}
+    className="detection-modal onboarding-modal"
+    footer={selected
+      ? <><Button tone="quiet" onClick={() => setSelected(undefined)}>Back</Button><Button icon={CirclePlus} tone="primary" disabled={creating || !title.trim() || !models.length} onClick={create}>{creating ? "Creating…" : mode === "resume" ? "Resume in Chromux" : "Start fresh"}</Button></>
+      : <><div className="detection-fallbacks"><Button icon={FolderPlus} tone="quiet" onClick={chooseProject}>Choose Folder</Button>{onboarding && <Button tone="quiet" onClick={complete}>Continue Without Session</Button>}</div><Button icon={RefreshCw} onClick={scan} disabled={loading}>Rescan</Button></>}
   >
-    <div className="onboarding-step"><b>1</b><div><h3>Add your first folder</h3><p>{workspace.projects.length ? `${workspace.projects.length} folder${workspace.projects.length === 1 ? "" : "s"} ready.` : "You can also continue and add one later from Settings."}</p></div><Button icon={FolderPlus} tone="primary" onClick={chooseProject}>Choose folder</Button></div>
-    <div className="onboarding-step"><b>2</b><div><h3>Session defaults</h3><div className="modal-grid"><label>Permissions<select value={workspace.defaultPermissionPreset} onChange={(event) => update({ defaultPermissionPreset: event.target.value as "workspace" | "read-only" })}><option value="workspace">Workspace</option><option value="read-only">Read only</option></select></label><label>Model<select value={workspace.defaultModel ?? selectedModel?.id ?? ""} onChange={(event) => update({ defaultModel: event.target.value || null })}><option value="">Recommended</option>{models.map((model) => <option value={model.id} key={model.id}>{model.displayName}</option>)}</select></label><label>Reasoning<select value={workspace.defaultReasoningEffort ?? selectedModel?.defaultReasoningEffort ?? ""} onChange={(event) => update({ defaultReasoningEffort: event.target.value || null })}><option value="">Model default</option>{selectedModel?.reasoningEfforts.map((effort) => <option key={effort}>{effort}</option>)}</select></label></div></div></div>
+    {selected ? <form className="session-form detection-config" onSubmit={(event) => { event.preventDefault(); create(); }}>
+      <div className="detected-summary"><Badge tone="sage">{selected.agent}</Badge><strong>{selected.title || selected.command}</strong><small>{selected.directory}</small></div>
+      {mode === "resume" && selected.externalActive && <p className="detection-warning"><AlertTriangle size={16} aria-hidden="true" /> Resume creates a separate Chromux Next continuation. The external Codex process stays active, so the two continuations may diverge.</p>}
+      {createError && <p className="detection-error" role="alert"><AlertTriangle size={16} aria-hidden="true" /> {createError}</p>}
+      <label>Session title<input autoFocus maxLength={256} value={title} onChange={(event) => setTitle(event.target.value)} /></label>
+      <div className="modal-grid">
+        <label>Permissions<select value={permission} onChange={(event) => setPermission(event.target.value as "workspace" | "read-only")}><option value="workspace">Workspace</option><option value="read-only">Read only</option></select></label>
+        <label>Model<select value={model} onChange={(event) => { setModel(event.target.value); setEffort(models.find((item) => item.id === event.target.value)?.defaultReasoningEffort ?? ""); }}><option value="">Recommended</option>{models.map((item) => <option value={item.id} key={item.id}>{item.displayName}</option>)}</select></label>
+        <label>Reasoning<select value={effort} onChange={(event) => setEffort(event.target.value)}><option value="">Model default</option>{(models.find((item) => item.id === model)?.reasoningEfforts ?? recommended?.reasoningEfforts ?? []).map((item) => <option key={item}>{item}</option>)}</select></label>
+      </div>
+    </form> : <div className="detection-results">
+      {loading && <EmptyState icon={Search} title="Scanning open terminal tabs…" description="macOS may ask for Terminal or iTerm Automation access so Chromux can show tab names." />}
+      {!loading && scanError && <EmptyState icon={AlertTriangle} title="Detection failed" description={scanError} action={<Button icon={RefreshCw} onClick={scan}>Try again</Button>} />}
+      {!loading && !scanError && result?.titlePermission === "denied" && <p className="permission-notice"><AlertTriangle size={16} aria-hidden="true" /> Tab-name access was denied. Process, agent, and folder detection still works; only tab names are unavailable.</p>}
+      {!loading && !scanError && result && <label className="detection-search"><Search size={16} aria-hidden="true" /><input aria-label="Search detected terminals" placeholder="Search folders, agents, or tab names" value={query} onChange={(event) => setQuery(event.target.value)} /></label>}
+      {!loading && !scanError && result && !rows.length && <EmptyState icon={TerminalSquare} title={query ? "No matching terminals" : "No terminal work found"} description={query ? "Try a different search." : "Open a terminal in a project, rescan, choose a folder, or continue without a session."} />}
+      {!loading && !!rows.length && <div className="detected-list" role="list">{rows.map((row) => <article key={row.targetId} role="listitem">
+        <div className="detected-row-copy"><div><Badge {...(row.agent === "codex" ? { tone: "sage" as const } : {})}>{row.agent}</Badge><strong>{row.title || row.command}</strong>{row.alreadyOpenSessionId && <Badge tone="success">Open</Badge>}</div><small>{row.terminal} · {row.directory}</small>{row.resumePreview && <p>{row.resumePreview}</p>}</div>
+        <div className="detected-actions">{row.alreadyOpenSessionId
+          ? <Button tone="primary" onClick={() => pick(row, "resume")}>Focus Existing</Button>
+          : <><Button disabled={!row.resumeAvailable} onClick={() => pick(row, "resume")}>Resume</Button><Button tone="primary" onClick={() => pick(row, "fresh")}>Start Fresh</Button></>}</div>
+      </article>)}</div>}
+    </div>}
   </Dialog>;
 }
 
@@ -888,6 +1004,7 @@ function App() {
   const [error, setError] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [newSessionOpen, setNewSessionOpen] = useState(false);
+  const [detectOpen, setDetectOpen] = useState(false);
   const [groupDialog, setGroupDialog] = useState<{ open: boolean; group?: RunnerStateV1["groups"][number] }>({ open: false });
   const [alignmentDocument, setAlignmentDocument] = useState<AlignmentDocumentV1>(() => structuredClone(sampleDocument));
   const alignmentDocumentRef = useRef(alignmentDocument);
@@ -1096,13 +1213,14 @@ function App() {
     setSettingsOpen(false);
     setGroupDialog({ open: true, ...(group ? { group } : {}) });
   };
-  const shellProps: ShellProps = { state, models, surface, selectedSession, error, alignment, setSurface, openSettings: () => setSettingsOpen(true), openNewSession: () => setNewSessionOpen(true), openGroupDialog, clearError: () => setError("") };
+  const shellProps: ShellProps = { state, models, surface, selectedSession, error, alignment, setSurface, openSettings: () => setSettingsOpen(true), openNewSession: () => setNewSessionOpen(true), openDetect: () => setDetectOpen(true), openGroupDialog, clearError: () => setError("") };
   return <div className={`app-root density-${preferences.density} motion-${preferences.motion}`} data-approach={preferences.approach}>
     <UnifiedApproachShell approach={preferences.approach} {...shellProps} />
     {settingsOpen && <SettingsOverlay preferences={preferences} workspace={workspacePreferences} models={models} state={state} update={updatePreferences} updateWorkspace={updateWorkspacePreferences} chooseProject={chooseProject} removeProject={removeProject} openGroupDialog={openGroupDialog} close={() => setSettingsOpen(false)} />}
     {newSessionOpen && <NewSessionDialog models={models} workspace={workspacePreferences} selectedSession={selectedSession} selectedGroupId={state.groups.find((group) => group.id === selectedSession?.groupId)?.kind === "custom" ? selectedSession?.groupId : undefined} chooseProject={chooseProject} close={() => setNewSessionOpen(false)} created={() => { setNewSessionOpen(false); setSurface("runner"); }} fail={(reason) => setError(String(reason))} />}
+    {detectOpen && workspacePreferences.onboardingComplete && <DetectionDialog onboarding={false} workspace={workspacePreferences} models={models} state={state} chooseProject={chooseProject} close={() => setDetectOpen(false)} complete={() => { setDetectOpen(false); setSurface("runner"); }} fail={(reason) => setError(String(reason))} />}
     {groupDialog.open && <GroupDialog {...(groupDialog.group ? { group: groupDialog.group } : {})} close={() => setGroupDialog({ open: false })} />}
-    {settingsReady && !workspacePreferences.onboardingComplete && <OnboardingOverlay workspace={workspacePreferences} models={models} chooseProject={chooseProject} update={updateWorkspacePreferences} done={() => updateWorkspacePreferences({ onboardingComplete: true })} />}
+    {settingsReady && !workspacePreferences.onboardingComplete && <DetectionDialog onboarding workspace={workspacePreferences} models={models} state={state} chooseProject={chooseProject} close={() => undefined} complete={() => { updateWorkspacePreferences({ onboardingComplete: true }); setSurface("runner"); }} fail={(reason) => setError(String(reason))} />}
   </div>;
 }
 

@@ -88,7 +88,7 @@ const exitCode = await new Promise((resolve, reject) => {
   child.once("exit", resolve);
 });
 clearTimeout(timeout);
-if (exitCode !== 0 || !output.includes("visual qualification captured 20 views")) {
+if (exitCode !== 0 || !output.includes("visual qualification captured 26 views")) {
   throw new Error(`Packaged visual qualification failed (${exitCode}): ${output.slice(-4_000)}`);
 }
 const restart = spawn(executable, ["--smoke"], {

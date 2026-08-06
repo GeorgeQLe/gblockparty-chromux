@@ -5,10 +5,21 @@ separate Electron app from legacy Chromux in `../prototype/`: it has a distinct
 package, bundle identifier, user-data directory, architecture, and release
 line.
 
-## Current prerelease: v0.6.0
+## Current prerelease: v0.7.0
 
 This runner-first prerelease includes:
 
+- Detect-first onboarding that automatically scans open macOS Terminal and
+  iTerm tabs for shell, Claude, Codex, and Grok workspaces without attaching
+  to or changing the original processes. DETECT remains available from the
+  product header after onboarding.
+- Exact-directory Codex thread enrichment through the existing app-server,
+  with bounded latest-agent previews, Resume, Start Fresh, and Focus Existing.
+  Renderer requests use opaque short-lived scan IDs; authoritative directories
+  and thread IDs never cross into renderer-controlled creation input.
+- Transactional detected-session creation that registers a project/worktree
+  and persists a successful fresh or resumed session together. Failed or
+  expired scans leave no partial session and do not complete onboarding.
 - A calm premium-dark interface system shared by all five layouts, with
   semantic graphite/sage tokens, comfortable and compact density, consistent
   controls and states, Lucide icons, responsive navigation, and reduced-motion
@@ -17,9 +28,9 @@ This runner-first prerelease includes:
   contextual session strip. Accessible in-app dialogs replace native prompts
   for custom-group creation and rename, with focus containment, Escape
   handling, and focus restoration.
-- Polished runner, transcript, Composer, approval, attention, onboarding,
+- Polished runner, transcript, Composer, approval, attention, detect-first onboarding,
   Settings, New Session, empty/error, and Alignment states. Packaged visual
-  qualification now reviews 20 standard and narrow captures.
+  qualification now reviews 26 standard and narrow captures.
 - First-run successor-native onboarding with a native project/worktree folder
   chooser, a persisted project registry, and editable default permission,
   model, and reasoning preferences for new sessions.

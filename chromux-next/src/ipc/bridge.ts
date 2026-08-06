@@ -17,6 +17,7 @@ import type {
   WorkspacePreferencesPatchV1,
   WorkspacePreferencesV1
 } from "../settings/workspace-preferences";
+import type { CreateFromDetectionInput, DetectionResultV1 } from "../detection/contracts";
 
 export interface DocumentPayload {
   filePath: string;
@@ -55,6 +56,8 @@ export interface ChromuxNextApi {
       model?: string;
       reasoningEffort?: string;
     }): Promise<RunnerSessionV1>;
+    detectExternal(): Promise<DetectionResultV1>;
+    createFromDetection(input: CreateFromDetectionInput): Promise<RunnerSessionV1>;
     close(sessionId: string): Promise<void>;
     send(sessionId: string, text: string): Promise<void>;
     interrupt(sessionId: string): Promise<void>;

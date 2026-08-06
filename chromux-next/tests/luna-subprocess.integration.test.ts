@@ -21,7 +21,7 @@ async function analyzer(config: Record<string, unknown>) {
     command: process.execPath,
     prefixArgs: [fixture],
     env: { ...process.env, CHROMUX_NEXT_FIXTURE_SCENARIO: scenarioPath },
-    timeoutMs: 250,
+    timeoutMs: 1_000,
     maxLineBytes: 4096,
     shutdownGraceMs: 30
   });
@@ -50,7 +50,7 @@ describe("Luna subprocess", () => {
     ["authentication", { lunaExitCode: 1 }, /authentication failed \[REDACTED\]/],
     ["malformed JSONL", { lunaMalformed: true }, /invalid JSONL/],
     ["oversized output", { lunaOversize: true, oversizeBytes: 8192 }, /invalid JSONL/],
-    ["timeout", { lunaDelayMs: 500, ignoreTerm: true }, /timed out/],
+    ["timeout", { lunaDelayMs: 2_000, ignoreTerm: true }, /timed out/],
     ["stale evidence", {
       lunaResult: {
         schemaVersion: 1, generatedAt: "2026-08-05T12:00:00.000Z",

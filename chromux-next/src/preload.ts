@@ -8,6 +8,8 @@ import {
   MutationResultSchema,
   RunnerStateV1Schema,
   CompatibilityDiagnosticsV1Schema,
+  CreateFromDetectionInputSchema,
+  DetectionResultV1Schema,
   UiPreferencesPatchV1Schema,
   UiPreferencesV1Schema
   ,WorkspacePreferencesPatchV1Schema
@@ -97,6 +99,17 @@ const api: ChromuxNextApi = {
       return RunnerSessionV1Schema.parse(await ipcRenderer.invoke(
         IpcChannels.runnerCreate,
         CreateSessionInputSchema.parse(input)
+      ));
+    },
+    async detectExternal() {
+      return DetectionResultV1Schema.parse(
+        await ipcRenderer.invoke(IpcChannels.runnerDetectExternal)
+      );
+    },
+    async createFromDetection(input) {
+      return RunnerSessionV1Schema.parse(await ipcRenderer.invoke(
+        IpcChannels.runnerCreateFromDetection,
+        CreateFromDetectionInputSchema.parse(input)
       ));
     },
     async close(sessionId) {

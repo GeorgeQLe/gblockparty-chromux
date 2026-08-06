@@ -59,6 +59,15 @@ instead of resuming the `prototype/` implementation.
 
 ## Completed Work
 
+- [x] Make DETECT the first Chromux Next experience with bounded macOS
+  Terminal/iTerm process and folder discovery, optional Automation titles,
+  exact-cwd Codex thread previews and Resume, Focus Existing, opaque transient
+  scan authority, transactional detected-session/project persistence,
+  searchable two-stage onboarding, permanent later access, 26-capture
+  packaged qualification, and v0.7.0 prerelease documentation. _(source:
+  user-supplied Chromux Next Detect-First Onboarding plan; successor-only
+  scope; external terminals and legacy state remain untouched)_
+
 - [x] Rework Chromux Next into a calm premium-dark production interface with
   semantic graphite/sage tokens, shared accessible primitives and Lucide
   icons, one global surface header, contextual session navigation, in-app

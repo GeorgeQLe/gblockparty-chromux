@@ -46,6 +46,30 @@ cross IPC. `src/persistence` owns isolated atomic app state and canonical
 document transactions. `src/ipc` is the only renderer/main contract. Existing
 `src/domain` alignment contracts remain schema-v1 compatible.
 
+## Detect-first onboarding
+
+- On macOS, the main process runs bounded `ps` and per-process `lsof` probes
+  for processes with attached ttys. It excludes the Chromux process tree, canonicalizes
+  valid working directories, sanitizes output, caps work and renderer rows,
+  and treats exited processes and command timeouts as missing observations.
+- Terminal and iTerm tab titles are optional Automation metadata. Denial is
+  reported separately and removes only titles; process, agent, and directory
+  detection continues.
+- Codex candidates are enriched only through exact-cwd `thread/list` matches
+  from the existing app-server. A bounded `thread/read` lookup supplies the
+  latest available agent preview. No legacy Chromux state is read.
+- Authoritative cwd and thread IDs remain in a two-minute main-process cache.
+  The renderer receives opaque scan/target IDs and cannot supply either value
+  to detected-session creation. A later scan replaces the prior cache.
+- Fresh creation uses `thread/start`; resume uses `thread/resume`; an already
+  open thread focuses its existing session. Successful detected creation
+  atomically persists the project/worktree registry and runner state. Failed
+  validation, start, resume, or persistence does not create a partial Chromux
+  session or complete onboarding.
+- Detection never attaches to a terminal, sends it input, interrupts it, or
+  changes its process state. Resuming an active external Codex thread creates
+  a separate continuation that may diverge.
+
 ## Runner lifecycle
 
 - The main process validates Codex CLI 0.146.0+, initializes one app-server,

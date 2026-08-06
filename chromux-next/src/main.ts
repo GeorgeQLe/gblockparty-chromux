@@ -26,6 +26,7 @@ import {
   SavePayloadSchema,
   TriageInputSchema,
   TurnInputSchema
+  ,CreateFromDetectionInputSchema
   ,UiPreferencesPatchV1Schema
   ,WorkspacePreferencesPatchV1Schema
 } from "./ipc/contracts";
@@ -37,6 +38,7 @@ import { LocalStore } from "./persistence/local-store";
 import { CodexAppServer } from "./runner/protocol";
 import { LunaAnalyzer } from "./runner/attention";
 import { RunnerManager } from "./runner/manager";
+import { ExternalTerminalDetector } from "./detection/external";
 
 if (started) app.quit();
 
@@ -66,14 +68,68 @@ const runner = new RunnerManager(
   localStore,
   new LunaAnalyzer(path.join(app.getPath("userData"), "attention-analyzer"), runnerSmokeOptions)
 );
+const detector = new ExternalTerminalDetector((rows) => runner.enrichDetection(rows));
 const running = new Map<string, AbortController>();
 const isSmoke = process.argv.includes("--smoke") || Boolean(runnerSmokePhase);
 const visualSmokeArgument = process.argv.find((argument) => argument.startsWith("--visual-smoke-dir="));
 const visualSmokeDirectory = visualSmokeArgument?.slice("--visual-smoke-dir=".length);
 const isVisualSmoke = Boolean(visualSmokeDirectory);
+type VisualDetectionMode = "scanning" | "populated" | "empty" | "denied";
+let visualDetectionMode: VisualDetectionMode = "scanning";
+let resolveVisualDetection: ((value: ReturnType<typeof visualDetectionFixture>) => void) | undefined;
 let mainWindow: BrowserWindow | null = null;
 let browserView: WebContentsView | null = null;
 let browserUrl = "";
+
+function visualDetectionFixture(mode: Exclude<VisualDetectionMode, "scanning">) {
+  const rows = mode === "empty" ? [] : [
+    {
+      schemaVersion: 1 as const,
+      targetId: "visual-codex",
+      terminal: "Terminal" as const,
+      agent: "codex" as const,
+      pid: 1201,
+      directory: "/Users/example/Projects/chromux-next-long-project-name",
+      ...(mode === "denied" ? {} : { title: "Codex · detect-first onboarding" }),
+      command: "codex",
+      externalActive: true,
+      resumeAvailable: true,
+      resumePreview: "I mapped the runner and onboarding boundaries. Ready to continue implementation.",
+      threadUpdatedAt: "2026-08-06T12:00:00.000Z"
+    },
+    {
+      schemaVersion: 1 as const,
+      targetId: "visual-claude",
+      terminal: "iTerm" as const,
+      agent: "claude" as const,
+      pid: 1202,
+      directory: "/Users/example/Projects/design-system",
+      ...(mode === "denied" ? {} : { title: "Design system review" }),
+      command: "claude",
+      externalActive: true,
+      resumeAvailable: false
+    },
+    {
+      schemaVersion: 1 as const,
+      targetId: "visual-shell",
+      terminal: "Terminal" as const,
+      agent: "shell" as const,
+      pid: 1203,
+      directory: "/Users/example/Projects/site",
+      ...(mode === "denied" ? {} : { title: "Local development" }),
+      command: "zsh",
+      externalActive: false,
+      resumeAvailable: false
+    }
+  ];
+  return {
+    schemaVersion: 1 as const,
+    scanId: `visual-${mode}`,
+    scannedAt: "2026-08-06T12:00:00.000Z",
+    titlePermission: mode === "denied" ? "denied" as const : "granted" as const,
+    rows
+  };
+}
 
 function resizeBrowser(): void {
   if (!mainWindow || !browserView) return;
@@ -190,13 +246,45 @@ function createWindow(): void {
           await writeFile(path.join(visualSmokeDirectory, `${name}.png`), image.toPNG());
           captureCount += 1;
         };
-        await new Promise((resolve) => setTimeout(resolve, 180));
-        const onboardingVisible = await visualWindow.webContents.executeJavaScript(
-          "Boolean(document.querySelector('.onboarding-modal'))"
-        );
+        const onboardingDeadline = Date.now() + 5_000;
+        let onboardingVisible = false;
+        while (!onboardingVisible && Date.now() < onboardingDeadline) {
+          onboardingVisible = Boolean(await visualWindow.webContents.executeJavaScript(
+            "Boolean(document.querySelector('.onboarding-modal'))"
+          ));
+          if (!onboardingVisible) await new Promise((resolve) => setTimeout(resolve, 50));
+        }
         if (!onboardingVisible) throw new Error("Successor onboarding was not visible");
-        await capture("onboarding-standard");
-        await capture("onboarding-narrow", 820, 720);
+        await capture("detect-scanning-standard");
+        await capture("detect-scanning-narrow", 820, 720);
+        visualDetectionMode = "populated";
+        resolveVisualDetection?.(visualDetectionFixture("populated"));
+        resolveVisualDetection = undefined;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        await capture("detect-populated-standard");
+        await capture("detect-populated-narrow", 820, 720);
+        visualDetectionMode = "empty";
+        await visualWindow.webContents.executeJavaScript(
+          "[...document.querySelectorAll('button')].find((item) => item.textContent?.includes('Rescan'))?.click()"
+        );
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        await capture("detect-empty-standard");
+        visualDetectionMode = "denied";
+        await visualWindow.webContents.executeJavaScript(
+          "[...document.querySelectorAll('button')].find((item) => item.textContent?.includes('Rescan'))?.click()"
+        );
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        await capture("detect-denied-standard");
+        visualDetectionMode = "populated";
+        await visualWindow.webContents.executeJavaScript(
+          "[...document.querySelectorAll('button')].find((item) => item.textContent?.includes('Rescan'))?.click()"
+        );
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        await visualWindow.webContents.executeJavaScript(
+          "[...document.querySelectorAll('button')].find((item) => item.textContent?.includes('Resume'))?.click()"
+        );
+        await capture("detect-config-standard");
+        await capture("detect-config-narrow", 820, 720);
         const visualProjectAt = new Date().toISOString();
         await localStore.addProject({
           schemaVersion: 1,
@@ -293,7 +381,7 @@ function createWindow(): void {
             await capture(`${approach}-${size.name}`, size.width, size.height);
           }
         }
-        if (captureCount !== 20) throw new Error(`Expected 20 visual captures, received ${captureCount}`);
+        if (captureCount !== 26) throw new Error(`Expected 26 visual captures, received ${captureCount}`);
         console.log(`Chromux Next visual qualification captured ${captureCount} views`);
       } catch (error) {
         process.exitCode = 1;
@@ -416,6 +504,37 @@ function registerIpc(): void {
   ipcMain.handle(IpcChannels.runnerModels, () => runner.getModels());
   ipcMain.handle(IpcChannels.runnerCreate, (_event, input: unknown) =>
     runner.createSession(CreateSessionInputSchema.parse(input)));
+  ipcMain.handle(IpcChannels.runnerDetectExternal, () => {
+    if (!isVisualSmoke) return detector.scan();
+    if (visualDetectionMode === "scanning") {
+      return new Promise((resolve) => { resolveVisualDetection = resolve; });
+    }
+    return visualDetectionFixture(visualDetectionMode);
+  });
+  ipcMain.handle(IpcChannels.runnerCreateFromDetection, async (_event, input: unknown) => {
+    const value = CreateFromDetectionInputSchema.parse(input);
+    const target = detector.resolve(value.scanId, value.targetId);
+    if (value.mode === "resume" && !target.threadId) {
+      throw new Error("The selected terminal has no resumable exact-directory Codex thread.");
+    }
+    const created = await runner.createDetectedSession({
+      cwd: target.cwd,
+      ...(value.mode === "resume" && target.threadId ? { threadId: target.threadId } : {}),
+      mode: value.mode,
+      title: value.title,
+      permissionPreset: value.permissionPreset,
+      ...(value.model ? { model: value.model } : {}),
+      ...(value.reasoningEffort ? { reasoningEffort: value.reasoningEffort } : {})
+    });
+    if (created.workspacePreferences) {
+      for (const window of BrowserWindow.getAllWindows()) {
+        if (!window.isDestroyed()) {
+          window.webContents.send(IpcChannels.settingsWorkspacePreferencesChanged, created.workspacePreferences);
+        }
+      }
+    }
+    return created.session;
+  });
   ipcMain.handle(IpcChannels.runnerClose, (_event, input: unknown) => {
     if (typeof input !== "string") throw new Error("Invalid session id");
     return runner.closeSession(input);
@@ -437,7 +556,7 @@ function registerIpc(): void {
     if (typeof payload?.groupId !== "string" || typeof payload?.sessionId !== "string") {
       throw new Error("Invalid selection");
     }
-    runner.select(payload.groupId, payload.sessionId);
+    return runner.select(payload.groupId, payload.sessionId);
   });
   ipcMain.handle(IpcChannels.attentionRefresh, () => runner.refreshAttention());
   ipcMain.handle(IpcChannels.attentionTriage, (_event, input: unknown) =>

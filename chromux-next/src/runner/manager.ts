@@ -29,6 +29,7 @@ import {
 } from "./contracts";
 import { AttentionCadence, buildAttentionSnapshot, LunaAnalyzer, redact, snapshotHash } from "./attention";
 import type { AppServerTransport } from "./protocol";
+import type { DetectionCandidate, EnrichedDetectionCandidate } from "../detection/contracts";
 
 type Envelope = { id?: string | number; method: string; params?: any };
 const execFileAsync = promisify(execFile);
@@ -68,6 +69,142 @@ export class RunnerManager extends EventEmitter {
 
   getState(): RunnerStateV1 { return structuredClone(this.state); }
   getModels(): ModelOptionV1[] { return structuredClone(this.models); }
+
+  async enrichDetection(rows: DetectionCandidate[]): Promise<EnrichedDetectionCandidate[]> {
+    let threads: any[] = [];
+    try {
+      const response = await this.server.request("thread/list", {
+        limit: 100,
+        sortKey: "updated_at"
+      }) as any;
+      threads = Array.isArray(response?.data) ? response.data
+        : Array.isArray(response?.threads) ? response.threads : [];
+    } catch {
+      return rows.map((row) => ({ ...row }));
+    }
+    const byDirectory = new Map<string, any>();
+    for (const thread of threads.slice(0, 100)) {
+      const cwd = typeof thread?.cwd === "string" ? await canonicalize(thread.cwd).catch(() => undefined) : undefined;
+      if (!cwd || byDirectory.has(cwd)) continue;
+      byDirectory.set(cwd, thread);
+    }
+    let previewReads = 0;
+    return Promise.all(rows.map(async (row) => {
+      const thread = row.agent === "codex" ? byDirectory.get(row.cwd) : undefined;
+      const threadId = typeof thread?.id === "string" ? thread.id : undefined;
+      const alreadyOpen = threadId
+        ? this.state.sessions.find((session) => session.status !== "closed" && session.threadId === threadId)
+        : undefined;
+      let preview = findLatestAgentPreview(thread);
+      if (threadId && !preview && previewReads < 20) {
+        previewReads += 1;
+        try {
+          const detail = await this.server.request("thread/read", { threadId, includeTurns: true });
+          preview = findLatestAgentPreview(detail);
+        } catch {
+          // A malformed or concurrently removed thread simply has no preview.
+        }
+      }
+      const updatedAt = normalizeTimestamp(thread?.updatedAt ?? thread?.updated_at);
+      return {
+        ...row,
+        ...(threadId ? { threadId } : {}),
+        ...(preview ? { resumePreview: preview } : {}),
+        ...(updatedAt ? { threadUpdatedAt: updatedAt } : {}),
+        ...(alreadyOpen ? { alreadyOpenSessionId: alreadyOpen.id } : {})
+      };
+    }));
+  }
+
+  async createDetectedSession(input: {
+    cwd: string;
+    threadId?: string;
+    mode: "resume" | "fresh";
+    title: string;
+    permissionPreset: RunnerSessionV1["permissionPreset"];
+    model?: string;
+    reasoningEffort?: string;
+  }): Promise<{ session: RunnerSessionV1; workspacePreferences?: Awaited<ReturnType<LocalStore["getWorkspacePreferences"]>> }> {
+    const canonicalProjectPath = await canonicalize(input.cwd);
+    if (canonicalProjectPath !== input.cwd) throw new Error("Detected directory changed. Rescan to continue.");
+    if (input.mode === "resume" && !input.threadId) throw new Error("No exact-directory Codex thread is available to resume.");
+    const existing = input.mode === "resume" && input.threadId
+      ? this.state.sessions.find((session) => session.status !== "closed" && session.threadId === input.threadId)
+      : undefined;
+    if (existing) {
+      this.state.selectedGroupId = existing.groupId;
+      this.state.selectedSessionId = existing.id;
+      await this.persist();
+      this.emitState();
+      return { session: structuredClone(existing) };
+    }
+    const model = input.model ?? this.models.find((item) => item.recommended)?.id ?? this.models[0]?.id;
+    const selectedModel = this.models.find((item) => item.id === model);
+    const response = await this.server.request(input.mode === "resume" ? "thread/resume" : "thread/start", {
+      ...(input.mode === "resume" ? { threadId: input.threadId } : {}),
+      cwd: canonicalProjectPath,
+      model,
+      ...permissionParams(input.permissionPreset)
+    }) as any;
+    const threadId = input.mode === "resume" ? input.threadId : response?.thread?.id;
+    if (!threadId) throw new Error(`${input.mode === "resume" ? "thread/resume" : "thread/start"} returned no thread id`);
+
+    const now = new Date().toISOString();
+    const next = structuredClone(this.state);
+    let group = next.groups.find((item) => item.kind === "project" && item.projectPath === canonicalProjectPath);
+    if (!group) {
+      group = RunnerGroupV1Schema.parse({
+        schemaVersion: 1,
+        id: randomUUID(),
+        title: path.basename(canonicalProjectPath) || canonicalProjectPath,
+        kind: "project",
+        projectPath: canonicalProjectPath,
+        sessionIds: [],
+        createdAt: now,
+        updatedAt: now
+      });
+      next.groups.push(group);
+    }
+    const session = RunnerSessionV1Schema.parse({
+      schemaVersion: 1,
+      id: randomUUID(),
+      title: input.title,
+      projectPath: canonicalProjectPath,
+      canonicalProjectPath,
+      groupId: group.id,
+      threadId,
+      status: "idle",
+      model,
+      reasoningEffort: input.reasoningEffort ?? selectedModel?.defaultReasoningEffort,
+      permissionPreset: input.permissionPreset,
+      draft: "",
+      createdAt: now,
+      updatedAt: now,
+      events: [],
+      interactions: []
+    });
+    this.appendEvent(session, "system", `${input.mode === "resume" ? "Thread resumed" : "Session ready"} · ${session.permissionPreset} · ${session.model ?? "default model"}`);
+    next.sessions.push(session);
+    group.sessionIds.push(session.id);
+    next.selectedGroupId = group.id;
+    next.selectedSessionId = session.id;
+    const workspacePreferences = await this.store.registerDetectedSession(
+      RunnerStateV1Schema.parse(next),
+      {
+        schemaVersion: 1,
+        id: randomUUID(),
+        name: path.basename(canonicalProjectPath) || canonicalProjectPath,
+        path: canonicalProjectPath,
+        kind: await detectedProjectKind(canonicalProjectPath),
+        addedAt: now,
+        lastUsedAt: now
+      }
+    );
+    this.state = next;
+    this.cadence.changed();
+    this.emitState();
+    return { session: structuredClone(session), workspacePreferences };
+  }
 
   getCompatibilityDiagnostics(appVersion: string, platform: string): CompatibilityDiagnosticsV1 {
     const status = this.server.getCompatibilityStatus?.();
@@ -298,12 +435,22 @@ export class RunnerManager extends EventEmitter {
     await this.changed();
   }
 
-  select(groupId: string, sessionId: string): void {
+  async select(groupId: string, sessionId: string): Promise<void> {
     const session = this.session(sessionId);
     if (session.groupId !== groupId) throw new Error("Session is not in the selected group");
+    if (session.status === "closed") throw new Error("Closed sessions cannot be selected");
+    const previousGroupId = this.state.selectedGroupId;
+    const previousSessionId = this.state.selectedSessionId;
     this.state.selectedGroupId = groupId;
     this.state.selectedSessionId = sessionId;
-    void this.persist();
+    try {
+      await this.persist();
+    } catch (error) {
+      this.state.selectedGroupId = previousGroupId;
+      this.state.selectedSessionId = previousSessionId;
+      throw error;
+    }
+    this.emitState();
   }
 
   async refreshAttention(): Promise<AttentionAnalysisV1 | undefined> {
@@ -501,6 +648,46 @@ function turnPermissionParams(
 async function canonicalize(value: string): Promise<string> {
   if (!path.isAbsolute(value)) throw new Error("Project path must be absolute");
   return realpath(value);
+}
+
+function normalizeTimestamp(value: unknown): string | undefined {
+  if (typeof value !== "string" && typeof value !== "number") return undefined;
+  const date = new Date(value);
+  return Number.isNaN(date.valueOf()) ? undefined : date.toISOString();
+}
+
+function findLatestAgentPreview(value: unknown): string | undefined {
+  const found: string[] = [];
+  const visit = (item: unknown, depth: number, agentContext = false) => {
+    if (depth > 8 || found.length > 100 || item === null || item === undefined) return;
+    if (typeof item === "string") {
+      if (agentContext) found.push(item.replace(/[\u0000-\u001f\u007f-\u009f]/g, " ").trim().slice(0, 2048));
+      return;
+    }
+    if (Array.isArray(item)) {
+      for (const child of item.slice(-100)) visit(child, depth + 1, agentContext);
+      return;
+    }
+    if (typeof item !== "object") return;
+    const record = item as Record<string, unknown>;
+    const type = String(record.type ?? record.kind ?? "").toLowerCase();
+    const nextAgentContext = agentContext || type.includes("agent");
+    if (nextAgentContext && (typeof record.text === "string" || typeof record.content === "string")) {
+      found.push(String(record.text ?? record.content).replace(/[\u0000-\u001f\u007f-\u009f]/g, " ").trim().slice(0, 2048));
+    }
+    for (const child of Object.values(record).slice(0, 100)) visit(child, depth + 1, nextAgentContext);
+  };
+  visit(value, 0);
+  return found.filter(Boolean).at(-1);
+}
+
+async function detectedProjectKind(projectPath: string): Promise<"project" | "worktree"> {
+  try {
+    const { stat } = await import("node:fs/promises");
+    return (await stat(path.join(projectPath, ".git"))).isFile() ? "worktree" : "project";
+  } catch {
+    return "project";
+  }
 }
 
 function normalizeNotification(sessionId: string, envelope: Envelope): RunnerEventV1 | undefined {

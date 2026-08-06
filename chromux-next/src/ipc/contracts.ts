@@ -21,6 +21,11 @@ import {
   WorkspacePreferencesPatchV1Schema,
   WorkspacePreferencesV1Schema
 } from "../settings/workspace-preferences";
+import {
+  CreateFromDetectionInputSchema,
+  DetectionResultV1Schema,
+  DetectedTerminalV1Schema
+} from "../detection/contracts";
 
 export const IpcChannels = {
   documentOpen: "document:open",
@@ -44,6 +49,8 @@ export const IpcChannels = {
   ,runnerModels: "runner:models"
   ,runnerGroup: "runner:group"
   ,runnerSelect: "runner:select"
+  ,runnerDetectExternal: "runner:detect-external"
+  ,runnerCreateFromDetection: "runner:create-from-detection"
   ,attentionRefresh: "attention:refresh"
   ,attentionTriage: "attention:triage"
   ,settingsGetUiPreferences: "settings:get-ui-preferences"
@@ -106,4 +113,7 @@ export {
   ,UiPreferencesV1Schema
   ,WorkspacePreferencesPatchV1Schema
   ,WorkspacePreferencesV1Schema
+  ,CreateFromDetectionInputSchema
+  ,DetectionResultV1Schema
+  ,DetectedTerminalV1Schema
 };

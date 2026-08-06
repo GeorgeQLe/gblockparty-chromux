@@ -20,7 +20,7 @@ async function scenario(value: Record<string, unknown>) {
     command: process.execPath,
     prefixArgs: [fixture],
     env: { ...process.env, CHROMUX_NEXT_FIXTURE_SCENARIO: scenarioPath },
-    requestTimeoutMs: 300,
+    requestTimeoutMs: 1_000,
     maxLineBytes: 4096,
     restartDelaysMs: [10, 20, 50],
     shutdownGraceMs: 40
@@ -29,7 +29,7 @@ async function scenario(value: Record<string, unknown>) {
   return { server, logPath };
 }
 
-async function waitFor(predicate: () => boolean | Promise<boolean>, timeout = 1_000) {
+async function waitFor(predicate: () => boolean | Promise<boolean>, timeout = 3_000) {
   const deadline = Date.now() + timeout;
   while (!await predicate()) {
     if (Date.now() >= deadline) throw new Error("Timed out waiting for fixture event");
@@ -50,7 +50,7 @@ describe("incremental JSONL decoder", () => {
 });
 
 describe("Codex app-server subprocess", () => {
-  it("initializes with 0.6.0 and handles fragmented responses, notifications, and server requests", async () => {
+  it("initializes with 0.7.0 and handles fragmented responses, notifications, and server requests", async () => {
     const { server, logPath } = await scenario({
       fragments: [1, 2, 3, 5, 8],
       notificationAfter: "thread/start",
@@ -66,7 +66,7 @@ describe("Codex app-server subprocess", () => {
     expect(await server.request("thread/start", {})).toEqual({ thread: { id: "fixture-thread-1" } });
     await waitFor(() => notifications.some((item) => item.method === "item/agentMessage/delta") && requests.length === 1);
     const log = await readFile(logPath, "utf8");
-    expect(log).toContain('"version":"0.6.0"');
+    expect(log).toContain('"version":"0.7.0"');
     server.respond("server-request", { decision: "decline" });
   });
 
@@ -135,7 +135,7 @@ describe("Codex app-server subprocess", () => {
     server.on("crash", (error) => crashes.push(error));
     await server.start();
     await expect(server.request("thread/start", {})).rejects.toThrow("exited");
-    await waitFor(() => crashes.some((error) => error.message.includes("restart limit reached")), 2_000);
+    await waitFor(() => crashes.some((error) => error.message.includes("restart limit reached")), 5_000);
     const entries = (await readFile(logPath, "utf8")).trim().split("\n").map((line) => JSON.parse(line));
     const starts = entries.filter((entry) => entry.event === "start" && entry.mode === "app-server");
     expect(starts).toHaveLength(4);

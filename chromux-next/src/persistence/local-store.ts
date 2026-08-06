@@ -157,6 +157,31 @@ export class LocalStore {
     await this.update((state) => ({ ...state, ...(runner ? { runner } : {}) }));
   }
 
+  async registerDetectedSession(
+    runner: NonNullable<LocalState["runner"]>,
+    project: ProjectEntryV1
+  ): Promise<WorkspacePreferencesV1> {
+    const validatedRunner = RunnerStateV1Schema.parse(runner);
+    const validatedProject = ProjectEntryV1Schema.parse(project);
+    let result = structuredClone(DEFAULT_WORKSPACE_PREFERENCES);
+    await this.update((state) => {
+      const current = recoverWorkspacePreferences(state.workspacePreferences);
+      const existing = current.projects.find((item) => item.path === validatedProject.path);
+      const projects = existing
+        ? current.projects.map((item) => item.id === existing.id
+          ? { ...validatedProject, id: existing.id, addedAt: existing.addedAt }
+          : item)
+        : [...current.projects, validatedProject];
+      result = WorkspacePreferencesV1Schema.parse({
+        ...current,
+        projects,
+        defaultProjectId: current.defaultProjectId ?? existing?.id ?? validatedProject.id
+      });
+      return { ...state, runner: validatedRunner, workspacePreferences: result };
+    });
+    return result;
+  }
+
   private async update(mutator: (state: LocalState) => LocalState): Promise<void> {
     const next = this.writeQueue.then(async () => {
       const state = LocalStateSchema.parse(mutator(await this.read()));

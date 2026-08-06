@@ -2987,3 +2987,68 @@
   contract exists; the GitHub prerelease is the required publication. Next
   command: begin the macOS daily-driver and clean-install evidence tracked by
   the Chromux Next cutover gate in `tasks/todo.md`.
+
+## 2026-08-06 — Chromux Next detect-first onboarding v0.7.0
+
+- Made DETECT the first Chromux Next experience and retained it permanently in
+  the product header, with scanning, populated, empty, denied-title, failure,
+  searchable, and two-stage configuration states plus Choose Folder and
+  Continue Without Session fallbacks.
+- Ship manifest — User goal: implement the supplied Chromux Next Detect-First
+  Onboarding plan completely, verify the packaged macOS app, and publish
+  `chromux-next-v0.7.0` as a prerelease without changing legacy Chromux or the
+  stable `/releases/latest` channel.
+- Changed files and per-file purpose: `src/detection/{contracts,external}.ts`
+  define strict public payloads, opaque creation input, bounded macOS process/
+  cwd/title discovery, sanitization, ancestry exclusion, deduplication, and
+  transient cache authority; runner manager/store changes provide exact-cwd
+  app-server enrichment, bounded nested agent previews, already-open matching,
+  and atomic detected project/session persistence; IPC/preload/main changes
+  validate and route opaque IDs, broadcast preferences, and add deterministic
+  visual fixtures; renderer/styles add detect-first onboarding and permanent
+  access; tests cover parser, bounds, denial, expiry, enrichment, spoof
+  prevention, transactions, and interface contracts; package/protocol
+  metadata, README, architecture, UAT, release notes, and task records define
+  v0.7.0; the visual harness now requires 26 captures. Test-only subprocess
+  deadlines were widened to tolerate observed Node startup latency while
+  retaining bounded timeout and cleanup assertions.
+- User-goal mapping: detection uses capped `ps`, concurrent capped `lsof`, and
+  optional Terminal/iTerm Automation metadata without controlling external
+  processes; exact-directory Codex rows use `thread/list` and bounded
+  `thread/read`; renderer creation cannot supply cwd/thread IDs; two-minute
+  main cache entries are actively evicted; resume warns about divergence;
+  Focus Existing avoids duplicate open threads; detected creation starts or
+  resumes before atomically committing project and runner state; onboarding
+  completes only after success or the explicit empty-workspace fallback.
+- Executable verification: `npm run verify` passed TypeScript, all 17 Vitest
+  files with 93 tests, Electron Forge macOS arm64 packaging, baseline packaged
+  smoke, and two-launch/two-session restoration smoke. `npm run
+  visual:packaged -- /tmp/chromux-next-0.7.0-release-visual` captured all 26
+  required views. Scanning, populated, denied-title, empty, and configuration
+  captures were visually inspected at applicable standard/narrow sizes.
+  `git diff --check` and a diff secret-pattern scan passed.
+- Skipped tests and residual risk: live Automation consent with real Terminal
+  and iTerm tabs and live authenticated Codex thread history were not
+  automated because they depend on local macOS privacy state and user-owned
+  CLI history. Dependency-injected detector tests, fixture app-server tests,
+  packaged visual states, and manual capture inspection cover deterministic
+  behavior; first daily-driver use should confirm real tab-title mapping and
+  exact-cwd preview shape. With Automation denied, another app's tty may appear
+  as a generic terminal because no title metadata is available; thread-list
+  source metadata also varies by CLI version, so exact-cwd matching is the
+  current saved-thread authority. Windows/Linux detection remains an
+  adapter-friendly empty result and is part of the separate cutover gate.
+- Adversarial review: performed failure-oriented self-review plus an
+  independent read-only release review, targeting renderer spoofing, expired
+  cache authority, cwd canonicalization, descendant exclusion, denied titles,
+  malformed app-server data, preview bounds, duplicate threads, partial state,
+  onboarding completion, narrow layout, version consistency, and legacy-state
+  isolation. Findings were fixed before the final verification run; no
+  blocking finding remains.
+- Rollback note: remove the GitHub prerelease and tag
+  `chromux-next-v0.7.0`, then revert the v0.7.0 shipping commit. Chromux Next
+  v0.6.0 and the legacy stable release remain available. Deploy skipped:
+  no `deploy.md` or `tasks/deploy.md` manual deployment contract exists; the
+  GitHub prerelease is the required publication. Next command: begin the
+  macOS daily-driver and clean-install evidence tracked by the Chromux Next
+  cutover gate in `tasks/todo.md`.

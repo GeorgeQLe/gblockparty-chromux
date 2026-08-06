@@ -10,7 +10,7 @@ describe("five-approach shared interface system", () => {
     ]) expect(source).toContain(`function ${shell}`);
     for (const primitive of [
       "RunnerTerminal", "Composer", "InteractionCard", "AttentionSidebar",
-      "Workspace", "NewSessionDialog", "GroupDialog", "SurfaceTabs"
+      "Workspace", "NewSessionDialog", "DetectionDialog", "GroupDialog", "SurfaceTabs"
     ]) expect(source).toContain(`function ${primitive}`);
   });
 
@@ -106,12 +106,31 @@ describe("five-approach shared interface system", () => {
     const main = await readFile("src/main.ts", "utf8");
     const store = await readFile("src/persistence/local-store.ts", "utf8");
     for (const feature of [
-      "OnboardingOverlay", "Projects and worktrees", "New session defaults",
+      "DetectionDialog", "Find your work", "Continue Without Session", "Projects and worktrees", "New session defaults",
       "Session groups", "Compatibility diagnostics", "chooseProject"
     ]) expect(renderer).toContain(feature);
     expect(main).toContain('properties: ["openDirectory", "createDirectory"]');
     expect(main).toContain("getCompatibilityDiagnostics");
     expect(store).toContain("workspacePreferences");
     expect(store).not.toContain("prototype");
+  });
+
+  it("makes DETECT first-run and permanently available without controlling external terminals", async () => {
+    const [renderer, preload, main] = await Promise.all([
+      readFile("src/renderer.tsx", "utf8"),
+      readFile("src/preload.ts", "utf8"),
+      readFile("src/main.ts", "utf8")
+    ]);
+    expect(renderer).toContain("Scanning open terminal tabs");
+    expect(renderer).toContain("Focus Existing");
+    expect(renderer).toContain(".then(complete)");
+    expect(renderer).toContain("setResult(undefined)");
+    expect(renderer).toContain("two continuations may diverge");
+    expect(renderer).toContain(">Detect</Button>");
+    expect(preload).toContain("CreateFromDetectionInputSchema.parse");
+    expect(main).toContain("detector.resolve(value.scanId, value.targetId)");
+    expect(main).toContain('value.mode === "resume" && target.threadId');
+    expect(main).not.toContain("input.cwd");
+    expect(main).not.toContain("input.threadId");
   });
 });

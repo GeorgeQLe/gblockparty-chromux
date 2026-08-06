@@ -24,4 +24,23 @@ describe("runner renderer security", () => {
     expect(bridge).not.toContain("css:");
     expect(bridge).not.toContain("filesystem");
   });
+
+  it("does not expose detected cwd or thread ownership in create IPC", async () => {
+    const [preload, bridge, contracts] = await Promise.all([
+      readFile("src/preload.ts", "utf8"),
+      readFile("src/ipc/bridge.ts", "utf8"),
+      readFile("src/detection/contracts.ts", "utf8")
+    ]);
+    expect(preload).toContain("detectExternal");
+    expect(preload).toContain("CreateFromDetectionInputSchema.parse");
+    expect(bridge).toContain("CreateFromDetectionInput");
+    expect(contracts).toContain("scanId: Id");
+    expect(contracts).toContain("targetId: Id");
+    const createSchema = contracts.slice(
+      contracts.indexOf("CreateFromDetectionInputSchema"),
+      contracts.indexOf("export type CreateFromDetectionInput")
+    );
+    expect(createSchema).not.toContain("cwd:");
+    expect(createSchema).not.toContain("threadId:");
+  });
 });

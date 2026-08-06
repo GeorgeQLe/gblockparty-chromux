@@ -7,6 +7,10 @@ import {
 } from "../src/runner/contracts";
 import { compareVersions } from "../src/runner/protocol";
 import { permissionParams } from "../src/runner/manager";
+import {
+  CreateFromDetectionInputSchema,
+  DetectionResultV1Schema
+} from "../src/detection/contracts";
 
 describe("runner contracts and compatibility", () => {
   it("requires Codex CLI 0.146.0 or newer", () => {
@@ -83,5 +87,35 @@ describe("runner contracts and compatibility", () => {
       checks: [{ id: "codex-cli", label: "Codex CLI", status: "pass", detail: "0.146.0" }]
     });
     expect(diagnostics.stateScope).toBe("successor-only");
+  });
+
+  it("keeps detection IPC opaque, strict, and bounded", () => {
+    const result = DetectionResultV1Schema.parse({
+      schemaVersion: 1,
+      scanId: "scan",
+      scannedAt: "2026-08-06T12:00:00.000Z",
+      titlePermission: "denied",
+      rows: [{
+        schemaVersion: 1,
+        targetId: "target",
+        terminal: "Terminal",
+        agent: "codex",
+        pid: 42,
+        directory: "/tmp",
+        command: "codex",
+        externalActive: true,
+        resumeAvailable: true
+      }]
+    });
+    expect(result.rows[0]?.targetId).toBe("target");
+    expect(() => CreateFromDetectionInputSchema.parse({
+      scanId: "scan",
+      targetId: "target",
+      mode: "resume",
+      title: "Session",
+      permissionPreset: "workspace",
+      cwd: "/renderer-controlled",
+      threadId: "renderer-controlled"
+    })).toThrow();
   });
 });
