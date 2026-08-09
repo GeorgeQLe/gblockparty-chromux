@@ -59,6 +59,14 @@ instead of resuming the `prototype/` implementation.
 
 ## Completed Work
 
+- [x] Ship the Chromux Next v0.8.0 session browser and reviewed-evidence
+  workflow with session-isolated persistent guests, explicit HTTP(S)
+  navigation, independently recoverable browser state, private current-page
+  captures, human approval before delivery, exact-once/retry semantics,
+  responsive review UI, focused contract/recovery coverage, and packaged
+  prerelease qualification. _(successor scope only; legacy Chromux and
+  `/releases/latest` remain unchanged)_
+
 - [x] Establish the Chromux Next v0.7.1 modular baseline with an injected
   browser-view owner, explicit service interfaces, startup-enforced IPC parity,
   runtime-validated renderer events, independently recoverable atomic state

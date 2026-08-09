@@ -1,6 +1,6 @@
 {
   "name": "chromux-next",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "productName": "GBlockParty Chromux Next",
   "description": "A structured local-first human and agent alignment workspace.",
   "main": ".vite/build/main.js",
@@ -16,11 +16,12 @@
     "icons": "node scripts/build-icons.mjs",
     "smoke:packaged": "node scripts/smoke-packaged.mjs",
     "smoke:runner-restoration": "node scripts/smoke-runner-restoration.mjs",
+    "smoke:browser-evidence": "node scripts/smoke-browser-evidence.mjs",
     "visual:packaged": "node scripts/visual-qualify.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "verify": "npm run typecheck && npm test && npm run package && npm run smoke:packaged && npm run smoke:runner-restoration"
+    "verify": "npm run typecheck && npm test && npm run package && npm run smoke:packaged && npm run smoke:runner-restoration && npm run smoke:browser-evidence"
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.10.0",

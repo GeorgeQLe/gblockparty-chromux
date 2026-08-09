@@ -1,6 +1,7 @@
 import type { IpcMain, IpcMainInvokeEvent } from "electron";
 import {
   AgentRunEventSchema,
+  BrowserWorkspaceV1Schema,
   IpcChannels,
   RunnerStateV1Schema,
   UiPreferencesV1Schema,
@@ -17,6 +18,12 @@ export const PreloadInvokeChannels = [
   IpcChannels.agentCancel,
   IpcChannels.browserOpen,
   IpcChannels.browserAction,
+  IpcChannels.browserState,
+  IpcChannels.browserPresent,
+  IpcChannels.browserCapture,
+  IpcChannels.browserReview,
+  IpcChannels.browserPreview,
+  IpcChannels.browserDeliver,
   IpcChannels.runnerState,
   IpcChannels.runnerModels,
   IpcChannels.runnerCreate,
@@ -44,14 +51,16 @@ export const MainToRendererChannels = [
   IpcChannels.agentEvent,
   IpcChannels.runnerStateChanged,
   IpcChannels.settingsUiPreferencesChanged,
-  IpcChannels.settingsWorkspacePreferencesChanged
+  IpcChannels.settingsWorkspacePreferencesChanged,
+  IpcChannels.browserStateChanged
 ] as const;
 
 const MainToRendererSchemas = {
   [IpcChannels.agentEvent]: AgentRunEventSchema,
   [IpcChannels.runnerStateChanged]: RunnerStateV1Schema,
   [IpcChannels.settingsUiPreferencesChanged]: UiPreferencesV1Schema,
-  [IpcChannels.settingsWorkspacePreferencesChanged]: WorkspacePreferencesV1Schema
+  [IpcChannels.settingsWorkspacePreferencesChanged]: WorkspacePreferencesV1Schema,
+  [IpcChannels.browserStateChanged]: BrowserWorkspaceV1Schema
 } as const;
 
 export function parseMainToRendererEvent<C extends typeof MainToRendererChannels[number]>(

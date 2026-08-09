@@ -18,6 +18,11 @@ import {
   type WorkspacePreferencesPatchV1,
   type WorkspacePreferencesV1
 } from "../settings/workspace-preferences";
+import {
+  BrowserWorkspaceV1Schema,
+  DEFAULT_BROWSER_WORKSPACE,
+  type BrowserWorkspaceV1
+} from "../browser/contracts";
 
 const AppStateV1Schema = z.object({
   schemaVersion: z.literal(1),
@@ -52,6 +57,7 @@ export type LocalState = AppStateV1 & {
   runner?: RunnerStateV1;
   uiPreferences: UiPreferencesV1;
   workspacePreferences: WorkspacePreferencesV1;
+  browserWorkspace: BrowserWorkspaceV1;
 };
 
 const DEFAULT_APP_STATE: AppStateV1 = {
@@ -67,6 +73,7 @@ type SliceName =
   | "runner-state-v1.json"
   | "ui-preferences-v1.json"
   | "workspace-preferences-v1.json"
+  | "browser-workspace-v1.json"
   | "detected-session-transaction-v1.json";
 
 /**
@@ -93,13 +100,16 @@ export class LocalStore {
     const runner = RunnerStateV1Schema.safeParse(transaction?.runner ?? runnerValue ?? legacy?.runner);
     const uiValue = await this.readUnknownSlice("ui-preferences-v1.json");
     const workspaceValue = await this.readUnknownSlice("workspace-preferences-v1.json");
+    const browserValue = await this.readUnknownSlice("browser-workspace-v1.json");
+    const browser = BrowserWorkspaceV1Schema.safeParse(browserValue);
     return {
       ...app,
       ...(runner.success ? { runner: runner.data } : {}),
       uiPreferences: recoverUiPreferences(uiValue ?? legacy?.uiPreferences),
       workspacePreferences: recoverWorkspacePreferences(
         transaction?.workspacePreferences ?? workspaceValue ?? legacy?.workspacePreferences
-      )
+      ),
+      browserWorkspace: browser.success ? browser.data : structuredClone(DEFAULT_BROWSER_WORKSPACE)
     };
   }
 
@@ -110,6 +120,7 @@ export class LocalStore {
       if (validated.runner) await this.writeSlice("runner-state-v1.json", validated.runner);
       await this.writeSlice("ui-preferences-v1.json", validated.uiPreferences);
       await this.writeSlice("workspace-preferences-v1.json", validated.workspacePreferences);
+      await this.writeSlice("browser-workspace-v1.json", validated.browserWorkspace);
     });
   }
 
@@ -180,6 +191,15 @@ export class LocalStore {
     await this.enqueue(() => this.writeSlice("runner-state-v1.json", validated));
   }
 
+  async getBrowserWorkspace(): Promise<BrowserWorkspaceV1> {
+    return (await this.read()).browserWorkspace;
+  }
+
+  async updateBrowserWorkspace(workspace: BrowserWorkspaceV1): Promise<void> {
+    const validated = BrowserWorkspaceV1Schema.parse(workspace);
+    await this.enqueue(() => this.writeSlice("browser-workspace-v1.json", validated));
+  }
+
   async registerDetectedSession(
     runner: NonNullable<LocalState["runner"]>,
     project: ProjectEntryV1
@@ -231,7 +251,8 @@ export class LocalStore {
       ...AppStateV1Schema.parse(state),
       ...(state.runner ? { runner: RunnerStateV1Schema.parse(state.runner) } : {}),
       uiPreferences: UiPreferencesV1Schema.parse(state.uiPreferences),
-      workspacePreferences: WorkspacePreferencesV1Schema.parse(state.workspacePreferences)
+      workspacePreferences: WorkspacePreferencesV1Schema.parse(state.workspacePreferences),
+      browserWorkspace: BrowserWorkspaceV1Schema.parse(state.browserWorkspace)
     };
   }
 

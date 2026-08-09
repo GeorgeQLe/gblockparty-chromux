@@ -181,3 +181,30 @@ Navigation happens only after a click. A main-process-owned `WebContentsView`
 denies popups and unsupported schemes. `file:`, `javascript:`, custom schemes,
 and automatic navigation are rejected. Localhost is treated like any other
 explicit HTTP(S) link.
+
+## Session browser and reviewed evidence
+
+`BrowserViewService` owns one sandboxed `WebContentsView` per open runner
+session. Each guest uses a stable session-derived persistent partition; the
+raw session ID, partition name, guest object, and `webContents` never cross
+preload. The renderer supplies only a validated session ID and viewport
+rectangle. Main clamps that rectangle to the host window and hides every guest
+when Browser is inactive or a dialog obscures it.
+
+Last safe URL/title state and bounded evidence metadata live in the independent
+`browser-workspace-v1.json` slice. Invalid or future browser state recovers to
+an empty browser workspace without affecting runner or preference slices.
+Guest history and cookies remain Chromium-owned; restoring Chromux recreates a
+guest lazily only when its session's Browser surface becomes visible.
+
+Page capture is an explicit user action. Main captures the originating guest
+to a private PNG under `browser-evidence/`, then records immutable session,
+URL, title, timestamp, and artifact identity before exposing an Awaiting Review
+record. The renderer can request only a bounded data-URL preview by evidence
+ID; it never supplies or receives an artifact path.
+
+Delivery is a two-action gate: Approve, then Send to session. The serialized
+workflow rechecks Approved status immediately before calling the runner and
+marks Delivered only after `turn/start` or `turn/steer` succeeds. A runner
+failure leaves the evidence Approved for retry. Rejected and delivered records
+remain inspectable, and delivered evidence cannot be reviewed or sent again.

@@ -8,11 +8,15 @@ import {
   ipcMain
 } from "electron";
 import started from "electron-squirrel-startup";
-import { isSafeNavigation } from "./domain/links";
 import {
   AgentRunRequestSchema,
   AlignmentDocumentV1Schema,
-  BrowserActionSchema,
+  BrowserActionInputSchema,
+  BrowserOpenInputSchema,
+  BrowserPresentationInputSchema,
+  EvidenceCaptureInputSchema,
+  EvidenceIdInputSchema,
+  EvidenceReviewInputSchema,
   ApprovalResponseInputSchema,
   CreateSessionInputSchema,
   DraftInputSchema,
@@ -38,6 +42,7 @@ import { RunnerManager } from "./runner/manager";
 import { ExternalTerminalDetector } from "./detection/external";
 import { BrowserViewService } from "./main/browser-view-service";
 import { IpcHandlerRegistry } from "./ipc/registry";
+import { BrowserEvidenceWorkflow } from "./browser/workflow";
 
 if (started) app.quit();
 
@@ -50,11 +55,13 @@ const documents = new DocumentStore();
 const localStore = new LocalStore(app.getPath("userData"));
 const runnerSmokeArgument = process.argv.find((argument) => argument.startsWith("--runner-restoration-smoke="));
 const runnerSmokePhase = runnerSmokeArgument?.slice("--runner-restoration-smoke=".length);
+const browserEvidenceSmokeArgument = process.argv.find((argument) => argument.startsWith("--browser-evidence-smoke="));
+const browserEvidenceSmokeUrl = browserEvidenceSmokeArgument?.slice("--browser-evidence-smoke=".length);
 const runnerSmokeScenario = process.env.CHROMUX_NEXT_FIXTURE_SCENARIO;
 const runnerFixturePath = app.isPackaged
   ? path.join(process.resourcesPath, "subprocess-fixture.cjs")
   : path.join(app.getAppPath(), "fixtures", "subprocess-fixture.cjs");
-const runnerSmokeOptions = runnerSmokePhase && runnerSmokeScenario ? {
+const runnerSmokeOptions = (runnerSmokePhase || browserEvidenceSmokeUrl) && runnerSmokeScenario ? {
   command: process.execPath,
   prefixArgs: [runnerFixturePath],
   env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
@@ -69,7 +76,7 @@ const runner = new RunnerManager(
 );
 const detector = new ExternalTerminalDetector((rows) => runner.enrichDetection(rows));
 const running = new Map<string, AbortController>();
-const isSmoke = process.argv.includes("--smoke") || Boolean(runnerSmokePhase);
+const isSmoke = process.argv.includes("--smoke") || Boolean(runnerSmokePhase) || Boolean(browserEvidenceSmokeUrl);
 const visualSmokeArgument = process.argv.find((argument) => argument.startsWith("--visual-smoke-dir="));
 const visualSmokeDirectory = visualSmokeArgument?.slice("--visual-smoke-dir=".length);
 const isVisualSmoke = Boolean(visualSmokeDirectory);
@@ -78,12 +85,26 @@ let visualDetectionMode: VisualDetectionMode = "scanning";
 let resolveVisualDetection: ((value: ReturnType<typeof visualDetectionFixture>) => void) | undefined;
 let mainWindow: BrowserWindow | null = null;
 const browser = new BrowserViewService({
-  getWindow: () => mainWindow,
-  getBounds: (window) => {
-    const [width = 1440, height = 900] = window.getContentSize();
-    return { x: 250, y: 104, width: Math.max(400, width - 570), height: Math.max(300, height - 104) };
-  }
+  getWindow: () => mainWindow
+}, (snapshot) => {
+  void evidenceWorkflow.recordNavigation(snapshot).then(sendBrowserState).catch(() => undefined);
 });
+const evidenceWorkflow = new BrowserEvidenceWorkflow(
+  localStore,
+  path.join(app.getPath("userData"), "browser-evidence")
+);
+
+function sendBrowserState(state: Awaited<ReturnType<BrowserEvidenceWorkflow["state"]>>): void {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) window.webContents.send(IpcChannels.browserStateChanged, state);
+  }
+}
+
+function requireOpenSession(sessionId: string): void {
+  if (!runner.getState().sessions.some((session) => session.id === sessionId && session.status !== "closed")) {
+    throw new Error("The browser target session is unavailable");
+  }
+}
 
 function visualDetectionFixture(mode: Exclude<VisualDetectionMode, "scanning">) {
   const rows = mode === "empty" ? [] : [
@@ -146,7 +167,7 @@ function createWindow(): void {
     minWidth: 760,
     minHeight: 600,
     title: "GBlockParty Chromux Next",
-    show: !isSmoke && !isVisualSmoke,
+    show: Boolean(browserEvidenceSmokeUrl) || (!isSmoke && !isVisualSmoke),
     backgroundColor: "#111315",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -164,7 +185,7 @@ function createWindow(): void {
   }
   if (isSmoke) {
     mainWindow.webContents.once("did-finish-load", async () => {
-      if (runnerSmokePhase) return;
+      if (runnerSmokePhase || browserEvidenceSmokeUrl) return;
       const ready = await mainWindow?.webContents.executeJavaScript(
         "Boolean(window.chromuxNext?.documents && window.chromuxNext?.runner && window.chromuxNext?.attention && window.chromuxNext?.browser)"
       );
@@ -228,6 +249,48 @@ function createWindow(): void {
       } catch (error) {
         process.exitCode = 1;
         console.error("Chromux Next runner restoration smoke failed:", error instanceof Error ? error.message : String(error));
+      } finally {
+        app.quit();
+      }
+    });
+  }
+  if (browserEvidenceSmokeUrl) {
+    mainWindow.webContents.once("did-finish-load", async () => {
+      try {
+        const result = await mainWindow?.webContents.executeJavaScript(`(async () => {
+          const deadline = Date.now() + 5000;
+          while ((await window.chromuxNext.runner.models()).length === 0) {
+            if (Date.now() >= deadline) throw new Error("Runner did not initialize");
+            await new Promise((resolve) => setTimeout(resolve, 25));
+          }
+          const first = await window.chromuxNext.runner.create({ projectPath: "/tmp", title: "Browser one" });
+          const second = await window.chromuxNext.runner.create({ projectPath: "/tmp", title: "Browser two" });
+          await window.chromuxNext.browser.present(first.id, { x: 20, y: 100, width: 640, height: 480 });
+          await window.chromuxNext.browser.open(first.id, ${JSON.stringify(`${browserEvidenceSmokeUrl}/one`)});
+          await window.chromuxNext.browser.open(second.id, ${JSON.stringify(`${browserEvidenceSmokeUrl}/two`)});
+          await window.chromuxNext.browser.present(first.id, { x: 20, y: 100, width: 640, height: 480 });
+          await new Promise((resolve) => setTimeout(resolve, 150));
+          const captured = await window.chromuxNext.browser.capture(first.id, "Verify real packaged capture");
+          const evidence = captured.evidence.at(-1);
+          if (!evidence || evidence.status !== "awaiting-review") throw new Error("Capture did not enter review");
+          const preview = await window.chromuxNext.browser.preview(evidence.id);
+          await window.chromuxNext.browser.review(evidence.id, "approve", "Packaged review approved");
+          const delivered = await window.chromuxNext.browser.deliver(evidence.id);
+          return {
+            preview: preview.dataUrl.startsWith("data:image/png;base64,"),
+            status: delivered.evidence.find((item) => item.id === evidence.id)?.status,
+            urls: delivered.sessions.map((item) => item.url).sort()
+          };
+        })()`);
+        if (!result?.preview || result.status !== "delivered"
+          || result.urls?.length !== 2
+          || !result.urls[0]?.endsWith("/one") || !result.urls[1]?.endsWith("/two")) {
+          throw new Error(`Browser evidence result mismatch: ${JSON.stringify(result)}`);
+        }
+        console.log("Chromux Next packaged browser evidence smoke passed");
+      } catch (error) {
+        process.exitCode = 1;
+        console.error("Chromux Next packaged browser evidence smoke failed:", error instanceof Error ? error.message : String(error));
       } finally {
         app.quit();
       }
@@ -347,6 +410,14 @@ function createWindow(): void {
         await visualWindow.webContents.executeJavaScript(
           "document.querySelector('[aria-label=\"Close Settings\"]')?.click()"
         );
+        await visualWindow.webContents.executeJavaScript(`(() => {
+          const button = [...document.querySelectorAll('.surface-tabs button')]
+            .find((item) => item.textContent?.trim().toLowerCase() === 'browser');
+          if (!button) throw new Error('Browser surface control was not found');
+          button.click();
+        })()`);
+        await capture("session-browser-standard");
+        await capture("session-browser-narrow", 820, 720);
         const approaches = ["control-room", "ide-workbench", "focus-studio", "mission-board", "spatial-canvas"] as const;
         const sizes = [{ name: "standard", width: 1440, height: 900 }, { name: "narrow", width: 820, height: 720 }];
         for (const approach of approaches) {
@@ -383,7 +454,7 @@ function createWindow(): void {
             await capture(`${approach}-${size.name}`, size.width, size.height);
           }
         }
-        if (captureCount !== 26) throw new Error(`Expected 26 visual captures, received ${captureCount}`);
+        if (captureCount !== 28) throw new Error(`Expected 28 visual captures, received ${captureCount}`);
         console.log(`Chromux Next visual qualification captured ${captureCount} views`);
       } catch (error) {
         process.exitCode = 1;
@@ -459,12 +530,47 @@ function registerIpc(): void {
     return Boolean(controller);
   });
   registry.handle(IpcChannels.browserOpen, async (_event, input: unknown) => {
-    if (typeof input !== "string" || !isSafeNavigation(input)) return false;
-    return browser.open(input);
+    const value = BrowserOpenInputSchema.parse(input);
+    requireOpenSession(value.sessionId);
+    return browser.open(value.sessionId, value.url);
   });
   registry.handle(IpcChannels.browserAction, async (_event, input: unknown) => {
-    const action = BrowserActionSchema.parse(input);
-    return browser.action(action.type);
+    const action = BrowserActionInputSchema.parse(input);
+    requireOpenSession(action.sessionId);
+    return browser.action(action.sessionId, action.type);
+  });
+  registry.handle(IpcChannels.browserState, () => evidenceWorkflow.state());
+  registry.handle(IpcChannels.browserPresent, (_event, input: unknown) => {
+    const presentation = BrowserPresentationInputSchema.parse(input);
+    if (presentation.sessionId) requireOpenSession(presentation.sessionId);
+    browser.present(presentation.sessionId, presentation.bounds);
+  });
+  registry.handle(IpcChannels.browserCapture, async (_event, input: unknown) => {
+    const value = EvidenceCaptureInputSchema.parse(input);
+    requireOpenSession(value.sessionId);
+    const capture = await browser.captureEvidence(value.sessionId);
+    const result = await evidenceWorkflow.capture(capture.snapshot, value.note, capture.png);
+    sendBrowserState(result.state);
+    return result.state;
+  });
+  registry.handle(IpcChannels.browserReview, async (_event, input: unknown) => {
+    const value = EvidenceReviewInputSchema.parse(input);
+    const state = await evidenceWorkflow.review(value.evidenceId, value.decision, value.note);
+    sendBrowserState(state);
+    return state;
+  });
+  registry.handle(IpcChannels.browserPreview, (_event, input: unknown) => {
+    const value = EvidenceIdInputSchema.parse(input);
+    return evidenceWorkflow.preview(value.evidenceId);
+  });
+  registry.handle(IpcChannels.browserDeliver, async (_event, input: unknown) => {
+    const value = EvidenceIdInputSchema.parse(input);
+    const state = await evidenceWorkflow.deliver(value.evidenceId, async (sessionId, prompt) => {
+      requireOpenSession(sessionId);
+      await runner.startOrSteer({ sessionId, text: prompt });
+    });
+    sendBrowserState(state);
+    return state;
   });
   registry.handle(IpcChannels.runnerState, () => runner.getState());
   registry.handle(IpcChannels.runnerModels, () => runner.getModels());
@@ -501,9 +607,10 @@ function registerIpc(): void {
     }
     return created.session;
   });
-  registry.handle(IpcChannels.runnerClose, (_event, input: unknown) => {
+  registry.handle(IpcChannels.runnerClose, async (_event, input: unknown) => {
     if (typeof input !== "string") throw new Error("Invalid session id");
-    return runner.closeSession(input);
+    await runner.closeSession(input);
+    browser.closeSession(input);
   });
   registry.handle(IpcChannels.runnerSend, (_event, input: unknown) =>
     runner.startOrSteer(TurnInputSchema.parse(input)));

@@ -8,6 +8,9 @@ import {
   AlignLeft,
   ArrowDown,
   ArrowUp,
+  Camera,
+  ChevronLeft,
+  ChevronRight,
   Boxes,
   Check,
   CirclePlus,
@@ -15,6 +18,7 @@ import {
   FileText,
   FolderPlus,
   Globe2,
+  ExternalLink,
   MessagesSquare,
   PanelTop,
   Plus,
@@ -77,6 +81,11 @@ import {
   Tabs
 } from "./ui/components";
 import { PersistentSurfaces, type CenterSurface } from "./renderer/persistent-surfaces";
+import {
+  DEFAULT_BROWSER_WORKSPACE,
+  type BrowserEvidenceV1,
+  type BrowserWorkspaceV1
+} from "./browser/contracts";
 import "./styles.css";
 
 const terminalViewports = new Map<string, number>();
@@ -101,12 +110,14 @@ function ansi(event: RunnerEventV1): string {
   return `\x1b[${color}m${label}\x1b[0m ${event.text.replace(/\r?\n/g, "\r\n            ")}\r\n`;
 }
 
-function RunnerTerminal({ session }: { session?: RunnerSessionV1 }) {
+function RunnerTerminal({ session, openBrowser }: { session?: RunnerSessionV1; openBrowser(url: string): void }) {
   const host = useRef<HTMLDivElement>(null);
   const terminal = useRef<Terminal | undefined>(undefined);
   const fit = useRef<FitAddon | undefined>(undefined);
   const search = useRef<SearchAddon | undefined>(undefined);
   const [needle, setNeedle] = useState("");
+  const openBrowserRef = useRef(openBrowser);
+  openBrowserRef.current = openBrowser;
 
   useEffect(() => {
     if (!host.current) return;
@@ -139,7 +150,7 @@ function RunnerTerminal({ session }: { session?: RunnerSessionV1 }) {
             start: { x: (match.index ?? 0) + 1, y: lineNumber },
             end: { x: (match.index ?? 0) + match[0].length + 1, y: lineNumber }
           },
-          activate: () => void window.chromuxNext.browser.open(match[0])
+          activate: () => openBrowserRef.current(match[0])
         }));
         callback(links);
       }
@@ -395,14 +406,14 @@ function KindEditor({ item, update }: { item: AlignmentItem; update(next: Alignm
   </div>;
 }
 
-function LinkedText({ text }: { text: string }) {
+function LinkedText({ text, openBrowser }: { text: string; openBrowser?: (url: string) => void }) {
   const parts = text.split(/(https?:\/\/[^\s<>"')\]]+)/g);
   return <p className="agent-response">{parts.map((part, index) => /^https?:\/\//.test(part)
-    ? <button className="text-link" key={`${part}-${index}`} onClick={() => void window.chromuxNext.browser.open(part)}>{part}</button>
+    ? <button className="text-link" key={`${part}-${index}`} onClick={() => openBrowser?.(part)}>{part}</button>
     : <React.Fragment key={index}>{part}</React.Fragment>)}</p>;
 }
 
-function ContributorPanel({ alignment }: { alignment: AlignmentWorkspaceProps }) {
+function ContributorPanel({ alignment, openBrowser }: { alignment: AlignmentWorkspaceProps; openBrowser(url: string): void }) {
   const [provider, setProvider] = useState<"fake" | "codex">("fake");
   const [prompt, setPrompt] = useState("Review the selected item and suggest a concrete improvement.");
   return <aside className="contributor-panel">
@@ -411,7 +422,7 @@ function ContributorPanel({ alignment }: { alignment: AlignmentWorkspaceProps })
     <Field label="Request"><textarea rows={4} value={prompt} onChange={(event) => setPrompt(event.target.value)} /></Field>
     <div className="button-row"><button className="primary" disabled={!prompt.trim() || alignment.runStatus === "running"} onClick={() => alignment.run(provider, prompt)}>Contribute</button><button disabled={alignment.runStatus !== "running"} onClick={alignment.cancel}>Cancel</button></div>
     <div className="agent-events" role="log" aria-live="polite">{alignment.events.map((event, index) => <small key={`${event.runId}-${index}`}>{event.type}{event.type === "progress" ? ` · ${event.message}` : event.type === "failed" ? ` · ${event.message}` : ""}</small>)}</div>
-    {alignment.response && <LinkedText text={alignment.response} />}
+    {alignment.response && <LinkedText text={alignment.response} openBrowser={openBrowser} />}
     <section className="proposal-list"><h4>Unapplied proposals</h4>{alignment.proposals.map((proposal, index) => {
       const stale = isProposalStale(proposal, alignment.document);
       return <article className={stale ? "stale" : ""} key={`${proposal.baseRevision}-${index}`}><strong>{proposal.summary}</strong><small>{proposal.operations.length} operation{proposal.operations.length === 1 ? "" : "s"} · revision {proposal.baseRevision}{stale ? " · stale, rerun required" : ""}</small><div><button className="primary" disabled={stale || alignment.runStatus === "running"} onClick={() => alignment.applyProposal(index)}>Apply</button><button onClick={() => alignment.rejectProposal(index)}>Reject</button></div></article>;
@@ -419,7 +430,7 @@ function ContributorPanel({ alignment }: { alignment: AlignmentWorkspaceProps })
   </aside>;
 }
 
-function AlignmentSurface({ alignment }: { alignment: AlignmentWorkspaceProps }) {
+function AlignmentSurface({ alignment, openBrowser }: { alignment: AlignmentWorkspaceProps; openBrowser(url: string): void }) {
   const selected = alignment.document.items.find((item) => item.id === alignment.selectedItemId) ?? alignment.document.items[0];
   const [insertKind, setInsertKind] = useState<AlignmentItemKind>("text");
   const selectedIndex = selected ? alignment.document.items.findIndex((item) => item.id === selected.id) : -1;
@@ -436,7 +447,7 @@ function AlignmentSurface({ alignment }: { alignment: AlignmentWorkspaceProps })
       alignment.select(item.id);
     }}>Insert</button></div>{alignment.document.items.map((item, index) => <button key={item.id} className={item.id === selected?.id ? "active" : ""} aria-current={item.id === selected?.id ? "true" : undefined} onClick={() => alignment.select(item.id)}><span>{index + 1}</span><strong>{itemLabel(item)}</strong><i className={`review-${item.review.status}`} /></button>)}</nav>
     <main className="item-editor">{selected ? <React.Fragment key={`${selected.id}-${alignment.document.revision}`}><header><div><span>{selected.kind}</span><h3>{itemLabel(selected)}</h3><small>{selected.id}</small></div><div className="button-row"><IconButton label="Move item up" icon={ArrowUp} disabled={selectedIndex <= 0} onClick={() => alignment.apply("Move item up", [{ type: "item.move", itemId: selected.id, toIndex: selectedIndex - 1 }])} /><IconButton label="Move item down" icon={ArrowDown} disabled={selectedIndex >= alignment.document.items.length - 1} onClick={() => alignment.apply("Move item down", [{ type: "item.move", itemId: selected.id, toIndex: selectedIndex + 1 }])} /><Button tone="danger" onClick={() => alignment.apply(`Remove ${selected.kind}`, [{ type: "item.remove", itemId: selected.id }])}>Remove</Button></div></header><KindEditor item={selected} update={updateItem} /><fieldset className="review-editor"><legend>Human review</legend><Field label="Status"><select value={selected.review.status} onChange={(event) => alignment.apply("Update item review", [{ type: "review.update", itemId: selected.id, review: humanReview(event.target.value as AlignmentItem["review"]["status"], selected.review.feedback, "Human editor") }])}><option value="unreviewed">Unreviewed</option><option value="changes-requested">Changes requested</option><option value="approved">Approved</option></select></Field><Field label="Feedback"><textarea rows={4} defaultValue={selected.review.feedback} onBlur={(event) => alignment.apply("Update review feedback", [{ type: "review.update", itemId: selected.id, review: humanReview(selected.review.status, event.target.value, "Human editor") }])} /></Field>{selected.review.reviewer && <small>Reviewed by {selected.review.reviewer} · {new Date(selected.review.reviewedAt!).toLocaleString()}</small>}</fieldset></React.Fragment> : <EmptyState icon={FileText} title="No document items" description="Insert an item to begin editing the Alignment document." />}</main>
-    <ContributorPanel alignment={alignment} />
+    <ContributorPanel alignment={alignment} openBrowser={openBrowser} />
   </section>;
 }
 
@@ -555,6 +566,10 @@ type ShellProps = {
   selectedSession: RunnerSessionV1 | undefined;
   error: string;
   alignment: AlignmentWorkspaceProps;
+  browserWorkspace: BrowserWorkspaceV1;
+  browserEnabled: boolean;
+  updateBrowserWorkspace(value: BrowserWorkspaceV1): void;
+  reportError(reason: unknown): void;
   setSurface(surface: CenterSurface): void;
   openSettings(): void;
   openNewSession(): void;
@@ -629,7 +644,130 @@ function TabNavigation({ state, selectedSession, openGroupDialog }: { state: Run
   </section>;
 }
 
-function Workspace({ state, models, selectedSession, surface, setSurface, error, clearError, alignment, hideHeader = false }: Omit<ShellProps, "openSettings" | "openNewSession"> & { hideHeader?: boolean }) {
+function BrowserSurface({
+  active,
+  session,
+  workspace,
+  update,
+  fail
+}: {
+  active: boolean;
+  session?: RunnerSessionV1;
+  workspace: BrowserWorkspaceV1;
+  update(value: BrowserWorkspaceV1): void;
+  fail(reason: unknown): void;
+}) {
+  const guest = useRef<HTMLDivElement>(null);
+  const restored = useRef(new Set<string>());
+  const [url, setUrl] = useState("https://");
+  const [note, setNote] = useState("");
+  const [selectedEvidenceId, setSelectedEvidenceId] = useState<string>();
+  const [preview, setPreview] = useState<string>();
+  const sessionState = workspace.sessions.find((entry) => entry.sessionId === session?.id);
+  const evidence = workspace.evidence.filter((entry) => entry.sessionId === session?.id).reverse();
+
+  useEffect(() => {
+    if (sessionState?.url) setUrl(sessionState.url);
+  }, [session?.id, sessionState?.url]);
+
+  useEffect(() => {
+    if (!active || !session || !guest.current) {
+      void window.chromuxNext.browser.present().catch(fail);
+      return;
+    }
+    if (sessionState?.url && !restored.current.has(session.id)) {
+      restored.current.add(session.id);
+      void window.chromuxNext.browser.open(session.id, sessionState.url).catch(fail);
+    }
+    const present = () => {
+      const rect = guest.current?.getBoundingClientRect();
+      if (!rect || rect.width < 1 || rect.height < 1) return;
+      void window.chromuxNext.browser.present(session.id, {
+        x: Math.round(rect.x),
+        y: Math.round(rect.y),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height)
+      }).catch(fail);
+    };
+    present();
+    const observer = new ResizeObserver(present);
+    observer.observe(guest.current);
+    window.addEventListener("resize", present);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", present);
+      void window.chromuxNext.browser.present().catch(() => undefined);
+    };
+  }, [active, session?.id]);
+
+  const navigate = () => {
+    if (!session) return;
+    let target = url.trim();
+    if (target && !/^[a-z][a-z0-9+.-]*:/i.test(target)) target = `https://${target}`;
+    restored.current.add(session.id);
+    void window.chromuxNext.browser.open(session.id, target)
+      .then((opened) => { if (!opened) throw new Error("Only HTTP(S) pages can open in the session browser"); })
+      .catch(fail);
+  };
+  const action = (type: "back" | "forward" | "reload" | "copy-link" | "open-external") => {
+    if (session) void window.chromuxNext.browser.action(session.id, type).catch(fail);
+  };
+  const capture = () => {
+    if (!session) return;
+    void window.chromuxNext.browser.capture(session.id, note).then((next) => {
+      update(next);
+      setNote("");
+      setSelectedEvidenceId(next.evidence.at(-1)?.id);
+    }).catch(fail);
+  };
+  const review = (item: BrowserEvidenceV1, decision: "approve" | "reject") => {
+    void window.chromuxNext.browser.review(item.id, decision, item.note).then(update).catch(fail);
+  };
+  const inspect = (item: BrowserEvidenceV1) => {
+    setSelectedEvidenceId(item.id);
+    setPreview(undefined);
+    void window.chromuxNext.browser.preview(item.id).then((value) => setPreview(value.dataUrl)).catch(fail);
+  };
+
+  return <section className="browser-workspace">
+    <form className="browser-toolbar" onSubmit={(event) => { event.preventDefault(); navigate(); }}>
+      <IconButton type="button" label="Back" icon={ChevronLeft} disabled={!sessionState} onClick={() => action("back")} />
+      <IconButton type="button" label="Forward" icon={ChevronRight} disabled={!sessionState} onClick={() => action("forward")} />
+      <IconButton type="button" label="Reload" icon={RefreshCw} disabled={!sessionState} onClick={() => action("reload")} />
+      <input aria-label="Session browser URL" value={url} disabled={!session} onChange={(event) => setUrl(event.target.value)} />
+      <Button type="submit" tone="primary" disabled={!session || !url.trim()}>Open</Button>
+      <IconButton type="button" label="Copy page link" icon={Copy} disabled={!sessionState} onClick={() => action("copy-link")} />
+      <IconButton type="button" label="Open in default browser" icon={ExternalLink} disabled={!sessionState} onClick={() => action("open-external")} />
+    </form>
+    <div className="browser-body">
+      <div className="browser-guest">{!sessionState && <EmptyState icon={Globe2} title="Session browser" description="Enter an HTTP(S) address or click a link in this session’s transcript. Pages never open automatically." />}</div>
+      <aside className="evidence-panel">
+        <header><div><span>Review gate</span><h3>Browser evidence</h3></div><Badge tone={evidence.some((item) => item.status === "awaiting-review") ? "warning" : "neutral"}>{evidence.filter((item) => item.status === "awaiting-review").length} pending</Badge></header>
+        <Field label="Capture note"><textarea rows={3} value={note} disabled={!sessionState} placeholder="What should the agent inspect?" onChange={(event) => setNote(event.target.value)} /></Field>
+        <Button icon={Camera} disabled={!sessionState} onClick={capture}>Capture for review</Button>
+        <div className="evidence-list">{evidence.map((item) => <article className={selectedEvidenceId === item.id ? "selected" : ""} key={item.id}>
+          <button className="evidence-summary" onClick={() => inspect(item)}><strong>{item.title || new URL(item.url).hostname}</strong><small>{item.status.replace("-", " ")} · {new Date(item.capturedAt).toLocaleTimeString()}</small></button>
+          {selectedEvidenceId === item.id && <>
+            {preview && <img src={preview} alt={`Captured page: ${item.title || item.url}`} />}
+            <p>{item.note || "No reviewer note."}</p>
+            <div className="button-row">
+              {item.status !== "delivered" && <Button tone="quiet" onClick={() => review(item, "reject")}>Reject</Button>}
+              {item.status !== "delivered" && <Button tone="primary" onClick={() => review(item, "approve")}>{item.status === "approved" ? "Approved" : "Approve"}</Button>}
+              {item.status === "approved" && <Button icon={Send} onClick={() => void window.chromuxNext.browser.deliver(item.id).then(update).catch(fail)}>Send to session</Button>}
+            </div>
+          </>}
+        </article>)}{!evidence.length && <p className="empty">Captures stay local and cannot reach Codex until you approve and send them.</p>}</div>
+      </aside>
+    </div>
+  </section>;
+}
+
+function Workspace({ state, models, selectedSession, surface, setSurface, error, clearError, alignment, browserWorkspace, browserEnabled, updateBrowserWorkspace, reportError, hideHeader = false }: Omit<ShellProps, "openSettings" | "openNewSession"> & { hideHeader?: boolean }) {
+  const openBrowser = (url: string) => {
+    if (!selectedSession) return;
+    setSurface("browser");
+    void window.chromuxNext.browser.open(selectedSession.id, url).catch(reportError);
+  };
   return <section className="center workflow-workspace">
     {!hideHeader && <div className="center-header"><div><h2>{selectedSession?.title ?? "Codex sessions"}</h2><p>{selectedSession?.projectPath ?? "Create a session for a project or worktree"}</p></div>{selectedSession && <>
       <select value={selectedSession.model ?? ""} disabled aria-label="Session model"><option>{models.find((item) => item.id === selectedSession.model)?.displayName ?? selectedSession.model ?? "Recommended"}</option></select>
@@ -639,11 +777,11 @@ function Workspace({ state, models, selectedSession, surface, setSurface, error,
     </>}</div>}
     <PersistentSurfaces
       active={surface}
-      runner={<><RunnerTerminal {...(selectedSession ? { session: selectedSession } : {})} /><Composer {...(selectedSession ? { session: selectedSession } : {})} /></>}
-      alignment={<AlignmentSurface alignment={alignment} />}
+      runner={<><RunnerTerminal {...(selectedSession ? { session: selectedSession } : {})} openBrowser={openBrowser} /><Composer {...(selectedSession ? { session: selectedSession } : {})} /></>}
+      alignment={<AlignmentSurface alignment={alignment} openBrowser={openBrowser} />}
       deck={<DeckSurface document={alignment.document} />}
       canvas={<CanvasSurface document={alignment.document} />}
-      browser={<section className="secondary-surface browser-placeholder"><h2>Browser</h2><p>HTTP(S) links open here only after an explicit click in a runner transcript or contributor response.</p></section>}
+      browser={<BrowserSurface active={surface === "browser" && browserEnabled} {...(selectedSession ? { session: selectedSession } : {})} workspace={browserWorkspace} update={updateBrowserWorkspace} fail={reportError} />}
     />
     {error && <button className="error-banner" onClick={clearError}><AlertTriangle aria-hidden="true" size={16} /><span>{error}</span><X aria-hidden="true" size={16} /></button>}
   </section>;
@@ -999,6 +1137,9 @@ function App() {
   const [workspacePreferences, setWorkspacePreferences] = useState<WorkspacePreferencesV1>(
     structuredClone(DEFAULT_WORKSPACE_PREFERENCES)
   );
+  const [browserWorkspace, setBrowserWorkspace] = useState<BrowserWorkspaceV1>(
+    structuredClone(DEFAULT_BROWSER_WORKSPACE)
+  );
   const [settingsReady, setSettingsReady] = useState(false);
   const [surface, setSurface] = useState<CenterSurface>("runner");
   const [error, setError] = useState("");
@@ -1026,18 +1167,21 @@ function App() {
       window.chromuxNext.runner.state(),
       window.chromuxNext.runner.models(),
       window.chromuxNext.settings.getUiPreferences(),
-      window.chromuxNext.settings.getWorkspacePreferences()
-    ]).then(([nextState, nextModels, nextPreferences, nextWorkspacePreferences]) => {
+      window.chromuxNext.settings.getWorkspacePreferences(),
+      window.chromuxNext.browser.state()
+    ]).then(([nextState, nextModels, nextPreferences, nextWorkspacePreferences, nextBrowserWorkspace]) => {
       setState(nextState);
       setModels(nextModels);
       setPreferences(nextPreferences);
       setWorkspacePreferences(nextWorkspacePreferences);
+      setBrowserWorkspace(nextBrowserWorkspace);
       setSettingsReady(true);
     }).catch((reason) => setError(String(reason)));
     const offState = window.chromuxNext.runner.onState(setState);
     const offPreferences = window.chromuxNext.settings.onUiPreferencesChanged(setPreferences);
     const offWorkspacePreferences = window.chromuxNext.settings.onWorkspacePreferencesChanged(setWorkspacePreferences);
-    return () => { offState(); offPreferences(); offWorkspacePreferences(); };
+    const offBrowser = window.chromuxNext.browser.onState(setBrowserWorkspace);
+    return () => { offState(); offPreferences(); offWorkspacePreferences(); offBrowser(); };
   }, []);
   useEffect(() => window.chromuxNext.agents.onEvent((event) => {
     if (event.runId !== runIdRef.current) return;
@@ -1213,7 +1357,7 @@ function App() {
     setSettingsOpen(false);
     setGroupDialog({ open: true, ...(group ? { group } : {}) });
   };
-  const shellProps: ShellProps = { state, models, surface, selectedSession, error, alignment, setSurface, openSettings: () => setSettingsOpen(true), openNewSession: () => setNewSessionOpen(true), openDetect: () => setDetectOpen(true), openGroupDialog, clearError: () => setError("") };
+  const shellProps: ShellProps = { state, models, surface, selectedSession, error, alignment, browserWorkspace, browserEnabled: !settingsOpen && !newSessionOpen && !detectOpen && !groupDialog.open && workspacePreferences.onboardingComplete, updateBrowserWorkspace: setBrowserWorkspace, reportError: (reason) => setError(String(reason)), setSurface, openSettings: () => setSettingsOpen(true), openNewSession: () => setNewSessionOpen(true), openDetect: () => setDetectOpen(true), openGroupDialog, clearError: () => setError("") };
   return <div className={`app-root density-${preferences.density} motion-${preferences.motion}`} data-approach={preferences.approach}>
     <UnifiedApproachShell approach={preferences.approach} {...shellProps} />
     {settingsOpen && <SettingsOverlay preferences={preferences} workspace={workspacePreferences} models={models} state={state} update={updatePreferences} updateWorkspace={updateWorkspacePreferences} chooseProject={chooseProject} removeProject={removeProject} openGroupDialog={openGroupDialog} close={() => setSettingsOpen(false)} />}

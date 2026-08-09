@@ -5,9 +5,18 @@ separate Electron app from legacy Chromux in `../prototype/`: it has a distinct
 package, bundle identifier, user-data directory, architecture, and release
 line.
 
-## Current prerelease: v0.7.1
+## Current prerelease: v0.8.0
 
 This runner-first prerelease includes:
+
+- A persistent browser for each open session, with isolated Chromium storage,
+  explicit HTTP(S)-only URL/transcript/contributor navigation, bounded native
+  controls, exact responsive guest placement, and last-page restoration.
+- A local reviewed-evidence workflow: capture the current page with an
+  optional note, inspect the private screenshot, approve or reject it, and
+  explicitly send approved evidence to its originating Codex session. Failed
+  sends remain approved and retryable; rejected and delivered records remain
+  inspectable.
 
 - Detect-first onboarding that automatically scans open macOS Terminal and
   iTerm tabs for shell, Claude, Codex, and Grok workspaces without attaching
@@ -30,7 +39,7 @@ This runner-first prerelease includes:
   handling, and focus restoration.
 - Polished runner, transcript, Composer, approval, attention, detect-first onboarding,
   Settings, New Session, empty/error, and Alignment states. Packaged visual
-  qualification now reviews 26 standard and narrow captures.
+  qualification now reviews 28 standard and narrow captures.
 - First-run successor-native onboarding with a native project/worktree folder
   chooser, a persisted project registry, and editable default permission,
   model, and reasoning preferences for new sessions.
@@ -107,8 +116,10 @@ ICNS, ICO, and PNG assets.
 ## Data model and trust boundaries
 
 Codex remains authoritative for conversation history. Chromux Next stores only
-its own groups, thread IDs, bounded display cache, drafts, settings, and
-attention triage. Raw app-server envelopes remain in the main process; the
+its own groups, thread IDs, bounded display cache, drafts, settings, attention
+triage, session browser locations, and reviewed local evidence records. Private
+PNG artifacts live under the successor user-data directory. Raw app-server
+envelopes remain in the main process; the
 renderer receives validated normalized events. Renderer isolation, context
 isolation, sandboxing, popup denial, and an HTTP(S)-only navigation allowlist
 are enabled.

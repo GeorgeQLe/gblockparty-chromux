@@ -18,6 +18,7 @@ import type {
   WorkspacePreferencesV1
 } from "../settings/workspace-preferences";
 import type { CreateFromDetectionInput, DetectionResultV1 } from "../detection/contracts";
+import type { BrowserWorkspaceV1 } from "../browser/contracts";
 
 export interface DocumentPayload {
   filePath: string;
@@ -42,8 +43,15 @@ export interface ChromuxNextApi {
     onEvent(listener: (event: AgentRunEvent) => void): () => void;
   };
   browser: {
-    open(url: string): Promise<boolean>;
-    action(type: "back" | "forward" | "reload" | "close" | "copy-link" | "open-external"): Promise<boolean>;
+    state(): Promise<BrowserWorkspaceV1>;
+    open(sessionId: string, url: string): Promise<boolean>;
+    present(sessionId?: string, bounds?: { x: number; y: number; width: number; height: number }): Promise<void>;
+    action(sessionId: string, type: "back" | "forward" | "reload" | "copy-link" | "open-external"): Promise<boolean>;
+    capture(sessionId: string, note: string): Promise<BrowserWorkspaceV1>;
+    review(evidenceId: string, decision: "approve" | "reject", note?: string): Promise<BrowserWorkspaceV1>;
+    preview(evidenceId: string): Promise<{ evidenceId: string; dataUrl: string }>;
+    deliver(evidenceId: string): Promise<BrowserWorkspaceV1>;
+    onState(listener: (state: BrowserWorkspaceV1) => void): () => void;
   };
   runner: {
     state(): Promise<RunnerStateV1>;

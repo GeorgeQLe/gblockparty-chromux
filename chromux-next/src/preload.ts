@@ -10,6 +10,14 @@ import {
   CompatibilityDiagnosticsV1Schema,
   CreateFromDetectionInputSchema,
   DetectionResultV1Schema,
+  BrowserActionInputSchema,
+  BrowserOpenInputSchema,
+  BrowserPresentationInputSchema,
+  BrowserWorkspaceV1Schema,
+  EvidenceCaptureInputSchema,
+  EvidenceIdInputSchema,
+  EvidencePreviewSchema,
+  EvidenceReviewInputSchema,
   UiPreferencesPatchV1Schema,
   UiPreferencesV1Schema
   ,WorkspacePreferencesPatchV1Schema
@@ -82,11 +90,52 @@ const api: ChromuxNextApi = {
     }
   },
   browser: {
-    async open(url) {
-      return Boolean(await ipcRenderer.invoke(IpcChannels.browserOpen, url));
+    async state() {
+      return BrowserWorkspaceV1Schema.parse(await ipcRenderer.invoke(IpcChannels.browserState));
     },
-    async action(type) {
-      return Boolean(await ipcRenderer.invoke(IpcChannels.browserAction, { type }));
+    async open(sessionId, url) {
+      const input = BrowserOpenInputSchema.parse({ sessionId, url });
+      return Boolean(await ipcRenderer.invoke(IpcChannels.browserOpen, input));
+    },
+    async present(sessionId, bounds) {
+      await ipcRenderer.invoke(IpcChannels.browserPresent, BrowserPresentationInputSchema.parse({ sessionId, bounds }));
+    },
+    async action(sessionId, type) {
+      return Boolean(await ipcRenderer.invoke(
+        IpcChannels.browserAction,
+        BrowserActionInputSchema.parse({ sessionId, type })
+      ));
+    },
+    async capture(sessionId, note) {
+      return BrowserWorkspaceV1Schema.parse(await ipcRenderer.invoke(
+        IpcChannels.browserCapture,
+        EvidenceCaptureInputSchema.parse({ sessionId, note })
+      ));
+    },
+    async review(evidenceId, decision, note) {
+      return BrowserWorkspaceV1Schema.parse(await ipcRenderer.invoke(
+        IpcChannels.browserReview,
+        EvidenceReviewInputSchema.parse({ evidenceId, decision, note })
+      ));
+    },
+    async preview(evidenceId) {
+      return EvidencePreviewSchema.parse(await ipcRenderer.invoke(
+        IpcChannels.browserPreview,
+        EvidenceIdInputSchema.parse({ evidenceId })
+      ));
+    },
+    async deliver(evidenceId) {
+      return BrowserWorkspaceV1Schema.parse(await ipcRenderer.invoke(
+        IpcChannels.browserDeliver,
+        EvidenceIdInputSchema.parse({ evidenceId })
+      ));
+    },
+    onState(listener) {
+      const handler = (_event: Electron.IpcRendererEvent, value: unknown) => {
+        listener(parseMainToRendererEvent(IpcChannels.browserStateChanged, value));
+      };
+      ipcRenderer.on(IpcChannels.browserStateChanged, handler);
+      return () => ipcRenderer.removeListener(IpcChannels.browserStateChanged, handler);
     }
   },
   runner: {

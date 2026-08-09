@@ -29,7 +29,8 @@ describe("preload/main IPC conformance", () => {
       IpcChannels.agentEvent,
       IpcChannels.runnerStateChanged,
       IpcChannels.settingsUiPreferencesChanged,
-      IpcChannels.settingsWorkspacePreferencesChanged
+      IpcChannels.settingsWorkspacePreferencesChanged,
+      IpcChannels.browserStateChanged
     ]));
     expect(parseMainToRendererEvent(IpcChannels.runnerStateChanged, {
       schemaVersion: 1,

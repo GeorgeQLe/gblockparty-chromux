@@ -1,5 +1,85 @@
 # Session History
 
+## 2026-08-09 — Chromux Next v0.8.0 session browser and reviewed evidence
+
+- **User goal:** Implement the next successor milestone: a session browser and
+  reviewed evidence workflow.
+- **Implementation:** Added main-owned per-session sandboxed browser guests,
+  session-derived persistent partitions, renderer-measured/clamped geometry,
+  explicit safe navigation, independently persisted last-page state, private
+  page screenshots, bounded previews, and a serialized Awaiting Review →
+  Approved/Rejected → Delivered workflow. Delivery targets immutable
+  originating session provenance, occurs only after separate Approve and Send
+  actions, becomes Delivered only after runner acceptance, and remains
+  Approved after failure for retry.
+- **Verification:** TypeScript, focused browser/view/workflow/recovery/IPC tests,
+  the complete 106-test Vitest suite, packaged baseline and two-launch runner
+  smokes, a real packaged two-session localhost browser/capture/review/delivery
+  smoke, and 28-view packaged visual qualification cover the release boundary.
+- **Scope and residual risk:** This milestone does not add browser automation,
+  background capture, remote upload, or legacy-state import. Chromium history
+  and cookies remain guest-owned, while Chromux persists only last safe page
+  metadata and reviewed capture records. Stable cutover remains gated.
+- **Rollback:** Remove prerelease `chromux-next-v0.8.0` and revert the shipping
+  commit. The independent browser slice and artifacts can remain safely
+  ignored by v0.7.1; legacy Chromux remains unchanged.
+- **Ship manifest — User goal:** Implement and ship Chromux Next v0.8.0 session
+  browser and reviewed evidence workflow.
+- **Changed files:** `chromux-next/src/browser/contracts.ts`,
+  `chromux-next/src/browser/workflow.ts`,
+  `chromux-next/src/main/browser-view-service.ts`, `chromux-next/src/main.ts`,
+  `chromux-next/src/ipc/{contracts,registry,bridge}.ts`,
+  `chromux-next/src/preload.ts`, `chromux-next/src/persistence/local-store.ts`,
+  `chromux-next/src/renderer.tsx`, `chromux-next/src/styles/legacy.css`,
+  `chromux-next/tests/{browser-evidence,browser-view-service,ipc-contract,state-slice-recovery}.test.ts`,
+  `chromux-next/scripts/{smoke-browser-evidence,visual-qualify}.mjs`,
+  `chromux-next/package.json`, `chromux-next/package-lock.json`,
+  `chromux-next/README.md`, `chromux-next/docs/{architecture,uat-0.8.0}.md`,
+  `RELEASES.md`, `tasks/todo.md`, and `tasks/history.md`.
+- **Per-file purpose and user-goal mapping:** Browser contracts and workflow own
+  bounded persisted session/evidence state and the serialized human review
+  gate; the browser-view service owns session partitions, safe navigation,
+  popup denial, provenance-stable capture, and guest lifecycle; main/IPC/preload
+  expose only validated operations and route approved evidence to the exact
+  runner session; LocalStore adds an independently recoverable private slice;
+  renderer/styles provide the responsive session browser and evidence rail and
+  hide guests beneath dialogs; tests and packaged scripts cover those trust and
+  lifecycle claims; metadata, architecture, UAT, release, and task documents
+  define v0.8.0 and its rollback boundary.
+- **Tests run:** `npm run verify` passed TypeScript, all 106 Vitest tests,
+  Electron Forge packaging, baseline packaged smoke, two-launch/two-session
+  restoration smoke, and the real packaged browser-evidence smoke. The latter
+  served two distinct localhost pages, created two actual `WebContentsView`
+  guests, captured a real PNG, returned a bounded preview, approved it, and
+  delivered it through the fixture app-server. `npm run visual:packaged --
+  /private/tmp/chromux-next-0.8.0-final-visual` produced 28 views; standard and
+  820px Browser captures were visually inspected for clipping and hierarchy.
+  `git diff --check` passed.
+- **Skipped tests:** Windows/Linux packaging and real-device clean-install UAT
+  remain part of the explicit successor cutover gate, not this macOS prerelease
+  milestone. Public-internet browsing was not used because the deterministic
+  real-HTTP localhost packaged smoke exercises the same Electron navigation and
+  capture boundary without network or credential variability.
+- **Adversarial review:** A failure-oriented changed-file audit was used as the
+  skill-permitted equivalent review because repository policy disallows an
+  unrequested reviewer subagent. It traced renderer-spoofed session IDs and
+  bounds, unsupported schemes, script popups, cross-session storage, navigation
+  races during capture, malformed/future slices, oversized previews, approval
+  bypass, duplicate delivery, delivery failure, closed sessions, overlay
+  hiding, stale preview images, and source/package version drift. Findings fixed
+  before ship were popup-triggered navigation, provenance drift during capture,
+  custom-scheme URL rewriting, stale preview display, and a packaged capture
+  smoke that initially attempted capture from a hidden native guest.
+- **Residual risk:** The packaged smoke verifies native Chromium on this Apple
+  Silicon host only. Windows/Linux guest composition and clean-install behavior
+  remain unproven until the cutover gate runs; users on those platforms would
+  first notice incorrect guest geometry or unavailable capture. Evidence files
+  are intentionally retained locally even when their oldest bounded metadata
+  ages out, so future retention controls remain separate product work.
+- **Next command:** Begin the active Chromux Next cutover gate with the macOS
+  daily-driver and clean-install evidence run, then use those findings to scope
+  the next successor prerelease.
+
 ## 2026-08-05 — Chromux Next v0.4.1 runner hardening
 
 - **User goal:** Complete the runner-first release gate with deterministic

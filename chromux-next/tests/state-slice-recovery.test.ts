@@ -35,6 +35,19 @@ describe("independently recoverable local state", () => {
     expect(restored.workspacePreferences.onboardingComplete).toBe(true);
   });
 
+  it("recovers malformed browser evidence without discarding runner state", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "chromux-next-browser-slice-"));
+    const store = new LocalStore(directory);
+    await store.updateRunner({ schemaVersion: 1, groups: [], sessions: [], triage: [] });
+    await writeFile(path.join(directory, "browser-workspace-v1.json"), JSON.stringify({
+      schemaVersion: 99,
+      sessions: [{ url: "javascript:unsafe" }]
+    }), { mode: 0o600 });
+    const restored = await new LocalStore(directory).read();
+    expect(restored.runner?.schemaVersion).toBe(1);
+    expect(restored.browserWorkspace).toEqual({ schemaVersion: 1, sessions: [], evidence: [] });
+  });
+
   it("writes private, schema-owned files and leaves the legacy fallback untouched", async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), "chromux-next-private-slices-"));
     const legacyPath = path.join(directory, "state-v1.json");

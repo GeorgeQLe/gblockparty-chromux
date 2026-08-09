@@ -1,5 +1,32 @@
 # Release Notes
 
+## GBlockParty Chromux Next v0.8.0 (prerelease)
+
+Tag: `chromux-next-v0.8.0`
+
+- Replace the Browser placeholder with one persistent, isolated Chromium guest
+  per open Chromux session. Session changes preserve each page, cookies remain
+  in a session-derived partition, and only explicit HTTP(S) navigation is
+  accepted from the URL bar, transcript links, or contributor links.
+- Add bounded browser controls, exact guest geometry, responsive review UI,
+  and automatic guest hiding beneath Settings, onboarding, and session/group
+  dialogs. Renderer code receives browser state and validated actions, never a
+  guest, `webContents`, partition name, or filesystem authority.
+- Persist each session's last safe URL/title in an independently recoverable
+  private state slice. Malformed or future browser data falls back on its own
+  without discarding runner, workspace, or appearance state.
+- Add explicit current-page screenshot capture with private local artifacts
+  and immutable URL/title/session provenance. Captures begin in Awaiting Review;
+  rejected evidence remains inspectable, and only human-approved evidence can
+  be sent to its originating Codex session.
+- Keep approved evidence retryable when delivery fails, mark it Delivered only
+  after the runner accepts the turn/steer request, and prevent duplicate or
+  post-delivery sends. No page or capture is opened, approved, uploaded, or
+  delivered automatically.
+- Add browser ownership, unsafe-navigation, review-gate, exact-once delivery,
+  retry, preview, IPC parity, and independent recovery coverage. Packaged
+  qualification now includes 28 standard/narrow views.
+
 ## GBlockParty Chromux Next v0.7.1 (prerelease)
 
 Tag: `chromux-next-v0.7.1`

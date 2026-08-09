@@ -26,6 +26,16 @@ import {
   DetectionResultV1Schema,
   DetectedTerminalV1Schema
 } from "../detection/contracts";
+import {
+  BrowserActionInputSchema,
+  BrowserOpenInputSchema,
+  BrowserPresentationInputSchema,
+  BrowserWorkspaceV1Schema,
+  EvidenceCaptureInputSchema,
+  EvidenceIdInputSchema,
+  EvidencePreviewSchema,
+  EvidenceReviewInputSchema
+} from "../browser/contracts";
 
 export const IpcChannels = {
   documentOpen: "document:open",
@@ -37,7 +47,14 @@ export const IpcChannels = {
   agentCancel: "agent:cancel",
   agentEvent: "agent:event",
   browserOpen: "browser:open",
-  browserAction: "browser:action"
+  browserAction: "browser:action",
+  browserState: "browser:state",
+  browserPresent: "browser:present",
+  browserCapture: "browser:capture",
+  browserReview: "browser:review",
+  browserPreview: "browser:preview",
+  browserDeliver: "browser:deliver",
+  browserStateChanged: "browser:state-changed"
   ,runnerState: "runner:state"
   ,runnerStateChanged: "runner:state-changed"
   ,runnerCreate: "runner:create"
@@ -87,15 +104,6 @@ export const MutationResultSchema = z.object({
   inverseBatch: AlignmentMutationBatchV1Schema
 });
 
-export const BrowserActionSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("back") }),
-  z.object({ type: z.literal("forward") }),
-  z.object({ type: z.literal("reload") }),
-  z.object({ type: z.literal("close") }),
-  z.object({ type: z.literal("copy-link") }),
-  z.object({ type: z.literal("open-external") })
-]);
-
 export {
   AgentRunEventSchema,
   AgentRunRequestSchema,
@@ -116,4 +124,12 @@ export {
   ,CreateFromDetectionInputSchema
   ,DetectionResultV1Schema
   ,DetectedTerminalV1Schema
+  ,BrowserActionInputSchema
+  ,BrowserOpenInputSchema
+  ,BrowserPresentationInputSchema
+  ,BrowserWorkspaceV1Schema
+  ,EvidenceCaptureInputSchema
+  ,EvidenceIdInputSchema
+  ,EvidencePreviewSchema
+  ,EvidenceReviewInputSchema
 };
