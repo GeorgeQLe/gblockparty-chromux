@@ -4,11 +4,8 @@ import { mkdir, realpath, stat, writeFile } from "node:fs/promises";
 import {
   app,
   BrowserWindow,
-  clipboard,
   dialog,
-  ipcMain,
-  shell,
-  WebContentsView
+  ipcMain
 } from "electron";
 import started from "electron-squirrel-startup";
 import { isSafeNavigation } from "./domain/links";
@@ -39,6 +36,8 @@ import { CodexAppServer } from "./runner/protocol";
 import { LunaAnalyzer } from "./runner/attention";
 import { RunnerManager } from "./runner/manager";
 import { ExternalTerminalDetector } from "./detection/external";
+import { BrowserViewService } from "./main/browser-view-service";
+import { IpcHandlerRegistry } from "./ipc/registry";
 
 if (started) app.quit();
 
@@ -78,8 +77,13 @@ type VisualDetectionMode = "scanning" | "populated" | "empty" | "denied";
 let visualDetectionMode: VisualDetectionMode = "scanning";
 let resolveVisualDetection: ((value: ReturnType<typeof visualDetectionFixture>) => void) | undefined;
 let mainWindow: BrowserWindow | null = null;
-let browserView: WebContentsView | null = null;
-let browserUrl = "";
+const browser = new BrowserViewService({
+  getWindow: () => mainWindow,
+  getBounds: (window) => {
+    const [width = 1440, height = 900] = window.getContentSize();
+    return { x: 250, y: 104, width: Math.max(400, width - 570), height: Math.max(300, height - 104) };
+  }
+});
 
 function visualDetectionFixture(mode: Exclude<VisualDetectionMode, "scanning">) {
   const rows = mode === "empty" ? [] : [
@@ -132,9 +136,7 @@ function visualDetectionFixture(mode: Exclude<VisualDetectionMode, "scanning">) 
 }
 
 function resizeBrowser(): void {
-  if (!mainWindow || !browserView) return;
-  const [width = 1440, height = 900] = mainWindow.getContentSize();
-  browserView.setBounds({ x: 250, y: 104, width: Math.max(400, width - 570), height: Math.max(300, height - 104) });
+  browser.resize();
 }
 
 function createWindow(): void {
@@ -393,36 +395,14 @@ function createWindow(): void {
   }
   mainWindow.on("resize", resizeBrowser);
   mainWindow.on("closed", () => {
-    browserView?.webContents.close();
-    browserView = null;
+    browser.close();
     mainWindow = null;
   });
 }
 
-function ensureBrowserView(): WebContentsView {
-  if (!mainWindow) throw new Error("Main window is unavailable");
-  if (browserView) return browserView;
-  browserView = new WebContentsView({
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true
-    }
-  });
-  browserView.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-  browserView.webContents.on("will-navigate", (event, url) => {
-    if (!isSafeNavigation(url)) event.preventDefault();
-  });
-  browserView.webContents.on("did-navigate", (_event, url) => {
-    browserUrl = url;
-  });
-  mainWindow.contentView.addChildView(browserView);
-  resizeBrowser();
-  return browserView;
-}
-
 function registerIpc(): void {
-  ipcMain.handle(IpcChannels.documentOpen, async () => {
+  const registry = new IpcHandlerRegistry(ipcMain);
+  registry.handle(IpcChannels.documentOpen, async () => {
     const result = await dialog.showOpenDialog({
       title: "Open alignment document",
       properties: ["openFile"],
@@ -431,16 +411,16 @@ function registerIpc(): void {
     const filePath = result.filePaths[0];
     return result.canceled || !filePath ? null : { filePath, document: await documents.read(filePath) };
   });
-  ipcMain.handle(IpcChannels.documentRead, async (_event, input: unknown) => {
+  registry.handle(IpcChannels.documentRead, async (_event, input: unknown) => {
     const filePath = DocumentPathSchema.parse(input);
     return { filePath, document: await documents.read(filePath) };
   });
-  ipcMain.handle(IpcChannels.documentSave, async (_event, input: unknown) => {
+  registry.handle(IpcChannels.documentSave, async (_event, input: unknown) => {
     const payload = SavePayloadSchema.parse(input);
     await documents.write(payload.filePath, payload.document);
     return payload;
   });
-  ipcMain.handle(IpcChannels.documentSaveAs, async (_event, input: unknown) => {
+  registry.handle(IpcChannels.documentSaveAs, async (_event, input: unknown) => {
     const document = AlignmentDocumentV1Schema.parse(input);
     const result = await dialog.showSaveDialog({
       title: "Save alignment document",
@@ -451,12 +431,12 @@ function registerIpc(): void {
     await documents.write(result.filePath, document);
     return { filePath: result.filePath, document };
   });
-  ipcMain.handle(IpcChannels.mutationApply, async (_event, input: unknown) => {
+  registry.handle(IpcChannels.mutationApply, async (_event, input: unknown) => {
     const payload = MutationPayloadSchema.parse(input);
     const applied = await documents.apply(payload.filePath, payload.batch);
     return { filePath: payload.filePath, document: applied.document, inverseBatch: applied.inverseBatch };
   });
-  ipcMain.handle(IpcChannels.agentRun, async (ipcEvent, input: unknown) => {
+  registry.handle(IpcChannels.agentRun, async (ipcEvent, input: unknown) => {
     const request = AgentRunRequestSchema.parse(input);
     if (running.has(request.id)) throw new Error(`Run already exists: ${request.id}`);
     const controller = new AbortController();
@@ -472,46 +452,32 @@ function registerIpc(): void {
       running.delete(request.id);
     }
   });
-  ipcMain.handle(IpcChannels.agentCancel, (_event, input: unknown) => {
+  registry.handle(IpcChannels.agentCancel, (_event, input: unknown) => {
     if (typeof input !== "string") return false;
     const controller = running.get(input);
     controller?.abort();
     return Boolean(controller);
   });
-  ipcMain.handle(IpcChannels.browserOpen, async (_event, input: unknown) => {
+  registry.handle(IpcChannels.browserOpen, async (_event, input: unknown) => {
     if (typeof input !== "string" || !isSafeNavigation(input)) return false;
-    browserUrl = input;
-    await ensureBrowserView().webContents.loadURL(input);
-    return true;
+    return browser.open(input);
   });
-  ipcMain.handle(IpcChannels.browserAction, async (_event, input: unknown) => {
+  registry.handle(IpcChannels.browserAction, async (_event, input: unknown) => {
     const action = BrowserActionSchema.parse(input);
-    if (!browserView) return false;
-    if (action.type === "back" && browserView.webContents.canGoBack()) browserView.webContents.goBack();
-    if (action.type === "forward" && browserView.webContents.canGoForward()) browserView.webContents.goForward();
-    if (action.type === "reload") browserView.webContents.reload();
-    if (action.type === "copy-link") clipboard.writeText(browserUrl);
-    if (action.type === "open-external" && isSafeNavigation(browserUrl)) await shell.openExternal(browserUrl);
-    if (action.type === "close" && mainWindow) {
-      mainWindow.contentView.removeChildView(browserView);
-      browserView.webContents.close();
-      browserView = null;
-      browserUrl = "";
-    }
-    return true;
+    return browser.action(action.type);
   });
-  ipcMain.handle(IpcChannels.runnerState, () => runner.getState());
-  ipcMain.handle(IpcChannels.runnerModels, () => runner.getModels());
-  ipcMain.handle(IpcChannels.runnerCreate, (_event, input: unknown) =>
+  registry.handle(IpcChannels.runnerState, () => runner.getState());
+  registry.handle(IpcChannels.runnerModels, () => runner.getModels());
+  registry.handle(IpcChannels.runnerCreate, (_event, input: unknown) =>
     runner.createSession(CreateSessionInputSchema.parse(input)));
-  ipcMain.handle(IpcChannels.runnerDetectExternal, () => {
+  registry.handle(IpcChannels.runnerDetectExternal, () => {
     if (!isVisualSmoke) return detector.scan();
     if (visualDetectionMode === "scanning") {
       return new Promise((resolve) => { resolveVisualDetection = resolve; });
     }
     return visualDetectionFixture(visualDetectionMode);
   });
-  ipcMain.handle(IpcChannels.runnerCreateFromDetection, async (_event, input: unknown) => {
+  registry.handle(IpcChannels.runnerCreateFromDetection, async (_event, input: unknown) => {
     const value = CreateFromDetectionInputSchema.parse(input);
     const target = detector.resolve(value.scanId, value.targetId);
     if (value.mode === "resume" && !target.threadId) {
@@ -535,34 +501,34 @@ function registerIpc(): void {
     }
     return created.session;
   });
-  ipcMain.handle(IpcChannels.runnerClose, (_event, input: unknown) => {
+  registry.handle(IpcChannels.runnerClose, (_event, input: unknown) => {
     if (typeof input !== "string") throw new Error("Invalid session id");
     return runner.closeSession(input);
   });
-  ipcMain.handle(IpcChannels.runnerSend, (_event, input: unknown) =>
+  registry.handle(IpcChannels.runnerSend, (_event, input: unknown) =>
     runner.startOrSteer(TurnInputSchema.parse(input)));
-  ipcMain.handle(IpcChannels.runnerInterrupt, (_event, input: unknown) => {
+  registry.handle(IpcChannels.runnerInterrupt, (_event, input: unknown) => {
     if (typeof input !== "string") throw new Error("Invalid session id");
     return runner.interrupt(input);
   });
-  ipcMain.handle(IpcChannels.runnerDraft, (_event, input: unknown) =>
+  registry.handle(IpcChannels.runnerDraft, (_event, input: unknown) =>
     runner.saveDraft(DraftInputSchema.parse(input)));
-  ipcMain.handle(IpcChannels.runnerRespond, (_event, input: unknown) =>
+  registry.handle(IpcChannels.runnerRespond, (_event, input: unknown) =>
     runner.respond(ApprovalResponseInputSchema.parse(input)));
-  ipcMain.handle(IpcChannels.runnerGroup, (_event, input: unknown) =>
+  registry.handle(IpcChannels.runnerGroup, (_event, input: unknown) =>
     runner.mutateGroup(GroupMutationInputSchema.parse(input)));
-  ipcMain.handle(IpcChannels.runnerSelect, (_event, input: unknown) => {
+  registry.handle(IpcChannels.runnerSelect, (_event, input: unknown) => {
     const payload = input as { groupId?: unknown; sessionId?: unknown };
     if (typeof payload?.groupId !== "string" || typeof payload?.sessionId !== "string") {
       throw new Error("Invalid selection");
     }
     return runner.select(payload.groupId, payload.sessionId);
   });
-  ipcMain.handle(IpcChannels.attentionRefresh, () => runner.refreshAttention());
-  ipcMain.handle(IpcChannels.attentionTriage, (_event, input: unknown) =>
+  registry.handle(IpcChannels.attentionRefresh, () => runner.refreshAttention());
+  registry.handle(IpcChannels.attentionTriage, (_event, input: unknown) =>
     runner.triage(TriageInputSchema.parse(input)));
-  ipcMain.handle(IpcChannels.settingsGetUiPreferences, () => localStore.getUiPreferences());
-  ipcMain.handle(IpcChannels.settingsUpdateUiPreferences, async (_event, input: unknown) => {
+  registry.handle(IpcChannels.settingsGetUiPreferences, () => localStore.getUiPreferences());
+  registry.handle(IpcChannels.settingsUpdateUiPreferences, async (_event, input: unknown) => {
     const preferences = await localStore.updateUiPreferences(UiPreferencesPatchV1Schema.parse(input));
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed()) window.webContents.send(IpcChannels.settingsUiPreferencesChanged, preferences);
@@ -576,15 +542,15 @@ function registerIpc(): void {
       }
     }
   };
-  ipcMain.handle(IpcChannels.settingsGetWorkspacePreferences, () => localStore.getWorkspacePreferences());
-  ipcMain.handle(IpcChannels.settingsUpdateWorkspacePreferences, async (_event, input: unknown) => {
+  registry.handle(IpcChannels.settingsGetWorkspacePreferences, () => localStore.getWorkspacePreferences());
+  registry.handle(IpcChannels.settingsUpdateWorkspacePreferences, async (_event, input: unknown) => {
     const preferences = await localStore.updateWorkspacePreferences(
       WorkspacePreferencesPatchV1Schema.parse(input)
     );
     broadcastWorkspacePreferences(preferences);
     return preferences;
   });
-  ipcMain.handle(IpcChannels.settingsChooseProject, async () => {
+  registry.handle(IpcChannels.settingsChooseProject, async () => {
     const result = await dialog.showOpenDialog({
       title: "Add a project or worktree",
       buttonLabel: "Add to Chromux Next",
@@ -612,14 +578,15 @@ function registerIpc(): void {
     broadcastWorkspacePreferences(preferences);
     return preferences;
   });
-  ipcMain.handle(IpcChannels.settingsRemoveProject, async (_event, input: unknown) => {
+  registry.handle(IpcChannels.settingsRemoveProject, async (_event, input: unknown) => {
     if (typeof input !== "string") throw new Error("Invalid project id");
     const preferences = await localStore.removeProject(input);
     broadcastWorkspacePreferences(preferences);
     return preferences;
   });
-  ipcMain.handle(IpcChannels.settingsCompatibilityDiagnostics, () =>
+  registry.handle(IpcChannels.settingsCompatibilityDiagnostics, () =>
     runner.getCompatibilityDiagnostics(app.getVersion(), `${process.platform} ${process.arch}`));
+  registry.assertComplete();
   runner.on("state", (state) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send(IpcChannels.runnerStateChanged, state);

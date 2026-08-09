@@ -76,9 +76,9 @@ import {
   IconButton,
   Tabs
 } from "./ui/components";
+import { PersistentSurfaces, type CenterSurface } from "./renderer/persistent-surfaces";
 import "./styles.css";
 
-type CenterSurface = "runner" | "alignment" | "deck" | "canvas" | "browser";
 const terminalViewports = new Map<string, number>();
 
 const EMPTY_STATE: RunnerStateV1 = {
@@ -637,14 +637,14 @@ function Workspace({ state, models, selectedSession, surface, setSurface, error,
       <select aria-label="Move session to group" value={selectedSession.groupId} onChange={(event) => void window.chromuxNext.runner.mutateGroup({ type: "move-session", groupId: event.target.value, sessionId: selectedSession.id })}>{state.groups.map((group) => <option key={group.id} value={group.id}>{group.title}</option>)}</select>
       <button aria-label="Close selected session" onClick={() => closeSession(selectedSession)}>Close</button>
     </>}</div>}
-    <div className={`surface-pane runner-pane ${surface === "runner" ? "active" : ""}`} aria-hidden={surface !== "runner"}>
-      <RunnerTerminal {...(selectedSession ? { session: selectedSession } : {})} />
-      <Composer {...(selectedSession ? { session: selectedSession } : {})} />
-    </div>
-    <div className={`surface-pane ${surface === "alignment" ? "active" : ""}`} aria-hidden={surface !== "alignment"}><AlignmentSurface alignment={alignment} /></div>
-    <div className={`surface-pane ${surface === "deck" ? "active" : ""}`} aria-hidden={surface !== "deck"}><DeckSurface document={alignment.document} /></div>
-    <div className={`surface-pane ${surface === "canvas" ? "active" : ""}`} aria-hidden={surface !== "canvas"}><CanvasSurface document={alignment.document} /></div>
-    <div className={`surface-pane ${surface === "browser" ? "active" : ""}`} aria-hidden={surface !== "browser"}><section className="secondary-surface browser-placeholder"><h2>Browser</h2><p>HTTP(S) links open here only after an explicit click in a runner transcript or contributor response.</p></section></div>
+    <PersistentSurfaces
+      active={surface}
+      runner={<><RunnerTerminal {...(selectedSession ? { session: selectedSession } : {})} /><Composer {...(selectedSession ? { session: selectedSession } : {})} /></>}
+      alignment={<AlignmentSurface alignment={alignment} />}
+      deck={<DeckSurface document={alignment.document} />}
+      canvas={<CanvasSurface document={alignment.document} />}
+      browser={<section className="secondary-surface browser-placeholder"><h2>Browser</h2><p>HTTP(S) links open here only after an explicit click in a runner transcript or contributor response.</p></section>}
+    />
     {error && <button className="error-banner" onClick={clearError}><AlertTriangle aria-hidden="true" size={16} /><span>{error}</span><X aria-hidden="true" size={16} /></button>}
   </section>;
 }

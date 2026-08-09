@@ -46,6 +46,27 @@ cross IPC. `src/persistence` owns isolated atomic app state and canonical
 document transactions. `src/ipc` is the only renderer/main contract. Existing
 `src/domain` alignment contracts remain schema-v1 compatible.
 
+## Modular baseline and recovery
+
+The v0.7.1 baseline makes ownership enforceable rather than conventional:
+
+- `main/browser-view-service.ts` owns the guest view and accepts an injected
+  host/dependency interface; renderer code never receives a view, filesystem
+  path, or `webContents` reference.
+- `ipc/registry.ts` is the complete preload invocation catalog. Main-process
+  startup asserts that every catalog entry has exactly one handler. The same
+  module owns the schema map for all main-to-renderer event streams.
+- `renderer/persistent-surfaces.tsx` keeps every surface mounted and changes
+  visibility only. Presentation shells cannot destroy workspace state as a
+  side effect of layout changes.
+- `persistence/local-store.ts` stores app, runner, UI, and workspace/onboarding
+  state in separate `0600` atomic JSON slices. A malformed or future optional
+  slice recovers independently. The previous combined `state-v1.json` is read
+  only as an upgrade fallback and is never rewritten or removed.
+- `main/service-contracts.ts` defines injection seams for subprocess, storage,
+  release-client, clock, and ID behavior. Migration and update services have
+  explicit main-process boundaries before they gain renderer-visible APIs.
+
 ## Detect-first onboarding
 
 - On macOS, the main process runs bounded `ps` and per-process `lsof` probes

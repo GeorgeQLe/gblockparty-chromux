@@ -1,5 +1,27 @@
 # Release Notes
 
+## GBlockParty Chromux Next v0.7.1 (prerelease)
+
+Tag: `chromux-next-v0.7.1`
+
+- Introduce explicit main-process service boundaries for guest browser views,
+  release clients, subprocess launchers, state storage, clocks, IDs, successor
+  migration, and future update behavior.
+- Make preload/main handler parity executable: startup now fails if any preload
+  invocation lacks a main-process handler or is registered twice.
+- Route every main-to-renderer event through a shared runtime schema before it
+  reaches application listeners.
+- Keep runner, UI, workspace/onboarding, and general app state in independent,
+  private, atomically replaced schema-owned files. Existing v0.7.0 combined
+  state remains a read-only fallback so upgrades preserve sessions and drafts.
+- Move persistent surface mounting into a dedicated renderer component so all
+  five presentations retain terminal viewport, Composer, Alignment, Deck,
+  Canvas, and Browser component state while switching.
+- Extract singleton browser-view ownership from the entrypoint behind injected
+  host and Electron dependencies while preserving explicit-click HTTP(S)-only
+  navigation, popup denial, and the existing bridge.
+- Add IPC conformance and adversarial state-slice recovery tests.
+
 ## GBlockParty Chromux Next v0.7.0 (prerelease)
 
 Tag: `chromux-next-v0.7.0`

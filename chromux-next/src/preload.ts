@@ -16,6 +16,7 @@ import {
   ,WorkspacePreferencesV1Schema
 } from "./ipc/contracts";
 import type { ChromuxNextApi } from "./ipc/bridge";
+import { parseMainToRendererEvent } from "./ipc/registry";
 import { AlignmentDocumentV1Schema, AlignmentMutationBatchV1Schema } from "./domain/schema";
 import {
   AttentionAnalysisV1Schema,
@@ -74,7 +75,7 @@ const api: ChromuxNextApi = {
     },
     onEvent(listener) {
       const handler = (_event: Electron.IpcRendererEvent, value: unknown) => {
-        listener(AgentRunEventSchema.parse(value));
+        listener(parseMainToRendererEvent(IpcChannels.agentEvent, value));
       };
       ipcRenderer.on(IpcChannels.agentEvent, handler);
       return () => ipcRenderer.removeListener(IpcChannels.agentEvent, handler);
@@ -135,7 +136,7 @@ const api: ChromuxNextApi = {
     },
     onState(listener) {
       const handler = (_event: Electron.IpcRendererEvent, value: unknown) => {
-        listener(RunnerStateV1Schema.parse(value));
+        listener(parseMainToRendererEvent(IpcChannels.runnerStateChanged, value));
       };
       ipcRenderer.on(IpcChannels.runnerStateChanged, handler);
       return () => ipcRenderer.removeListener(IpcChannels.runnerStateChanged, handler);
@@ -162,7 +163,7 @@ const api: ChromuxNextApi = {
     },
     onUiPreferencesChanged(listener) {
       const handler = (_event: Electron.IpcRendererEvent, value: unknown) => {
-        listener(UiPreferencesV1Schema.parse(value));
+        listener(parseMainToRendererEvent(IpcChannels.settingsUiPreferencesChanged, value));
       };
       ipcRenderer.on(IpcChannels.settingsUiPreferencesChanged, handler);
       return () => ipcRenderer.removeListener(IpcChannels.settingsUiPreferencesChanged, handler);
@@ -194,7 +195,7 @@ const api: ChromuxNextApi = {
     },
     onWorkspacePreferencesChanged(listener) {
       const handler = (_event: Electron.IpcRendererEvent, value: unknown) => {
-        listener(WorkspacePreferencesV1Schema.parse(value));
+        listener(parseMainToRendererEvent(IpcChannels.settingsWorkspacePreferencesChanged, value));
       };
       ipcRenderer.on(IpcChannels.settingsWorkspacePreferencesChanged, handler);
       return () => ipcRenderer.removeListener(IpcChannels.settingsWorkspacePreferencesChanged, handler);

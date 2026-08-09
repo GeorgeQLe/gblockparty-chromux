@@ -1,6 +1,6 @@
 {
   "name": "chromux-next",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "productName": "GBlockParty Chromux Next",
   "description": "A structured local-first human and agent alignment workspace.",
   "main": ".vite/build/main.js",

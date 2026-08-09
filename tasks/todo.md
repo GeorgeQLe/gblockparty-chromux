@@ -59,6 +59,15 @@ instead of resuming the `prototype/` implementation.
 
 ## Completed Work
 
+- [x] Establish the Chromux Next v0.7.1 modular baseline with an injected
+  browser-view owner, explicit service interfaces, startup-enforced IPC parity,
+  runtime-validated renderer events, independently recoverable atomic state
+  slices, persistent surface mounting, legacy-lessons documentation, focused
+  recovery/contract coverage, and prerelease UAT. _(source: user-supplied
+  Chromux Next Cutover-Ready Upgrade Program; successor scope only; later
+  browser/evidence, qualification/import, signed-update, cross-platform, and
+  stable-cutover milestones remain in the active cutover gate above)_
+
 - [x] Make DETECT the first Chromux Next experience with bounded macOS
   Terminal/iTerm process and folder discovery, optional Automation titles,
   exact-cwd Codex thread previews and Resume, Focus Existing, opaque transient

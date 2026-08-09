@@ -50,7 +50,7 @@ describe("incremental JSONL decoder", () => {
 });
 
 describe("Codex app-server subprocess", () => {
-  it("initializes with 0.7.0 and handles fragmented responses, notifications, and server requests", async () => {
+  it("initializes with 0.7.1 and handles fragmented responses, notifications, and server requests", async () => {
     const { server, logPath } = await scenario({
       fragments: [1, 2, 3, 5, 8],
       notificationAfter: "thread/start",
@@ -66,7 +66,7 @@ describe("Codex app-server subprocess", () => {
     expect(await server.request("thread/start", {})).toEqual({ thread: { id: "fixture-thread-1" } });
     await waitFor(() => notifications.some((item) => item.method === "item/agentMessage/delta") && requests.length === 1);
     const log = await readFile(logPath, "utf8");
-    expect(log).toContain('"version":"0.7.0"');
+    expect(log).toContain('"version":"0.7.1"');
     server.respond("server-request", { decision: "decline" });
   });
 

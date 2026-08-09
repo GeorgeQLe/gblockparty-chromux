@@ -11,9 +11,12 @@ describe("runner renderer security", () => {
   });
 
   it("keeps blockers non-dismissible and secondary surfaces independent", async () => {
-    const source = await readFile("src/renderer.tsx", "utf8");
+    const [source, surfaces] = await Promise.all([
+      readFile("src/renderer.tsx", "utf8"),
+      readFile("src/renderer/persistent-surfaces.tsx", "utf8")
+    ]);
     expect(source).toContain("cannot dismiss");
-    expect(source).toContain('type CenterSurface = "runner" | "alignment" | "deck" | "canvas" | "browser"');
+    expect(surfaces).toContain('type CenterSurface = "runner" | "alignment" | "deck" | "canvas" | "browser"');
   });
 
   it("keeps settings narrow and runtime validated across the preload boundary", async () => {

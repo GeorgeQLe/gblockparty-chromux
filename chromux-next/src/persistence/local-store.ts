@@ -1,7 +1,7 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
-import { RunnerStateV1Schema } from "../runner/contracts";
+import { RunnerStateV1Schema, type RunnerStateV1 } from "../runner/contracts";
 import {
   DEFAULT_UI_PREFERENCES,
   UiPreferencesV1Schema,
@@ -19,7 +19,7 @@ import {
   type WorkspacePreferencesV1
 } from "../settings/workspace-preferences";
 
-const LocalStateSchema = z.object({
+const AppStateV1Schema = z.object({
   schemaVersion: z.literal(1),
   recentDocuments: z.array(z.string().max(4096)).max(20).default([]),
   lastProjectPath: z.string().max(4096).default(""),
@@ -32,76 +32,109 @@ const LocalStateSchema = z.object({
     provider: z.string(),
     status: z.string(),
     at: z.string().datetime()
-  })).max(100).default([]),
-  runner: RunnerStateV1Schema.optional(),
-  // Invalid or future preference values recover independently so runner state
-  // is never discarded because presentation metadata was malformed.
-  uiPreferences: z.unknown().optional().transform(recoverUiPreferences),
-  // Successor-native onboarding data is recovered independently and never
-  // consults the legacy Chromux user-data directory.
-  workspacePreferences: z.unknown().optional().transform(recoverWorkspacePreferences)
+  })).max(100).default([])
 });
-export type LocalState = z.infer<typeof LocalStateSchema>;
 
-const DEFAULT_STATE: LocalState = {
+const LegacyLocalStateSchema = AppStateV1Schema.extend({
+  runner: z.unknown().optional(),
+  uiPreferences: z.unknown().optional(),
+  workspacePreferences: z.unknown().optional()
+});
+
+const DetectedSessionTransactionV1Schema = z.object({
+  schemaVersion: z.literal(1),
+  runner: RunnerStateV1Schema,
+  workspacePreferences: WorkspacePreferencesV1Schema
+});
+
+type AppStateV1 = z.infer<typeof AppStateV1Schema>;
+export type LocalState = AppStateV1 & {
+  runner?: RunnerStateV1;
+  uiPreferences: UiPreferencesV1;
+  workspacePreferences: WorkspacePreferencesV1;
+};
+
+const DEFAULT_APP_STATE: AppStateV1 = {
   schemaVersion: 1,
   recentDocuments: [],
   lastProjectPath: "",
   window: { width: 1440, height: 900 },
-  runLogs: [],
-  uiPreferences: { ...DEFAULT_UI_PREFERENCES },
-  workspacePreferences: structuredClone(DEFAULT_WORKSPACE_PREFERENCES)
+  runLogs: []
 };
 
+type SliceName =
+  | "app-state-v1.json"
+  | "runner-state-v1.json"
+  | "ui-preferences-v1.json"
+  | "workspace-preferences-v1.json"
+  | "detected-session-transaction-v1.json";
+
+/**
+ * Successor state is split by ownership. A malformed optional slice is
+ * recovered without invalidating drafts, sessions, or another preference
+ * domain. state-v1.json remains a read-only migration fallback for v0.7.0.
+ */
 export class LocalStore {
-  private readonly filePath: string;
+  private readonly userDataPath: string;
+  private readonly legacyFilePath: string;
   private writeQueue: Promise<void> = Promise.resolve();
 
   constructor(userDataPath: string) {
-    this.filePath = path.join(userDataPath, "state-v1.json");
+    this.userDataPath = userDataPath;
+    this.legacyFilePath = path.join(userDataPath, "state-v1.json");
   }
 
   async read(): Promise<LocalState> {
-    try {
-      return LocalStateSchema.parse(JSON.parse(await readFile(this.filePath, "utf8")));
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return structuredClone(DEFAULT_STATE);
-      throw error;
-    }
+    const legacy = await this.readLegacy();
+    const transaction = await this.recoverDetectedSessionTransaction();
+    const app = await this.readSlice("app-state-v1.json", AppStateV1Schema)
+      ?? (legacy ? AppStateV1Schema.parse(legacy) : structuredClone(DEFAULT_APP_STATE));
+    const runnerValue = await this.readUnknownSlice("runner-state-v1.json");
+    const runner = RunnerStateV1Schema.safeParse(transaction?.runner ?? runnerValue ?? legacy?.runner);
+    const uiValue = await this.readUnknownSlice("ui-preferences-v1.json");
+    const workspaceValue = await this.readUnknownSlice("workspace-preferences-v1.json");
+    return {
+      ...app,
+      ...(runner.success ? { runner: runner.data } : {}),
+      uiPreferences: recoverUiPreferences(uiValue ?? legacy?.uiPreferences),
+      workspacePreferences: recoverWorkspacePreferences(
+        transaction?.workspacePreferences ?? workspaceValue ?? legacy?.workspacePreferences
+      )
+    };
   }
 
   async write(state: LocalState): Promise<void> {
-    const validated = LocalStateSchema.parse(state);
-    const next = this.writeQueue.then(() => this.writeValidated(validated));
-    this.writeQueue = next.catch(() => undefined);
-    await next;
+    const validated = this.validateState(state);
+    await this.enqueue(async () => {
+      await this.writeSlice("app-state-v1.json", AppStateV1Schema.parse(validated));
+      if (validated.runner) await this.writeSlice("runner-state-v1.json", validated.runner);
+      await this.writeSlice("ui-preferences-v1.json", validated.uiPreferences);
+      await this.writeSlice("workspace-preferences-v1.json", validated.workspacePreferences);
+    });
   }
 
   async getUiPreferences(): Promise<UiPreferencesV1> {
-    return recoverUiPreferences((await this.read()).uiPreferences);
+    return (await this.read()).uiPreferences;
   }
 
   async updateUiPreferences(patch: UiPreferencesPatchV1): Promise<UiPreferencesV1> {
     let result: UiPreferencesV1 = { ...DEFAULT_UI_PREFERENCES };
-    await this.update((state) => {
-      result = UiPreferencesV1Schema.parse({
-        ...recoverUiPreferences(state.uiPreferences),
-        ...patch,
-        schemaVersion: 1
-      });
-      return { ...state, uiPreferences: result };
+    await this.enqueue(async () => {
+      const current = (await this.read()).uiPreferences;
+      result = UiPreferencesV1Schema.parse({ ...current, ...patch, schemaVersion: 1 });
+      await this.writeSlice("ui-preferences-v1.json", result);
     });
     return result;
   }
 
   async getWorkspacePreferences(): Promise<WorkspacePreferencesV1> {
-    return recoverWorkspacePreferences((await this.read()).workspacePreferences);
+    return (await this.read()).workspacePreferences;
   }
 
   async updateWorkspacePreferences(patch: WorkspacePreferencesPatchV1): Promise<WorkspacePreferencesV1> {
     let result = structuredClone(DEFAULT_WORKSPACE_PREFERENCES);
-    await this.update((state) => {
-      const current = recoverWorkspacePreferences(state.workspacePreferences);
+    await this.enqueue(async () => {
+      const current = (await this.read()).workspacePreferences;
       result = WorkspacePreferencesV1Schema.parse({
         ...current,
         ...patch,
@@ -112,49 +145,39 @@ export class LocalStore {
           : patch.defaultReasoningEffort ?? current.defaultReasoningEffort,
         schemaVersion: 1
       });
-      return { ...state, workspacePreferences: result };
+      await this.writeSlice("workspace-preferences-v1.json", result);
     });
     return result;
   }
 
   async addProject(project: ProjectEntryV1): Promise<WorkspacePreferencesV1> {
     const validated = ProjectEntryV1Schema.parse(project);
-    let result = structuredClone(DEFAULT_WORKSPACE_PREFERENCES);
-    await this.update((state) => {
-      const current = recoverWorkspacePreferences(state.workspacePreferences);
+    return this.mutateProjects((current) => {
       const existing = current.projects.find((item) => item.path === validated.path);
       const projects = existing
         ? current.projects.map((item) => item.id === existing.id
           ? { ...validated, id: existing.id, addedAt: existing.addedAt }
           : item)
         : [...current.projects, validated];
-      result = WorkspacePreferencesV1Schema.parse({
-        ...current,
-        projects,
-        defaultProjectId: current.defaultProjectId ?? existing?.id ?? validated.id
-      });
-      return { ...state, workspacePreferences: result };
+      return { ...current, projects, defaultProjectId: current.defaultProjectId ?? existing?.id ?? validated.id };
     });
-    return result;
   }
 
   async removeProject(projectId: string): Promise<WorkspacePreferencesV1> {
-    let result = structuredClone(DEFAULT_WORKSPACE_PREFERENCES);
-    await this.update((state) => {
-      const current = recoverWorkspacePreferences(state.workspacePreferences);
+    return this.mutateProjects((current) => {
       const projects = current.projects.filter((item) => item.id !== projectId);
-      result = WorkspacePreferencesV1Schema.parse({
+      return {
         ...current,
         projects,
         defaultProjectId: current.defaultProjectId === projectId ? projects[0]?.id : current.defaultProjectId
-      });
-      return { ...state, workspacePreferences: result };
+      };
     });
-    return result;
   }
 
   async updateRunner(runner: LocalState["runner"]): Promise<void> {
-    await this.update((state) => ({ ...state, ...(runner ? { runner } : {}) }));
+    if (!runner) return;
+    const validated = RunnerStateV1Schema.parse(runner);
+    await this.enqueue(() => this.writeSlice("runner-state-v1.json", validated));
   }
 
   async registerDetectedSession(
@@ -164,8 +187,8 @@ export class LocalStore {
     const validatedRunner = RunnerStateV1Schema.parse(runner);
     const validatedProject = ProjectEntryV1Schema.parse(project);
     let result = structuredClone(DEFAULT_WORKSPACE_PREFERENCES);
-    await this.update((state) => {
-      const current = recoverWorkspacePreferences(state.workspacePreferences);
+    await this.enqueue(async () => {
+      const current = (await this.read()).workspacePreferences;
       const existing = current.projects.find((item) => item.path === validatedProject.path);
       const projects = existing
         ? current.projects.map((item) => item.id === existing.id
@@ -177,24 +200,92 @@ export class LocalStore {
         projects,
         defaultProjectId: current.defaultProjectId ?? existing?.id ?? validatedProject.id
       });
-      return { ...state, runner: validatedRunner, workspacePreferences: result };
+      // The marker makes the two-file mutation logically atomic. If the
+      // process exits between renames, read() completes the exact transaction
+      // before exposing either slice.
+      await this.writeSlice("detected-session-transaction-v1.json", {
+        schemaVersion: 1,
+        runner: validatedRunner,
+        workspacePreferences: result
+      });
+      await this.writeSlice("workspace-preferences-v1.json", result);
+      await this.writeSlice("runner-state-v1.json", validatedRunner);
+      await this.removeTransactionMarker();
     });
     return result;
   }
 
-  private async update(mutator: (state: LocalState) => LocalState): Promise<void> {
-    const next = this.writeQueue.then(async () => {
-      const state = LocalStateSchema.parse(mutator(await this.read()));
-      await this.writeValidated(state);
+  private async mutateProjects(
+    mutate: (current: WorkspacePreferencesV1) => WorkspacePreferencesV1
+  ): Promise<WorkspacePreferencesV1> {
+    let result = structuredClone(DEFAULT_WORKSPACE_PREFERENCES);
+    await this.enqueue(async () => {
+      result = WorkspacePreferencesV1Schema.parse(mutate((await this.read()).workspacePreferences));
+      await this.writeSlice("workspace-preferences-v1.json", result);
     });
-    this.writeQueue = next.catch(() => undefined);
-    await next;
+    return result;
   }
 
-  private async writeValidated(state: LocalState): Promise<void> {
-    await mkdir(path.dirname(this.filePath), { recursive: true });
-    const temporaryPath = `${this.filePath}.${process.pid}.tmp`;
-    await writeFile(temporaryPath, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 });
-    await rename(temporaryPath, this.filePath);
+  private validateState(state: LocalState): LocalState {
+    return {
+      ...AppStateV1Schema.parse(state),
+      ...(state.runner ? { runner: RunnerStateV1Schema.parse(state.runner) } : {}),
+      uiPreferences: UiPreferencesV1Schema.parse(state.uiPreferences),
+      workspacePreferences: WorkspacePreferencesV1Schema.parse(state.workspacePreferences)
+    };
+  }
+
+  private async readLegacy(): Promise<z.infer<typeof LegacyLocalStateSchema> | undefined> {
+    try {
+      return LegacyLocalStateSchema.parse(JSON.parse(await readFile(this.legacyFilePath, "utf8")));
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async recoverDetectedSessionTransaction(): Promise<z.infer<typeof DetectedSessionTransactionV1Schema> | undefined> {
+    const value = await this.readUnknownSlice("detected-session-transaction-v1.json");
+    const parsed = DetectedSessionTransactionV1Schema.safeParse(value);
+    if (!parsed.success) return undefined;
+    await this.writeSlice("workspace-preferences-v1.json", parsed.data.workspacePreferences);
+    await this.writeSlice("runner-state-v1.json", parsed.data.runner);
+    await this.removeTransactionMarker();
+    return parsed.data;
+  }
+
+  private async removeTransactionMarker(): Promise<void> {
+    try {
+      await unlink(path.join(this.userDataPath, "detected-session-transaction-v1.json"));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+  }
+
+  private async readUnknownSlice(name: SliceName): Promise<unknown | undefined> {
+    try {
+      return JSON.parse(await readFile(path.join(this.userDataPath, name), "utf8"));
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async readSlice<T>(name: SliceName, schema: z.ZodType<T>): Promise<T | undefined> {
+    const value = await this.readUnknownSlice(name);
+    const parsed = schema.safeParse(value);
+    return parsed.success ? parsed.data : undefined;
+  }
+
+  private enqueue(operation: () => Promise<void>): Promise<void> {
+    const next = this.writeQueue.then(operation);
+    this.writeQueue = next.catch(() => undefined);
+    return next;
+  }
+
+  private async writeSlice(name: SliceName, value: unknown): Promise<void> {
+    await mkdir(this.userDataPath, { recursive: true });
+    const filePath = path.join(this.userDataPath, name);
+    const temporaryPath = `${filePath}.${process.pid}.${Math.random().toString(16).slice(2)}.tmp`;
+    await writeFile(temporaryPath, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
+    await rename(temporaryPath, filePath);
   }
 }

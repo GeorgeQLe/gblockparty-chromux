@@ -67,12 +67,16 @@ describe("five-approach shared interface system", () => {
   });
 
   it("flushes drafts and preserves transcript viewport before live switching", async () => {
-    const source = await readFile("src/renderer.tsx", "utf8");
+    const [source, surfaces] = await Promise.all([
+      readFile("src/renderer.tsx", "utf8"),
+      readFile("src/renderer/persistent-surfaces.tsx", "utf8")
+    ]);
     expect(source).toContain('new Event("chromux:flush-drafts")');
     expect(source).toContain("terminalViewports.set");
     expect(source).toContain("scrollToLine(viewport)");
     expect(source).toContain('key="persistent-workspace"');
-    expect(source).toContain("surface-pane runner-pane");
+    expect(surfaces).toContain("surface-pane runner-pane");
+    expect(surfaces).toContain("Keeps every workspace mounted");
     expect(source).not.toContain('surface === "runner" && <Composer');
   });
 

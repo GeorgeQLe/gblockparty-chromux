@@ -3052,3 +3052,28 @@
   GitHub prerelease is the required publication. Next command: begin the
   macOS daily-driver and clean-install evidence tracked by the Chromux Next
   cutover gate in `tasks/todo.md`.
+
+## 2026-08-09 — Chromux Next v0.7.1 modular baseline
+
+- **User goal:** Begin the cutover-ready upgrade program in release order,
+  preserving successor behavior while creating enforceable module, IPC,
+  dependency-injection, and recovery boundaries.
+- **Implementation:** Browser guest ownership moved to an injected
+  `BrowserViewService`; IPC registrations now pass through a complete handler
+  catalog with startup parity enforcement; main-to-renderer events share
+  runtime schemas; persistent surfaces have a dedicated renderer owner; and
+  app, runner, UI, and workspace/onboarding data now use independent private
+  atomic files with the v0.7.0 combined file retained as a read-only fallback.
+  Main-process contracts now define subprocess, storage, release-client,
+  clock, ID, successor migration, and future update seams.
+- **Verification:** `npm run typecheck` and all 100 Vitest tests passed,
+  including new duplicate/missing IPC and malformed/future slice cases. Full
+  packaged verification and release publication are recorded separately at
+  ship time.
+- **Scope and residual risk:** This prerelease does not import legacy Chromux,
+  expose an update API, or implement the session browser/evidence workflow.
+  Those remain the subsequent v0.8.0–v0.10.0 program milestones. Stable 1.0.0
+  remains blocked by the explicit seven-day, signing, platform, upgrade, and
+  rollback gates and must not replace `/releases/latest` early.
+- **Rollback:** Remove prerelease `chromux-next-v0.7.1` and revert its commit;
+  v0.7.0 continues reading the untouched combined successor state file.
