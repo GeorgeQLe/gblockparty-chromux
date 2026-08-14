@@ -1011,7 +1011,7 @@ function DetectionDialog({
   };
   useEffect(scan, []);
   const rows = (result?.rows ?? []).filter((row) =>
-    `${row.title ?? ""} ${row.directory} ${row.agent} ${row.command}`.toLowerCase().includes(query.toLowerCase())
+    `${row.projectName} ${row.title ?? ""} ${row.directory} ${row.agent} ${row.command}`.toLowerCase().includes(query.toLowerCase())
   );
   const pick = (row: DetectedTerminalV1, nextMode: CreateFromDetectionInput["mode"]) => {
     if (row.alreadyOpenSessionId) {
@@ -1028,7 +1028,7 @@ function DetectionDialog({
     }
     setSelected(row);
     setMode(nextMode);
-    setTitle(row.title || `${nextMode === "resume" ? "Resume" : "Codex"} · ${row.directory.split("/").at(-1) || "session"}`);
+    setTitle(`${nextMode === "resume" ? "Resume" : "Codex"} · ${row.projectName}`);
   };
   const create = () => {
     if (!result || !selected || !title.trim()) return;
@@ -1063,7 +1063,7 @@ function DetectionDialog({
       : <><div className="detection-fallbacks"><Button icon={FolderPlus} tone="quiet" onClick={chooseProject}>Choose Folder</Button>{onboarding && <Button tone="quiet" onClick={complete}>Continue Without Session</Button>}</div><Button icon={RefreshCw} onClick={scan} disabled={loading}>Rescan</Button></>}
   >
     {selected ? <form className="session-form detection-config" onSubmit={(event) => { event.preventDefault(); create(); }}>
-      <div className="detected-summary"><Badge tone="sage">{selected.agent}</Badge><strong>{selected.title || selected.command}</strong><small>{selected.directory}</small></div>
+      <div className="detected-summary"><Badge tone="sage">{selected.agent}</Badge><strong>{selected.projectName}</strong><small>{selected.directory}</small></div>
       {mode === "resume" && selected.externalActive && <p className="detection-warning"><AlertTriangle size={16} aria-hidden="true" /> Resume creates a separate Chromux Next continuation. The external Codex process stays active, so the two continuations may diverge.</p>}
       {createError && <p className="detection-error" role="alert"><AlertTriangle size={16} aria-hidden="true" /> {createError}</p>}
       <label>Session title<input autoFocus maxLength={256} value={title} onChange={(event) => setTitle(event.target.value)} /></label>
@@ -1079,7 +1079,7 @@ function DetectionDialog({
       {!loading && !scanError && result && <label className="detection-search"><Search size={16} aria-hidden="true" /><input aria-label="Search detected terminals" placeholder="Search folders, agents, or tab names" value={query} onChange={(event) => setQuery(event.target.value)} /></label>}
       {!loading && !scanError && result && !rows.length && <EmptyState icon={TerminalSquare} title={query ? "No matching terminals" : "No terminal work found"} description={query ? "Try a different search." : "Open a terminal in a project, rescan, choose a folder, or continue without a session."} />}
       {!loading && !!rows.length && <div className="detected-list" role="list">{rows.map((row) => <article key={row.targetId} role="listitem">
-        <div className="detected-row-copy"><div><Badge {...(row.agent === "codex" ? { tone: "sage" as const } : {})}>{row.agent}</Badge><strong>{row.title || row.command}</strong>{row.alreadyOpenSessionId && <Badge tone="success">Open</Badge>}</div><small>{row.terminal} · {row.directory}</small>{row.resumePreview && <p>{row.resumePreview}</p>}</div>
+        <div className="detected-row-copy"><div><Badge {...(row.agent === "codex" ? { tone: "sage" as const } : {})}>{row.agent}</Badge><strong>{row.projectName}</strong>{row.alreadyOpenSessionId && <Badge tone="success">Open</Badge>}</div><small>{row.terminal} · {row.directory}</small>{row.resumePreview && <p>{row.resumePreview}</p>}</div>
         <div className="detected-actions">{row.alreadyOpenSessionId
           ? <Button tone="primary" onClick={() => pick(row, "resume")}>Focus Existing</Button>
           : <><Button disabled={!row.resumeAvailable} onClick={() => pick(row, "resume")}>Resume</Button><Button tone="primary" onClick={() => pick(row, "fresh")}>Start Fresh</Button></>}</div>

@@ -11,6 +11,7 @@ export const DetectedTerminalV1Schema = z.object({
   agent: z.enum(["shell", "claude", "codex", "grok"]),
   pid: z.number().int().positive(),
   directory: z.string().min(1).max(4096),
+  projectName: z.string().min(1).max(512),
   title: SafeText.optional(),
   command: SafeText,
   externalActive: z.boolean(),

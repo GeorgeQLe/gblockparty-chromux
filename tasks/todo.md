@@ -59,6 +59,12 @@ instead of resuming the `prototype/` implementation.
 
 ## Completed Work
 
+- [x] Replace raw `node` and `/usr/bin/env` labels in Chromux Next's Find Your
+  Work flow with the detected working directory's project name, including
+  search, configuration, default title, contract coverage, and v0.9.0
+  prerelease metadata. _(source: user request; successor-only scope; legacy
+  Chromux and `/releases/latest` remain unchanged)_
+
 - [x] Ship the Chromux Next v0.8.0 session browser and reviewed-evidence
   workflow with session-isolated persistent guests, explicit HTTP(S)
   navigation, independently recoverable browser state, private current-page

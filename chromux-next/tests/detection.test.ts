@@ -47,7 +47,7 @@ describe("external terminal detection", () => {
         if (command.endsWith("ps")) return {
           stdout: [
             " 10 1 ttys001 /bin/zsh -l",
-            " 20 10 ttys001 /usr/local/bin/codex codex",
+            " 20 10 ttys001 /usr/bin/env node /usr/local/bin/codex",
             " 999 1 ttys002 Chromux Chromux",
             " 1000 999 ttys002 codex codex"
           ].join("\n")
@@ -63,6 +63,7 @@ describe("external terminal detection", () => {
     expect(result.rows[0]).toMatchObject({
       agent: "codex",
       directory: "/tmp/project",
+      projectName: "project",
       resumeAvailable: true,
       resumePreview: "Latest agent reply"
     });

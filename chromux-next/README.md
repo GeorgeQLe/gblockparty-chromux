@@ -5,9 +5,13 @@ separate Electron app from legacy Chromux in `../prototype/`: it has a distinct
 package, bundle identifier, user-data directory, architecture, and release
 line.
 
-## Current prerelease: v0.8.0
+## Current prerelease: v0.9.0
 
 This runner-first prerelease includes:
+
+- Project names in DETECT results and detected-session setup, replacing raw
+  launcher labels such as `node` and `/usr/bin/env` while keeping full paths
+  and terminal metadata available as supporting context.
 
 - A persistent browser for each open session, with isolated Chromium storage,
   explicit HTTP(S)-only URL/transcript/contributor navigation, bounded native

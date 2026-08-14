@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { realpath } from "node:fs/promises";
+import path from "node:path";
 import { promisify } from "node:util";
 import {
   DetectionResultV1Schema,
@@ -232,6 +233,7 @@ export class ExternalTerminalDetector {
         agent: item.agent,
         pid: item.pid,
         directory: sanitizeDirectoryDisplay(item.cwd),
+        projectName: sanitizeDetectionText(path.basename(item.cwd) || item.cwd),
         ...(item.title ? { title: sanitizeDetectionText(item.title) } : {}),
         command: sanitizeDetectionText(item.command),
         externalActive: item.agent !== "shell",

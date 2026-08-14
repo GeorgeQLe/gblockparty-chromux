@@ -3157,3 +3157,47 @@
   rollback gates and must not replace `/releases/latest` early.
 - **Rollback:** Remove prerelease `chromux-next-v0.7.1` and revert its commit;
   v0.7.0 continues reading the untouched combined successor state file.
+
+## 2026-08-14 — Chromux Next project labels v0.9.0
+
+- **User goal:** Replace low-value `node` and `/usr/bin/env` labels beside
+  Codex in the Find Your Work modal with the detected project name.
+- **Changed files and purpose:** `src/detection/contracts.ts` and
+  `src/detection/external.ts` add a bounded, sanitized project name derived
+  from the canonical cwd; `src/renderer.tsx` uses it in result rows, selected
+  configuration, search, and generated session titles; `src/main.ts` keeps
+  visual fixtures contract-complete; detection, contract, and interface tests
+  cover env/node launchers and prevent raw-command label regressions;
+  package/lock metadata, README, `RELEASES.md`, and task records document the
+  v0.9.0 prerelease.
+- **User-goal mapping:** Every detected row still shows its agent badge,
+  terminal, and full directory, but the adjacent primary label now comes from
+  the working directory basename. Optional tab titles and raw commands remain
+  bounded detection/search metadata and are no longer used as the primary
+  project label.
+- **Executable verification:** `npm run verify` passed TypeScript, all 21
+  Vitest files with 106 tests, Electron Forge macOS arm64 packaging, packaged
+  app smoke, packaged two-session restoration, and packaged browser-evidence
+  smoke. The three focused detection/contract/interface files passed 19 tests
+  after the final regression assertion. The root website suite was also run
+  inadvertently and passed without changing tracked output.
+- **Skipped tests and residual risk:** A new visual capture was not required
+  because the existing visual fixture now carries the same project-name field
+  and the change does not alter layout or styling. Live Terminal/iTerm process
+  discovery was not repeated because it depends on local Automation privacy
+  state; dependency-injected coverage verifies an `/usr/bin/env node ...
+  codex` process resolves to the canonical cwd basename. Unusual cwd basenames
+  are sanitized and bounded by the strict schema.
+- **Adversarial review:** Failure-oriented self-review checked launcher
+  wrappers, root-directory fallback, overlong/control-character names, strict
+  fixture parity, search retention for tab title and raw command, selected-row
+  consistency, version metadata, legacy isolation, and prerelease channel
+  behavior. Required fixture fields and direct renderer regression assertions
+  were added; no blocking finding remains.
+- **Rollback note:** Remove GitHub prerelease and tag
+  `chromux-next-v0.9.0`, then revert the v0.9.0 shipping commit. Chromux Next
+  v0.8.0 and the stable legacy release remain available. Deploy skipped: no
+  explicit manual deployment contract exists; GitHub prerelease publication
+  is the required release step. Next command: begin the macOS daily-driver and
+  clean-install evidence tracked by the Chromux Next cutover gate in
+  `tasks/todo.md`.

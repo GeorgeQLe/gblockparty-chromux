@@ -130,6 +130,9 @@ describe("five-approach shared interface system", () => {
     expect(renderer).toContain(".then(complete)");
     expect(renderer).toContain("setResult(undefined)");
     expect(renderer).toContain("two continuations may diverge");
+    expect(renderer).toContain("<strong>{row.projectName}</strong>");
+    expect(renderer).toContain("<strong>{selected.projectName}</strong>");
+    expect(renderer).not.toContain("<strong>{row.title || row.command}</strong>");
     expect(renderer).toContain(">Detect</Button>");
     expect(preload).toContain("CreateFromDetectionInputSchema.parse");
     expect(main).toContain("detector.resolve(value.scanId, value.targetId)");

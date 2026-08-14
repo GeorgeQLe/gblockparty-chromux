@@ -1,5 +1,17 @@
 # Release Notes
 
+## GBlockParty Chromux Next v0.9.0 (prerelease)
+
+Tag: `chromux-next-v0.9.0`
+
+- Show the detected working directory's project name beside each agent in the
+  Find Your Work modal instead of low-value process executables such as `node`
+  or `/usr/bin/env`.
+- Carry the project name through the strict detection payload and use it in
+  search, detected-session configuration, and generated session titles.
+- Preserve the canonical full directory, terminal source, optional tab title,
+  and process command as supporting detection metadata.
+
 ## GBlockParty Chromux Next v0.8.0 (prerelease)
 
 Tag: `chromux-next-v0.8.0`

@@ -102,6 +102,7 @@ describe("runner contracts and compatibility", () => {
         agent: "codex",
         pid: 42,
         directory: "/tmp",
+        projectName: "tmp",
         command: "codex",
         externalActive: true,
         resumeAvailable: true
