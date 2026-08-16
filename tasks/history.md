@@ -1,5 +1,57 @@
 # Session History
 
+## 2026-08-16 — Chromux Next v0.10.2 DETECT startup race hotfix
+
+- **User goal:** Unstick the live Situation Room modal where neither Start
+  Fresh nor Create continuation could be submitted, while keeping the external
+  Codex source process and legacy Chromux window untouched.
+- **Root cause and fix:** The renderer opened before `RunnerManager.initialize`
+  completed. Its one-time IPC snapshot captured an empty model list and never
+  refreshed, permanently disabling both actions. `chromux-next/src/main.ts`
+  now finishes app-server model discovery and persisted-session restoration
+  before creating the renderer window. `tests/interface-system.test.ts` locks
+  in that startup ordering.
+- **Live recovery:** Reloaded only the packaged Situation Room after confirming
+  the installed Codex 0.147.0 app-server returned seven valid models. The live
+  Chromux row then selected GPT-5.6-Sol and exposed an enabled Create
+  continuation action. Automation stopped before clicking it, so the user
+  retains the required explicit active-writer UAT action.
+- **Release and install metadata:** Chromux Next metadata is 0.10.2;
+  `RELEASES.md`, README, `docs/uat-0.10.2.md`, `tasks/todo.md`, and this entry
+  document the patch. The lockfile now contains the fully resolved optional
+  `encoding@0.1.13` entry required by npm 11.6.2; the prior invalid placeholder
+  removal still left `npm ci` inconsistent.
+- **Verification:** The installed Codex app-server initialize/model-list probe
+  returned seven valid models without starting, resuming, or forking a thread.
+  A clean `npm ci` installed 675 packages; typecheck passed; all 117 tests in
+  23 files passed; Electron Forge packaging passed; baseline and Situation
+  Room launch, two-session restoration, and browser-evidence smokes passed.
+  Visual qualification captured 28 standard plus 8 Situation Room views; the
+  standard and narrow populated/configuration DETECT views were inspected with
+  selected models, enabled actions, and no clipping.
+- **Adversarial review:** Applied `.agents/skillpacks/docs/quality-gate-contract.md`
+  to the exact diff. Checked initialization success, bounded protocol failure,
+  quit-during-startup handling, restored-session timing, model-schema parsing,
+  Start Fresh/Continue parity, package versioning, and legacy release-channel
+  isolation. The review found the npm lock inconsistency, repaired it in a
+  separate commit, and found no thread/persistence/permission-wire regression.
+- **Skipped tests and residual risk:** Windows/Linux packaging and signing are
+  unchanged successor cutover gates and are not useful proof for this macOS
+  renderer timing fix. The final live fork remains intentionally manual because
+  automation must not fork the user's active source thread. Cold launch now
+  withholds the window for the app-server's bounded initialization interval;
+  this can expose a short launch delay on a slow or failing CLI, but failure
+  still falls through to the renderer and existing diagnostics.
+- **Disk cleanup:** Cleared the rebuildable 3.4 GB npm download cache with user
+  approval and removed only the incomplete project `node_modules` directory
+  left by the failed ENOSPC install before the successful clean reinstall.
+- **Rollback note:** Revert the v0.10.2 shipping commit and delete prerelease
+  `chromux-next-v0.10.2`; v0.10.1 remains the prior successor prerelease. No
+  persistence migration, external-process change, legacy app change, or stable
+  update-channel rollback is required.
+- **Next command:** In the relaunched 0.10.2 Situation Room, the user explicitly
+  clicks Create continuation and completes `chromux-next/docs/uat-0.10.2.md`.
+
 ## 2026-08-16 — Chromux Next v0.10.1 active-writer continuation hotfix
 
 - **User goal:** Ship a Chromux Next patch that continues a detected external

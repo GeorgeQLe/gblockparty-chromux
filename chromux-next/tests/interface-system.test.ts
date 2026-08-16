@@ -148,4 +148,11 @@ describe("five-approach shared interface system", () => {
     expect(main).not.toContain("input.cwd");
     expect(main).not.toContain("input.threadId");
   });
+
+  it("finishes runner initialization before the renderer snapshots models and sessions", async () => {
+    const main = await readFile("src/main.ts", "utf8");
+    const startup = main.slice(main.indexOf("app.whenReady().then"));
+    expect(startup.indexOf("await runner.initialize()")).toBeGreaterThanOrEqual(0);
+    expect(startup.indexOf("await runner.initialize()")).toBeLessThan(startup.indexOf("createWindow();"));
+  });
 });

@@ -59,6 +59,14 @@ instead of resuming the `prototype/` implementation.
 
 ## Completed Work
 
+- [x] Ship Chromux Next v0.10.2 so cold launch completes Codex model discovery
+  and persisted-session restoration before DETECT renders, preventing Start
+  Fresh and Create continuation from remaining disabled on an empty startup
+  snapshot. Repair npm 11 clean-install metadata and qualify the packaged
+  startup, restoration, browser, and responsive modal states. _(source: live
+  Situation Room UAT; successor-only scope; external Codex process, legacy
+  Chromux, persistence schema, and `/releases/latest` remain unchanged)_
+
 - [x] Ship Chromux Next v0.10.1 so DETECT Continue forks safely stored Codex
   history into a distinct Chromux-owned thread, never shares the active source
   writer or falls back on failure, retains ordinary restart resume, updates

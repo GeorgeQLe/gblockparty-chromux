@@ -765,13 +765,15 @@ function registerIpc(): void {
 
 app.whenReady().then(async () => {
   registerIpc();
-  createWindow();
   await runner.initialize().catch((error) => {
     const message = error instanceof Error ? error.message : String(error);
     if (!isSmoke || !/is stopping|app-server stopped/.test(message)) {
       console.error("Runner initialization failed:", message);
     }
   });
+  // Do not let the renderer snapshot empty runner state while model discovery
+  // and persisted-session restoration are still in flight.
+  createWindow();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });

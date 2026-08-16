@@ -5,7 +5,7 @@ separate Electron app from legacy Chromux in `../prototype/`: it has a distinct
 package, bundle identifier, user-data directory, architecture, and release
 line.
 
-## Current prerelease: v0.10.1
+## Current prerelease: v0.10.2
 
 This runner-first prerelease includes:
 

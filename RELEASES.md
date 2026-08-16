@@ -1,5 +1,16 @@
 # Release Notes
 
+## GBlockParty Chromux Next v0.10.2 (prerelease)
+
+Tag: `chromux-next-v0.10.2`
+
+- Finish Codex model discovery and persisted-session restoration before opening
+  the renderer, preventing a cold-launch race that left DETECT configuration
+  actions permanently disabled with an empty model list.
+- Preserve the v0.10.1 continuation contract: Create continuation still forks
+  safely stored history into a distinct thread and never attaches to the active
+  external writer.
+
 ## GBlockParty Chromux Next v0.10.1 (prerelease)
 
 Tag: `chromux-next-v0.10.1`
