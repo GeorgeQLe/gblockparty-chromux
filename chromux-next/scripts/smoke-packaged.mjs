@@ -36,3 +36,21 @@ if (exitCode !== 0 || !output.includes("Chromux Next smoke passed")) {
   throw new Error(`Packaged smoke failed (${exitCode}): ${output.slice(-4_000)}`);
 }
 process.stdout.write(output);
+
+const situationChild = spawn(executable, ["--smoke", "--situation-room"], {
+  env: { ...process.env, CHROMUX_NEXT_SMOKE_USER_DATA: userData, CHROMUX_NEXT_EXPECT_SITUATION_ROOM: "1" },
+  stdio: ["ignore", "pipe", "pipe"]
+});
+let situationOutput = "";
+situationChild.stdout.on("data", (chunk) => { situationOutput += chunk; });
+situationChild.stderr.on("data", (chunk) => { situationOutput += chunk; });
+const situationTimeout = setTimeout(() => situationChild.kill("SIGKILL"), 20_000);
+const situationExitCode = await new Promise((resolve, reject) => {
+  situationChild.once("error", reject);
+  situationChild.once("exit", resolve);
+});
+clearTimeout(situationTimeout);
+if (situationExitCode !== 0 || !situationOutput.includes("Chromux Next smoke passed")) {
+  throw new Error(`Packaged Situation Room smoke failed (${situationExitCode}): ${situationOutput.slice(-4_000)}`);
+}
+process.stdout.write(situationOutput);

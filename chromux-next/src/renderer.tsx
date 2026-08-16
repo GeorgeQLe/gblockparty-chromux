@@ -39,6 +39,15 @@ import type {
   RunnerSessionV1,
   RunnerStateV1
 } from "./runner/contracts";
+import {
+  collectRoomRequests,
+  decisionCopy,
+  eligibleRoomRequests,
+  reconcileDeferrals,
+  roomRequestKey,
+  roomCounts,
+  type RoomRequest
+} from "./runner/situation-room";
 import type {
   CreateFromDetectionInput,
   DetectionResultV1,
@@ -270,7 +279,7 @@ function InteractionCard({
   );
 }
 
-function Composer({ session }: { session?: RunnerSessionV1 }) {
+function Composer({ session, hideInteractions = false }: { session?: RunnerSessionV1; hideInteractions?: boolean }) {
   const [draft, setDraft] = useState("");
   const saveTimer = useRef<number | undefined>(undefined);
   useEffect(() => setDraft(session?.draft ?? ""), [session?.id]);
@@ -299,7 +308,7 @@ function Composer({ session }: { session?: RunnerSessionV1 }) {
   }
   return (
     <section className="composer-panel">
-      {session?.interactions.map((interaction) => (
+      {!hideInteractions && session?.interactions.map((interaction) => (
         <InteractionCard
           key={interaction.id}
           interaction={interaction}
@@ -762,7 +771,7 @@ function BrowserSurface({
   </section>;
 }
 
-function Workspace({ state, models, selectedSession, surface, setSurface, error, clearError, alignment, browserWorkspace, browserEnabled, updateBrowserWorkspace, reportError, hideHeader = false }: Omit<ShellProps, "openSettings" | "openNewSession"> & { hideHeader?: boolean }) {
+function Workspace({ state, models, selectedSession, surface, setSurface, error, clearError, alignment, browserWorkspace, browserEnabled, updateBrowserWorkspace, reportError, hideHeader = false, hideInteractions = false }: Omit<ShellProps, "openSettings" | "openNewSession"> & { hideHeader?: boolean; hideInteractions?: boolean }) {
   const openBrowser = (url: string) => {
     if (!selectedSession) return;
     setSurface("browser");
@@ -777,7 +786,7 @@ function Workspace({ state, models, selectedSession, surface, setSurface, error,
     </>}</div>}
     <PersistentSurfaces
       active={surface}
-      runner={<><RunnerTerminal {...(selectedSession ? { session: selectedSession } : {})} openBrowser={openBrowser} /><Composer {...(selectedSession ? { session: selectedSession } : {})} /></>}
+      runner={<><RunnerTerminal {...(selectedSession ? { session: selectedSession } : {})} openBrowser={openBrowser} /><Composer {...(selectedSession ? { session: selectedSession } : {})} hideInteractions={hideInteractions} /></>}
       alignment={<AlignmentSurface alignment={alignment} openBrowser={openBrowser} />}
       deck={<DeckSurface document={alignment.document} />}
       canvas={<CanvasSurface document={alignment.document} />}
@@ -824,6 +833,128 @@ function SpatialMap({ state, selectedSession }: { state: RunnerStateV1; selected
 }
 function SpatialCanvasShell(props: ShellProps) {
   return <main className="approach-shell spatial-canvas-shell"><Brand approach="spatial-canvas" {...props} /><SurfaceTabs {...props} /><SpatialMap {...props} /><section className="spatial-dock"><Workspace {...props} /></section><aside className="spatial-attention"><AttentionSidebar state={props.state} /></aside></main>;
+}
+
+type Decision = PendingInteractionV1["offeredDecisions"][number];
+
+export function SituationEvent({ request, sending, error, later, respond }: {
+  request: RoomRequest;
+  sending: boolean;
+  error: string;
+  later(): void;
+  respond(decision: Decision, answers?: Record<string, string[]>): void;
+}) {
+  const { interaction, session, project } = request;
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [attempted, setAttempted] = useState(false);
+  const recent = session.events.filter((event) => event.kind === "user" || event.kind === "agent" || event.kind === "error").slice(-4);
+  const complete = interaction.questions.every((question) => Boolean(answers[question.id]?.trim()));
+  const choose = (questionId: string, value: string) => setAnswers((current) => ({ ...current, [questionId]: value }));
+  return <Dialog
+    title={interaction.title}
+    eyebrow={`${interaction.kind.replaceAll("-", " ")} · decision required`}
+    description={`${project} / ${session.title}`}
+    close={later}
+    backdropDismissible={false}
+    className="situation-event"
+    footer={<><Button disabled={sending} onClick={later}>Later</Button><span className="event-footer-note">Escape defers this event without responding.</span></>}
+  >
+    <section className="event-intelligence" aria-label="Request intelligence">
+      <dl><div><dt>Project</dt><dd>{project}</dd></div><div><dt>Session</dt><dd>{session.title}</dd></div><div><dt>Agent</dt><dd>{session.model ?? "Codex"}</dd></div><div><dt>Arrived</dt><dd>{new Date(interaction.at).toLocaleString()}</dd></div></dl>
+      {recent.length > 0 && <div className="event-context"><span>Recent field context</span>{recent.map((event) => <p key={event.id}><strong>{event.kind}</strong>{event.text}</p>)}</div>}
+      <details className="event-dossier"><summary>Open exact request dossier</summary><dl><dt>Runner method</dt><dd>{interaction.rawMethod}</dd><dt>Request ID</dt><dd>{String(interaction.requestId)}</dd></dl><pre>{interaction.detail}</pre></details>
+    </section>
+    {interaction.questions.length > 0 && <section className="event-questions" aria-label="Questions">{interaction.questions.map((question) => {
+      const offered = question.options.some((option) => option.label === answers[question.id]);
+      return <fieldset key={question.id} className={attempted && !answers[question.id]?.trim() ? "invalid" : ""}>
+        <legend><span>{question.header}</span>{question.question}</legend>
+        <div className="question-options">{question.options.map((option) => <label key={option.label} className={answers[question.id] === option.label ? "selected" : ""}>
+          <input type="radio" name={question.id} checked={answers[question.id] === option.label} onChange={() => choose(question.id, option.label)} />
+          <span><strong>{option.label}</strong><small>{option.description}</small></span>
+        </label>)}</div>
+        <label className={`freeform-decision ${answers[question.id] && !offered ? "selected" : ""}`}><input type="radio" name={question.id} checked={Boolean(answers[question.id] && !offered)} onChange={() => choose(question.id, "")} /><span>Write a different answer</span><textarea aria-label={`${question.header} free-form answer`} rows={2} value={offered ? "" : answers[question.id] ?? ""} onFocus={() => offered && choose(question.id, "")} onChange={(event) => choose(question.id, event.target.value)} /></label>
+        {attempted && !answers[question.id]?.trim() && <small role="alert">Choose an option or provide an answer.</small>}
+      </fieldset>;
+    })}</section>}
+    {interaction.policyAmendment?.length ? <section className="policy-amendment"><span>Offered policy amendment</span><ul>{interaction.policyAmendment.map((line) => <li key={line}>{line}</li>)}</ul></section> : null}
+    <section className="event-decisions" aria-label="Available decisions">{interaction.offeredDecisions.map((decision) => {
+      const copy = interaction.kind === "question" && decision === "accept"
+        ? { title: "Submit answers", description: "Send these answers to the agent and resume the blocked request." }
+        : decisionCopy(decision);
+      const needsAnswers = interaction.kind === "question" && decision === "accept";
+      return <button key={decision} disabled={sending} className={`decision-card decision-${decision}`} onClick={() => {
+        if (needsAnswers && !complete) { setAttempted(true); return; }
+        respond(decision, needsAnswers ? Object.fromEntries(Object.entries(answers).map(([id, answer]) => [id, [answer.trim()]])) : undefined);
+      }}><span>{copy.title}</span><p>{copy.description}</p>{decision === "accept-amendment" && <small>Review the exact amendment above before applying.</small>}</button>;
+    })}</section>
+    {sending && <p className="event-status" role="status">Sending decision to the secure runner…</p>}
+    {error && <p className="event-error" role="alert"><AlertTriangle aria-hidden="true" size={17} />{error} Your choices are preserved; retry when ready.</p>}
+  </Dialog>;
+}
+
+function SituationRoomShell(props: ShellProps) {
+  const requests = useMemo(() => collectRoomRequests(props.state), [props.state]);
+  const counts = useMemo(() => roomCounts(props.state), [props.state]);
+  const [deferred, setDeferred] = useState<Set<string>>(() => new Set());
+  const [activeId, setActiveId] = useState<string>();
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState("");
+  const active = requests.find((request) => roomRequestKey(request) === activeId);
+
+  useEffect(() => {
+    setDeferred((current) => {
+      const next = reconcileDeferrals(current, requests);
+      return next.size === current.size && [...next].every((id) => current.has(id)) ? current : next;
+    });
+    if (activeId && !requests.some((request) => roomRequestKey(request) === activeId)) {
+      setActiveId(undefined);
+      setSending(false);
+      setSendError("");
+      return;
+    }
+    if (!activeId) {
+      const next = eligibleRoomRequests(requests, deferred)[0];
+      setActiveId(next ? roomRequestKey(next) : undefined);
+    }
+  }, [requests, activeId, deferred]);
+
+  const open = (request: RoomRequest) => {
+    setDeferred((current) => { const next = new Set(current); next.delete(roomRequestKey(request)); return next; });
+    setActiveId(roomRequestKey(request));
+    setSendError("");
+    void window.chromuxNext.runner.select(request.session.groupId, request.session.id);
+  };
+  const later = () => {
+    if (!active || sending) return;
+    setDeferred((current) => new Set(current).add(roomRequestKey(active)));
+    setActiveId(undefined);
+    setSendError("");
+  };
+  const respond = (decision: Decision, answers?: Record<string, string[]>) => {
+    if (!active || sending) return;
+    setSending(true);
+    setSendError("");
+    void window.chromuxNext.runner.respond({ sessionId: active.session.id, interactionId: active.interaction.id, decision, ...(answers ? { answers } : {}) })
+      .catch((reason) => { setSending(false); setSendError(String(reason)); });
+  };
+  const visibleRecommendations = props.state.attention?.recommendations ?? [];
+  return <main className="situation-room-shell">
+    <header className="situation-command-bar">
+      <div className="situation-title"><img src="./mark.svg" alt="" /><div><span>Experimental command interface</span><h1>Situation Room</h1></div></div>
+      <dl aria-label="Room status"><div><dt>Active</dt><dd>{counts.active}</dd></div><div><dt>Blocked</dt><dd>{counts.blocked}</dd></div><div><dt>Failed</dt><dd>{counts.failed}</dd></div><div className="pending"><dt>Decisions</dt><dd>{counts.pendingRequests}</dd></div></dl>
+      <div className="brand-actions"><Button icon={Settings} tone="quiet" onClick={props.openSettings}>Settings</Button><Button icon={Search} tone="quiet" onClick={props.openDetect}>Detect</Button><Button icon={Plus} tone="primary" onClick={props.openNewSession}>New Session</Button></div>
+    </header>
+    <aside className="situation-operations"><header><span>Operations</span><h2>Session theater</h2></header><SessionTree state={props.state} selectedSession={props.selectedSession} openGroupDialog={props.openGroupDialog} compact /></aside>
+    <nav className="situation-surfaces"><SurfaceTabs surface={props.surface} setSurface={props.setSurface} /></nav>
+    <section className="situation-theater"><Workspace {...props} browserEnabled={props.browserEnabled && !active} hideInteractions /></section>
+    <aside className="situation-queue">
+      <header><span>Global queue</span><h2>Strategic decisions</h2><Badge tone={requests.length ? "warning" : "success"}>{requests.length} pending</Badge></header>
+      <div className="decision-queue-list">{requests.map((request, index) => <button key={roomRequestKey(request)} className={`${deferred.has(roomRequestKey(request)) ? "deferred" : ""} ${roomRequestKey(request) === activeId ? "active" : ""}`} onClick={() => open(request)}><span>{String(index + 1).padStart(2, "0")} · {request.interaction.kind.replaceAll("-", " ")}</span><strong>{request.interaction.title}</strong><small>{request.project} / {request.session.title}</small>{deferred.has(roomRequestKey(request)) && <Badge>Later</Badge>}</button>)}</div>
+      {!requests.length && <EmptyState icon={Check} title="Queue clear" description="No agent questions or approvals are waiting." />}
+      <section className="room-intelligence"><header><span>Passive intelligence</span><button onClick={() => void window.chromuxNext.attention.refresh()}>Refresh Luna</button></header>{visibleRecommendations.map((item) => <article key={item.id}><Badge tone={item.priority === "critical" ? "danger" : item.priority === "high" ? "warning" : "sage"}>{item.priority}</Badge><strong>{item.title}</strong><p>{item.reason}</p><small>{item.suggestedAction}</small></article>)}{props.state.attentionFailure && <p className="luna-failure" role="status">Luna refresh failed: {props.state.attentionFailure}</p>}{!visibleRecommendations.length && !props.state.attentionFailure && <p className="empty">No recommendations in the room.</p>}</section>
+    </aside>
+    {active && <SituationEvent key={active.interaction.id} request={active} sending={sending} error={sendError} later={later} respond={respond} />}
+  </main>;
 }
 
 function UnifiedApproachShell({ approach, ...props }: ShellProps & { approach: UiApproachV1 }) {
@@ -1131,6 +1262,7 @@ function NewSessionDialog({ models, workspace, selectedSession, selectedGroupId,
 }
 
 function App() {
+  const situationRoom = new URLSearchParams(window.location.search).get("mode") === "situation-room";
   const [state, setState] = useState<RunnerStateV1>(EMPTY_STATE);
   const [models, setModels] = useState<ModelOptionV1[]>([]);
   const [preferences, setPreferences] = useState<UiPreferencesV1>({ ...DEFAULT_UI_PREFERENCES });
@@ -1358,8 +1490,8 @@ function App() {
     setGroupDialog({ open: true, ...(group ? { group } : {}) });
   };
   const shellProps: ShellProps = { state, models, surface, selectedSession, error, alignment, browserWorkspace, browserEnabled: !settingsOpen && !newSessionOpen && !detectOpen && !groupDialog.open && workspacePreferences.onboardingComplete, updateBrowserWorkspace: setBrowserWorkspace, reportError: (reason) => setError(String(reason)), setSurface, openSettings: () => setSettingsOpen(true), openNewSession: () => setNewSessionOpen(true), openDetect: () => setDetectOpen(true), openGroupDialog, clearError: () => setError("") };
-  return <div className={`app-root density-${preferences.density} motion-${preferences.motion}`} data-approach={preferences.approach}>
-    <UnifiedApproachShell approach={preferences.approach} {...shellProps} />
+  return <div className={`app-root density-${preferences.density} motion-${preferences.motion}`} data-approach={situationRoom ? "situation-room" : preferences.approach}>
+    {situationRoom ? <SituationRoomShell {...shellProps} /> : <UnifiedApproachShell approach={preferences.approach} {...shellProps} />}
     {settingsOpen && <SettingsOverlay preferences={preferences} workspace={workspacePreferences} models={models} state={state} update={updatePreferences} updateWorkspace={updateWorkspacePreferences} chooseProject={chooseProject} removeProject={removeProject} openGroupDialog={openGroupDialog} close={() => setSettingsOpen(false)} />}
     {newSessionOpen && <NewSessionDialog models={models} workspace={workspacePreferences} selectedSession={selectedSession} selectedGroupId={state.groups.find((group) => group.id === selectedSession?.groupId)?.kind === "custom" ? selectedSession?.groupId : undefined} chooseProject={chooseProject} close={() => setNewSessionOpen(false)} created={() => { setNewSessionOpen(false); setSurface("runner"); }} fail={(reason) => setError(String(reason))} />}
     {detectOpen && workspacePreferences.onboardingComplete && <DetectionDialog onboarding={false} workspace={workspacePreferences} models={models} state={state} chooseProject={chooseProject} close={() => setDetectOpen(false)} complete={() => { setDetectOpen(false); setSurface("runner"); }} fail={(reason) => setError(String(reason))} />}
@@ -1368,4 +1500,5 @@ function App() {
   </div>;
 }
 
-createRoot(document.getElementById("root")!).render(<App />);
+const applicationRoot = document.getElementById("root");
+if (applicationRoot) createRoot(applicationRoot).render(<App />);

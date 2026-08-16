@@ -59,6 +59,15 @@ instead of resuming the `prototype/` implementation.
 
 ## Completed Work
 
+- [x] Ship the flag-gated Chromux Next v0.10.0 Situation Room with a distinct
+  operations shell, global chronological approval/question queue, session-local
+  deferral and reopen behavior, contract-offered decision consequences,
+  multi-question validation, passive Luna intelligence, responsive/reduced-
+  motion styling, deterministic fixtures, packaged smoke and 36-view visual
+  qualification. _(source: user-supplied Chromux Situation Room Experiment;
+  successor-only scope; saved five-approach preferences, runner wire schema,
+  legacy Chromux, and `/releases/latest` remain unchanged)_
+
 - [x] Replace raw `node` and `/usr/bin/env` labels in Chromux Next's Find Your
   Work flow with the detected working directory's project name, including
   search, configuration, default title, contract coverage, and v0.9.0

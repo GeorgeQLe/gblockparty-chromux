@@ -1,5 +1,25 @@
 # Release Notes
 
+## GBlockParty Chromux Next v0.10.0 (prerelease)
+
+Tag: `chromux-next-v0.10.0`
+
+- Add a flag-gated Situation Room launch (`npm run start:situation-room`) that
+  does not read or change the saved choice among the five standard interfaces.
+- Add an operations-room shell with project-grouped sessions, live active,
+  blocked, failed, and pending-decision counts, the existing persistent work
+  surfaces, a global chronological decision queue, and passive Luna status.
+- Present agent approvals and structured questions as focus-contained strategy
+  events with recent context, an expandable exact-request dossier, only the
+  decisions offered by the validated runner contract, explicit consequences,
+  policy amendments, and accessible validation.
+- Let users defer events with Later or Escape without contacting the runner,
+  reopen deferred requests from the queue, retry failed submissions without
+  losing answers, and automatically advance when runner state resolves an event.
+- Add deterministic approval and multi-question fixtures, pure queue/count/copy
+  helpers, component coverage for exact response payloads and interaction
+  states, reduced-motion styling, and packaged launch-mode smoke coverage.
+
 ## GBlockParty Chromux Next v0.9.0 (prerelease)
 
 Tag: `chromux-next-v0.9.0`

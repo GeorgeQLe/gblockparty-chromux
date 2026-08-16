@@ -161,7 +161,8 @@ export function Dialog({
   footer,
   className = "",
   initialFocus,
-  dismissible = true
+  dismissible = true,
+  backdropDismissible = dismissible
 }: {
   title: string;
   eyebrow?: string;
@@ -172,6 +173,7 @@ export function Dialog({
   className?: string;
   initialFocus?: React.RefObject<HTMLElement | null>;
   dismissible?: boolean;
+  backdropDismissible?: boolean;
 }) {
   const dialog = useRef<HTMLDivElement>(null);
   const titleId = React.useId();
@@ -209,7 +211,7 @@ export function Dialog({
     };
   }, [close, dismissible, initialFocus]);
 
-  return <div className="modal-backdrop" onMouseDown={dismissible ? close : undefined}>
+  return <div className="modal-backdrop" onMouseDown={backdropDismissible ? close : undefined}>
     <div
       ref={dialog}
       className={`ui-dialog ${className}`}

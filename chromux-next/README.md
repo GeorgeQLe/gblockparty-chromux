@@ -5,9 +5,15 @@ separate Electron app from legacy Chromux in `../prototype/`: it has a distinct
 package, bundle identifier, user-data directory, architecture, and release
 line.
 
-## Current prerelease: v0.9.0
+## Current prerelease: v0.10.0
 
 This runner-first prerelease includes:
+
+- An experimental Situation Room (`npm run start:situation-room`) that presents
+  all pending agent questions and approvals in one chronological decision queue
+  while retaining the transcript, composer, browser, and Alignment surfaces.
+  Later defers a request only for the current renderer lifetime; no response is
+  sent until an offered decision is explicitly selected.
 
 - Project names in DETECT results and detected-session setup, replacing raw
   launcher labels such as `node` and `/usr/bin/env` while keeping full paths
@@ -105,6 +111,8 @@ Requires Node.js 22.12 or newer and Codex CLI 0.146.0 or newer.
 ```sh
 npm install
 npm start
+# Flag-gated operations-room experiment:
+npm run start:situation-room
 ```
 
 Use `npm run verify` for TypeScript, contract/unit and subprocess integration

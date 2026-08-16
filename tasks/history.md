@@ -1,5 +1,61 @@
 # Session History
 
+## 2026-08-16 — Chromux Next v0.10.0 Situation Room experiment
+
+- **User goal:** Build and ship a flag-gated operations-room interface that
+  turns live runner approvals and structured questions into global,
+  consequence-oriented strategy events without changing the secure runner
+  protocol or the five saved standard interface approaches.
+- **Changed files and purpose:** `chromux-next/src/main.ts` and package scripts
+  propagate and smoke-test the ephemeral launch flag; `src/renderer.tsx`,
+  `src/runner/situation-room.ts`, `src/ui/components.tsx`, and the Situation
+  Room stylesheet implement the shell, pure queue projection, focus-contained
+  event workflow, explicit non-backdrop deferral, and responsive visuals;
+  deterministic fixtures plus unit/component/packaged scripts exercise
+  ordering, counts, offered decisions, exact answer payloads, retry states,
+  launch isolation, and visual states. README, UAT, release notes, version/lock,
+  task queue, and this history entry own the 0.10.0 release boundary.
+- **User-goal mapping:** The renderer collects all open-session interactions in
+  chronological order; keys them by owning session and interaction; opens the
+  oldest eligible event; keeps Later/Escape deferrals renderer-local; hides
+  duplicate inline cards and native browser guests only in this mode; renders
+  only contract-offered choices; requires one mutually exclusive answer per
+  question; preserves answers and the event on failure; and advances only when
+  authoritative runner state removes the resolved interaction. Luna findings
+  and failures remain passive in the room.
+- **Executable verification:** `npm run typecheck` passed. All 114 Vitest unit,
+  component, contract, security, persistence, manager, and subprocess tests
+  passed. Electron Forge packaging passed. Packaged baseline and explicit
+  `--situation-room` launch smoke, two-launch runner restoration, and real
+  browser-evidence smoke passed. Packaged visual qualification produced and
+  visually reviewed 28 baseline plus 8 Situation Room standard/narrow captures
+  covering approval, question, long overflow, deferred, reduced-motion, and
+  empty states. `git diff --check` passed.
+- **Skipped tests:** Manual live Codex approval/question UAT is documented in
+  `chromux-next/docs/uat-0.10.0.md` but cannot be deterministic in the release
+  harness. Windows/Linux packages, clean install, signing, and daily-driver
+  proof remain the explicit successor cutover gate and do not block this macOS
+  0.x prerelease.
+- **Adversarial review:** A failure-oriented exact-diff review served as the
+  equivalent gate because no repository quality-gate contract or reviewer lane
+  exists and repository policy disallows unrequested subagents. It traced
+  duplicate IDs across sessions, stale/resolved deferrals, new arrivals,
+  offered-decision enforcement, incomplete/whitespace answers, free-form versus
+  option exclusivity, repeated submission, synchronous protocol errors,
+  successful state-removal races, backdrop/Escape behavior, native browser
+  layering, focus restoration, restart semantics, preference persistence,
+  narrow overflow, and reduced motion. The cross-session key collision finding
+  was fixed and regression-tested; no blocking finding remains.
+- **Residual risk and rollback:** Live Codex wording and unusually large
+  normalized requests may expose copy or layout cases beyond deterministic
+  fixtures; the retryable contract path remains covered. Roll back by removing
+  prerelease `chromux-next-v0.10.0` and reverting the shipping commit. No IPC,
+  persistence schema, legacy data, or stable update channel requires rollback.
+- **Deploy status:** No manual deploy contract exists. The required deployment
+  is the Git tag and GitHub prerelease; it must not become `/releases/latest`.
+- **Next command:** Continue the active Chromux Next cutover-gate evidence work
+  during the next product session.
+
 ## 2026-08-09 — Chromux Next v0.8.0 session browser and reviewed evidence
 
 - **User goal:** Implement the next successor milestone: a session browser and

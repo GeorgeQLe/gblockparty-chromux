@@ -49,6 +49,23 @@ const approval = {
   offeredDecisions: ["accept", "accept-session", "decline", "cancel"],
   rawMethod: "item/commandExecution/requestApproval"
 };
+const question = {
+  schemaVersion: 1,
+  id: "question-1",
+  requestId: "request-2",
+  sessionId: "session-question",
+  threadId: "visual-thread-question",
+  at: new Date(Date.parse(at) + 60_000).toISOString(),
+  kind: "question",
+  title: "Choose release posture",
+  detail: "The qualified package is ready. Confirm audience and rollout posture before the prerelease is published. ".repeat(12),
+  questions: [
+    { id: "audience", header: "Audience", question: "Who should receive this experiment?", options: [{ label: "Internal operators", description: "Limit access to the operations group." }, { label: "All testers", description: "Offer it to all opted-in testers." }] },
+    { id: "rollout", header: "Rollout", question: "How should access expand?", options: [{ label: "Staged", description: "Expand after the review window." }, { label: "Immediate", description: "Enable access at publication." }] }
+  ],
+  offeredDecisions: ["accept", "cancel"],
+  rawMethod: "item/tool/requestUserInput"
+};
 await writeFile(path.join(userData, "state-v1.json"), `${JSON.stringify({
   schemaVersion: 1,
   recentDocuments: [],
@@ -59,11 +76,12 @@ await writeFile(path.join(userData, "state-v1.json"), `${JSON.stringify({
   runner: {
     schemaVersion: 1,
     groups: [
-      { schemaVersion: 1, id: "group-project", title: "Chromux Next · Interface System", kind: "project", projectPath: "/Users/example/Projects/chromux-next-long-project-name", sessionIds: ["session-approval", "session-active", "session-ready"], createdAt: at, updatedAt: at },
+      { schemaVersion: 1, id: "group-project", title: "Chromux Next · Interface System", kind: "project", projectPath: "/Users/example/Projects/chromux-next-long-project-name", sessionIds: ["session-approval", "session-question", "session-active", "session-ready"], createdAt: at, updatedAt: at },
       { schemaVersion: 1, id: "group-release", title: "Release qualification", kind: "custom", sessionIds: ["session-failed", "session-idle"], createdAt: at, updatedAt: at }
     ],
     sessions: [
-      session("session-approval", "Resolve package approval", "group-project", "idle", { interactions: [approval] }),
+      session("session-approval", "Resolve package approval", "group-project", "idle", { threadId: "visual-thread-approval", interactions: [approval] }),
+      session("session-question", "Choose publication strategy", "group-project", "idle", { threadId: "visual-thread-question", interactions: [question] }),
       session("session-active", "Implement five interface approaches", "group-project", "active", { activeTurnId: "visual-turn-active" }),
       session("session-ready", "Review accessibility fallbacks", "group-project", "idle"),
       session("session-failed", "Qualify narrow window packaging", "group-release", "failed"),
@@ -91,6 +109,25 @@ clearTimeout(timeout);
 if (exitCode !== 0 || !output.includes("visual qualification captured 28 views")) {
   throw new Error(`Packaged visual qualification failed (${exitCode}): ${output.slice(-4_000)}`);
 }
+const scenarioPath = path.join(userData, "situation-room-scenario.json");
+await writeFile(scenarioPath, JSON.stringify({ version: "0.146.0" }));
+const situation = spawn(executable, [`--visual-smoke-dir=${destination}`, "--situation-room"], {
+  env: { ...process.env, CHROMUX_NEXT_SMOKE_USER_DATA: userData, CHROMUX_NEXT_FIXTURE_SCENARIO: scenarioPath },
+  stdio: ["ignore", "pipe", "pipe"]
+});
+let situationOutput = "";
+situation.stdout.on("data", (chunk) => { situationOutput += chunk; });
+situation.stderr.on("data", (chunk) => { situationOutput += chunk; });
+const situationTimeout = setTimeout(() => situation.kill("SIGKILL"), 60_000);
+const situationExitCode = await new Promise((resolve, reject) => {
+  situation.once("error", reject);
+  situation.once("exit", resolve);
+});
+clearTimeout(situationTimeout);
+if (situationExitCode !== 0 || !situationOutput.includes("Situation Room visual qualification captured 8 views")) {
+  throw new Error(`Packaged Situation Room visual qualification failed (${situationExitCode}): ${situationOutput.slice(-4_000)}`);
+}
+output += situationOutput;
 const restart = spawn(executable, ["--smoke"], {
   env: { ...process.env, CHROMUX_NEXT_SMOKE_USER_DATA: userData, CHROMUX_NEXT_EXPECT_APPROACH: "spatial-canvas" },
   stdio: ["ignore", "pipe", "pipe"]

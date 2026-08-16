@@ -57,11 +57,15 @@ const runnerSmokeArgument = process.argv.find((argument) => argument.startsWith(
 const runnerSmokePhase = runnerSmokeArgument?.slice("--runner-restoration-smoke=".length);
 const browserEvidenceSmokeArgument = process.argv.find((argument) => argument.startsWith("--browser-evidence-smoke="));
 const browserEvidenceSmokeUrl = browserEvidenceSmokeArgument?.slice("--browser-evidence-smoke=".length);
+const visualSmokeArgument = process.argv.find((argument) => argument.startsWith("--visual-smoke-dir="));
+const visualSmokeDirectory = visualSmokeArgument?.slice("--visual-smoke-dir=".length);
+const isVisualSmoke = Boolean(visualSmokeDirectory);
+const situationRoomMode = process.argv.includes("--situation-room");
 const runnerSmokeScenario = process.env.CHROMUX_NEXT_FIXTURE_SCENARIO;
 const runnerFixturePath = app.isPackaged
   ? path.join(process.resourcesPath, "subprocess-fixture.cjs")
   : path.join(app.getAppPath(), "fixtures", "subprocess-fixture.cjs");
-const runnerSmokeOptions = (runnerSmokePhase || browserEvidenceSmokeUrl) && runnerSmokeScenario ? {
+const runnerSmokeOptions = (runnerSmokePhase || browserEvidenceSmokeUrl || (situationRoomMode && isVisualSmoke)) && runnerSmokeScenario ? {
   command: process.execPath,
   prefixArgs: [runnerFixturePath],
   env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
@@ -77,9 +81,6 @@ const runner = new RunnerManager(
 const detector = new ExternalTerminalDetector((rows) => runner.enrichDetection(rows));
 const running = new Map<string, AbortController>();
 const isSmoke = process.argv.includes("--smoke") || Boolean(runnerSmokePhase) || Boolean(browserEvidenceSmokeUrl);
-const visualSmokeArgument = process.argv.find((argument) => argument.startsWith("--visual-smoke-dir="));
-const visualSmokeDirectory = visualSmokeArgument?.slice("--visual-smoke-dir=".length);
-const isVisualSmoke = Boolean(visualSmokeDirectory);
 type VisualDetectionMode = "scanning" | "populated" | "empty" | "denied";
 let visualDetectionMode: VisualDetectionMode = "scanning";
 let resolveVisualDetection: ((value: ReturnType<typeof visualDetectionFixture>) => void) | undefined;
@@ -182,9 +183,13 @@ function createWindow(): void {
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   mainWindow.webContents.on("will-navigate", (event) => event.preventDefault());
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-    void mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
+    const rendererUrl = new URL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
+    if (situationRoomMode) rendererUrl.searchParams.set("mode", "situation-room");
+    void mainWindow.loadURL(rendererUrl.toString());
   } else {
-    void mainWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
+    void mainWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`), {
+      ...(situationRoomMode ? { query: { mode: "situation-room" } } : {})
+    });
   }
   if (isSmoke) {
     mainWindow.webContents.once("did-finish-load", async () => {
@@ -192,11 +197,15 @@ function createWindow(): void {
       const ready = await mainWindow?.webContents.executeJavaScript(
         "Boolean(window.chromuxNext?.documents && window.chromuxNext?.runner && window.chromuxNext?.attention && window.chromuxNext?.browser)"
       );
+      const expectedSituationRoom = process.env.CHROMUX_NEXT_EXPECT_SITUATION_ROOM === "1";
+      const renderedSituationRoom = expectedSituationRoom
+        ? await mainWindow?.webContents.executeJavaScript("document.querySelector('.app-root')?.dataset.approach === 'situation-room'")
+        : true;
       const expectedApproach = process.env.CHROMUX_NEXT_EXPECT_APPROACH;
       const restoredApproach = expectedApproach
         ? await mainWindow?.webContents.executeJavaScript("window.chromuxNext.settings.getUiPreferences().then((value) => value.approach)")
         : undefined;
-      const passed = Boolean(ready) && (!expectedApproach || restoredApproach === expectedApproach);
+      const passed = Boolean(ready) && Boolean(renderedSituationRoom) && (!expectedApproach || restoredApproach === expectedApproach);
       if (!passed) process.exitCode = 1;
       console.log(passed ? "Chromux Next smoke passed" : `Chromux Next smoke failed (approach: ${String(restoredApproach)})`);
       app.quit();
@@ -314,6 +323,56 @@ function createWindow(): void {
           await writeFile(path.join(visualSmokeDirectory, `${name}.png`), image.toPNG());
           captureCount += 1;
         };
+        if (situationRoomMode) {
+          const roomDeadline = Date.now() + 5_000;
+          while (!await visualWindow.webContents.executeJavaScript("Boolean(document.querySelector('.situation-room-shell'))")) {
+            if (Date.now() >= roomDeadline) throw new Error("Situation Room shell was not visible");
+            await new Promise((resolve) => setTimeout(resolve, 50));
+          }
+          await capture("situation-approval-standard");
+          await visualWindow.webContents.executeJavaScript("document.querySelector('.event-dossier summary')?.click()");
+          await capture("situation-approval-long-narrow", 820, 720);
+          await visualWindow.webContents.executeJavaScript("[...document.querySelectorAll('button')].find((item) => item.textContent?.trim() === 'Later')?.click()");
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          await capture("situation-question-standard", 1440, 900);
+          await capture("situation-question-narrow", 820, 720);
+          await visualWindow.webContents.executeJavaScript("[...document.querySelectorAll('button')].find((item) => item.textContent?.trim() === 'Later')?.click()");
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          await capture("situation-deferred-queue", 1440, 900);
+          const reducedPreferences = await localStore.updateUiPreferences({ motion: "reduced" });
+          visualWindow.webContents.send(IpcChannels.settingsUiPreferencesChanged, reducedPreferences);
+          await capture("situation-reduced-motion", 1440, 900);
+          await visualWindow.webContents.executeJavaScript(`(() => {
+            const approval = [...document.querySelectorAll('.decision-queue-list button')].find((item) => item.textContent?.includes('Approve package verification'));
+            if (!approval) throw new Error('Deferred approval was not found');
+            approval.click();
+          })()`);
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          await visualWindow.webContents.executeJavaScript(`(() => {
+            const accept = [...document.querySelectorAll('.decision-card')].find((item) => item.textContent?.includes('Authorize once'));
+            if (!accept) throw new Error('Authorize once was not found');
+            accept.click();
+          })()`);
+          await new Promise((resolve) => setTimeout(resolve, 150));
+          await visualWindow.webContents.executeJavaScript(`(() => {
+            const question = [...document.querySelectorAll('.decision-queue-list button')].find((item) => item.textContent?.includes('Choose release posture'));
+            if (!question) throw new Error('Deferred question was not found');
+            question.click();
+          })()`);
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          await visualWindow.webContents.executeJavaScript(`(() => {
+            document.querySelectorAll('.event-questions fieldset').forEach((fieldset) => fieldset.querySelector('input[type="radio"]')?.click());
+            const submit = [...document.querySelectorAll('.decision-card')].find((item) => item.textContent?.includes('Submit answers'));
+            if (!submit) throw new Error('Submit answers was not found');
+            submit.click();
+          })()`);
+          await new Promise((resolve) => setTimeout(resolve, 180));
+          await capture("situation-empty-queue", 1440, 900);
+          await capture("situation-empty-queue-narrow", 820, 720);
+          if (captureCount !== 8) throw new Error(`Expected 8 Situation Room captures, received ${captureCount}`);
+          console.log(`Chromux Next Situation Room visual qualification captured ${captureCount} views`);
+          return;
+        }
         const onboardingDeadline = Date.now() + 5_000;
         let onboardingVisible = false;
         while (!onboardingVisible && Date.now() < onboardingDeadline) {
