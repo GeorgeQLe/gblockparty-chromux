@@ -140,14 +140,20 @@ export class RunnerManager extends EventEmitter {
     }
     const model = input.model ?? this.models.find((item) => item.recommended)?.id ?? this.models[0]?.id;
     const selectedModel = this.models.find((item) => item.id === model);
-    const response = await this.server.request(input.mode === "resume" ? "thread/resume" : "thread/start", {
+    const method = input.mode === "resume" ? "thread/fork" : "thread/start";
+    const response = await this.server.request(method, {
       ...(input.mode === "resume" ? { threadId: input.threadId } : {}),
       cwd: canonicalProjectPath,
       model,
       ...permissionParams(input.permissionPreset)
     }) as any;
-    const threadId = input.mode === "resume" ? input.threadId : response?.thread?.id;
-    if (!threadId) throw new Error(`${input.mode === "resume" ? "thread/resume" : "thread/start"} returned no thread id`);
+    const threadId = typeof response?.thread?.id === "string" && response.thread.id.trim()
+      ? response.thread.id
+      : undefined;
+    if (!threadId) throw new Error(`${method} returned no thread id`);
+    if (input.mode === "resume" && threadId === input.threadId) {
+      throw new Error("thread/fork returned the source thread id");
+    }
 
     const now = new Date().toISOString();
     const next = structuredClone(this.state);
@@ -183,7 +189,7 @@ export class RunnerManager extends EventEmitter {
       events: [],
       interactions: []
     });
-    this.appendEvent(session, "system", `${input.mode === "resume" ? "Thread resumed" : "Session ready"} · ${session.permissionPreset} · ${session.model ?? "default model"}`);
+    this.appendEvent(session, "system", `${input.mode === "resume" ? "Continuation created" : "Session ready"} · ${session.permissionPreset} · ${session.model ?? "default model"}`);
     next.sessions.push(session);
     group.sessionIds.push(session.id);
     next.selectedGroupId = group.id;

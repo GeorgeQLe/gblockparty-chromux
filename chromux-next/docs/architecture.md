@@ -82,14 +82,19 @@ The v0.7.1 baseline makes ownership enforceable rather than conventional:
 - Authoritative cwd and thread IDs remain in a two-minute main-process cache.
   The renderer receives opaque scan/target IDs and cannot supply either value
   to detected-session creation. A later scan replaces the prior cache.
-- Fresh creation uses `thread/start`; resume uses `thread/resume`; an already
-  open thread focuses its existing session. Successful detected creation
+- Fresh creation uses `thread/start`; detected continuation uses `thread/fork`
+  with the authoritative source thread ID plus the selected cwd, model, and
+  permission policy. It omits `lastTurnId` so an active source turn becomes an
+  interruption marker, and persists only the returned fork ID. An already open
+  source thread focuses its existing session. Successful detected creation
   atomically persists the project/worktree registry and runner state. Failed
-  validation, start, resume, or persistence does not create a partial Chromux
-  session or complete onboarding.
+  validation, start, fork, missing-ID, or persistence does not create a partial
+  Chromux session or complete onboarding; it never falls back to start or
+  resume.
 - Detection never attaches to a terminal, sends it input, interrupts it, or
-  changes its process state. Resuming an active external Codex thread creates
-  a separate continuation that may diverge.
+  changes its process state. Continuing an active external Codex thread copies
+  safely stored history into a separate thread, does not share an in-progress
+  partial turn, and may later diverge.
 
 ## Runner lifecycle
 
@@ -99,7 +104,7 @@ The v0.7.1 baseline makes ownership enforceable rather than conventional:
   malformed, schema-invalid, and oversized messages compromise the child,
   reject each pending request once, and enter bounded recovery.
 - A new session starts one persisted Codex thread. Restoration resumes stored
-  thread IDs without starting a turn.
+  Chromux-owned thread IDs with `thread/resume` without starting a turn.
 - Idle composer submissions call `turn/start`; active submissions call
   `turn/steer` with the expected turn ID; Stop calls `turn/interrupt`.
 - Closing cancels pending interactions, interrupts active work, and

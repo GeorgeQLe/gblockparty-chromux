@@ -1159,7 +1159,7 @@ function DetectionDialog({
     }
     setSelected(row);
     setMode(nextMode);
-    setTitle(`${nextMode === "resume" ? "Resume" : "Codex"} · ${row.projectName}`);
+    setTitle(`${nextMode === "resume" ? "Continue" : "Codex"} · ${row.projectName}`);
   };
   const create = () => {
     if (!result || !selected || !title.trim()) return;
@@ -1184,18 +1184,20 @@ function DetectionDialog({
     title={selected ? "Configure detected session" : onboarding ? "Find your work" : "Detect terminal sessions"}
     eyebrow={onboarding ? "Welcome · DETECT first" : "DETECT"}
     description={selected
-      ? `Start Codex in ${selected.directory}. The original ${selected.terminal} process remains untouched.`
+      ? mode === "resume"
+        ? `Create a separate continuation in ${selected.directory}. The original ${selected.terminal} process remains untouched.`
+        : `Start Codex in ${selected.directory}. The original ${selected.terminal} process remains untouched.`
       : "Scan open macOS terminal tabs for agents and working folders. Detection never attaches to, types into, or stops those processes."}
     close={close}
     dismissible={!onboarding}
     className="detection-modal onboarding-modal"
     footer={selected
-      ? <><Button tone="quiet" onClick={() => setSelected(undefined)}>Back</Button><Button icon={CirclePlus} tone="primary" disabled={creating || !title.trim() || !models.length} onClick={create}>{creating ? "Creating…" : mode === "resume" ? "Resume in Chromux" : "Start fresh"}</Button></>
+      ? <><Button tone="quiet" onClick={() => setSelected(undefined)}>Back</Button><Button icon={CirclePlus} tone="primary" disabled={creating || !title.trim() || !models.length} onClick={create}>{creating ? "Creating…" : mode === "resume" ? "Create continuation" : "Start fresh"}</Button></>
       : <><div className="detection-fallbacks"><Button icon={FolderPlus} tone="quiet" onClick={chooseProject}>Choose Folder</Button>{onboarding && <Button tone="quiet" onClick={complete}>Continue Without Session</Button>}</div><Button icon={RefreshCw} onClick={scan} disabled={loading}>Rescan</Button></>}
   >
     {selected ? <form className="session-form detection-config" onSubmit={(event) => { event.preventDefault(); create(); }}>
       <div className="detected-summary"><Badge tone="sage">{selected.agent}</Badge><strong>{selected.projectName}</strong><small>{selected.directory}</small></div>
-      {mode === "resume" && selected.externalActive && <p className="detection-warning"><AlertTriangle size={16} aria-hidden="true" /> Resume creates a separate Chromux Next continuation. The external Codex process stays active, so the two continuations may diverge.</p>}
+      {mode === "resume" && selected.externalActive && <p className="detection-warning"><AlertTriangle size={16} aria-hidden="true" /> Chromux copies safely stored history into a separate thread. It does not share an in-progress partial turn. The external Codex process stays active, and the two threads may diverge.</p>}
       {createError && <p className="detection-error" role="alert"><AlertTriangle size={16} aria-hidden="true" /> {createError}</p>}
       <label>Session title<input autoFocus maxLength={256} value={title} onChange={(event) => setTitle(event.target.value)} /></label>
       <div className="modal-grid">
@@ -1213,7 +1215,7 @@ function DetectionDialog({
         <div className="detected-row-copy"><div><Badge {...(row.agent === "codex" ? { tone: "sage" as const } : {})}>{row.agent}</Badge><strong>{row.projectName}</strong>{row.alreadyOpenSessionId && <Badge tone="success">Open</Badge>}</div><small>{row.terminal} · {row.directory}</small>{row.resumePreview && <p>{row.resumePreview}</p>}</div>
         <div className="detected-actions">{row.alreadyOpenSessionId
           ? <Button tone="primary" onClick={() => pick(row, "resume")}>Focus Existing</Button>
-          : <><Button disabled={!row.resumeAvailable} onClick={() => pick(row, "resume")}>Resume</Button><Button tone="primary" onClick={() => pick(row, "fresh")}>Start Fresh</Button></>}</div>
+          : <><Button disabled={!row.resumeAvailable} onClick={() => pick(row, "resume")}>Continue</Button><Button tone="primary" onClick={() => pick(row, "fresh")}>Start Fresh</Button></>}</div>
       </article>)}</div>}
     </div>}
   </Dialog>;

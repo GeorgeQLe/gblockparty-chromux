@@ -1,5 +1,21 @@
 # Release Notes
 
+## GBlockParty Chromux Next v0.10.1 (prerelease)
+
+Tag: `chromux-next-v0.10.1`
+
+- Continue detected Codex work by calling `thread/fork` with the authoritative
+  source thread, selected directory, model, and permission policy, then persist
+  only the returned continuation thread ID.
+- Keep ordinary Chromux Next restart restoration on `thread/resume`; never
+  attach a second writer to an active external thread and never fall back to a
+  context-losing start or resume retry when a fork fails.
+- Explain that Continue copies safely stored history into a separate thread,
+  excludes an in-progress partial turn, leaves the external process untouched,
+  and can later diverge.
+- Cover active-writer, rejected-fork, missing-ID, transactional state, fresh,
+  focus-existing, compatibility-fixture, and persisted restoration behavior.
+
 ## GBlockParty Chromux Next v0.10.0 (prerelease)
 
 Tag: `chromux-next-v0.10.0`

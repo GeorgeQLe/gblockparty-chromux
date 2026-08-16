@@ -5,7 +5,7 @@ separate Electron app from legacy Chromux in `../prototype/`: it has a distinct
 package, bundle identifier, user-data directory, architecture, and release
 line.
 
-## Current prerelease: v0.10.0
+## Current prerelease: v0.10.1
 
 This runner-first prerelease includes:
 
@@ -33,12 +33,15 @@ This runner-first prerelease includes:
   to or changing the original processes. DETECT remains available from the
   product header after onboarding.
 - Exact-directory Codex thread enrichment through the existing app-server,
-  with bounded latest-agent previews, Resume, Start Fresh, and Focus Existing.
+  with bounded latest-agent previews, Continue, Start Fresh, and Focus Existing.
   Renderer requests use opaque short-lived scan IDs; authoritative directories
   and thread IDs never cross into renderer-controlled creation input.
 - Transactional detected-session creation that registers a project/worktree
-  and persists a successful fresh or resumed session together. Failed or
-  expired scans leave no partial session and do not complete onboarding.
+  and persists a successful fresh session or forked continuation together.
+  Continue copies safely stored source history into a distinct thread without
+  sharing an in-progress partial turn; the external process remains active and
+  the two threads can later diverge. Failed or expired scans leave no partial
+  session and do not complete onboarding.
 - A calm premium-dark interface system shared by all five layouts, with
   semantic graphite/sage tokens, comfortable and compact density, consistent
   controls and states, Lucide icons, responsive navigation, and reduced-motion

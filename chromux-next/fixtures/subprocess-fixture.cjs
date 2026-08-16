@@ -77,6 +77,13 @@ if (process.argv.includes("app-server")) {
         } else if (message.method === "thread/start") {
           scenario.threadCounter = (scenario.threadCounter || 0) + 1;
           write({ id: message.id, result: { thread: { id: `fixture-thread-${scenario.threadCounter}` } } }, "thread/start");
+        } else if (message.method === "thread/fork") {
+          if ((scenario.failForkThreadIds || []).includes(message.params?.threadId)) {
+            write({ id: message.id, error: { message: "fork rejected" } }, "thread/fork");
+          } else {
+            scenario.threadCounter = (scenario.threadCounter || 0) + 1;
+            write({ id: message.id, result: { thread: { id: `fixture-fork-${scenario.threadCounter}` } } }, "thread/fork");
+          }
         } else if (message.method === "thread/resume") {
           if ((scenario.failResumeThreadIds || []).includes(message.params?.threadId)) {
             write({ id: message.id, error: { message: "resume rejected" } }, "thread/resume");

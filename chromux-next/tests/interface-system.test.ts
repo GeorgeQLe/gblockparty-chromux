@@ -129,7 +129,15 @@ describe("five-approach shared interface system", () => {
     expect(renderer).toContain("Focus Existing");
     expect(renderer).toContain(".then(complete)");
     expect(renderer).toContain("setResult(undefined)");
-    expect(renderer).toContain("two continuations may diverge");
+    expect(renderer).toContain(">Continue</Button>");
+    expect(renderer).toContain("Create continuation");
+    expect(renderer).toContain("copies safely stored history into a separate thread");
+    expect(renderer).toContain("does not share an in-progress partial turn");
+    expect(renderer).toContain("the two threads may diverge");
+    expect(renderer).toContain("Scanning open terminal tabs");
+    expect(renderer).toContain('title="Detection failed"');
+    expect(renderer).toContain(">Try again</Button>");
+    expect(renderer).toContain(">Start Fresh</Button>");
     expect(renderer).toContain("<strong>{row.projectName}</strong>");
     expect(renderer).toContain("<strong>{selected.projectName}</strong>");
     expect(renderer).not.toContain("<strong>{row.title || row.command}</strong>");

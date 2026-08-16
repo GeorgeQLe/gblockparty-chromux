@@ -59,6 +59,14 @@ instead of resuming the `prototype/` implementation.
 
 ## Completed Work
 
+- [x] Ship Chromux Next v0.10.1 so DETECT Continue forks safely stored Codex
+  history into a distinct Chromux-owned thread, never shares the active source
+  writer or falls back on failure, retains ordinary restart resume, updates
+  continuation copy, and covers failure, persistence, compatibility, packaged
+  restoration, and visual states. _(source: user-supplied Active-Writer
+  Continuation Hotfix plan; successor-only scope; external Codex process,
+  legacy Chromux, persistence schema, and `/releases/latest` remain unchanged)_
+
 - [x] Ship the flag-gated Chromux Next v0.10.0 Situation Room with a distinct
   operations shell, global chronological approval/question queue, session-local
   deferral and reopen behavior, contract-offered decision consequences,

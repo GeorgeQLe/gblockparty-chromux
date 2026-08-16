@@ -14,7 +14,10 @@ class FakeServer extends EventEmitter implements AppServerTransport {
   thread = 0;
   turn = 0;
   failResume = new Set<string>();
+  failFork = new Set<string>();
   failStart = false;
+  forkWithoutId = false;
+  forkReturnsSource = false;
   listedThreads: any[] = [];
   threadReads = new Map<string, any>();
   async start() {}
@@ -34,6 +37,12 @@ class FakeServer extends EventEmitter implements AppServerTransport {
     if (method === "thread/start") {
       if (this.failStart) throw new Error("start failed");
       return { thread: { id: `thread-${++this.thread}` } };
+    }
+    if (method === "thread/fork") {
+      if (this.failFork.has(params.threadId)) throw new Error("fork failed");
+      return this.forkWithoutId ? { thread: {} }
+        : this.forkReturnsSource ? { thread: { id: params.threadId } }
+          : { thread: { id: `fork-${++this.thread}` } };
     }
     if (method === "thread/list") return { data: this.listedThreads };
     if (method === "thread/read") return this.threadReads.get(params.threadId) ?? {};
@@ -137,19 +146,29 @@ describe("runner manager", () => {
     expect((await store.getWorkspacePreferences()).projects).toHaveLength(0);
 
     server.failStart = false;
+    server.failResume.add("saved-thread");
     const created = await manager.createDetectedSession({
       cwd: canonicalTmp,
       mode: "resume",
       threadId: "saved-thread",
-      title: "Resumed",
-      permissionPreset: "read-only"
+      title: "Continued",
+      permissionPreset: "read-only",
+      model: "model"
     });
-    expect(created.session).toMatchObject({ threadId: "saved-thread", status: "idle" });
+    expect(created.session).toMatchObject({ threadId: "fork-1", status: "idle", model: "model" });
     expect((await store.getWorkspacePreferences()).projects[0]?.path).toBe(canonicalTmp);
     expect(server.requests).toContainEqual({
-      method: "thread/resume",
-      params: expect.objectContaining({ threadId: "saved-thread", cwd: canonicalTmp })
+      method: "thread/fork",
+      params: {
+        threadId: "saved-thread",
+        cwd: canonicalTmp,
+        model: "model",
+        sandbox: "read-only",
+        approvalPolicy: "never"
+      }
     });
+    expect(server.requests.some((request) => request.method === "thread/resume")).toBe(false);
+    expect(server.requests.find((request) => request.method === "thread/fork")?.params).not.toHaveProperty("lastTurnId");
 
     const fresh = await manager.createDetectedSession({
       cwd: canonicalTmp,
@@ -160,6 +179,39 @@ describe("runner manager", () => {
     });
     expect(fresh.session.threadId).not.toBe("saved-thread");
     expect(server.requests.filter((request) => request.method === "thread/start")).toHaveLength(2);
+    await manager.shutdown();
+  });
+
+  it("fails detected continuations closed on fork rejection or a missing fork id", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "chromux-next-fork-failure-"));
+    const server = new FakeServer();
+    const store = new LocalStore(directory);
+    const manager = new RunnerManager(server, store, new LunaAnalyzer(directory, "missing-codex"));
+    await manager.initialize();
+    const canonicalTmp = await (await import("node:fs/promises")).realpath("/tmp");
+    const input = {
+      cwd: canonicalTmp,
+      mode: "resume" as const,
+      threadId: "active-source",
+      title: "Continuation",
+      permissionPreset: "workspace" as const
+    };
+
+    server.failFork.add("active-source");
+    await expect(manager.createDetectedSession(input)).rejects.toThrow("fork failed");
+    server.failFork.clear();
+    server.forkWithoutId = true;
+    await expect(manager.createDetectedSession(input)).rejects.toThrow("thread/fork returned no thread id");
+    server.forkWithoutId = false;
+    server.forkReturnsSource = true;
+    await expect(manager.createDetectedSession(input)).rejects.toThrow("thread/fork returned the source thread id");
+
+    expect(manager.getState().sessions).toHaveLength(0);
+    expect(manager.getState().groups).toHaveLength(0);
+    expect((await store.getWorkspacePreferences()).projects).toHaveLength(0);
+    expect(server.requests.filter((request) => request.method === "thread/fork")).toHaveLength(3);
+    expect(server.requests.some((request) => request.method === "thread/resume")).toBe(false);
+    expect(server.requests.some((request) => request.method === "thread/start")).toBe(false);
     await manager.shutdown();
   });
 

@@ -5,6 +5,7 @@
     "initialize",
     "model/list",
     "thread/start",
+    "thread/fork",
     "thread/resume",
     "thread/unsubscribe",
     "turn/start",

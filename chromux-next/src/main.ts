@@ -408,7 +408,7 @@ function createWindow(): void {
         );
         await new Promise((resolve) => setTimeout(resolve, 100));
         await visualWindow.webContents.executeJavaScript(
-          "[...document.querySelectorAll('button')].find((item) => item.textContent?.includes('Resume'))?.click()"
+          "[...document.querySelectorAll('button')].find((item) => item.textContent?.includes('Continue'))?.click()"
         );
         await capture("detect-config-standard");
         await capture("detect-config-narrow", 820, 720);

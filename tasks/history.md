@@ -1,5 +1,76 @@
 # Session History
 
+## 2026-08-16 — Chromux Next v0.10.1 active-writer continuation hotfix
+
+- **User goal:** Ship a Chromux Next patch that continues a detected external
+  Codex thread by forking safely stored history instead of attaching a second
+  writer, while leaving restart restoration and the external process untouched.
+- **Changed files and per-file purpose:**
+  `chromux-next/src/runner/manager.ts` maps only detected `resume` mode to
+  `thread/fork`, forwards authoritative cwd/model/permission configuration,
+  omits `lastTurnId`, validates a non-empty distinct returned thread ID, and
+  retains `thread/resume` for persisted restoration;
+  `tests/runner-manager.test.ts` covers active-writer resume failure plus fork
+  success, returned-ID persistence, exact parameters, no fallback, rejected,
+  missing-ID, echoed-source-ID, fresh, transactional state, and restoration;
+  the subprocess and 0.146.0 fixtures add deterministic fork support and the
+  compatibility method; `src/renderer.tsx`, `src/main.ts`, and the interface
+  contract rename actions, explain the separate safe-history copy, retain
+  loading/error/fresh/focus behavior, and keep visual automation aligned;
+  package metadata sets 0.10.1; README, architecture, the new 0.10.1 UAT,
+  `RELEASES.md`, `tasks/todo.md`, and this history entry document the behavior,
+  evidence, and prerelease boundary.
+- **User-goal mapping:** The source thread ID comes only from the opaque
+  main-process detection cache and is used only as `thread/fork.threadId`.
+  Chromux persists only the validated distinct `response.thread.id`; fork
+  failure cannot call `thread/start` or `thread/resume` and cannot mutate the
+  project/session registry. Ordinary persisted Chromux-owned sessions continue
+  to restore independently with `thread/resume` and never start or steer a turn.
+- **Executable verification:** Official OpenAI App Server documentation was
+  fetched and confirmed that `thread/fork` creates a new ID and that omitting
+  `lastTurnId` on an active source records an interruption marker. `npm run
+  typecheck` passed. The final full `npm test` passed all 116 tests across 23
+  files, including manager, detection, IPC, persistence/recovery, renderer,
+  security, and real subprocess fixtures. Electron Forge packaging passed and
+  the rebuilt plist reports both version fields as 0.10.1. Packaged baseline
+  plus Situation Room launch, two-launch/two-thread restoration, and real
+  browser-evidence smokes passed; the restoration log proved exactly two
+  `thread/resume` requests and no turn start/steer. Final packaged visual
+  qualification produced 28 standard plus 8 Situation Room captures; standard
+  and 820×720 populated/configuration views were visually inspected with no
+  clipping or action/copy loss. `git diff --check` passed.
+- **Skipped tests:** Automation intentionally did not click Continue on the
+  user's live external Codex thread because the UAT contract requires that
+  explicit user action. Windows/Linux package, signing, clean-install, and
+  daily-driver gates remain the existing successor cutover task and do not
+  block this macOS 0.x prerelease.
+- **Adversarial review:** Applied
+  `.agents/skillpacks/docs/quality-gate-contract.md` with an exact-diff,
+  failure-oriented domain review. It traced opaque authority, canonical cwd,
+  source/fork identity separation, empty/non-string/echoed IDs, active writer,
+  permission presets, omitted `lastTurnId`, multiple explicit forks, already
+  open focus, fresh start, persistence ordering, initialization/crash restore,
+  no fallback, retryable UI error state, narrow layout, compatibility minimum,
+  tag/title/channel rules, and legacy exclusion. The echoed-source-ID hole was
+  found, fixed, and regression-tested; no blocking finding remains.
+- **Warnings and residual risk:** The successful clean install reports inherited
+  deprecated transitive Electron Forge packages and 29 npm audit findings; a
+  broad dependency upgrade is deferred because it is breaking-prone and outside
+  this patch. Packaged smoke emitted two macOS Chromium `task_policy_set`
+  diagnostics while both launch modes passed; they do not affect app behavior.
+  The remaining product risk is the manual live active-writer interaction with
+  the installed Codex process, documented in `docs/uat-0.10.1.md` and handed to
+  the user in a relaunched Situation Room.
+- **Rollback note:** Revert the v0.10.1 shipping commit and delete prerelease
+  `chromux-next-v0.10.1`; v0.10.0 remains the prior successor prerelease. No
+  persistence migration, external process change, legacy app change, or stable
+  update-channel rollback is required.
+- **Deploy status:** No `deploy.md` or `tasks/deploy.md` exists. The required
+  deployment is the Git tag and GitHub prerelease, which must not replace the
+  legacy release returned by `/releases/latest`.
+- **Next command:** Use `$guide` to complete the explicit-click active-writer
+  steps in `chromux-next/docs/uat-0.10.1.md` from the relaunched Situation Room.
+
 ## 2026-08-16 — Chromux Next clean-install lockfile hygiene
 
 - **User goal:** Unblock the requested v0.10.1 qualification after disk-pressure
