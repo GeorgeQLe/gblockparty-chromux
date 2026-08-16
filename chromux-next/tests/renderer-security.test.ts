@@ -35,15 +35,18 @@ describe("runner renderer security", () => {
       readFile("src/detection/contracts.ts", "utf8")
     ]);
     expect(preload).toContain("detectExternal");
+    expect(preload).toContain("AcquireDetectionLeaseInputSchema.parse");
+    expect(preload).toContain("DetectionLeaseIdInputSchema.parse");
     expect(preload).toContain("CreateFromDetectionInputSchema.parse");
     expect(bridge).toContain("CreateFromDetectionInput");
-    expect(contracts).toContain("scanId: Id");
-    expect(contracts).toContain("targetId: Id");
     const createSchema = contracts.slice(
       contracts.indexOf("CreateFromDetectionInputSchema"),
       contracts.indexOf("export type CreateFromDetectionInput")
     );
     expect(createSchema).not.toContain("cwd:");
     expect(createSchema).not.toContain("threadId:");
+    expect(createSchema).not.toContain("scanId:");
+    expect(createSchema).not.toContain("targetId:");
+    expect(createSchema).toContain("leaseId: Id");
   });
 });

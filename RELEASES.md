@@ -1,5 +1,22 @@
 # Release Notes
 
+## GBlockParty Chromux Next v0.10.3 (prerelease)
+
+Tag: `chromux-next-v0.10.3`
+
+- Reserve authoritative detected cwd/thread data in a bounded, renewable
+  main-process lease before opening configuration, so long waits and later
+  scans cannot invalidate Create continuation or Start fresh.
+- Renew open configuration leases every 30 seconds, release them on Back,
+  close, or unmount, consume them only after successful transactional creation,
+  and clean up abandoned leases after expiry.
+- Keep fork/start rejection retryable with the same form and lease. If lease
+  acquisition or renewal fails, preserve form values, explain that a rescan is
+  required, and offer Rescan directly.
+- Restrict detected creation IPC to an opaque lease ID plus validated mode,
+  title, model, reasoning, and permission settings; renderer-controlled cwd and
+  thread IDs remain impossible.
+
 ## GBlockParty Chromux Next v0.10.2 (prerelease)
 
 Tag: `chromux-next-v0.10.2`

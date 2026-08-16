@@ -79,9 +79,14 @@ The v0.7.1 baseline makes ownership enforceable rather than conventional:
 - Codex candidates are enriched only through exact-cwd `thread/list` matches
   from the existing app-server. A bounded `thread/read` lookup supplies the
   latest available agent preview. No legacy Chromux state is read.
-- Authoritative cwd and thread IDs remain in a two-minute main-process cache.
-  The renderer receives opaque scan/target IDs and cannot supply either value
-  to detected-session creation. A later scan replaces the prior cache.
+- Authoritative cwd and thread IDs enter a bounded main-process lease store when
+  Continue or Start Fresh exchanges the renderer's opaque scan/target IDs for
+  an opaque lease ID. The renderer renews the two-minute lease every 30 seconds
+  while configuration is open and can supply only that lease plus validated
+  configuration to creation. A later scan may replace the scan cache but cannot
+  revoke active leases. Back, close, and unmount release a lease; successful
+  transactional creation consumes it; expired/crashed-renderer leases clean
+  themselves up automatically.
 - Fresh creation uses `thread/start`; detected continuation uses `thread/fork`
   with the authoritative source thread ID plus the selected cwd, model, and
   permission policy. It omits `lastTurnId` so an active source turn becomes an

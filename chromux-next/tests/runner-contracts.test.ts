@@ -8,7 +8,10 @@ import {
 import { compareVersions } from "../src/runner/protocol";
 import { permissionParams } from "../src/runner/manager";
 import {
+  AcquireDetectionLeaseInputSchema,
   CreateFromDetectionInputSchema,
+  DetectionLeaseIdInputSchema,
+  DetectionLeaseV1Schema,
   DetectionResultV1Schema
 } from "../src/detection/contracts";
 
@@ -109,14 +112,27 @@ describe("runner contracts and compatibility", () => {
       }]
     });
     expect(result.rows[0]?.targetId).toBe("target");
+    expect(AcquireDetectionLeaseInputSchema.parse({ scanId: "scan", targetId: "target" }))
+      .toEqual({ scanId: "scan", targetId: "target" });
+    expect(DetectionLeaseV1Schema.parse({
+      schemaVersion: 1,
+      leaseId: "lease",
+      expiresAt: "2026-08-06T12:02:00.000Z"
+    }).leaseId).toBe("lease");
+    expect(DetectionLeaseIdInputSchema.parse({ leaseId: "lease" })).toEqual({ leaseId: "lease" });
     expect(() => CreateFromDetectionInputSchema.parse({
-      scanId: "scan",
-      targetId: "target",
+      leaseId: "lease",
       mode: "resume",
       title: "Session",
       permissionPreset: "workspace",
       cwd: "/renderer-controlled",
       threadId: "renderer-controlled"
     })).toThrow();
+    expect(CreateFromDetectionInputSchema.parse({
+      leaseId: "lease",
+      mode: "fresh",
+      title: "Session",
+      permissionPreset: "workspace"
+    })).not.toHaveProperty("scanId");
   });
 });

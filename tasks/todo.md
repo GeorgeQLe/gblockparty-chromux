@@ -59,6 +59,14 @@ instead of resuming the `prototype/` implementation.
 
 ## Completed Work
 
+- [x] Ship Chromux Next v0.10.3 with renewable opaque detection leases so a
+  configured Continue or Start Fresh target survives waits beyond two minutes
+  and later scans, while bounded main-process authority, retryable failures,
+  cleanup, strict IPC, long-wait UAT, and existing fork/start/resume semantics
+  remain enforced. _(source: user-supplied Detection-Lease Hotfix plan;
+  successor-only scope; external threads, legacy Chromux, persistence schema,
+  and `/releases/latest` remain unchanged)_
+
 - [x] Ship Chromux Next v0.10.2 so cold launch completes Codex model discovery
   and persisted-session restoration before DETECT renders, preventing Start
   Fresh and Create continuation from remaining disabled on an empty startup

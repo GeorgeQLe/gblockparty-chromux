@@ -244,6 +244,7 @@ i.failed { background: var(--danger); }
   color: #efd29f; background: #70552b33;
 }
 .detection-error { color: #f1aaa5; border-color: #744844; background: #723b3833; }
+.detection-error span { flex: 1; }
 .detected-summary { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: var(--space-2); }
 .detected-summary small { grid-column: 1 / -1; color: var(--graphite-400); overflow-wrap: anywhere; }
 .onboarding-modal > footer { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }

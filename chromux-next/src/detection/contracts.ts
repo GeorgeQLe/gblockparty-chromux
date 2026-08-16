@@ -31,9 +31,26 @@ export const DetectionResultV1Schema = z.object({
 }).strict();
 export type DetectionResultV1 = z.infer<typeof DetectionResultV1Schema>;
 
-export const CreateFromDetectionInputSchema = z.object({
+export const AcquireDetectionLeaseInputSchema = z.object({
   scanId: Id,
-  targetId: Id,
+  targetId: Id
+}).strict();
+export type AcquireDetectionLeaseInput = z.infer<typeof AcquireDetectionLeaseInputSchema>;
+
+export const DetectionLeaseV1Schema = z.object({
+  schemaVersion: z.literal(1),
+  leaseId: Id,
+  expiresAt: z.string().datetime()
+}).strict();
+export type DetectionLeaseV1 = z.infer<typeof DetectionLeaseV1Schema>;
+
+export const DetectionLeaseIdInputSchema = z.object({
+  leaseId: Id
+}).strict();
+export type DetectionLeaseIdInput = z.infer<typeof DetectionLeaseIdInputSchema>;
+
+export const CreateFromDetectionInputSchema = z.object({
+  leaseId: Id,
   mode: z.enum(["resume", "fresh"]),
   title: z.string().min(1).max(256),
   permissionPreset: PermissionPresetSchema,

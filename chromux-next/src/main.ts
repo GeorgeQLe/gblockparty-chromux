@@ -27,7 +27,9 @@ import {
   SavePayloadSchema,
   TriageInputSchema,
   TurnInputSchema
+  ,AcquireDetectionLeaseInputSchema
   ,CreateFromDetectionInputSchema
+  ,DetectionLeaseIdInputSchema
   ,UiPreferencesPatchV1Schema
   ,WorkspacePreferencesPatchV1Schema
 } from "./ipc/contracts";
@@ -40,6 +42,8 @@ import { CodexAppServer } from "./runner/protocol";
 import { LunaAnalyzer } from "./runner/attention";
 import { RunnerManager } from "./runner/manager";
 import { ExternalTerminalDetector } from "./detection/external";
+import { DetectionLeaseStore } from "./detection/leases";
+import type { EnrichedDetectionCandidate } from "./detection/contracts";
 import { BrowserViewService } from "./main/browser-view-service";
 import { IpcHandlerRegistry } from "./ipc/registry";
 import { BrowserEvidenceWorkflow } from "./browser/workflow";
@@ -79,6 +83,7 @@ const runner = new RunnerManager(
   new LunaAnalyzer(path.join(app.getPath("userData"), "attention-analyzer"), runnerSmokeOptions)
 );
 const detector = new ExternalTerminalDetector((rows) => runner.enrichDetection(rows));
+const detectionLeases = new DetectionLeaseStore();
 const running = new Map<string, AbortController>();
 const isSmoke = process.argv.includes("--smoke") || Boolean(runnerSmokePhase) || Boolean(browserEvidenceSmokeUrl);
 type VisualDetectionMode = "scanning" | "populated" | "empty" | "denied";
@@ -157,6 +162,22 @@ function visualDetectionFixture(mode: Exclude<VisualDetectionMode, "scanning">) 
     scannedAt: "2026-08-06T12:00:00.000Z",
     titlePermission: mode === "denied" ? "denied" as const : "granted" as const,
     rows
+  };
+}
+
+function visualDetectionTarget(targetId: string): EnrichedDetectionCandidate {
+  const row = visualDetectionFixture("populated").rows.find((item) => item.targetId === targetId);
+  if (!row) throw new Error("Detected terminal target is no longer available. Rescan to continue.");
+  return {
+    pid: row.pid,
+    ppid: 1,
+    tty: `visual-${row.pid}`,
+    command: row.command,
+    args: row.command,
+    cwd: row.directory,
+    terminal: row.terminal,
+    agent: row.agent,
+    ...(row.resumeAvailable ? { threadId: "visual-source-thread" } : {})
   };
 }
 
@@ -645,9 +666,24 @@ function registerIpc(): void {
     }
     return visualDetectionFixture(visualDetectionMode);
   });
+  registry.handle(IpcChannels.runnerAcquireDetectionLease, (_event, input: unknown) => {
+    const value = AcquireDetectionLeaseInputSchema.parse(input);
+    const target = isVisualSmoke
+      ? visualDetectionTarget(value.targetId)
+      : detector.resolve(value.scanId, value.targetId);
+    return detectionLeases.acquire(target);
+  });
+  registry.handle(IpcChannels.runnerRenewDetectionLease, (_event, input: unknown) => {
+    const value = DetectionLeaseIdInputSchema.parse(input);
+    return detectionLeases.renew(value.leaseId);
+  });
+  registry.handle(IpcChannels.runnerReleaseDetectionLease, (_event, input: unknown) => {
+    const value = DetectionLeaseIdInputSchema.parse(input);
+    detectionLeases.release(value.leaseId);
+  });
   registry.handle(IpcChannels.runnerCreateFromDetection, async (_event, input: unknown) => {
     const value = CreateFromDetectionInputSchema.parse(input);
-    const target = detector.resolve(value.scanId, value.targetId);
+    const target = detectionLeases.resolve(value.leaseId);
     if (value.mode === "resume" && !target.threadId) {
       throw new Error("The selected terminal has no resumable exact-directory Codex thread.");
     }
@@ -667,6 +703,7 @@ function registerIpc(): void {
         }
       }
     }
+    detectionLeases.consume(value.leaseId);
     return created.session;
   });
   registry.handle(IpcChannels.runnerClose, async (_event, input: unknown) => {

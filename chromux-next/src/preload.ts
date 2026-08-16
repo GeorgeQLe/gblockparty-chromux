@@ -8,7 +8,10 @@ import {
   MutationResultSchema,
   RunnerStateV1Schema,
   CompatibilityDiagnosticsV1Schema,
+  AcquireDetectionLeaseInputSchema,
   CreateFromDetectionInputSchema,
+  DetectionLeaseIdInputSchema,
+  DetectionLeaseV1Schema,
   DetectionResultV1Schema,
   BrowserActionInputSchema,
   BrowserOpenInputSchema,
@@ -154,6 +157,24 @@ const api: ChromuxNextApi = {
     async detectExternal() {
       return DetectionResultV1Schema.parse(
         await ipcRenderer.invoke(IpcChannels.runnerDetectExternal)
+      );
+    },
+    async acquireDetectionLease(input) {
+      return DetectionLeaseV1Schema.parse(await ipcRenderer.invoke(
+        IpcChannels.runnerAcquireDetectionLease,
+        AcquireDetectionLeaseInputSchema.parse(input)
+      ));
+    },
+    async renewDetectionLease(leaseId) {
+      return DetectionLeaseV1Schema.parse(await ipcRenderer.invoke(
+        IpcChannels.runnerRenewDetectionLease,
+        DetectionLeaseIdInputSchema.parse({ leaseId })
+      ));
+    },
+    async releaseDetectionLease(leaseId) {
+      await ipcRenderer.invoke(
+        IpcChannels.runnerReleaseDetectionLease,
+        DetectionLeaseIdInputSchema.parse({ leaseId })
       );
     },
     async createFromDetection(input) {

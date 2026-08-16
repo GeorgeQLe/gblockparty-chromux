@@ -17,7 +17,12 @@ import type {
   WorkspacePreferencesPatchV1,
   WorkspacePreferencesV1
 } from "../settings/workspace-preferences";
-import type { CreateFromDetectionInput, DetectionResultV1 } from "../detection/contracts";
+import type {
+  AcquireDetectionLeaseInput,
+  CreateFromDetectionInput,
+  DetectionLeaseV1,
+  DetectionResultV1
+} from "../detection/contracts";
 import type { BrowserWorkspaceV1 } from "../browser/contracts";
 
 export interface DocumentPayload {
@@ -65,6 +70,9 @@ export interface ChromuxNextApi {
       reasoningEffort?: string;
     }): Promise<RunnerSessionV1>;
     detectExternal(): Promise<DetectionResultV1>;
+    acquireDetectionLease(input: AcquireDetectionLeaseInput): Promise<DetectionLeaseV1>;
+    renewDetectionLease(leaseId: string): Promise<DetectionLeaseV1>;
+    releaseDetectionLease(leaseId: string): Promise<void>;
     createFromDetection(input: CreateFromDetectionInput): Promise<RunnerSessionV1>;
     close(sessionId: string): Promise<void>;
     send(sessionId: string, text: string): Promise<void>;

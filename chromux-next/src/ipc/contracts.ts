@@ -22,7 +22,10 @@ import {
   WorkspacePreferencesV1Schema
 } from "../settings/workspace-preferences";
 import {
+  AcquireDetectionLeaseInputSchema,
   CreateFromDetectionInputSchema,
+  DetectionLeaseIdInputSchema,
+  DetectionLeaseV1Schema,
   DetectionResultV1Schema,
   DetectedTerminalV1Schema
 } from "../detection/contracts";
@@ -67,6 +70,9 @@ export const IpcChannels = {
   ,runnerGroup: "runner:group"
   ,runnerSelect: "runner:select"
   ,runnerDetectExternal: "runner:detect-external"
+  ,runnerAcquireDetectionLease: "runner:acquire-detection-lease"
+  ,runnerRenewDetectionLease: "runner:renew-detection-lease"
+  ,runnerReleaseDetectionLease: "runner:release-detection-lease"
   ,runnerCreateFromDetection: "runner:create-from-detection"
   ,attentionRefresh: "attention:refresh"
   ,attentionTriage: "attention:triage"
@@ -122,6 +128,9 @@ export {
   ,WorkspacePreferencesPatchV1Schema
   ,WorkspacePreferencesV1Schema
   ,CreateFromDetectionInputSchema
+  ,AcquireDetectionLeaseInputSchema
+  ,DetectionLeaseIdInputSchema
+  ,DetectionLeaseV1Schema
   ,DetectionResultV1Schema
   ,DetectedTerminalV1Schema
   ,BrowserActionInputSchema

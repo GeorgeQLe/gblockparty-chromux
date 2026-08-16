@@ -1,5 +1,75 @@
 # Session History
 
+## 2026-08-16 — Chromux Next v0.10.3 detection-lease hotfix
+
+- **User goal:** Replace the two-minute DETECT configuration deadline with a
+  renewable opaque main-process lease, retain retryability and authoritative
+  cwd/thread ownership, and ship Chromux Next 0.10.3 as a prerelease without
+  changing the legacy stable release channel.
+- **Changed files:** `chromux-next/src/detection/contracts.ts` defines strict
+  acquire/renew/release and lease-only creation schemas;
+  `src/detection/leases.ts` owns the bounded 32-entry, two-minute renewable
+  authority map and expiry timers; `src/ipc/contracts.ts`, `src/ipc/bridge.ts`,
+  `src/ipc/registry.ts`, and `src/preload.ts` expose and validate the three new
+  calls; `src/main.ts` exchanges scan authority for leases, resolves only a
+  lease during creation, retains it on failure, and consumes it on success;
+  `src/renderer.tsx` acquires before configuration, heartbeats every 30 seconds,
+  prevents duplicate acquisition, preserves retry state, offers Rescan on lease
+  loss, and releases on Back/close/unmount; `src/styles/legacy.css` lays out the
+  actionable lease-loss error; `tests/detection-leases.test.ts`,
+  `tests/detection-dialog.component.test.tsx`, `tests/runner-contracts.test.ts`,
+  `tests/renderer-security.test.ts`, and `tests/interface-system.test.ts` cover
+  authority lifecycle, UI lifecycle, strict IPC, and unchanged behavior;
+  `package.json` and `package-lock.json` set 0.10.3; `README.md`,
+  `docs/architecture.md`, `docs/uat-0.10.3.md`, root `RELEASES.md`,
+  `tasks/todo.md`, and this entry document the release and evidence.
+- **User-goal mapping:** Acquire is a clone-only main-process operation and
+  never calls the app-server. Active leases are independent of the replaceable
+  scan cache. Creation accepts only `leaseId` plus validated mode/title/model/
+  reasoning/permission configuration; cwd and source thread ID remain private.
+  `thread/fork`, `thread/start`, and persisted `thread/resume` ownership are
+  unchanged. Failed creation does not consume the lease or mutate partial
+  Chromux state; successful transactional creation consumes it.
+- **Executable verification:** A clean `npm ci` installed 675 packages.
+  `npm run verify` passed typecheck, all 124 tests across 25 files, Electron
+  Forge packaging, packaged baseline launch, two-session/two-launch restoration,
+  and browser-evidence smokes. `npm run visual:packaged --
+  /tmp/chromux-next-0.10.3-visual` produced all 28 standard/narrow product views
+  plus 8 Situation Room views; populated and configuration DETECT views were
+  inspected at standard and narrow widths with no clipping or control-state
+  regression. `npm audit --omit=dev --json` reported zero production
+  vulnerabilities. `git diff --check` passed.
+- **Skipped tests:** The real active-writer long-wait gate in
+  `docs/uat-0.10.3.md` remains human-controlled because its final click forks
+  the user's external Codex thread. Deterministic clock tests prove renewal
+  beyond two minutes and scan replacement without touching an external writer,
+  but they do not replace that explicit real-process sign-off. Windows/Linux
+  packages and signing remain unchanged cutover-gate work and do not exercise
+  this macOS DETECT flow.
+- **Adversarial review:** Applied
+  `.agents/skillpacks/docs/quality-gate-contract.md` to the exact shipping diff
+  and failure-audited expiry boundaries, scan replacement, lease-cap cleanup,
+  random-ID opacity, renderer-controlled authority injection, double clicks,
+  delayed acquisition after unmount, heartbeat overlap/failure, Back/close,
+  start/fork rejection, successful consumption, Focus Existing, visual fixtures,
+  and release-channel isolation. The review found and fixed a delayed-acquire
+  unmount leak by immediately releasing any lease returned after the component
+  is gone. Clean install emitted deprecated development-transitive warnings and
+  29 development-only audit findings; they are accepted for this patch because
+  the production-only audit is clean and dependency replacement would be an
+  unrelated high-risk toolchain upgrade.
+- **Residual risk:** A heavily throttled or suspended renderer could miss the
+  30-second heartbeat until the two-minute lease expires; the UI fails closed,
+  preserves form values, and requires Rescan. The real active-writer wait of
+  more than two minutes still needs the documented human sign-off before the
+  cutover evidence can claim live proof.
+- **Rollback note:** Revert the v0.10.3 shipping commit and delete prerelease
+  `chromux-next-v0.10.3`; v0.10.2 remains the prior successor prerelease. There
+  is no persistence migration, external-process mutation, legacy app change,
+  or stable update-channel rollback.
+- **Next command:** Run `$guide` for the manual active-writer long-wait gate in
+  `chromux-next/docs/uat-0.10.3.md`.
+
 ## 2026-08-16 — Chromux Next v0.10.2 DETECT startup race hotfix
 
 - **User goal:** Unstick the live Situation Room modal where neither Start

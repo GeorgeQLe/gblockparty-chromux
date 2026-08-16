@@ -1096,7 +1096,7 @@ function SettingsOverlay({
   </div></div>;
 }
 
-function DetectionDialog({
+export function DetectionDialog({
   onboarding,
   workspace,
   models,
@@ -1129,18 +1129,55 @@ function DetectionDialog({
   const [effort, setEffort] = useState(workspace.defaultReasoningEffort ?? recommended?.defaultReasoningEffort ?? "");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
+  const [leaseId, setLeaseId] = useState("");
+  const [leaseValid, setLeaseValid] = useState(false);
+  const [acquiringTargetId, setAcquiringTargetId] = useState("");
+  const leaseIdRef = useRef("");
+  const acquiringRef = useRef(false);
+  const preserveFormRef = useRef(false);
+  const mountedRef = useRef(true);
+
+  const releaseLease = () => {
+    const current = leaseIdRef.current;
+    leaseIdRef.current = "";
+    setLeaseId("");
+    setLeaseValid(false);
+    if (current) void window.chromuxNext.runner.releaseDetectionLease(current).catch(() => undefined);
+  };
 
   const scan = () => {
+    releaseLease();
     setLoading(true);
     setScanError("");
     setResult(undefined);
     setSelected(undefined);
+    setCreateError("");
     void window.chromuxNext.runner.detectExternal()
       .then(setResult)
       .catch((reason) => setScanError(String(reason)))
       .finally(() => setLoading(false));
   };
   useEffect(scan, []);
+  useEffect(() => () => {
+    mountedRef.current = false;
+    const current = leaseIdRef.current;
+    leaseIdRef.current = "";
+    if (current) void window.chromuxNext.runner.releaseDetectionLease(current).catch(() => undefined);
+  }, []);
+  useEffect(() => {
+    if (!leaseId || !leaseValid) return;
+    let renewing = false;
+    const heartbeat = window.setInterval(() => {
+      if (renewing) return;
+      renewing = true;
+      void window.chromuxNext.runner.renewDetectionLease(leaseId).catch((reason) => {
+        preserveFormRef.current = true;
+        setLeaseValid(false);
+        setCreateError(`The detected-session reservation was lost. Your settings are preserved, but you must rescan before creating. ${String(reason)}`);
+      }).finally(() => { renewing = false; });
+    }, 30_000);
+    return () => window.clearInterval(heartbeat);
+  }, [leaseId, leaseValid]);
   const rows = (result?.rows ?? []).filter((row) =>
     `${row.projectName} ${row.title ?? ""} ${row.directory} ${row.agent} ${row.command}`.toLowerCase().includes(query.toLowerCase())
   );
@@ -1157,23 +1194,53 @@ function DetectionDialog({
         return;
       }
     }
-    setSelected(row);
-    setMode(nextMode);
-    setTitle(`${nextMode === "resume" ? "Continue" : "Codex"} · ${row.projectName}`);
+    if (!result || acquiringRef.current) return;
+    acquiringRef.current = true;
+    setAcquiringTargetId(row.targetId);
+    setScanError("");
+    void window.chromuxNext.runner.acquireDetectionLease({
+      scanId: result.scanId,
+      targetId: row.targetId
+    }).then((lease) => {
+      if (!mountedRef.current) {
+        void window.chromuxNext.runner.releaseDetectionLease(lease.leaseId).catch(() => undefined);
+        return;
+      }
+      leaseIdRef.current = lease.leaseId;
+      setLeaseId(lease.leaseId);
+      setLeaseValid(true);
+      setSelected(row);
+      setMode(nextMode);
+      setCreateError("");
+      if (!preserveFormRef.current) {
+        setTitle(`${nextMode === "resume" ? "Continue" : "Codex"} · ${row.projectName}`);
+      }
+      preserveFormRef.current = false;
+    }).catch((reason) => {
+      if (!mountedRef.current) return;
+      setScanError(`Could not reserve that detected terminal. Rescan to continue. ${String(reason)}`);
+    }).finally(() => {
+      acquiringRef.current = false;
+      if (mountedRef.current) setAcquiringTargetId("");
+    });
   };
   const create = () => {
-    if (!result || !selected || !title.trim()) return;
+    if (!selected || !leaseId || !leaseValid || !title.trim()) return;
     setCreating(true);
     setCreateError("");
     void window.chromuxNext.runner.createFromDetection({
-      scanId: result.scanId,
-      targetId: selected.targetId,
+      leaseId,
       mode,
       title: title.trim(),
       permissionPreset: permission,
       ...(model ? { model } : {}),
       ...(effort ? { reasoningEffort: effort } : {})
-    }).then(() => complete()).catch((reason) => {
+    }).then(() => {
+      leaseIdRef.current = "";
+      setLeaseId("");
+      setLeaseValid(false);
+      complete();
+    }).catch((reason) => {
       fail(reason);
       setCreateError(String(reason));
       setCreating(false);
@@ -1188,17 +1255,17 @@ function DetectionDialog({
         ? `Create a separate continuation in ${selected.directory}. The original ${selected.terminal} process remains untouched.`
         : `Start Codex in ${selected.directory}. The original ${selected.terminal} process remains untouched.`
       : "Scan open macOS terminal tabs for agents and working folders. Detection never attaches to, types into, or stops those processes."}
-    close={close}
+    close={() => { releaseLease(); close(); }}
     dismissible={!onboarding}
     className="detection-modal onboarding-modal"
     footer={selected
-      ? <><Button tone="quiet" onClick={() => setSelected(undefined)}>Back</Button><Button icon={CirclePlus} tone="primary" disabled={creating || !title.trim() || !models.length} onClick={create}>{creating ? "Creating…" : mode === "resume" ? "Create continuation" : "Start fresh"}</Button></>
-      : <><div className="detection-fallbacks"><Button icon={FolderPlus} tone="quiet" onClick={chooseProject}>Choose Folder</Button>{onboarding && <Button tone="quiet" onClick={complete}>Continue Without Session</Button>}</div><Button icon={RefreshCw} onClick={scan} disabled={loading}>Rescan</Button></>}
+      ? <><Button tone="quiet" disabled={creating} onClick={() => { releaseLease(); setSelected(undefined); }}>Back</Button><Button icon={CirclePlus} tone="primary" disabled={creating || !leaseValid || !title.trim() || !models.length} onClick={create}>{creating ? "Creating…" : mode === "resume" ? "Create continuation" : "Start fresh"}</Button></>
+      : <><div className="detection-fallbacks"><Button icon={FolderPlus} tone="quiet" onClick={chooseProject}>Choose Folder</Button>{onboarding && <Button tone="quiet" onClick={complete}>Continue Without Session</Button>}</div><Button icon={RefreshCw} onClick={scan} disabled={loading || Boolean(acquiringTargetId)}>Rescan</Button></>}
   >
     {selected ? <form className="session-form detection-config" onSubmit={(event) => { event.preventDefault(); create(); }}>
       <div className="detected-summary"><Badge tone="sage">{selected.agent}</Badge><strong>{selected.projectName}</strong><small>{selected.directory}</small></div>
       {mode === "resume" && selected.externalActive && <p className="detection-warning"><AlertTriangle size={16} aria-hidden="true" /> Chromux copies safely stored history into a separate thread. It does not share an in-progress partial turn. The external Codex process stays active, and the two threads may diverge.</p>}
-      {createError && <p className="detection-error" role="alert"><AlertTriangle size={16} aria-hidden="true" /> {createError}</p>}
+      {createError && <div className="detection-error" role="alert"><AlertTriangle size={16} aria-hidden="true" /> <span>{createError}</span>{!leaseValid && <Button icon={RefreshCw} onClick={scan}>Rescan</Button>}</div>}
       <label>Session title<input autoFocus maxLength={256} value={title} onChange={(event) => setTitle(event.target.value)} /></label>
       <div className="modal-grid">
         <label>Permissions<select value={permission} onChange={(event) => setPermission(event.target.value as "workspace" | "read-only")}><option value="workspace">Workspace</option><option value="read-only">Read only</option></select></label>
@@ -1215,7 +1282,7 @@ function DetectionDialog({
         <div className="detected-row-copy"><div><Badge {...(row.agent === "codex" ? { tone: "sage" as const } : {})}>{row.agent}</Badge><strong>{row.projectName}</strong>{row.alreadyOpenSessionId && <Badge tone="success">Open</Badge>}</div><small>{row.terminal} · {row.directory}</small>{row.resumePreview && <p>{row.resumePreview}</p>}</div>
         <div className="detected-actions">{row.alreadyOpenSessionId
           ? <Button tone="primary" onClick={() => pick(row, "resume")}>Focus Existing</Button>
-          : <><Button disabled={!row.resumeAvailable} onClick={() => pick(row, "resume")}>Continue</Button><Button tone="primary" onClick={() => pick(row, "fresh")}>Start Fresh</Button></>}</div>
+          : <><Button disabled={!row.resumeAvailable || Boolean(acquiringTargetId)} onClick={() => pick(row, "resume")}>{acquiringTargetId === row.targetId ? "Reserving…" : "Continue"}</Button><Button tone="primary" disabled={Boolean(acquiringTargetId)} onClick={() => pick(row, "fresh")}>{acquiringTargetId === row.targetId ? "Reserving…" : "Start Fresh"}</Button></>}</div>
       </article>)}</div>}
     </div>}
   </Dialog>;
