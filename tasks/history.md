@@ -1,5 +1,39 @@
 # Session History
 
+## 2026-08-16 — Chromux Next clean-install lockfile hygiene
+
+- **User goal:** Unblock the requested v0.10.1 qualification after disk-pressure
+  cleanup required a clean dependency restoration.
+- **Changed files and purpose:** `chromux-next/package-lock.json` removes one
+  stale optional `minipass-fetch/node_modules/encoding` placeholder that had no
+  version, resolved artifact, or integrity and caused npm 11 Arborist to throw
+  `Invalid Version`; this history entry records the standalone hygiene boundary.
+- **User-goal mapping:** A reproducible clean install is required to rerun the
+  exact hotfix tests and package rather than relying on previously installed
+  dependencies. No declared dependency, application source, or runtime behavior
+  changes.
+- **Executable verification:** `npm install`, `npm ci`, and
+  `npm ci --omit=optional` reproduced the same pre-fix `Invalid Version` error;
+  after removing the invalid empty record, `npm ci` installed 673 packages and
+  completed its audit. The exact restored tree then passed the Chromux Next
+  typecheck, focused 29-test manager/interface/contract/recovery matrix, full
+  116-test suite, packaging, and packaged smokes as part of the following
+  hotfix boundary.
+- **Skipped tests:** No separate app test applies to this metadata-only repair;
+  the stronger complete successor validation ran immediately afterward.
+- **Adversarial review:** Compared the record with `HEAD`, confirmed the parent
+  retains its optional `encoding@^0.1.13` declaration so npm resolves a real
+  package, and checked that no other non-root package record lacks a version.
+  npm reported inherited deprecated transitive packages and 29 audit findings;
+  broad dependency upgrades are intentionally deferred because they would be a
+  breaking-prone scope expansion unrelated to the active-writer hotfix.
+- **Residual risk and rollback:** The existing Electron Forge dependency graph
+  retains its known npm audit/deprecation debt. Reintroducing the empty record
+  reproduces clean-install failure, so rollback is not recommended; the prior
+  already-installed tree was otherwise behaviorally equivalent.
+- **Next command:** Ship the Chromux Next v0.10.1 active-writer continuation
+  hotfix on top of this clean-install repair.
+
 ## 2026-08-16 — Chromux Next v0.10.0 Situation Room experiment
 
 - **User goal:** Build and ship a flag-gated operations-room interface that
