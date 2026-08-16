@@ -1,5 +1,19 @@
 # Lessons
 
+## 2026-08-16 — Fork qualification must model full-history response size
+
+- Do not treat a small synthetic `thread/fork` response as sufficient proof for
+  continuing a real, long-running Codex thread; the app-server normally returns
+  populated `thread.turns`, which can exceed a bounded JSONL frame even though
+  only the new thread ID is needed.
+- Request `excludeTurns: true` for detected continuations and keep the protocol
+  line cap intact. Apply this whenever a lifecycle response can return history
+  that the client does not consume.
+- Correction enforcement: the subprocess fixture can emit an oversized fork
+  history, `tests/runner-protocol.integration.test.ts` proves exclusion stays
+  below the frame limit, and `tests/runner-manager.test.ts` requires every
+  detected continuation to send `excludeTurns: true`.
+
 ## 2026-07-21 — Floating previews need opaque material layers
 
 - Theme-level alpha tokens can make a floating preview's header, footer, or terminal backing visually bleed into the workspace even when the outer shell looks substantial.

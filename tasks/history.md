@@ -1,5 +1,78 @@
 # Session History
 
+## 2026-08-16 — Chromux Next v0.10.4 large-history fork hotfix
+
+- **User goal:** Fix the live v0.10.3 continuation failure
+  `Codex app-server protocol violation: JSONL partial line exceeded limit`
+  without weakening the transport bound or touching the active external source.
+- **Root cause:** The v0.10.3 lease worked and reached `thread/fork`, but Codex
+  normally populated the fork response's `thread.turns`. A long source history
+  made that single JSONL response exceed Chromux's intentional 1 MiB line cap,
+  even though creation consumes only the new thread ID.
+- **Changed files and purpose:** `chromux-next/src/runner/manager.ts` adds
+  `excludeTurns: true` only to detected continuation forks;
+  `fixtures/subprocess-fixture.cjs` can reproduce a returned history larger than
+  the configured frame; `tests/runner-manager.test.ts` locks the exact request
+  and `tests/runner-protocol.integration.test.ts` proves omission fails at the
+  cap while exclusion succeeds; `package.json` and `package-lock.json` set
+  0.10.4; `README.md`, `docs/architecture.md`, `docs/uat-0.10.4.md`, root
+  `RELEASES.md`, `tasks/todo.md`, `tasks/lessons.md`, and this entry document
+  the correction, release, verification, and repeatable lesson.
+- **User-goal mapping:** `excludeTurns` changes only the response projection;
+  Codex still copies the authoritative safely stored history into the new fork.
+  Chromux still validates and persists the distinct returned ID, leaves
+  `lastTurnId` absent, retains the lease on rejection, never falls back to
+  start/resume, and keeps the 1 MiB corruption/DoS guard for every JSONL frame.
+- **Executable verification:** Generated the experimental app-server JSON
+  schemas from the installed official Codex 0.147.0 binary and a temporary
+  official npm Codex 0.146.0 macOS binary; both define `excludeTurns` with the
+  metadata/live-state-only behavior. `npm run verify` passed typecheck, all 125
+  tests across 25 files, Electron Forge packaging, packaged baseline launch,
+  two-session/two-launch restoration, and browser-evidence smokes. The final
+  focused manager/protocol rerun passed 24 tests, including a deterministic
+  omitted-flag reproduction and successful excluded-history response under a
+  4 KiB test cap. Packaged visual qualification produced 28 standard/narrow
+  product captures plus 8 Situation Room captures; standard and narrow DETECT
+  configuration views were inspected without clipping. The packaged plist
+  reports 0.10.4, production-only npm audit reports zero vulnerabilities, and
+  `git diff --check` passes.
+- **Skipped tests:** The corrected real active-writer click remains for the user
+  after installing 0.10.4 because it creates another real Codex fork. Automated
+  coverage now reproduces the exact response-size class that the prior fixture
+  missed. Windows/Linux packaging remains separate cutover work and does not
+  exercise this macOS active-terminal flow.
+- **Adversarial review:** Applied
+  `.agents/skillpacks/docs/quality-gate-contract.md` to the exact diff and
+  failure-audited casing/schema compatibility, full-history versus excluded
+  response size, fork semantics, returned-ID validation, `lastTurnId`, fresh
+  start, persisted resume, app-server compromise/restart, lease retention,
+  external-writer isolation, protocol memory bounds, and release-channel
+  isolation. The review rejected a broad line-limit increase in favor of the
+  server-supported response projection. It also strengthened the fixture to
+  prove the unprojected request still fails at the limit.
+- **Correction enforcement:** `tasks/lessons.md` records that real lifecycle
+  qualification must model unused history in responses; the large-history
+  subprocess fixture and manager request assertion enforce the replacement
+  behavior in every future detected continuation.
+- **Accepted warnings and disk cleanup:** The first visual run failed before
+  launch with `ENOSPC` after temporary official compatibility downloads. Only
+  generated `chromux-next/out`, temporary `/tmp` schema/package directories,
+  and the rebuildable npm download cache were removed; packaging was rebuilt
+  successfully and the visual rerun passed. No project source or user data was
+  deleted.
+- **Residual risk:** The failed v0.10.3 call may have created a valid Codex fork
+  before Chromux rejected its oversized response, leaving that fork unregistered
+  in Chromux. It does not modify or attach to the source, but a fresh DETECT scan
+  may see it as the newest exact-directory history and a retry may fork from it.
+  Chromux does not delete or hide Codex-owned history automatically.
+- **Rollback note:** Revert the v0.10.4 shipping commit and delete prerelease
+  `chromux-next-v0.10.4`; v0.10.3 remains the prior successor prerelease, though
+  its long-history continuation defect returns. No persistence migration,
+  external-process mutation, legacy app change, or stable-channel rollback is
+  required.
+- **Next command:** Install/relaunch Chromux Next 0.10.4 and complete
+  `chromux-next/docs/uat-0.10.4.md` against the same active-writer scenario.
+
 ## 2026-08-16 — Chromux Next v0.10.3 detection-lease hotfix
 
 - **User goal:** Replace the two-minute DETECT configuration deadline with a

@@ -1,5 +1,17 @@
 # Release Notes
 
+## GBlockParty Chromux Next v0.10.4 (prerelease)
+
+Tag: `chromux-next-v0.10.4`
+
+- Request `excludeTurns: true` when forking a detected continuation, preventing
+  long copied histories from being redundantly returned in one JSONL response
+  when Chromux needs only the new thread ID.
+- Keep the 1 MiB app-server framing guard intact for malformed or unexpectedly
+  oversized traffic instead of weakening the transport's memory bound.
+- Prove compatibility against the Codex 0.146.0 and 0.147.0 generated schemas,
+  and cover a large-history fork with the deterministic subprocess fixture.
+
 ## GBlockParty Chromux Next v0.10.3 (prerelease)
 
 Tag: `chromux-next-v0.10.3`

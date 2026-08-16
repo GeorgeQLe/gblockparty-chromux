@@ -59,6 +59,14 @@ instead of resuming the `prototype/` implementation.
 
 ## Completed Work
 
+- [x] Ship Chromux Next v0.10.4 so detected continuation forks request only
+  metadata with `excludeTurns`, preventing long source histories from exceeding
+  the bounded app-server JSONL frame while retaining the v0.10.3 lease,
+  transactional, external-writer, and stable-release boundaries. _(source:
+  live v0.10.3 active-writer UAT correction; successor-only scope; compatible
+  with Codex 0.146.0+; the external thread, legacy Chromux, persistence schema,
+  and `/releases/latest` remain unchanged)_
+
 - [x] Ship Chromux Next v0.10.3 with renewable opaque detection leases so a
   configured Continue or Start Fresh target survives waits beyond two minutes
   and later scans, while bounded main-process authority, retryable failures,

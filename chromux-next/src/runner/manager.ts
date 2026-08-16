@@ -142,7 +142,7 @@ export class RunnerManager extends EventEmitter {
     const selectedModel = this.models.find((item) => item.id === model);
     const method = input.mode === "resume" ? "thread/fork" : "thread/start";
     const response = await this.server.request(method, {
-      ...(input.mode === "resume" ? { threadId: input.threadId } : {}),
+      ...(input.mode === "resume" ? { threadId: input.threadId, excludeTurns: true } : {}),
       cwd: canonicalProjectPath,
       model,
       ...permissionParams(input.permissionPreset)

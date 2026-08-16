@@ -89,9 +89,12 @@ The v0.7.1 baseline makes ownership enforceable rather than conventional:
   themselves up automatically.
 - Fresh creation uses `thread/start`; detected continuation uses `thread/fork`
   with the authoritative source thread ID plus the selected cwd, model, and
-  permission policy. It omits `lastTurnId` so an active source turn becomes an
-  interruption marker, and persists only the returned fork ID. An already open
-  source thread focuses its existing session. Successful detected creation
+  permission policy. It sets `excludeTurns` because creation needs only the new
+  thread metadata and ID; copied history remains authoritative in Codex and is
+  not redundantly serialized through the bounded JSONL channel. It omits
+  `lastTurnId` so an active source turn becomes an interruption marker, and
+  persists only the returned fork ID. An already open source thread focuses its
+  existing session. Successful detected creation
   atomically persists the project/worktree registry and runner state. Failed
   validation, start, fork, missing-ID, or persistence does not create a partial
   Chromux session or complete onboarding; it never falls back to start or

@@ -70,6 +70,24 @@ describe("Codex app-server subprocess", () => {
     server.respond("server-request", { decision: "decline" });
   });
 
+  it("keeps a large-history fork response below the frame limit by excluding returned turns", async () => {
+    const { server: unbounded } = await scenario({ forkHistoryBytes: 8_192 });
+    await unbounded.start();
+    await expect(unbounded.request("thread/fork", { threadId: "large-source" }))
+      .rejects.toThrow(/JSONL (?:partial )?line exceeded limit/);
+    await unbounded.stop();
+
+    const { server, logPath } = await scenario({ forkHistoryBytes: 8_192 });
+    await server.start();
+    await expect(server.request("thread/fork", {
+      threadId: "large-source",
+      excludeTurns: true
+    })).resolves.toMatchObject({ thread: { id: "fixture-fork-1", turns: [] } });
+    const log = await readFile(logPath, "utf8");
+    expect(log).toContain('"method":"thread/fork"');
+    expect(log).toContain('"excludeTurns":true');
+  });
+
   it("rejects unavailable and incompatible CLI versions without leaving an app-server", async () => {
     const unavailable = new CodexAppServer({ command: path.join(os.tmpdir(), "missing-chromux-cli") });
     await expect(unavailable.start()).rejects.toThrow("unavailable");

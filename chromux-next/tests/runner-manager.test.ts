@@ -161,6 +161,7 @@ describe("runner manager", () => {
       method: "thread/fork",
       params: {
         threadId: "saved-thread",
+        excludeTurns: true,
         cwd: canonicalTmp,
         model: "model",
         sandbox: "read-only",

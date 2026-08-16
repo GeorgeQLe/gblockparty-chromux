@@ -82,7 +82,10 @@ if (process.argv.includes("app-server")) {
             write({ id: message.id, error: { message: "fork rejected" } }, "thread/fork");
           } else {
             scenario.threadCounter = (scenario.threadCounter || 0) + 1;
-            write({ id: message.id, result: { thread: { id: `fixture-fork-${scenario.threadCounter}` } } }, "thread/fork");
+            const turns = scenario.forkHistoryBytes && !message.params?.excludeTurns
+              ? [{ items: [{ type: "agentMessage", text: "x".repeat(scenario.forkHistoryBytes) }] }]
+              : [];
+            write({ id: message.id, result: { thread: { id: `fixture-fork-${scenario.threadCounter}`, turns } } }, "thread/fork");
           }
         } else if (message.method === "thread/resume") {
           if ((scenario.failResumeThreadIds || []).includes(message.params?.threadId)) {
