@@ -151,7 +151,7 @@ describe("five-approach shared interface system", () => {
     expect(preload).toContain("CreateFromDetectionInputSchema.parse");
     expect(main).toContain("detectionLeases.resolve(value.leaseId)");
     expect(main).toContain("detectionLeases.consume(value.leaseId)");
-    expect(main).toContain('value.mode === "resume" && target.threadId');
+    expect(main).toContain('value.mode === "continue" && target.threadId');
     expect(main).not.toContain("input.cwd");
     expect(main).not.toContain("input.threadId");
   });

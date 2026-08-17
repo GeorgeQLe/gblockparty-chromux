@@ -88,6 +88,38 @@ describe("Codex app-server subprocess", () => {
     expect(log).toContain('"excludeTurns":true');
   });
 
+  it("keeps excluded lifecycle responses and paginated summary history within the frame limit", async () => {
+    const { server, logPath } = await scenario({
+      forkHistoryBytes: 8_192,
+      resumeHistoryBytes: 8_192,
+      turnPages: {
+        first: {
+          data: [{ id: "turn-2", items: [{ id: "agent-2", type: "agentMessage", text: "bounded page 2" }] }],
+          nextCursor: "older"
+        },
+        older: {
+          data: [{ id: "turn-1", items: [{ id: "user-1", type: "userMessage", content: [{ type: "text", text: "bounded page 1" }] }] }],
+          nextCursor: null
+        }
+      }
+    });
+    await server.start();
+    await expect(server.request("thread/fork", { threadId: "large-source", excludeTurns: true }))
+      .resolves.toMatchObject({ thread: { turns: [] } });
+    await expect(server.request("thread/resume", { threadId: "fixture-fork-1", excludeTurns: true }))
+      .resolves.toMatchObject({ thread: { turns: [] } });
+    const first = await server.request("thread/turns/list", {
+      threadId: "fixture-fork-1", limit: 100, sortDirection: "desc", itemsView: "summary"
+    }) as any;
+    expect(first.nextCursor).toBe("older");
+    await expect(server.request("thread/turns/list", {
+      threadId: "fixture-fork-1", limit: 100, sortDirection: "desc", itemsView: "summary", cursor: first.nextCursor
+    })).resolves.toMatchObject({ nextCursor: null });
+    const log = await readFile(logPath, "utf8");
+    expect(log).toContain('"excludeTurns":true');
+    expect(log).toContain('"itemsView":"summary"');
+  });
+
   it("rejects unavailable and incompatible CLI versions without leaving an app-server", async () => {
     const unavailable = new CodexAppServer({ command: path.join(os.tmpdir(), "missing-chromux-cli") });
     await expect(unavailable.start()).rejects.toThrow("unavailable");

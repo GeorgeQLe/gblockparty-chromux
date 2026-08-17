@@ -684,12 +684,12 @@ function registerIpc(): void {
   registry.handle(IpcChannels.runnerCreateFromDetection, async (_event, input: unknown) => {
     const value = CreateFromDetectionInputSchema.parse(input);
     const target = detectionLeases.resolve(value.leaseId);
-    if (value.mode === "resume" && !target.threadId) {
+    if (value.mode === "continue" && !target.threadId) {
       throw new Error("The selected terminal has no resumable exact-directory Codex thread.");
     }
     const created = await runner.createDetectedSession({
       cwd: target.cwd,
-      ...(value.mode === "resume" && target.threadId ? { threadId: target.threadId } : {}),
+      ...(value.mode === "continue" && target.threadId ? { threadId: target.threadId } : {}),
       mode: value.mode,
       title: value.title,
       permissionPreset: value.permissionPreset,

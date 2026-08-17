@@ -59,6 +59,14 @@ instead of resuming the `prototype/` implementation.
 
 ## Completed Work
 
+- [x] Ship Chromux Next v0.10.5 so Continue retains safe fork ownership while
+  paginated summary hydration restores copied history within a 1,000-event
+  display cap, existing empty sessions repair without reforking, failed
+  hydration remains visible and retryable, and excluded lifecycle responses
+  retain the 1 MiB framing guard. _(source: user-supplied paginated
+  continuation-history plan; successor-only scope; external Codex process,
+  legacy Chromux, and stable `/releases/latest` remain unchanged)_
+
 - [x] Ship Chromux Next v0.10.4 so detected continuation forks request only
   metadata with `excludeTurns`, preventing long source histories from exceeding
   the bounded app-server JSONL frame while retaining the v0.10.3 lease,

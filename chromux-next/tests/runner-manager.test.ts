@@ -20,6 +20,8 @@ class FakeServer extends EventEmitter implements AppServerTransport {
   forkReturnsSource = false;
   listedThreads: any[] = [];
   threadReads = new Map<string, any>();
+  turnPages = new Map<string, Map<string, any>>();
+  failTurnList = new Set<string>();
   async start() {}
   async stop() {}
   async request(method: string, params: any): Promise<any> {
@@ -46,6 +48,10 @@ class FakeServer extends EventEmitter implements AppServerTransport {
     }
     if (method === "thread/list") return { data: this.listedThreads };
     if (method === "thread/read") return this.threadReads.get(params.threadId) ?? {};
+    if (method === "thread/turns/list") {
+      if (this.failTurnList.has(params.threadId)) throw new Error("history failed");
+      return this.turnPages.get(params.threadId)?.get(params.cursor ?? "first") ?? { data: [], nextCursor: null };
+    }
     if (method === "turn/start") return { turn: { id: `turn-${++this.turn}` } };
     if (method === "thread/resume" && this.failResume.has(params.threadId)) throw new Error("resume failed");
     return {};
@@ -82,6 +88,34 @@ describe("runner manager", () => {
     expect(server.requests.find((request) => request.method === "turn/steer")?.params.expectedTurnId).toBe("turn-1");
     await manager.closeSession(second.id);
     await expect(manager.select(second.groupId, second.id)).rejects.toThrow("Closed sessions");
+    await manager.shutdown();
+  });
+
+  it("renders live user and authoritative agent items exactly once", async () => {
+    const { manager, server } = await setup();
+    const session = await manager.createSession({ projectPath: "/tmp", title: "Transcript" });
+    await manager.startOrSteer({ sessionId: session.id, text: "Hello" });
+    server.emit("notification", {
+      method: "item/started",
+      params: { threadId: session.threadId, turnId: "turn-1", item: { id: "user-item", type: "userMessage", content: [{ type: "text", text: "Hello" }] } }
+    });
+    server.emit("notification", {
+      method: "item/completed",
+      params: { threadId: session.threadId, turnId: "turn-1", item: { id: "user-item", type: "userMessage", content: [{ type: "text", text: "Hello" }] } }
+    });
+    server.emit("notification", {
+      method: "item/agentMessage/delta",
+      params: { threadId: session.threadId, turnId: "turn-1", itemId: "agent-item", delta: "Draft" }
+    });
+    server.emit("notification", {
+      method: "item/completed",
+      params: { threadId: session.threadId, turnId: "turn-1", item: { id: "agent-item", type: "agentMessage", text: "Final" } }
+    });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const events = manager.getState().sessions.find((item) => item.id === session.id)!.events;
+    expect(events.filter((event) => event.kind === "user").map((event) => event.text)).toEqual(["Hello"]);
+    expect(events.filter((event) => event.kind === "agent").map((event) => event.text)).toEqual(["Final"]);
+    expect(events.some((event) => event.kind === "tool" && event.text === "userMessage")).toBe(false);
     await manager.shutdown();
   });
 
@@ -149,7 +183,7 @@ describe("runner manager", () => {
     server.failResume.add("saved-thread");
     const created = await manager.createDetectedSession({
       cwd: canonicalTmp,
-      mode: "resume",
+      mode: "continue",
       threadId: "saved-thread",
       title: "Continued",
       permissionPreset: "read-only",
@@ -183,6 +217,176 @@ describe("runner manager", () => {
     await manager.shutdown();
   });
 
+  it("hydrates continued history from the fork with chronological, deduplicated summary pages", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "chromux-next-history-"));
+    const server = new FakeServer();
+    server.turnPages.set("fork-1", new Map([
+      ["first", {
+        data: [
+          { id: "turn-3", items: [{ id: "agent-3", type: "agentMessage", text: "Newest answer" }] },
+          { id: "turn-2", items: [
+            { id: "user-2", type: "userMessage", content: [{ type: "text", text: "Middle question" }] },
+            { id: "reason-2", type: "reasoning", summary: [{ text: "Middle reasoning" }] }
+          ] }
+        ],
+        nextCursor: "older"
+      }],
+      ["older", {
+        data: [
+          { id: "turn-2", items: [{ id: "user-2", type: "userMessage", content: [{ type: "text", text: "Middle question" }] }] },
+          { id: "turn-1", items: [
+            { id: "command-1", type: "commandExecution", command: "npm test", aggregatedOutput: "passed" },
+            { id: "file-1", type: "fileChange", changes: [{ kind: "update", path: "src/a.ts" }] },
+            { id: "tool-1", type: "mcpToolCall", tool: "lookup" }
+          ] }
+        ],
+        nextCursor: null
+      }]
+    ]));
+    const manager = new RunnerManager(server, new LocalStore(directory), new LunaAnalyzer(directory, "missing-codex"));
+    await manager.initialize();
+    const canonicalTmp = await (await import("node:fs/promises")).realpath("/tmp");
+    const { session } = await manager.createDetectedSession({
+      cwd: canonicalTmp,
+      mode: "continue",
+      threadId: "external-source",
+      title: "Continue",
+      permissionPreset: "workspace"
+    });
+
+    expect(session.historyHydration).toBe("complete");
+    expect(session.events.map((event) => event.kind)).toEqual([
+      "command", "file-change", "tool", "user", "reasoning", "agent", "system"
+    ]);
+    expect(session.events.filter((event) => event.itemId === "user-2")).toHaveLength(1);
+    expect(server.requests.filter((request) => request.method === "thread/turns/list")).toEqual([
+      { method: "thread/turns/list", params: { threadId: "fork-1", limit: 100, sortDirection: "desc", itemsView: "summary" } },
+      { method: "thread/turns/list", params: { threadId: "fork-1", limit: 100, sortDirection: "desc", itemsView: "summary", cursor: "older" } }
+    ]);
+    expect(server.requests.some((request) =>
+      ["thread/resume", "turn/start", "turn/steer", "turn/interrupt"].includes(request.method)
+    )).toBe(false);
+    await manager.shutdown();
+  });
+
+  it("caps continued history with a notice and fails repeated cursors closed", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "chromux-next-history-cap-"));
+    const server = new FakeServer();
+    server.turnPages.set("fork-1", new Map([["first", {
+      data: [{ id: "large-turn", items: Array.from({ length: 1001 }, (_, index) => ({
+        id: `item-${index}`, type: "agentMessage", text: `message ${index}`
+      })) }],
+      nextCursor: null
+    }]]));
+    server.turnPages.set("fork-2", new Map([
+      ["first", { data: [], nextCursor: "repeat" }],
+      ["repeat", { data: [], nextCursor: "repeat" }]
+    ]));
+    const manager = new RunnerManager(server, new LocalStore(directory), new LunaAnalyzer(directory, "missing-codex"));
+    await manager.initialize();
+    const canonicalTmp = await (await import("node:fs/promises")).realpath("/tmp");
+    const capped = (await manager.createDetectedSession({
+      cwd: canonicalTmp, mode: "continue", threadId: "source-1", title: "Capped", permissionPreset: "workspace"
+    })).session;
+    expect(capped.historyHydration).toBe("truncated");
+    expect(capped.events).toHaveLength(1000);
+    expect(capped.events[0]).toMatchObject({ kind: "system", sourceMethod: "chromux/history-hydration" });
+    expect(capped.events[0]?.text).toContain("Earlier copied history was omitted");
+    expect(capped.events.at(-2)?.text).toBe("message 1000");
+    await manager.startOrSteer({ sessionId: capped.id, text: "New work" });
+    const activeCapped = manager.getState().sessions.find((session) => session.id === capped.id)!;
+    expect(activeCapped.events).toHaveLength(1000);
+    expect(activeCapped.events[0]?.text).toContain("Earlier copied history was omitted");
+    expect(activeCapped.events.at(-1)?.text).toBe("New work");
+
+    const cursorFailure = (await manager.createDetectedSession({
+      cwd: canonicalTmp, mode: "continue", threadId: "source-2", title: "Cursor", permissionPreset: "workspace"
+    })).session;
+    expect(cursorFailure.historyHydration).toBe("failed");
+    expect(cursorFailure.events.at(-1)?.text).toContain("repeated a pagination cursor");
+    await manager.shutdown();
+  });
+
+  it("keeps hydration failure retryable and restores the owned thread without reforking", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "chromux-next-history-retry-"));
+    const server = new FakeServer();
+    server.failTurnList.add("fork-1");
+    const manager = new RunnerManager(server, new LocalStore(directory), new LunaAnalyzer(directory, "missing-codex"));
+    await manager.initialize();
+    const canonicalTmp = await (await import("node:fs/promises")).realpath("/tmp");
+    const created = (await manager.createDetectedSession({
+      cwd: canonicalTmp, mode: "continue", threadId: "external", title: "Retry", permissionPreset: "workspace"
+    })).session;
+    expect(created).toMatchObject({ threadId: "fork-1", status: "idle", historyHydration: "failed" });
+    expect(created.events.at(-1)?.kind).toBe("error");
+
+    server.failTurnList.clear();
+    server.turnPages.set("fork-1", new Map([["first", {
+      data: [{ id: "turn", items: [{ id: "user", type: "userMessage", content: [{ type: "text", text: "Recovered history" }] }] }],
+      nextCursor: null
+    }]]));
+    server.emit("notification", { method: "chromux/server-restored", params: {} });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const restored = manager.getState().sessions.find((session) => session.id === created.id)!;
+    expect(restored.historyHydration).toBe("complete");
+    expect(restored.events.some((event) => event.text === "Recovered history")).toBe(true);
+    expect(restored.events.some((event) => event.text.includes("could not be loaded"))).toBe(false);
+    expect(server.requests.filter((request) => request.method === "thread/fork")).toHaveLength(1);
+    expect(server.requests).toContainEqual({
+      method: "thread/resume",
+      params: {
+        threadId: "fork-1", excludeTurns: true, cwd: canonicalTmp, model: "model",
+        sandbox: "workspace-write", approvalPolicy: "on-request"
+      }
+    });
+    await manager.shutdown();
+  });
+
+  it("hydrates a legacy empty session on application launch without creating another fork", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "chromux-next-history-launch-"));
+    const store = new LocalStore(directory);
+    await store.updateRunner({
+      schemaVersion: 1,
+      groups: [{
+        schemaVersion: 1, id: "group", title: "omega-war", kind: "project", projectPath: "/tmp",
+        sessionIds: ["session"], createdAt: "2026-08-16T12:00:00.000Z", updatedAt: "2026-08-16T12:00:00.000Z"
+      }],
+      sessions: [{
+        schemaVersion: 1, id: "session", title: "Continue · omega-war", projectPath: "/tmp",
+        canonicalProjectPath: "/tmp", groupId: "group", threadId: "owned-thread", status: "idle",
+        model: "model", permissionPreset: "workspace", draft: "",
+        createdAt: "2026-08-16T12:00:00.000Z", updatedAt: "2026-08-16T12:00:00.000Z",
+        events: [{
+          schemaVersion: 1, id: "persisted-user", sessionId: "session", threadId: "owned-thread",
+          at: "2026-08-16T12:00:00.000Z", kind: "user", text: "Earlier question", links: []
+        }], interactions: []
+      }],
+      triage: []
+    } as any);
+    const server = new FakeServer();
+    server.turnPages.set("owned-thread", new Map([["first", {
+      data: [{ id: "turn", items: [
+        { id: "user", type: "userMessage", content: [{ type: "text", text: "Earlier question" }] },
+        { id: "agent", type: "agentMessage", text: "Earlier conversation" }
+      ] }],
+      nextCursor: null
+    }]]));
+    const manager = new RunnerManager(server, store, new LunaAnalyzer(directory, "missing-codex"));
+    await manager.initialize();
+    const session = manager.getState().sessions[0]!;
+    expect(session.historyHydration).toBe("complete");
+    expect(session.events.map((event) => event.text)).toEqual(["Earlier question", "Earlier conversation"]);
+    expect(server.requests.filter((request) => request.method === "thread/fork")).toHaveLength(0);
+    expect(server.requests).toContainEqual({
+      method: "thread/resume",
+      params: {
+        threadId: "owned-thread", excludeTurns: true, cwd: "/tmp", model: "model",
+        sandbox: "workspace-write", approvalPolicy: "on-request"
+      }
+    });
+    await manager.shutdown();
+  });
+
   it("fails detected continuations closed on fork rejection or a missing fork id", async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), "chromux-next-fork-failure-"));
     const server = new FakeServer();
@@ -192,7 +396,7 @@ describe("runner manager", () => {
     const canonicalTmp = await (await import("node:fs/promises")).realpath("/tmp");
     const input = {
       cwd: canonicalTmp,
-      mode: "resume" as const,
+      mode: "continue" as const,
       threadId: "active-source",
       title: "Continuation",
       permissionPreset: "workspace" as const
@@ -315,6 +519,9 @@ describe("runner manager", () => {
     expect(restored.sessions.find((item) => item.id === closed.id)?.status).toBe("closed");
     expect(server.requests.filter((request) => request.method === "thread/resume").map((request) => request.params.threadId).sort())
       .toEqual([first.threadId, second.threadId].sort());
+    expect(server.requests.filter((request) => request.method === "thread/resume")
+      .every((request) => request.params.excludeTurns === true)).toBe(true);
+    expect(server.requests.some((request) => request.method === "thread/fork")).toBe(false);
     expect(server.requests.some((request) => request.method === "turn/start" || request.method === "turn/steer")).toBe(false);
     await manager.shutdown();
   });

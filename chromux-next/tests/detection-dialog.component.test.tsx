@@ -141,6 +141,7 @@ describe("detected-session lease UI", () => {
     expect(create).toHaveBeenCalledTimes(2);
     expect(create.mock.calls[0]![0]).toMatchObject({ leaseId: "lease" });
     expect(create.mock.calls[1]![0]).toMatchObject({ leaseId: "lease" });
+    expect(create.mock.calls[0]![0]).toMatchObject({ mode: "continue" });
     expect(runner.releaseDetectionLease).not.toHaveBeenCalled();
   });
 
@@ -157,6 +158,7 @@ describe("detected-session lease UI", () => {
         groupId: "group",
         status: "idle",
         permissionPreset: "workspace",
+        historyHydration: "complete",
         draft: "",
         createdAt: "2026-08-16T12:00:00.000Z",
         updatedAt: "2026-08-16T12:00:00.000Z",

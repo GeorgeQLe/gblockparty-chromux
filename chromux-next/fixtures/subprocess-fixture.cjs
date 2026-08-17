@@ -91,8 +91,15 @@ if (process.argv.includes("app-server")) {
           if ((scenario.failResumeThreadIds || []).includes(message.params?.threadId)) {
             write({ id: message.id, error: { message: "resume rejected" } }, "thread/resume");
           } else {
-            write({ id: message.id, result: { thread: { id: message.params?.threadId } } }, "thread/resume");
+            const turns = scenario.resumeHistoryBytes && !message.params?.excludeTurns
+              ? [{ items: [{ type: "agentMessage", text: "x".repeat(scenario.resumeHistoryBytes) }] }]
+              : [];
+            write({ id: message.id, result: { thread: { id: message.params?.threadId, turns } } }, "thread/resume");
           }
+        } else if (message.method === "thread/turns/list") {
+          const pages = scenario.turnPages || {};
+          const key = message.params?.cursor || "first";
+          write({ id: message.id, result: pages[key] || { data: [], nextCursor: null } }, "thread/turns/list");
         } else if (message.method === "turn/start") {
           write({ id: message.id, result: { turn: { id: "fixture-turn" } } }, "turn/start");
         } else {

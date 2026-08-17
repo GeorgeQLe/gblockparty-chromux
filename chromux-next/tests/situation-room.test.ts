@@ -6,7 +6,7 @@ import { situationRoomApprovalFixture, situationRoomQuestionFixture } from "../s
 function state(): RunnerStateV1 {
   const session = (id: string, status: "idle" | "active" | "failed", interactions: PendingInteractionV1[] = []) => ({
     schemaVersion: 1 as const, id, title: id, projectPath: `/work/${id}`, canonicalProjectPath: `/work/${id}`,
-    groupId: "group", status, permissionPreset: "workspace" as const, draft: "", createdAt: "2026-08-16T15:00:00.000Z",
+    groupId: "group", status, permissionPreset: "workspace" as const, historyHydration: "complete" as const, draft: "", createdAt: "2026-08-16T15:00:00.000Z",
     updatedAt: "2026-08-16T16:00:00.000Z", events: [], interactions
   });
   return { schemaVersion: 1, groups: [{ schemaVersion: 1, id: "group", title: "Chromux", kind: "project", projectPath: "/work", sessionIds: ["one", "two", "three"], createdAt: "2026-08-16T15:00:00.000Z", updatedAt: "2026-08-16T16:00:00.000Z" }], sessions: [

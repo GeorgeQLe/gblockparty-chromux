@@ -68,6 +68,7 @@ export const RunnerSessionV1Schema = z.object({
   model: z.string().max(256).optional(),
   reasoningEffort: z.string().max(64).optional(),
   permissionPreset: PermissionPresetSchema,
+  historyHydration: z.enum(["pending", "complete", "truncated", "failed"]).default("pending"),
   draft: BoundedText.default(""),
   createdAt: Timestamp,
   updatedAt: Timestamp,

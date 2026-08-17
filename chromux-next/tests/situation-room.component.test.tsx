@@ -17,7 +17,7 @@ function request(interaction = situationRoomQuestionFixture): RoomRequest {
     session: {
       schemaVersion: 1, id: interaction.sessionId, title: "Release qualification", projectPath: "/work/chromux",
       canonicalProjectPath: "/work/chromux", groupId: "project", threadId: interaction.threadId, status: "idle",
-      permissionPreset: "workspace", draft: "", createdAt: interaction.at, updatedAt: interaction.at,
+      permissionPreset: "workspace", historyHydration: "complete", draft: "", createdAt: interaction.at, updatedAt: interaction.at,
       events: [{ schemaVersion: 1, id: "context", sessionId: interaction.sessionId, at: interaction.at, kind: "agent", text: "Qualification passed.", links: [] }],
       interactions: [interaction]
     }

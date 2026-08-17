@@ -34,6 +34,21 @@ describe("runner contracts and compatibility", () => {
     };
     expect(RunnerEventV1Schema.parse(event).text).toBe("ok");
     expect(() => RunnerEventV1Schema.parse({ ...event, text: "x".repeat(64 * 1024 + 1) })).toThrow();
+    const session = RunnerSessionV1Schema.parse({
+      schemaVersion: 1,
+      id: "legacy-session",
+      title: "Legacy",
+      projectPath: "/tmp",
+      canonicalProjectPath: "/tmp",
+      groupId: "group",
+      status: "idle",
+      permissionPreset: "workspace",
+      createdAt: "2026-08-05T12:00:00.000Z",
+      updatedAt: "2026-08-05T12:00:00.000Z",
+      events: [],
+      interactions: []
+    });
+    expect(session.historyHydration).toBe("pending");
     expect(() => RunnerSessionV1Schema.parse({
       schemaVersion: 1,
       id: "session",
@@ -122,7 +137,7 @@ describe("runner contracts and compatibility", () => {
     expect(DetectionLeaseIdInputSchema.parse({ leaseId: "lease" })).toEqual({ leaseId: "lease" });
     expect(() => CreateFromDetectionInputSchema.parse({
       leaseId: "lease",
-      mode: "resume",
+      mode: "continue",
       title: "Session",
       permissionPreset: "workspace",
       cwd: "/renderer-controlled",

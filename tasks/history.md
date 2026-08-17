@@ -1,5 +1,78 @@
 # Session History
 
+## 2026-08-16 — Chromux Next v0.10.5 paginated continuation history
+
+- **User goal:** Repair the existing empty `Continue · omega-war` session in
+  place, render its copied history without weakening the 1 MiB JSONL bound or
+  reforking the external source, and ship Chromux Next 0.10.5 as a prerelease.
+- **Changed files and per-file purpose:** `src/runner/contracts.ts` persists the
+  bounded hydration status; `src/runner/manager.ts` owns excluded fork/resume
+  lifecycle calls, cursor-safe summary pagination, chronological event
+  normalization, deduplication, sticky truncation, retry, and exact-once live
+  item replacement; the detection contract, main routing, and renderer rename
+  only the internal creation mode from `resume` to `continue` while retaining
+  Continue/Create continuation wording; app-server fixtures model excluded
+  resume/fork plus bounded pages; manager, protocol, contract, detection, and
+  transcript component tests cover the full behavior; package/lock metadata,
+  README, architecture, v0.10.5 UAT, release notes, todo, lessons, and this
+  record define the prerelease and correction boundary. Direct-session test
+  fixtures carry the new persisted field.
+- **User-goal mapping:** Continue still calls `thread/fork` exactly once with
+  the leased source ID and `excludeTurns: true`, persists the returned owned
+  thread transactionally, and reads only that new ID through
+  `thread/turns/list` with `itemsView: "summary"`. Existing sessions default to
+  pending, resume their owned ID with excluded turns, and hydrate without
+  reforking. Failed hydration retains an idle session plus a visible retry
+  event. The newest display fits within 1,000 events, with a reserved notice
+  when older events are omitted. Start Fresh, Focus Existing, leases, the
+  external writer, legacy Chromux, and the stable channel are unchanged.
+- **Executable verification:** A clean `npm ci` installed 675 packages;
+  `npm audit --omit=dev` found zero production vulnerabilities. Final
+  `npm run verify` passed TypeScript, all 132 tests across 26 files, Electron
+  Forge macOS arm64 packaging, baseline packaged launch, two-session/two-launch
+  restoration, and browser-evidence smoke after one isolated retry of the
+  browser smoke's fixture version-check timeout. The plist reports 0.10.5.
+  Packaged visual qualification produced 28 standard/narrow product captures
+  plus 8 Situation Room captures; standard/narrow DETECT continuation and
+  Control Room views were inspected without clipping. `git diff --check`
+  passed.
+- **Manual active-writer gate:** Relaunching the updated packaged app repaired
+  the existing `Continue · omega-war` record on the same owned thread: four
+  earlier user/agent events appeared and persisted with hydration `complete`.
+  No additional fork was created. Two harmless Chromux messages returned
+  `CHROMUX_NEXT_0105_OK` and `CHROMUX_NEXT_0105_RENDER_OK`; the second remained
+  visibly rendered. The original external Codex process remained a distinct
+  foreground tty process with its original PID and independent app-server/tool
+  descendants.
+- **Adversarial review:** Failure-oriented review covered source-thread
+  mutation, transaction ordering, excluded restore, malformed/looping cursors,
+  page-boundary and legacy-event duplication, event-family mapping, missing
+  timestamps, cap overflow after later live events, sticky notice retention,
+  failed-history retry, page/frame bounds, and stable-channel isolation. It
+  found and fixed legacy no-item-ID user duplication, truncation-notice
+  eviction, echoed live user lifecycle rows, and duplicate delta/completion
+  agent rows before the final qualification.
+- **Accepted warnings and residual risk:** `npm ci` reports 29 dev-tree
+  advisories and deprecated transitive packages in the existing Electron Forge
+  toolchain; production dependencies have zero advisories, and a breaking
+  toolchain migration is outside this patch. Packaged restoration emitted
+  nonfatal macOS `task_policy_set` diagnostics. The first real message capture
+  briefly showed a blank renderer and recovered on relaunch; a second full
+  live round-trip did not reproduce it and remained rendered, so it is recorded
+  as a low-confidence observation rather than a release blocker. Summary item
+  shapes can evolve with experimental app-server releases; unknown typed items
+  remain bounded tool events and malformed pages fail visibly for retry.
+- **Skipped tests:** Windows/Linux packages remain in the separate cutover
+  gate. No production deploy was run because this repository has no explicit
+  `deploy.md` or `tasks/deploy.md`; GitHub prerelease publication is the release
+  channel. The earlier 36-view visual run was not repeated after the final
+  exact-once event merge because no renderer markup or styling changed.
+- **Rollback note:** Remove prerelease and tag `chromux-next-v0.10.5`, then
+  revert the shipping commit. Chromux Next 0.10.4 and the legacy stable release
+  remain available; the external source thread requires no rollback.
+- **Next command:** Begin the macOS daily-driver and clean-install evidence in
+  the active Chromux Next cutover gate.
+
 ## 2026-08-16 — Chromux Next v0.10.4 large-history fork hotfix
 
 - **User goal:** Fix the live v0.10.3 continuation failure

@@ -51,7 +51,7 @@ export type DetectionLeaseIdInput = z.infer<typeof DetectionLeaseIdInputSchema>;
 
 export const CreateFromDetectionInputSchema = z.object({
   leaseId: Id,
-  mode: z.enum(["resume", "fresh"]),
+  mode: z.enum(["continue", "fresh"]),
   title: z.string().min(1).max(256),
   permissionPreset: PermissionPresetSchema,
   model: z.string().max(256).optional(),

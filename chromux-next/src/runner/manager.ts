@@ -33,6 +33,10 @@ import type { DetectionCandidate, EnrichedDetectionCandidate } from "../detectio
 
 type Envelope = { id?: string | number; method: string; params?: any };
 const execFileAsync = promisify(execFile);
+const MAX_SESSION_EVENTS = 1000;
+const HISTORY_PAGE_LIMIT = 100;
+const HISTORY_SOURCE_METHOD = "thread/turns/list";
+const HISTORY_STATUS_METHOD = "chromux/history-hydration";
 
 export class RunnerManager extends EventEmitter {
   private state: RunnerStateV1 = { schemaVersion: 1, groups: [], sessions: [], triage: [] };
@@ -119,7 +123,7 @@ export class RunnerManager extends EventEmitter {
   async createDetectedSession(input: {
     cwd: string;
     threadId?: string;
-    mode: "resume" | "fresh";
+    mode: "continue" | "fresh";
     title: string;
     permissionPreset: RunnerSessionV1["permissionPreset"];
     model?: string;
@@ -127,8 +131,8 @@ export class RunnerManager extends EventEmitter {
   }): Promise<{ session: RunnerSessionV1; workspacePreferences?: Awaited<ReturnType<LocalStore["getWorkspacePreferences"]>> }> {
     const canonicalProjectPath = await canonicalize(input.cwd);
     if (canonicalProjectPath !== input.cwd) throw new Error("Detected directory changed. Rescan to continue.");
-    if (input.mode === "resume" && !input.threadId) throw new Error("No exact-directory Codex thread is available to resume.");
-    const existing = input.mode === "resume" && input.threadId
+    if (input.mode === "continue" && !input.threadId) throw new Error("No exact-directory Codex thread is available to continue.");
+    const existing = input.mode === "continue" && input.threadId
       ? this.state.sessions.find((session) => session.status !== "closed" && session.threadId === input.threadId)
       : undefined;
     if (existing) {
@@ -140,9 +144,9 @@ export class RunnerManager extends EventEmitter {
     }
     const model = input.model ?? this.models.find((item) => item.recommended)?.id ?? this.models[0]?.id;
     const selectedModel = this.models.find((item) => item.id === model);
-    const method = input.mode === "resume" ? "thread/fork" : "thread/start";
+    const method = input.mode === "continue" ? "thread/fork" : "thread/start";
     const response = await this.server.request(method, {
-      ...(input.mode === "resume" ? { threadId: input.threadId, excludeTurns: true } : {}),
+      ...(input.mode === "continue" ? { threadId: input.threadId, excludeTurns: true } : {}),
       cwd: canonicalProjectPath,
       model,
       ...permissionParams(input.permissionPreset)
@@ -151,7 +155,7 @@ export class RunnerManager extends EventEmitter {
       ? response.thread.id
       : undefined;
     if (!threadId) throw new Error(`${method} returned no thread id`);
-    if (input.mode === "resume" && threadId === input.threadId) {
+    if (input.mode === "continue" && threadId === input.threadId) {
       throw new Error("thread/fork returned the source thread id");
     }
 
@@ -183,13 +187,14 @@ export class RunnerManager extends EventEmitter {
       model,
       reasoningEffort: input.reasoningEffort ?? selectedModel?.defaultReasoningEffort,
       permissionPreset: input.permissionPreset,
+      historyHydration: input.mode === "continue" ? "pending" : "complete",
       draft: "",
       createdAt: now,
       updatedAt: now,
       events: [],
       interactions: []
     });
-    this.appendEvent(session, "system", `${input.mode === "resume" ? "Continuation created" : "Session ready"} · ${session.permissionPreset} · ${session.model ?? "default model"}`);
+    this.appendEvent(session, "system", `${input.mode === "continue" ? "Continuation created" : "Session ready"} · ${session.permissionPreset} · ${session.model ?? "default model"}`);
     next.sessions.push(session);
     group.sessionIds.push(session.id);
     next.selectedGroupId = group.id;
@@ -207,6 +212,10 @@ export class RunnerManager extends EventEmitter {
       }
     );
     this.state = next;
+    if (input.mode === "continue") {
+      await this.hydrateHistory(session);
+      await this.persist();
+    }
     this.cadence.changed();
     this.emitState();
     return { session: structuredClone(session), workspacePreferences };
@@ -297,6 +306,7 @@ export class RunnerManager extends EventEmitter {
       model,
       reasoningEffort: value.reasoningEffort ?? selectedModel?.defaultReasoningEffort,
       permissionPreset: value.permissionPreset,
+      historyHydration: "complete",
       draft: "",
       createdAt: now,
       updatedAt: now,
@@ -525,14 +535,19 @@ export class RunnerManager extends EventEmitter {
     } else {
       const normalized = normalizeNotification(session.id, envelope);
       if (normalized) {
-        const existing = normalized.itemId && normalized.phase === "delta"
+        const existing = normalized.itemId
           ? [...session.events].reverse().find((event) => event.itemId === normalized.itemId && event.kind === normalized.kind)
           : undefined;
         if (existing) {
-          existing.text = `${existing.text}${normalized.text}`.slice(-64 * 1024);
+          existing.text = normalized.phase === "delta"
+            ? `${existing.text}${normalized.text}`.slice(-64 * 1024)
+            : normalized.text;
           existing.at = normalized.at;
+          existing.phase = normalized.phase;
+          existing.sourceMethod = normalized.sourceMethod;
+          existing.links = normalized.links;
         } else session.events.push(normalized);
-        session.events = session.events.slice(-1000);
+        capSessionEvents(session);
       }
     }
     await this.changed();
@@ -568,7 +583,7 @@ export class RunnerManager extends EventEmitter {
       at: new Date().toISOString(), kind, text: String(text).slice(0, 64 * 1024),
       sourceMethod: source?.method, links: extractSafeLinks(String(text))
     }));
-    session.events = session.events.slice(-1000);
+    capSessionEvents(session);
     session.updatedAt = new Date().toISOString();
   }
 
@@ -606,18 +621,85 @@ export class RunnerManager extends EventEmitter {
         try {
           await this.server.request("thread/resume", {
             threadId: restored.threadId,
+            excludeTurns: true,
             cwd: restored.projectPath,
             model: restored.model,
             ...permissionParams(restored.permissionPreset)
           });
           restored.status = "idle";
           restored.activeTurnId = undefined;
+          if (restored.historyHydration === "pending" || restored.historyHydration === "failed") {
+            await this.hydrateHistory(restored);
+          }
           if (recovered) this.appendEvent(restored, "system", "Codex app-server connection restored");
         } catch (error) {
           restored.status = "failed";
           this.appendEvent(restored, "error", `${failurePrefix}: ${String(error)}`);
         }
       }));
+  }
+
+  private async hydrateHistory(session: RunnerSessionV1): Promise<void> {
+    if (!session.threadId) return;
+    const retained = session.events.filter((event) => event.sourceMethod !== HISTORY_STATUS_METHOD);
+    const pageEvents: RunnerEventV1[][] = [];
+    const eventKeys = new Set<string>();
+    const cursors = new Set<string>();
+    let cursor: string | undefined;
+    let eventCount = 0;
+    let omitted = false;
+    try {
+      for (let page = 0; page < 1000; page += 1) {
+        const response = await this.server.request(HISTORY_SOURCE_METHOD, {
+          threadId: session.threadId,
+          limit: HISTORY_PAGE_LIMIT,
+          sortDirection: "desc",
+          itemsView: "summary",
+          ...(cursor ? { cursor } : {})
+        }) as any;
+        if (!Array.isArray(response?.data)) throw new Error("thread/turns/list returned malformed data");
+        const normalized = normalizeHistoricalPage(session, response.data, eventKeys);
+        pageEvents.push(normalized);
+        eventCount += normalized.length;
+        const nextCursor = typeof response.nextCursor === "string" && response.nextCursor
+          ? response.nextCursor
+          : undefined;
+        if (!nextCursor) break;
+        if (cursors.has(nextCursor) || nextCursor === cursor) throw new Error("thread/turns/list repeated a pagination cursor");
+        cursors.add(nextCursor);
+        if (eventCount + retained.length >= MAX_SESSION_EVENTS) {
+          omitted = true;
+          break;
+        }
+        cursor = nextCursor;
+        if (page === 999) throw new Error("thread/turns/list exceeded the pagination limit");
+      }
+      const history = pageEvents.reverse().flat();
+      const merged = deduplicateEvents([...history, ...retained]);
+      omitted ||= merged.length > MAX_SESSION_EVENTS;
+      if (omitted) {
+        const notice = hydrationEvent(
+          session,
+          "system",
+          "Earlier copied history was omitted to keep this session within the 1,000-event display limit."
+        );
+        session.events = [notice, ...merged.slice(-(MAX_SESSION_EVENTS - 1))];
+        session.historyHydration = "truncated";
+      } else {
+        session.events = merged;
+        session.historyHydration = "complete";
+      }
+      session.updatedAt = new Date().toISOString();
+    } catch (error) {
+      session.events = retained.slice(-(MAX_SESSION_EVENTS - 1));
+      session.events.push(hydrationEvent(
+        session,
+        "error",
+        `Copied history could not be loaded. Chromux will retry after the next app-server restoration or application launch. ${String(error)}`
+      ));
+      session.historyHydration = "failed";
+      session.updatedAt = new Date().toISOString();
+    }
   }
   async shutdown(): Promise<void> {
     if (this.timer) {
@@ -660,6 +742,146 @@ function normalizeTimestamp(value: unknown): string | undefined {
   if (typeof value !== "string" && typeof value !== "number") return undefined;
   const date = new Date(value);
   return Number.isNaN(date.valueOf()) ? undefined : date.toISOString();
+}
+
+function normalizeHistoricalPage(
+  session: RunnerSessionV1,
+  turns: unknown[],
+  seen: Set<string>
+): RunnerEventV1[] {
+  const events: RunnerEventV1[] = [];
+  for (const turnValue of [...turns].reverse()) {
+    if (!turnValue || typeof turnValue !== "object") continue;
+    const turn = turnValue as Record<string, any>;
+    const turnId = typeof turn.id === "string" ? turn.id : undefined;
+    const items = Array.isArray(turn.items) ? turn.items : [];
+    for (const itemValue of items) {
+      if (!itemValue || typeof itemValue !== "object") continue;
+      const item = itemValue as Record<string, any>;
+      const kind = historicalKind(item.type);
+      const text = historicalText(item);
+      if (!kind || !text) continue;
+      const itemId = typeof item.id === "string" ? item.id : undefined;
+      const key = itemId
+        ? `${turnId ?? ""}\u0000${itemId}\u0000${kind}`
+        : `${turnId ?? ""}\u0000${kind}\u0000${createHash("sha256").update(text).digest("hex")}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const at = normalizeTimestamp(item.createdAt ?? item.created_at ?? turn.createdAt ?? turn.created_at)
+        ?? session.createdAt;
+      events.push(RunnerEventV1Schema.parse({
+        schemaVersion: 1,
+        id: `history-${createHash("sha256").update(`${session.id}\u0000${key}`).digest("hex")}`,
+        sessionId: session.id,
+        threadId: session.threadId,
+        ...(turnId ? { turnId } : {}),
+        ...(itemId ? { itemId } : {}),
+        at,
+        kind,
+        phase: "completed",
+        text: text.slice(0, 64 * 1024),
+        sourceMethod: HISTORY_SOURCE_METHOD,
+        links: extractSafeLinks(text)
+      }));
+    }
+  }
+  return events;
+}
+
+function historicalKind(type: unknown): RunnerEventV1["kind"] | undefined {
+  if (type === "userMessage") return "user";
+  if (type === "agentMessage") return "agent";
+  if (type === "reasoning") return "reasoning";
+  if (type === "commandExecution") return "command";
+  if (type === "fileChange") return "file-change";
+  return typeof type === "string" ? "tool" : undefined;
+}
+
+function historicalText(item: Record<string, any>): string {
+  if (item.type === "userMessage") return collectText(item.content) || "User attachment";
+  if (item.type === "agentMessage" || item.type === "plan") return collectText(item.text ?? item.content);
+  if (item.type === "reasoning") return collectText(item.summary) || collectText(item.content);
+  if (item.type === "commandExecution") {
+    return [collectText(item.command), collectText(item.aggregatedOutput)].filter(Boolean).join("\n");
+  }
+  if (item.type === "fileChange") {
+    const changes = Array.isArray(item.changes) ? item.changes : [];
+    return changes.map((change: any) => [change?.kind, change?.path, change?.diff].filter(Boolean).join(" "))
+      .filter(Boolean).join("\n") || "File change";
+  }
+  const label = collectText(item.tool ?? item.name ?? item.query ?? item.type);
+  const detail = collectText(item.error ?? item.result ?? item.arguments ?? item.action);
+  return [label, detail].filter(Boolean).join("\n") || "Tool activity";
+}
+
+function collectText(value: unknown, depth = 0): string {
+  if (depth > 6 || value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) return value.map((item) => collectText(item, depth + 1)).filter(Boolean).join("\n");
+  if (typeof value !== "object") return "";
+  const record = value as Record<string, unknown>;
+  for (const field of ["text", "message", "content", "output"]) {
+    const text = collectText(record[field], depth + 1);
+    if (text) return text;
+  }
+  return "";
+}
+
+function deduplicateEvents(events: RunnerEventV1[]): RunnerEventV1[] {
+  const seen = new Set<string>();
+  const historicalText = new Map<string, number>();
+  return events.filter((event) => {
+    const textKey = `${event.kind}\u0000${event.text}`;
+    const isHistorical = event.sourceMethod === HISTORY_SOURCE_METHOD;
+    if (!isHistorical && !event.itemId && isTranscriptKind(event.kind)) {
+      const remaining = historicalText.get(textKey) ?? 0;
+      if (remaining > 0) {
+        historicalText.set(textKey, remaining - 1);
+        return false;
+      }
+    }
+    const key = event.itemId
+      ? `${event.threadId ?? ""}\u0000${event.turnId ?? ""}\u0000${event.itemId}\u0000${event.kind}`
+      : `event\u0000${event.id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    if (isHistorical) historicalText.set(textKey, (historicalText.get(textKey) ?? 0) + 1);
+    return true;
+  });
+}
+
+function isTranscriptKind(kind: RunnerEventV1["kind"]): boolean {
+  return ["user", "agent", "reasoning", "command", "file-change", "tool"].includes(kind);
+}
+
+function capSessionEvents(session: RunnerSessionV1): void {
+  if (session.events.length <= MAX_SESSION_EVENTS) return;
+  const notice = session.historyHydration === "truncated"
+    ? session.events.find((event) =>
+      event.sourceMethod === HISTORY_STATUS_METHOD && event.text.startsWith("Earlier copied history was omitted"))
+    : undefined;
+  session.events = notice
+    ? [notice, ...session.events.filter((event) => event.id !== notice.id).slice(-(MAX_SESSION_EVENTS - 1))]
+    : session.events.slice(-MAX_SESSION_EVENTS);
+}
+
+function hydrationEvent(
+  session: RunnerSessionV1,
+  kind: "system" | "error",
+  text: string
+): RunnerEventV1 {
+  return RunnerEventV1Schema.parse({
+    schemaVersion: 1,
+    id: randomUUID(),
+    sessionId: session.id,
+    threadId: session.threadId,
+    at: new Date().toISOString(),
+    kind,
+    text: text.slice(0, 64 * 1024),
+    sourceMethod: HISTORY_STATUS_METHOD,
+    links: []
+  });
 }
 
 function findLatestAgentPreview(value: unknown): string | undefined {
@@ -707,7 +929,9 @@ function normalizeNotification(sessionId: string, envelope: Envelope): RunnerEve
   else if (envelope.method.includes("fileChange")) { kind = "file-change"; text = params.delta ?? summarize(item); }
   else if (envelope.method === "error") { kind = "error"; text = params.error?.message ?? params.message ?? "Unknown Codex error"; }
   else if (envelope.method === "item/started" || envelope.method === "item/completed") {
+    if (item.type === "userMessage") return undefined;
     kind = item.type === "agentMessage" ? "agent"
+      : item.type === "reasoning" ? "reasoning"
       : item.type === "commandExecution" ? "command"
       : item.type === "fileChange" ? "file-change"
       : "tool";

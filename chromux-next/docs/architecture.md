@@ -89,9 +89,11 @@ The v0.7.1 baseline makes ownership enforceable rather than conventional:
   themselves up automatically.
 - Fresh creation uses `thread/start`; detected continuation uses `thread/fork`
   with the authoritative source thread ID plus the selected cwd, model, and
-  permission policy. It sets `excludeTurns` because creation needs only the new
-  thread metadata and ID; copied history remains authoritative in Codex and is
-  not redundantly serialized through the bounded JSONL channel. It omits
+  permission policy. It sets `excludeTurns` so the lifecycle response carries
+  only the new thread metadata and ID, then pages the new fork's stored turns
+  through experimental `thread/turns/list` with `itemsView: "summary"`. This
+  keeps every JSONL frame bounded while reconstructing chronological user,
+  agent, reasoning, command, file-change, and tool display events. It omits
   `lastTurnId` so an active source turn becomes an interruption marker, and
   persists only the returned fork ID. An already open source thread focuses its
   existing session. Successful detected creation
@@ -112,7 +114,15 @@ The v0.7.1 baseline makes ownership enforceable rather than conventional:
   malformed, schema-invalid, and oversized messages compromise the child,
   reject each pending request once, and enter bounded recovery.
 - A new session starts one persisted Codex thread. Restoration resumes stored
-  Chromux-owned thread IDs with `thread/resume` without starting a turn.
+  Chromux-owned thread IDs with `thread/resume` and `excludeTurns: true`
+  without starting a turn. Each session persists display-history hydration as
+  `pending`, `complete`, `truncated`, or `failed`; older sessions default to
+  pending. Pending and failed sessions hydrate after resume, so an empty
+  continuation repairs in place without another fork. Hydration failure is
+  nonfatal and visible, and retries on the next launch or app-server restore.
+- Display history is capped at 1,000 total events. When older copied events are
+  omitted, one slot is reserved for a visible truncation notice. Cursor loops,
+  malformed pages, and oversized frames still fail closed.
 - Idle composer submissions call `turn/start`; active submissions call
   `turn/steer` with the expected turn ID; Stop calls `turn/interrupt`.
 - Closing cancels pending interactions, interrupts active work, and

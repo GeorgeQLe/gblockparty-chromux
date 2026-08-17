@@ -1,5 +1,20 @@
 # Lessons
 
+## 2026-08-16 — Minimized lifecycle responses still need display hydration
+
+- Excluding turns from fork and resume responses protects the protocol frame,
+  but it also removes the transcript payload that a client may have been using
+  implicitly for display.
+- Pair minimized lifecycle responses with a bounded, cursor-safe history read
+  from the newly owned thread. Persist hydration state so partial failures can
+  repair in place without repeating ownership-changing lifecycle calls.
+- Correction enforcement: `tests/runner-manager.test.ts` requires fork-only
+  Continue, excluded-turn restore, paginated summary hydration, chronological
+  deduplication, a 1,000-event cap, and retry without refork;
+  `tests/runner-protocol.integration.test.ts` keeps lifecycle and page frames
+  bounded; the transcript component test proves notices and failures remain
+  visible.
+
 ## 2026-08-16 — Fork qualification must model full-history response size
 
 - Do not treat a small synthetic `thread/fork` response as sufficient proof for

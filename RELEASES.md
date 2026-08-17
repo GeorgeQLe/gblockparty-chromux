@@ -1,5 +1,24 @@
 # Release Notes
 
+## GBlockParty Chromux Next v0.10.5 (prerelease)
+
+Tag: `chromux-next-v0.10.5`
+
+- Keep **Continue** as a safe `thread/fork`, then page the returned owned
+  thread through `thread/turns/list` with summary items so copied history is
+  visible without weakening the 1 MiB JSONL frame guard.
+- Persist retryable history hydration state, repair existing empty
+  continuations in place after excluded-turn `thread/resume`, and retain the
+  created session with a visible error if hydration fails.
+- Normalize copied user, agent, reasoning, command, file-change, and tool
+  events chronologically, deduplicate cursor boundaries, and cap the display at
+  1,000 events with an explicit older-history notice when truncated.
+- Keep later live transcript items exact-once by ignoring echoed user-message
+  lifecycle rows and replacing streamed items with their authoritative
+  completion rather than displaying both.
+- Preserve Start Fresh, Focus Existing, renewable detection leases, the active
+  external writer, legacy Chromux, and the stable `/releases/latest` channel.
+
 ## GBlockParty Chromux Next v0.10.4 (prerelease)
 
 Tag: `chromux-next-v0.10.4`

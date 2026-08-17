@@ -119,7 +119,7 @@ function ansi(event: RunnerEventV1): string {
   return `\x1b[${color}m${label}\x1b[0m ${event.text.replace(/\r?\n/g, "\r\n            ")}\r\n`;
 }
 
-function RunnerTerminal({ session, openBrowser }: { session?: RunnerSessionV1; openBrowser(url: string): void }) {
+export function RunnerTerminal({ session, openBrowser }: { session?: RunnerSessionV1; openBrowser(url: string): void }) {
   const host = useRef<HTMLDivElement>(null);
   const terminal = useRef<Terminal | undefined>(undefined);
   const fit = useRef<FitAddon | undefined>(undefined);
@@ -1213,7 +1213,7 @@ export function DetectionDialog({
       setMode(nextMode);
       setCreateError("");
       if (!preserveFormRef.current) {
-        setTitle(`${nextMode === "resume" ? "Continue" : "Codex"} · ${row.projectName}`);
+        setTitle(`${nextMode === "continue" ? "Continue" : "Codex"} · ${row.projectName}`);
       }
       preserveFormRef.current = false;
     }).catch((reason) => {
@@ -1251,7 +1251,7 @@ export function DetectionDialog({
     title={selected ? "Configure detected session" : onboarding ? "Find your work" : "Detect terminal sessions"}
     eyebrow={onboarding ? "Welcome · DETECT first" : "DETECT"}
     description={selected
-      ? mode === "resume"
+      ? mode === "continue"
         ? `Create a separate continuation in ${selected.directory}. The original ${selected.terminal} process remains untouched.`
         : `Start Codex in ${selected.directory}. The original ${selected.terminal} process remains untouched.`
       : "Scan open macOS terminal tabs for agents and working folders. Detection never attaches to, types into, or stops those processes."}
@@ -1259,12 +1259,12 @@ export function DetectionDialog({
     dismissible={!onboarding}
     className="detection-modal onboarding-modal"
     footer={selected
-      ? <><Button tone="quiet" disabled={creating} onClick={() => { releaseLease(); setSelected(undefined); }}>Back</Button><Button icon={CirclePlus} tone="primary" disabled={creating || !leaseValid || !title.trim() || !models.length} onClick={create}>{creating ? "Creating…" : mode === "resume" ? "Create continuation" : "Start fresh"}</Button></>
+      ? <><Button tone="quiet" disabled={creating} onClick={() => { releaseLease(); setSelected(undefined); }}>Back</Button><Button icon={CirclePlus} tone="primary" disabled={creating || !leaseValid || !title.trim() || !models.length} onClick={create}>{creating ? "Creating…" : mode === "continue" ? "Create continuation" : "Start fresh"}</Button></>
       : <><div className="detection-fallbacks"><Button icon={FolderPlus} tone="quiet" onClick={chooseProject}>Choose Folder</Button>{onboarding && <Button tone="quiet" onClick={complete}>Continue Without Session</Button>}</div><Button icon={RefreshCw} onClick={scan} disabled={loading || Boolean(acquiringTargetId)}>Rescan</Button></>}
   >
     {selected ? <form className="session-form detection-config" onSubmit={(event) => { event.preventDefault(); create(); }}>
       <div className="detected-summary"><Badge tone="sage">{selected.agent}</Badge><strong>{selected.projectName}</strong><small>{selected.directory}</small></div>
-      {mode === "resume" && selected.externalActive && <p className="detection-warning"><AlertTriangle size={16} aria-hidden="true" /> Chromux copies safely stored history into a separate thread. It does not share an in-progress partial turn. The external Codex process stays active, and the two threads may diverge.</p>}
+      {mode === "continue" && selected.externalActive && <p className="detection-warning"><AlertTriangle size={16} aria-hidden="true" /> Chromux copies safely stored history into a separate thread. It does not share an in-progress partial turn. The external Codex process stays active, and the two threads may diverge.</p>}
       {createError && <div className="detection-error" role="alert"><AlertTriangle size={16} aria-hidden="true" /> <span>{createError}</span>{!leaseValid && <Button icon={RefreshCw} onClick={scan}>Rescan</Button>}</div>}
       <label>Session title<input autoFocus maxLength={256} value={title} onChange={(event) => setTitle(event.target.value)} /></label>
       <div className="modal-grid">
@@ -1281,8 +1281,8 @@ export function DetectionDialog({
       {!loading && !!rows.length && <div className="detected-list" role="list">{rows.map((row) => <article key={row.targetId} role="listitem">
         <div className="detected-row-copy"><div><Badge {...(row.agent === "codex" ? { tone: "sage" as const } : {})}>{row.agent}</Badge><strong>{row.projectName}</strong>{row.alreadyOpenSessionId && <Badge tone="success">Open</Badge>}</div><small>{row.terminal} · {row.directory}</small>{row.resumePreview && <p>{row.resumePreview}</p>}</div>
         <div className="detected-actions">{row.alreadyOpenSessionId
-          ? <Button tone="primary" onClick={() => pick(row, "resume")}>Focus Existing</Button>
-          : <><Button disabled={!row.resumeAvailable || Boolean(acquiringTargetId)} onClick={() => pick(row, "resume")}>{acquiringTargetId === row.targetId ? "Reserving…" : "Continue"}</Button><Button tone="primary" disabled={Boolean(acquiringTargetId)} onClick={() => pick(row, "fresh")}>{acquiringTargetId === row.targetId ? "Reserving…" : "Start Fresh"}</Button></>}</div>
+          ? <Button tone="primary" onClick={() => pick(row, "continue")}>Focus Existing</Button>
+          : <><Button disabled={!row.resumeAvailable || Boolean(acquiringTargetId)} onClick={() => pick(row, "continue")}>{acquiringTargetId === row.targetId ? "Reserving…" : "Continue"}</Button><Button tone="primary" disabled={Boolean(acquiringTargetId)} onClick={() => pick(row, "fresh")}>{acquiringTargetId === row.targetId ? "Reserving…" : "Start Fresh"}</Button></>}</div>
       </article>)}</div>}
     </div>}
   </Dialog>;

@@ -9,7 +9,7 @@ const fixture = path.resolve("fixtures/subprocess-fixture.cjs");
 const session: RunnerSessionV1 = {
   schemaVersion: 1, id: "session", title: "Session", projectPath: "/tmp",
   canonicalProjectPath: "/tmp", groupId: "group", status: "idle",
-  permissionPreset: "read-only", draft: "", createdAt: "2026-08-05T12:00:00.000Z",
+  permissionPreset: "read-only", historyHydration: "complete", draft: "", createdAt: "2026-08-05T12:00:00.000Z",
   updatedAt: "2026-08-05T12:00:00.000Z", events: [], interactions: []
 };
 

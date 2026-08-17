@@ -5,7 +5,7 @@ separate Electron app from legacy Chromux in `../prototype/`: it has a distinct
 package, bundle identifier, user-data directory, architecture, and release
 line.
 
-## Current prerelease: v0.10.4
+## Current prerelease: v0.10.5
 
 This runner-first prerelease includes:
 
@@ -43,7 +43,10 @@ This runner-first prerelease includes:
   Continue copies safely stored source history into a distinct thread without
   sharing an in-progress partial turn; the external process remains active and
   the two threads can later diverge. Fork creation requests metadata only, so
-  long source histories are not echoed back through the bounded JSONL channel.
+  long source histories are not echoed back through one bounded JSONL frame.
+  Chromux pages summary history from the owned fork, displays it chronologically
+  within a 1,000-event cap, and repairs pending or failed hydration in place on
+  launch without creating another fork.
   Failed creation remains retryable on the same lease; abandoned or expired
   leases clean themselves up without leaving a partial session or completing
   onboarding.
