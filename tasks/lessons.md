@@ -1,5 +1,25 @@
 # Lessons
 
+## 2026-08-19 — Renderer-local numeric state must honor downstream contracts
+
+- The `Continue · omega-war` black screen was non-destructive: copied history
+  and Chromux-owned thread state remained stored, but a fractional xterm
+  `viewportY` entered the renderer cache and later violated `scrollToLine`'s
+  integer requirement during transcript restoration.
+- Treat measurements returned by layout/rendering libraries as untrusted at
+  the next API boundary. Normalize both when caching and when consuming them;
+  floor finite scroll positions to preserve the earliest visible line, clamp
+  negatives to zero, and discard non-finite values to a safe semantic fallback.
+- A top-level renderer should fail visibly and recoverably. Keep complete error
+  context in developer diagnostics, but give the user a concise message and a
+  reload action that does not delete persisted state or broaden lifecycle
+  authority.
+- Correction enforcement: `tests/runner-terminal.component.test.tsx` covers
+  fractional, negative, `NaN`, and infinite positions across switches and
+  event updates; `tests/renderer-recovery.component.test.tsx` covers render and
+  effect failures plus renderer reload; packaged visual qualification captures
+  the recovery screen at standard and narrow sizes.
+
 ## 2026-08-16 — Minimized lifecycle responses still need display hydration
 
 - Excluding turns from fork and resume responses protects the protocol frame,

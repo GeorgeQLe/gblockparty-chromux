@@ -46,6 +46,23 @@ cross IPC. `src/persistence` owns isolated atomic app state and canonical
 document transactions. `src/ipc` is the only renderer/main contract. Existing
 `src/domain` alignment contracts remain schema-v1 compatible.
 
+## Renderer-local recovery
+
+Terminal viewport retention remains deliberately renderer-local and
+in-memory-only. Before a viewport enters the cache or is supplied to xterm,
+finite positions are floored and clamped at zero. `NaN` and infinite values
+are discarded; a missing or discarded value restores at the transcript bottom.
+This keeps xterm's integer `scrollToLine` precondition inside the renderer and
+does not add a persistence field or alter a runner/session contract.
+
+The application root is wrapped in a React error boundary. Unexpected render
+or lifecycle failures are logged with their complete React diagnostic in the
+developer console and replace the failed tree with a small recovery screen.
+The screen exposes only a renderer reload; it never deletes state, resets the
+application, or invokes runner lifecycle operations. Persisted Chromux-owned
+sessions therefore restore through their ordinary `thread/resume` path after
+reload, without forking, steering, or mutating any external source thread.
+
 ## Modular baseline and recovery
 
 The v0.7.1 baseline makes ownership enforceable rather than conventional:

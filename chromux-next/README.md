@@ -5,9 +5,15 @@ separate Electron app from legacy Chromux in `../prototype/`: it has a distinct
 package, bundle identifier, user-data directory, architecture, and release
 line.
 
-## Current prerelease: v0.10.5
+## Current prerelease: v0.10.6
 
 This runner-first prerelease includes:
+
+- Safe transcript viewport recovery: xterm positions are normalized to
+  non-negative integers before the in-memory cache can restore them, and
+  missing or non-finite positions return to the transcript bottom. A root
+  renderer error boundary replaces future React blank screens with a concise
+  diagnostic, persisted-session assurance, and a renderer-only reload action.
 
 - An experimental Situation Room (`npm run start:situation-room`) that presents
   all pending agent questions and approvals in one chronological decision queue
@@ -59,8 +65,8 @@ This runner-first prerelease includes:
   for custom-group creation and rename, with focus containment, Escape
   handling, and focus restoration.
 - Polished runner, transcript, Composer, approval, attention, detect-first onboarding,
-  Settings, New Session, empty/error, and Alignment states. Packaged visual
-  qualification now reviews 28 standard and narrow captures.
+  Settings, New Session, empty/error, renderer-recovery, and Alignment states.
+  Packaged visual qualification now reviews 30 standard and narrow captures.
 - First-run successor-native onboarding with a native project/worktree folder
   chooser, a persisted project registry, and editable default permission,
   model, and reasoning preferences for new sessions.
@@ -130,7 +136,8 @@ Use `npm run verify` for TypeScript, contract/unit and subprocess integration
 tests, an Electron Forge package build, the baseline packaged smoke, and the
 two-launch runner restoration smoke. After packaging,
 `npm run visual:packaged -- /tmp/chromux-next-visual`
-captures standard and narrow screenshots of all five approaches.
+captures standard and narrow screenshots of all five approaches plus the
+renderer recovery screen.
 
 The successor uses an upward-chevron variation of the Chromux mark. Run
 `npm run icons` after changing `build/icon.svg` to regenerate the packaged

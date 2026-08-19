@@ -1,5 +1,79 @@
 # Session History
 
+## 2026-08-19 — Chromux Next v0.10.6 blank-renderer recovery
+
+- **User goal:** Prevent fractional terminal viewports from crashing xterm,
+  replace future React blank screens with a persisted-session-safe renderer
+  recovery action, record the `Continue · omega-war` incident, and ship Chromux
+  Next 0.10.6 without changing external-thread or stable-channel ownership.
+- **Changed files and per-file purpose:** `src/renderer/recovery.tsx` owns the
+  viewport normalizer, bounded diagnostic, root error boundary, console report,
+  and renderer reload; `src/renderer.tsx` normalizes the in-memory cache at
+  write and read boundaries and wraps the application root; `src/styles/layouts.css`
+  supplies the responsive recovery presentation; `src/main.ts` and
+  `scripts/visual-qualify.mjs` add an argv-gated packaged recovery fixture and
+  two captures; the two component test files cover viewport/session/event and
+  error-boundary behavior. Package and lock metadata set 0.10.6. README,
+  architecture, v0.10.6 UAT, `RELEASES.md`, todo, lessons, and this record own
+  the release contract and evidence.
+- **User-goal mapping:** Finite viewports are floored to retain the earliest
+  visible line and clamped at zero; non-finite values are removed and restore
+  at transcript bottom. Normalization occurs before both cache storage and
+  xterm consumption. The error boundary reports full `ErrorInfo` only to the
+  developer console, bounds the visible diagnostic to 240 characters, and
+  offers only `window.location.reload()`. No IPC, persistence schema, runner,
+  history-hydration, session ownership, or lifecycle contract changed.
+- **Executable verification:** A clean `npm ci` installed 675 packages. Final
+  `npm run verify` passed TypeScript, all 146 tests across 27 files, Electron
+  Forge macOS arm64 packaging, baseline and Situation Room startup, two-session
+  two-launch restoration, and browser-evidence smoke. Final packaged visual
+  qualification produced 28 normal standard/narrow captures, 8 Situation Room
+  captures, and 2 recovery captures; Control Room and recovery standard/narrow
+  images were inspected with no clipping or illegible action. The packaged
+  plist reports 0.10.6, `npm audit --omit=dev` reports zero vulnerabilities,
+  and `git diff --check` passes.
+- **Existing-session evidence:** The final packaged candidate launched against
+  the existing successor data and rendered `Continue · omega-war` with the
+  same single session ID, same owned thread ID, `historyHydration: complete`,
+  and all 37 cached events before and after read-only inspection. No text was
+  entered and no Send, Stop, Detect, continuation, or other session action was
+  invoked. The candidate was closed after inspection. The code path and runner
+  regression suite retain ordinary owned-thread resume and contain no recovery
+  call that can fork, steer, or mutate the external source thread.
+- **Adversarial review:** Applied
+  `.agents/skillpacks/docs/quality-gate-contract.md` with a failure-oriented
+  changed-file review of fractional/negative/non-finite boundaries, repeated
+  event updates, missing cache entries, cache lifetime, long/multiline error
+  disclosure, render/effect failures, reload scope, visual-fixture isolation,
+  persisted-state deletion, runner lifecycle reachability, version metadata,
+  and stable-channel separation. The review found that an arbitrary React
+  message could defeat the “concise diagnostic” requirement; the visible value
+  is now whitespace-normalized and capped while the full error remains in the
+  console, with a dedicated regression. No blocking finding remains.
+- **Correction enforcement:** `tasks/lessons.md` records the daily-driver
+  lesson. Viewport component tests enforce integer-only `scrollToLine`, bottom
+  fallback, and transcript retention; renderer-recovery tests enforce render
+  and effect recovery, bounded disclosure, full console diagnostics, and the
+  reload action; packaged visual qualification enforces recovery rendering at
+  standard and minimum window sizes.
+- **Accepted warnings:** Clean install repeats the existing Electron Forge
+  deprecated-transitive notices and 29 development-tree advisories. Production
+  dependencies audit clean; a breaking packaging-toolchain migration is beyond
+  this renderer patch and the same warning posture was accepted for 0.10.5.
+- **Skipped tests and residual risk:** Windows/Linux packages and signing remain
+  part of the separate cutover gate; this macOS xterm/React fix does not change
+  those platform contracts. React boundaries cannot catch errors in arbitrary
+  asynchronous callbacks or event handlers; those remain handled by existing
+  local error paths, while render and lifecycle failures are covered here.
+  The live check proves unchanged Chromux session/thread identity and a
+  read-only UI path, but does not add production app-server traffic logging;
+  deterministic manager tests remain the stronger lifecycle-call proof.
+- **Rollback note:** Delete prerelease and tag `chromux-next-v0.10.6`, then
+  revert the shipping commit. Chromux Next 0.10.5 and legacy stable remain
+  available; no state migration or external-thread rollback is required.
+- **Next command:** Continue the active Chromux Next cutover gate with a clean
+  Apple Silicon install baseline and daily-driver record.
+
 ## 2026-08-16 — Chromux Next v0.10.5 paginated continuation history
 
 - **User goal:** Repair the existing empty `Continue · omega-war` session in

@@ -59,6 +59,15 @@ instead of resuming the `prototype/` implementation.
 
 ## Completed Work
 
+- [x] Ship Chromux Next v0.10.6 so fractional or otherwise invalid in-memory
+  terminal viewports cannot violate xterm's integer scroll contract, and future
+  React renderer failures show a persisted-session-safe renderer reload screen
+  instead of an empty black window. Record the `Continue · omega-war` incident,
+  component regressions, packaged normal/recovery visuals, and unchanged
+  external-thread/stable-channel boundaries. _(source: user-supplied blank-
+  renderer recovery plan; successor-only scope; no IPC, persistence, runner,
+  source-thread, legacy Chromux, or `/releases/latest` contract change)_
+
 - [x] Ship Chromux Next v0.10.5 so Continue retains safe fork ownership while
   paginated summary hydration restores copied history within a 1,000-event
   display cap, existing empty sessions repair without reforking, failed

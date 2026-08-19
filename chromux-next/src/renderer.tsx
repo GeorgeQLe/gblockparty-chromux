@@ -90,6 +90,7 @@ import {
   Tabs
 } from "./ui/components";
 import { PersistentSurfaces, type CenterSurface } from "./renderer/persistent-surfaces";
+import { normalizeTerminalViewport, RendererErrorBoundary } from "./renderer/recovery";
 import {
   DEFAULT_BROWSER_WORKSPACE,
   type BrowserEvidenceV1,
@@ -98,6 +99,12 @@ import {
 import "./styles.css";
 
 const terminalViewports = new Map<string, number>();
+
+function cacheTerminalViewport(sessionId: string, value: unknown): void {
+  const viewport = normalizeTerminalViewport(value);
+  if (viewport === undefined) terminalViewports.delete(sessionId);
+  else terminalViewports.set(sessionId, viewport);
+}
 
 const EMPTY_STATE: RunnerStateV1 = {
   schemaVersion: 1,
@@ -171,7 +178,7 @@ export function RunnerTerminal({ session, openBrowser }: { session?: RunnerSessi
     const observer = new ResizeObserver(() => fitAddon.fit());
     observer.observe(host.current);
     return () => {
-      if (session?.id) terminalViewports.set(session.id, instance.buffer.active.viewportY);
+      if (session?.id) cacheTerminalViewport(session.id, instance.buffer.active.viewportY);
       observer.disconnect();
       instance.dispose();
     };
@@ -188,11 +195,11 @@ export function RunnerTerminal({ session, openBrowser }: { session?: RunnerSessi
     instance.writeln(`\x1b[1;38;5;151m${session.title}\x1b[0m  \x1b[38;5;245m${session.projectPath}\x1b[0m`);
     instance.writeln("");
     session.events.forEach((event) => instance.write(ansi(event)));
-    const viewport = terminalViewports.get(session.id);
+    const viewport = normalizeTerminalViewport(terminalViewports.get(session.id));
     if (viewport === undefined) instance.scrollToBottom();
     else instance.scrollToLine(viewport);
     return () => {
-      terminalViewports.set(session.id, instance.buffer.active.viewportY);
+      cacheTerminalViewport(session.id, instance.buffer.active.viewportY);
     };
   }, [session?.id, session?.events]);
 
@@ -1570,4 +1577,10 @@ function App() {
 }
 
 const applicationRoot = document.getElementById("root");
-if (applicationRoot) createRoot(applicationRoot).render(<App />);
+const rendererRecoveryVisual = new URLSearchParams(window.location.search).has("renderer-recovery-visual");
+function RendererRecoveryVisualFixture(): never {
+  throw new Error("Visual qualification renderer failure");
+}
+if (applicationRoot) createRoot(applicationRoot).render(
+  <RendererErrorBoundary>{rendererRecoveryVisual ? <RendererRecoveryVisualFixture /> : <App />}</RendererErrorBoundary>
+);

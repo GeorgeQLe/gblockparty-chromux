@@ -128,6 +128,23 @@ if (situationExitCode !== 0 || !situationOutput.includes("Situation Room visual 
   throw new Error(`Packaged Situation Room visual qualification failed (${situationExitCode}): ${situationOutput.slice(-4_000)}`);
 }
 output += situationOutput;
+const recovery = spawn(executable, [`--visual-smoke-dir=${destination}`, "--renderer-recovery-visual"], {
+  env: { ...process.env, CHROMUX_NEXT_SMOKE_USER_DATA: userData },
+  stdio: ["ignore", "pipe", "pipe"]
+});
+let recoveryOutput = "";
+recovery.stdout.on("data", (chunk) => { recoveryOutput += chunk; });
+recovery.stderr.on("data", (chunk) => { recoveryOutput += chunk; });
+const recoveryTimeout = setTimeout(() => recovery.kill("SIGKILL"), 30_000);
+const recoveryExitCode = await new Promise((resolve, reject) => {
+  recovery.once("error", reject);
+  recovery.once("exit", resolve);
+});
+clearTimeout(recoveryTimeout);
+if (recoveryExitCode !== 0 || !recoveryOutput.includes("Renderer recovery visual qualification captured 2 views")) {
+  throw new Error(`Packaged renderer recovery visual qualification failed (${recoveryExitCode}): ${recoveryOutput.slice(-4_000)}`);
+}
+output += recoveryOutput;
 const restart = spawn(executable, ["--smoke"], {
   env: { ...process.env, CHROMUX_NEXT_SMOKE_USER_DATA: userData, CHROMUX_NEXT_EXPECT_APPROACH: "spatial-canvas" },
   stdio: ["ignore", "pipe", "pipe"]

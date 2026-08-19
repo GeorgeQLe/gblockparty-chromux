@@ -65,6 +65,7 @@ const visualSmokeArgument = process.argv.find((argument) => argument.startsWith(
 const visualSmokeDirectory = visualSmokeArgument?.slice("--visual-smoke-dir=".length);
 const isVisualSmoke = Boolean(visualSmokeDirectory);
 const situationRoomMode = process.argv.includes("--situation-room");
+const rendererRecoveryVisual = process.argv.includes("--renderer-recovery-visual");
 const runnerSmokeScenario = process.env.CHROMUX_NEXT_FIXTURE_SCENARIO;
 const runnerFixturePath = app.isPackaged
   ? path.join(process.resourcesPath, "subprocess-fixture.cjs")
@@ -206,10 +207,14 @@ function createWindow(): void {
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     const rendererUrl = new URL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
     if (situationRoomMode) rendererUrl.searchParams.set("mode", "situation-room");
+    if (rendererRecoveryVisual) rendererUrl.searchParams.set("renderer-recovery-visual", "1");
     void mainWindow.loadURL(rendererUrl.toString());
   } else {
     void mainWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`), {
-      ...(situationRoomMode ? { query: { mode: "situation-room" } } : {})
+      ...(situationRoomMode || rendererRecoveryVisual ? { query: {
+        ...(situationRoomMode ? { mode: "situation-room" } : {}),
+        ...(rendererRecoveryVisual ? { "renderer-recovery-visual": "1" } : {})
+      } } : {})
     });
   }
   if (isSmoke) {
@@ -344,6 +349,18 @@ function createWindow(): void {
           await writeFile(path.join(visualSmokeDirectory, `${name}.png`), image.toPNG());
           captureCount += 1;
         };
+        if (rendererRecoveryVisual) {
+          const recoveryDeadline = Date.now() + 5_000;
+          while (!await visualWindow.webContents.executeJavaScript("Boolean(document.querySelector('.renderer-recovery'))")) {
+            if (Date.now() >= recoveryDeadline) throw new Error("Renderer recovery screen was not visible");
+            await new Promise((resolve) => setTimeout(resolve, 50));
+          }
+          await capture("renderer-recovery-standard");
+          await capture("renderer-recovery-narrow", 760, 600);
+          if (captureCount !== 2) throw new Error(`Expected 2 renderer recovery captures, received ${captureCount}`);
+          console.log(`Renderer recovery visual qualification captured ${captureCount} views`);
+          return;
+        }
         if (situationRoomMode) {
           const roomDeadline = Date.now() + 5_000;
           while (!await visualWindow.webContents.executeJavaScript("Boolean(document.querySelector('.situation-room-shell'))")) {

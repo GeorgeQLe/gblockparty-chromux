@@ -1,4 +1,47 @@
 .app-root { height: 100%; background: var(--graphite-950); }
+.renderer-recovery {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 100%;
+  padding: var(--space-6);
+  background:
+    radial-gradient(circle at 50% 20%, #27352d 0, transparent 42%),
+    var(--graphite-950);
+}
+.renderer-recovery-card {
+  width: min(560px, 100%);
+  padding: clamp(var(--space-5), 7vw, 52px);
+  border: 1px solid var(--graphite-700);
+  border-radius: var(--radius-lg);
+  background: var(--graphite-900);
+  box-shadow: var(--shadow-2);
+}
+.renderer-recovery-kicker {
+  color: var(--sage-300);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.renderer-recovery h1 { margin: var(--space-3) 0 var(--space-3); font-size: clamp(25px, 5vw, 36px); line-height: 1.1; }
+.renderer-recovery p { margin: 0 0 var(--space-4); color: var(--graphite-300); }
+.renderer-recovery-diagnostic {
+  padding: var(--space-3);
+  overflow-wrap: anywhere;
+  border-radius: var(--radius-sm);
+  color: var(--graphite-300);
+  background: var(--graphite-950);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+}
+.renderer-recovery-action {
+  padding: 0 var(--space-4);
+  color: var(--graphite-950);
+  border-color: var(--sage-300);
+  background: var(--sage-300);
+  font-weight: 700;
+}
 .approach-shell { display: grid; height: 100%; gap: 1px; background: var(--graphite-800); }
 .shell-brand {
   grid-area: brand; display: flex; align-items: center; gap: var(--space-5);

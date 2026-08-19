@@ -1,5 +1,23 @@
 # Release Notes
 
+## GBlockParty Chromux Next v0.10.6 (prerelease)
+
+Tag: `chromux-next-v0.10.6`
+
+- Sanitize every in-memory xterm viewport before caching or restoring it:
+  finite positions are floored and clamped to non-negative integers, while
+  non-finite positions are discarded and reopen at the transcript bottom.
+- Add a root renderer error boundary with a clear recovery screen, concise
+  diagnostic, persisted-session assurance, and renderer-only reload action.
+  Full React error details remain in the developer console.
+- Add component regression coverage for fractional, negative, `NaN`, and
+  infinite viewports, transcript event updates, render/effect failures, and
+  reload behavior. Packaged visual qualification includes standard and narrow
+  recovery-screen captures.
+- Preserve in-memory-only viewport ownership, persisted schemas, session
+  history, Chromux-owned thread restoration, the external source thread,
+  legacy Chromux, and the stable `/releases/latest` channel.
+
 ## GBlockParty Chromux Next v0.10.5 (prerelease)
 
 Tag: `chromux-next-v0.10.5`
