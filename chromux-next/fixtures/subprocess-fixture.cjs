@@ -122,8 +122,11 @@ if (process.argv.includes("app-server")) {
   process.stdin.resume();
 } else if (process.argv.includes("exec")) {
   log({ event: "start", mode: "exec" });
+  let prompt = "";
   process.stdin.resume();
+  process.stdin.on("data", (chunk) => prompt += chunk);
   process.stdin.on("end", () => {
+    log({ event: "prompt", args: process.argv.slice(2), prompt });
     if (scenario.lunaDelayMs) {
       setTimeout(runLuna, scenario.lunaDelayMs);
     } else runLuna();
@@ -140,7 +143,7 @@ if (process.argv.includes("app-server")) {
       generatedAt: new Date().toISOString(),
       recommendations: []
     };
-    write({ type: "turn.completed", result: analysis }, "luna");
+    write({ type: "turn.completed", result: analysis, ...(scenario.lunaUsage ? { usage: scenario.lunaUsage } : {}) }, "luna");
   }
 } else {
   process.stderr.write("Unknown fixture mode");

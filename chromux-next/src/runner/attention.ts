@@ -13,7 +13,19 @@ import {
 import { IncrementalJsonlDecoder, terminateChild } from "./protocol";
 
 const MAX_SNAPSHOT_BYTES = 128 * 1024;
-const SessionTitleV1Schema = z.object({ title: z.string().min(1).max(48) });
+const SessionTitleItemV1Schema = z.object({
+  sessionId: z.string().min(1).max(256), title: z.string().min(1).max(48)
+});
+const SessionTitlesOutputV1Schema = z.object({ titles: z.array(SessionTitleItemV1Schema).max(10) });
+const SessionTitlesV1Schema = z.object({ titles: z.array(z.unknown()).max(10) });
+const TITLE_MODEL = "gpt-5.6-luna";
+export const TITLE_PROMPT_VERSION = "session-title-v2";
+export type LunaTokenUsage = {
+  inputTokens: number; cachedInputTokens: number; outputTokens: number;
+  reasoningTokens: number; totalTokens: number;
+};
+export type AutomaticTitleInput = { sessionId: string; text: string; inputCharacters: number; fingerprint: string };
+export type AutomaticTitleRun = { titles: Map<string, string>; usage?: LunaTokenUsage };
 export interface LunaAnalyzerOptions {
   command?: string;
   prefixArgs?: string[];
@@ -29,6 +41,23 @@ export function redact(value: string): string {
     .replace(/\b(Bearer\s+)[A-Za-z0-9._~+/-]+=*/gi, "$1[REDACTED]")
     .replace(/((?:token|secret|password|api[_-]?key)\s*[:=]\s*)[^\s,;]+/gi, "$1[REDACTED]")
     .slice(0, 64 * 1024);
+}
+
+export function automaticTitleInput(session: RunnerSessionV1): AutomaticTitleInput | undefined {
+  const meaningfulUser = session.events.find((event) =>
+    event.kind === "user" && Boolean(event.text.trim()) && !isControlPhrase(event.text));
+  const fallbackAgent = meaningfulUser ? undefined : session.events.find((event) => event.kind === "agent" && event.text.trim());
+  const text = redact((meaningfulUser ?? fallbackAgent)?.text ?? "").replace(/\s+/g, " ").trim().slice(0, 512);
+  if (!text) return undefined;
+  const fingerprint = createHash("sha256")
+    .update(JSON.stringify({ input: text, model: TITLE_MODEL, promptVersion: TITLE_PROMPT_VERSION }))
+    .digest("hex");
+  return { sessionId: session.id, text, inputCharacters: text.length, fingerprint };
+}
+
+function isControlPhrase(value: string): boolean {
+  const normalized = value.toLocaleLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
+  return /^(continue|okay|ok|proceed|go ahead|yes|yep|sure|do it|carry on|resume|sounds good|thanks|thank you)$/.test(normalized);
 }
 
 export function buildAttentionSnapshot(
@@ -150,45 +179,68 @@ export class LunaAnalyzer {
     }
     snapshot.git.forEach((item) => sourceIds.add(item.sourceId));
     snapshot.alignment.forEach((item) => sourceIds.add(item.sourceId));
-    for (const recommendation of result.recommendations) {
+    for (const recommendation of result.value.recommendations) {
       if (recommendation.sourceIds.some((id) => !sourceIds.has(id))) {
         throw new Error("Luna returned a stale or unknown source reference");
       }
       recommendation.fingerprint = evidenceFingerprint(recommendation.sourceIds, recommendation.evidence);
     }
-    return result;
+    return result.value;
+  }
+
+  async summarizeTitles(inputs: AutomaticTitleInput[]): Promise<AutomaticTitleRun> {
+    const bounded = inputs.slice(0, 10);
+    if (!bounded.length) throw new Error("No session work to summarize");
+    const allowed = new Set(bounded.map((item) => item.sessionId));
+    const result = await this.runStructured(
+      SessionTitlesV1Schema,
+      "session-title",
+      [
+        `Prompt ${TITLE_PROMPT_VERSION}. Write one compact work title for each supplied session.`,
+        "Use 2-6 words, no quotes or trailing punctuation, at most 48 characters. Return only schema JSON.",
+        JSON.stringify(bounded.map(({ sessionId, text }) => ({ sessionId, request: text })))
+      ].join("\n\n"),
+      "none",
+      SessionTitlesOutputV1Schema
+    );
+    const titles = new Map<string, string>();
+    for (const value of result.value.titles) {
+      const parsed = SessionTitleItemV1Schema.safeParse(value);
+      if (!parsed.success) continue;
+      const item = parsed.data;
+      if (!allowed.has(item.sessionId) || titles.has(item.sessionId)) continue;
+      const title = item.title.replace(/\s+/g, " ").replace(/^[\"'`]+|[\"'`.]+$/g, "").trim().slice(0, 48);
+      if (title) titles.set(item.sessionId, title);
+    }
+    return { titles, ...(result.usage ? { usage: result.usage } : {}) };
   }
 
   async summarizeTitle(session: RunnerSessionV1): Promise<string> {
-    const messages = session.events
-      .filter((event) => event.kind === "user" || event.kind === "agent")
-      .slice(-8)
-      .map((event) => `${event.kind}: ${redact(event.text).slice(0, 2_000)}`);
-    if (!messages.length) throw new Error("Session has no work to summarize");
-    const result = await this.runStructured(
-      SessionTitleV1Schema,
-      "session-title",
-      [
-        "Write a compact tab title that describes the session's actual work.",
-        "Use 2-6 words, no directory name, no quotes, no trailing punctuation, and at most 48 characters.",
-        "Return only the JSON object required by the output schema.",
-        ...messages
-      ].join("\n\n")
-    );
-    return result.title.replace(/\s+/g, " ").replace(/^[\"'`]+|[\"'`.]+$/g, "").trim().slice(0, 48);
+    const input = automaticTitleInput(session);
+    if (!input) throw new Error("Session has no work to summarize");
+    const result = await this.summarizeTitles([input]);
+    const title = result.titles.get(session.id);
+    if (!title) throw new Error("Luna did not return a session title");
+    return title;
   }
 
-  private async runStructured<T>(schema: z.ZodType<T>, label: string, prompt: string): Promise<T> {
+  private async runStructured<T>(
+    schema: z.ZodType<T>,
+    label: string,
+    prompt: string,
+    effort = "low",
+    outputSchema: z.ZodType = schema
+  ): Promise<{ value: T; usage?: LunaTokenUsage }> {
     if (this.active) throw new Error("Attention analysis is already running");
     this.active = true;
     await mkdir(this.workingDirectory, { recursive: true });
     const schemaPath = path.join(this.workingDirectory, `${label}-schema-${process.pid}.json`);
-    await writeFile(schemaPath, JSON.stringify(z.toJSONSchema(schema)), { mode: 0o600 });
+    await writeFile(schemaPath, JSON.stringify(z.toJSONSchema(outputSchema)), { mode: 0o600 });
     const args = [
-      "exec", "-m", "gpt-5.6-luna", "--json", "--ephemeral",
+      "exec", "-m", TITLE_MODEL, "--json", "--ephemeral",
       "--sandbox", "read-only", "--ignore-user-config", "--ignore-rules",
       "--skip-git-repo-check", "-c", 'approval_policy="never"',
-      "-c", 'model_reasoning_effort="low"', "--output-schema", schemaPath, "-"
+      "-c", `model_reasoning_effort="${effort}"`, "--output-schema", schemaPath, "-"
     ];
     try {
       const result = await new Promise<unknown>((resolve, reject) => {
@@ -202,6 +254,7 @@ export class LunaAnalyzer {
         let timedOut = false;
         let completed = false;
         let candidate: unknown;
+        let usage: LunaTokenUsage | undefined;
         const decoder = new IncrementalJsonlDecoder(this.options.maxLineBytes, (value) => {
           const envelope = value as {
             type?: string;
@@ -210,6 +263,7 @@ export class LunaAnalyzer {
           };
           const next = envelope.result ?? envelope.item?.text;
           if (next !== undefined) candidate = typeof next === "string" ? JSON.parse(next) : next;
+          usage = parseTokenUsage(value) ?? usage;
         });
         const fail = async (error: Error) => {
           if (completed) return;
@@ -243,15 +297,38 @@ export class LunaAnalyzer {
           if (timedOut) reject(new Error("Luna analysis timed out"));
           else if (code !== 0) reject(new Error(redact(stderr || `Luna exited with status ${code}`)));
           else if (candidate === undefined) reject(new Error("Luna did not return a valid final JSON object"));
-          else resolve(candidate);
+          else resolve({ candidate, ...(usage ? { usage } : {}) });
         });
         child.stdin.end(prompt);
       });
-      return schema.parse(result);
+      const parsed = result as { candidate: unknown; usage?: LunaTokenUsage };
+      return { value: schema.parse(parsed.candidate), ...(parsed.usage ? { usage: parsed.usage } : {}) };
     } finally {
       this.active = false;
       this.child = undefined;
       await unlink(schemaPath).catch(() => undefined);
     }
   }
+}
+
+function parseTokenUsage(value: unknown): LunaTokenUsage | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const root = value as Record<string, any>;
+  const usage = root.usage ?? root.tokenUsage ?? root.token_usage ?? root.result?.usage;
+  if (!usage || typeof usage !== "object") return undefined;
+  const knownKeys = ["input_tokens", "inputTokens", "cached_input_tokens", "cachedInputTokens", "output_tokens", "outputTokens", "reasoning_tokens", "reasoningTokens", "total_tokens", "totalTokens"];
+  const hasReportedUsage = knownKeys.some((key) => Number.isFinite(usage[key]));
+  if (!hasReportedUsage) return undefined;
+  const read = (...keys: string[]) => {
+    for (const key of keys) if (Number.isFinite(usage[key]) && usage[key] >= 0) return Math.floor(usage[key]);
+    return 0;
+  };
+  const inputTokens = read("input_tokens", "inputTokens");
+  const cachedInputTokens = read("cached_input_tokens", "cachedInputTokens")
+    || (Number.isFinite(usage.input_tokens_details?.cached_tokens) ? Math.floor(usage.input_tokens_details.cached_tokens) : 0);
+  const outputTokens = read("output_tokens", "outputTokens");
+  const reasoningTokens = read("reasoning_tokens", "reasoningTokens")
+    || (Number.isFinite(usage.output_tokens_details?.reasoning_tokens) ? Math.floor(usage.output_tokens_details.reasoning_tokens) : 0);
+  const totalTokens = read("total_tokens", "totalTokens") || inputTokens + outputTokens;
+  return { inputTokens, cachedInputTokens, outputTokens, reasoningTokens, totalTokens };
 }

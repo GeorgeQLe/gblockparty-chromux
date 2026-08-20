@@ -5,7 +5,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { LocalStore } from "../src/persistence/local-store";
 import { LunaAnalyzer } from "../src/runner/attention";
-import { repairAutomaticTitle, RunnerManager } from "../src/runner/manager";
+import { automaticTitleFailureCategory, repairAutomaticTitle, RunnerManager, validAutomaticTitle } from "../src/runner/manager";
 import type { AppServerTransport } from "../src/runner/protocol";
 
 class FakeServer extends EventEmitter implements AppServerTransport {
@@ -18,6 +18,9 @@ class FakeServer extends EventEmitter implements AppServerTransport {
   failStart = false;
   forkWithoutId = false;
   forkReturnsSource = false;
+  startName: string | undefined;
+  forkName: string | undefined;
+  resumeNames = new Map<string, string>();
   listedThreads: any[] = [];
   threadReads = new Map<string, any>();
   turnPages = new Map<string, Map<string, any>>();
@@ -38,13 +41,13 @@ class FakeServer extends EventEmitter implements AppServerTransport {
     };
     if (method === "thread/start") {
       if (this.failStart) throw new Error("start failed");
-      return { thread: { id: `thread-${++this.thread}` } };
+      return { thread: { id: `thread-${++this.thread}`, ...(this.startName ? { name: this.startName } : {}) } };
     }
     if (method === "thread/fork") {
       if (this.failFork.has(params.threadId)) throw new Error("fork failed");
       return this.forkWithoutId ? { thread: {} }
         : this.forkReturnsSource ? { thread: { id: params.threadId } }
-          : { thread: { id: `fork-${++this.thread}` } };
+          : { thread: { id: `fork-${++this.thread}`, ...(this.forkName ? { name: this.forkName } : {}) } };
     }
     if (method === "thread/list") return { data: this.listedThreads };
     if (method === "thread/read") return this.threadReads.get(params.threadId) ?? {};
@@ -54,6 +57,9 @@ class FakeServer extends EventEmitter implements AppServerTransport {
     }
     if (method === "turn/start") return { turn: { id: `turn-${++this.turn}` } };
     if (method === "thread/resume" && this.failResume.has(params.threadId)) throw new Error("resume failed");
+    if (method === "thread/resume") return {
+      thread: { id: params.threadId, ...(this.resumeNames.has(params.threadId) ? { name: this.resumeNames.get(params.threadId) } : {}) }
+    };
     return {};
   }
   respond(id: string | number, result: unknown) {
@@ -74,6 +80,26 @@ async function setup() {
 }
 
 describe("runner manager", () => {
+  it("normalizes server titles and rejects directory and copy placeholders", () => {
+    expect(validAutomaticTitle("  Repair\nstartup   tabs  ", "/tmp/project")).toBe("Repair startup tabs");
+    expect(validAutomaticTitle("x".repeat(80), "/tmp/project")).toHaveLength(48);
+    expect(validAutomaticTitle("project", "/tmp/project")).toBeUndefined();
+    expect(validAutomaticTitle("project-copy-copy", "/tmp/project")).toBeUndefined();
+    expect(validAutomaticTitle("Continue · project", "/tmp/project")).toBeUndefined();
+  });
+
+  it.each([
+    ["authentication failed", "authentication"],
+    ["rate limit 429", "rate-limit"],
+    ["analysis timed out", "timeout"],
+    ["invalid JSONL output", "malformed-output"],
+    ["spawn ENOENT", "process"],
+    ["schema validation failed", "schema"],
+    ["unclassified failure", "unknown"]
+  ] as const)("sanitizes automatic-title failure %s as %s", (message, category) => {
+    expect(automaticTitleFailureCategory(new Error(message))).toBe(category);
+  });
+
   it("uses directory titles immediately and repairs copied restore placeholders", async () => {
     const { manager } = await setup();
     const session = await manager.createSession({ projectPath: "/tmp" });
@@ -88,7 +114,10 @@ describe("runner manager", () => {
     const server = new FakeServer();
     const analyzer = {
       analyze: async () => ({ schemaVersion: 1 as const, generatedAt: new Date().toISOString(), recommendations: [] }),
-      summarizeTitle: async () => "Repair startup titles"
+      summarizeTitles: async (inputs: Array<{ sessionId: string }>) => ({
+        titles: new Map(inputs.map((input) => [input.sessionId, "Repair startup titles"])),
+        usage: { inputTokens: 20, cachedInputTokens: 5, outputTokens: 4, reasoningTokens: 0, totalTokens: 24 }
+      })
     };
     const manager = new RunnerManager(server, new LocalStore(directory), analyzer as unknown as LunaAnalyzer);
     await manager.initialize();
@@ -102,6 +131,149 @@ describe("runner manager", () => {
     expect(manager.getState().sessions[0]).toMatchObject({
       title: "Repair startup titles", titleSource: "generated"
     });
+    expect(manager.getState().automaticTitles).toMatchObject({
+      subprocesses: 1, usageSubprocesses: 1, inputTokens: 20, cachedInputTokens: 5,
+      outputTokens: 4, reasoningTokens: 0, totalTokens: 24
+    });
+    await manager.shutdown();
+  });
+
+  it("consumes start, fork, and update server names without overwriting authored titles", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "chromux-next-server-title-"));
+    const server = new FakeServer();
+    server.startName = "  Server\nstart title ";
+    server.forkName = "Forked server title";
+    let lunaCalls = 0;
+    const analyzer = {
+      analyze: async () => ({ schemaVersion: 1 as const, generatedAt: new Date().toISOString(), recommendations: [] }),
+      summarizeTitles: async () => { lunaCalls += 1; return { titles: new Map() }; }
+    };
+    const manager = new RunnerManager(server, new LocalStore(directory), analyzer as unknown as LunaAnalyzer);
+    await manager.initialize();
+    const started = await manager.createSession({ projectPath: "/tmp" });
+    expect(started).toMatchObject({ title: "Server start title", titleSource: "server" });
+    const manual = await manager.createSession({ projectPath: "/tmp", title: "Manual title" });
+    server.emit("notification", {
+      method: "thread/name/updated", params: { threadId: manual.threadId, name: "Server replacement" }
+    });
+    const canonicalTmp = await (await import("node:fs/promises")).realpath("/tmp");
+    const forked = await manager.createDetectedSession({
+      cwd: canonicalTmp, threadId: "source", mode: "continue", permissionPreset: "workspace"
+    });
+    expect(forked.session).toMatchObject({ title: "Forked server title", titleSource: "server" });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(manager.getState().sessions.find((item) => item.id === manual.id)?.title).toBe("Manual title");
+    expect(lunaCalls).toBe(0);
+    await manager.shutdown();
+  });
+
+  it("reuses list and resume names before Luna and preserves generated titles", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "chromux-next-restored-server-title-"));
+    const store = new LocalStore(directory);
+    const now = "2026-08-20T12:00:00.000Z";
+    const makeSession = (id: string, source: "directory" | "generated", title = "tmp") => ({
+      schemaVersion: 1 as const, id, title, titleSource: source,
+      projectPath: "/tmp", canonicalProjectPath: "/tmp", groupId: "group", threadId: `thread-${id}`,
+      status: "idle" as const, permissionPreset: "read-only" as const, historyHydration: "complete" as const,
+      draft: "", createdAt: now, updatedAt: now,
+      events: [{ schemaVersion: 1 as const, id: `event-${id}`, sessionId: id, at: now, kind: "user" as const, text: "Implement restore titles", links: [] }],
+      interactions: []
+    });
+    await store.updateRunner({
+      schemaVersion: 1,
+      groups: [{ schemaVersion: 1, id: "group", title: "tmp", kind: "project", projectPath: "/tmp", sessionIds: ["list", "resume", "generated"], createdAt: now, updatedAt: now }],
+      sessions: [makeSession("list", "directory"), makeSession("resume", "directory"), makeSession("generated", "generated", "Existing generated")],
+      triage: []
+    });
+    const server = new FakeServer();
+    server.listedThreads = [{ id: "thread-list", cwd: "/tmp", name: "Listed work" }];
+    server.resumeNames.set("thread-resume", "Resumed work");
+    server.resumeNames.set("thread-generated", "Should not replace");
+    let calls = 0;
+    const analyzer = {
+      analyze: async () => ({ schemaVersion: 1 as const, generatedAt: now, recommendations: [] }),
+      summarizeTitles: async () => { calls += 1; return { titles: new Map() }; }
+    };
+    const manager = new RunnerManager(server, store, analyzer as unknown as LunaAnalyzer);
+    await manager.initialize();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(manager.getState().sessions.map(({ title, titleSource }) => ({ title, titleSource }))).toEqual([
+      { title: "Listed work", titleSource: "server" },
+      { title: "Resumed work", titleSource: "server" },
+      { title: "Existing generated", titleSource: "generated" }
+    ]);
+    expect(calls).toBe(0);
+    expect(manager.getState().automaticTitles?.serverTitleReuse).toBe(2);
+    await manager.shutdown();
+  });
+
+  it.each([1, 10, 11])("batches %i restored automatic titles in groups of ten", async (count) => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "chromux-next-title-batch-"));
+    const store = new LocalStore(directory);
+    const now = "2026-08-20T12:00:00.000Z";
+    const sessionIds = Array.from({ length: count }, (_, index) => `session-${index}`);
+    await store.updateRunner({
+      schemaVersion: 1,
+      groups: [{ schemaVersion: 1, id: "group", title: "tmp", kind: "project", projectPath: "/tmp", sessionIds, createdAt: now, updatedAt: now }],
+      sessions: sessionIds.map((id, index) => ({
+        schemaVersion: 1 as const, id, title: "tmp", titleSource: "directory" as const,
+        projectPath: "/tmp", canonicalProjectPath: "/tmp", groupId: "group", threadId: `thread-${index}`,
+        status: "idle" as const, permissionPreset: "read-only" as const, historyHydration: "complete" as const,
+        draft: "", createdAt: now, updatedAt: now,
+        events: [{ schemaVersion: 1 as const, id: `event-${index}`, sessionId: id, at: now, kind: "user" as const, text: `Implement feature ${index}`, links: [] }],
+        interactions: []
+      })),
+      triage: []
+    });
+    const batches: number[] = [];
+    const analyzer = {
+      analyze: async () => ({ schemaVersion: 1 as const, generatedAt: now, recommendations: [] }),
+      summarizeTitles: async (inputs: Array<{ sessionId: string }>) => {
+        batches.push(inputs.length);
+        return { titles: new Map(inputs.map((input) => [input.sessionId, `Feature ${input.sessionId}`])) };
+      }
+    };
+    const manager = new RunnerManager(new FakeServer(), store, analyzer as unknown as LunaAnalyzer);
+    await manager.initialize();
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(batches).toEqual(count === 11 ? [10, 1] : [count]);
+    expect(manager.getState().sessions.every((session) => session.titleSource === "generated")).toBe(true);
+    expect(manager.getState().automaticTitles?.subprocesses).toBe(Math.ceil(count / 10));
+    await manager.shutdown();
+  });
+
+  it("backs off unchanged failures but retries immediately when selected input changes", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "chromux-next-title-retry-"));
+    const server = new FakeServer();
+    let calls = 0;
+    const analyzer = {
+      analyze: async () => ({ schemaVersion: 1 as const, generatedAt: new Date().toISOString(), recommendations: [] }),
+      summarizeTitles: async () => { calls += 1; throw new Error("rate limit 429 secret=hidden"); }
+    };
+    const manager = new RunnerManager(server, new LocalStore(directory), analyzer as unknown as LunaAnalyzer);
+    await manager.initialize();
+    const session = await manager.createSession({ projectPath: "/tmp" });
+    await manager.startOrSteer({ sessionId: session.id, text: "continue" });
+    server.emit("notification", {
+      method: "item/completed",
+      params: { threadId: session.threadId, item: { id: "agent", type: "agentMessage", text: "Existing work context" } }
+    });
+    server.emit("notification", { method: "turn/completed", params: { threadId: session.threadId, turn: { status: "completed" } } });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(calls).toBe(1);
+    server.emit("notification", { method: "turn/completed", params: { threadId: session.threadId, turn: { status: "completed" } } });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(calls).toBe(1);
+    await manager.startOrSteer({ sessionId: session.id, text: "Implement automatic title telemetry" });
+    server.emit("notification", { method: "turn/completed", params: { threadId: session.threadId, turn: { status: "completed" } } });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const state = manager.getState();
+    expect(calls).toBe(2);
+    expect(state.sessions[0]?.automaticTitleAttempt).toMatchObject({ status: "failure", failureCategory: "rate-limit" });
+    expect(state.automaticTitles?.lastFailureCategory).toBe("rate-limit");
+    const diagnostic = manager.getCompatibilityDiagnostics("0.11.1", "darwin").checks.find((item) => item.id === "automatic-titles")?.detail ?? "";
+    expect(diagnostic).not.toContain("hidden");
+    expect(diagnostic).toContain("token usage unavailable");
     await manager.shutdown();
   });
 

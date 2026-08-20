@@ -155,10 +155,15 @@ isolation, sandboxing, popup denial, and an HTTP(S)-only navigation allowlist
 are enabled.
 
 Blank session titles opt into automatic naming. Chromux Next immediately uses
-the canonical project-directory basename, then asks an isolated, ephemeral
-GPT-5.6 Luna subprocess for one compact work summary after conversation content
-exists. The generated title is bounded and persisted; failure leaves the
-directory fallback intact, and explicit titles are never replaced.
+the canonical project-directory basename, then prefers a valid Codex
+app-server thread name. Remaining sessions use one redacted, 512-character
+request (or one agent excerpt when no meaningful request exists) in an
+isolated, ephemeral GPT-5.6 Luna subprocess with no reasoning. Restoration
+batches at most ten sessions per subprocess. Fingerprinted attempts retry
+immediately only when input or prompt configuration changes, otherwise after
+24 hours; explicit and already-generated titles are never replaced. Settings
+diagnostics show aggregate reuse, outcomes, retry timing, subprocesses, and
+reported token usage without storing prompts or process output.
 
 App-local state lives under the separate Electron user-data directory named
 `GBlockParty Chromux Next`. Alignment documents live only at user-selected JSON

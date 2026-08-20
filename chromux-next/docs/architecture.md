@@ -214,6 +214,15 @@ at their main-process boundary. Production retains the documented defaults;
 executable injection is wired into Electron only behind the explicit packaged
 runner-restoration smoke argument.
 
+Automatic title resolution is separate from attention analysis. Manual and
+generated titles are immutable. Directory fallbacks may be replaced by a
+normalized app-server thread name from list, resume, start/fork, or name-update
+traffic; redundant directory/copy labels are rejected. Remaining sessions use
+serialized Luna batches of ten with a versioned, fingerprinted 512-character
+input and no reasoning. Per-session attempts retain only bounded status and a
+sanitized failure category. Token usage is accumulated only when the Codex
+JSONL stream reports it and is never estimated or assigned to a session.
+
 ## Navigation
 
 Text is scanned for safe HTTP(S) URLs and displayed as ordinary buttons.

@@ -31,6 +31,7 @@ const url = `http://127.0.0.1:${address.port}`;
 const child = spawn(executable, [`--browser-evidence-smoke=${url}`], {
   env: {
     ...process.env,
+    ELECTRON_DISABLE_GPU: "1",
     CHROMUX_NEXT_SMOKE_USER_DATA: userData,
     CHROMUX_NEXT_FIXTURE_SCENARIO: scenarioPath
   },

@@ -3751,3 +3751,67 @@
   is the required release step. Next command: begin the macOS daily-driver and
   clean-install evidence tracked by the Chromux Next cutover gate in
   `tasks/todo.md`.
+
+## 2026-08-20 — Chromux Next automatic-title optimization v0.11.1
+
+- **User goal:** Reduce Luna title-generation prompt/token use and repeated
+  failures while preferring existing Codex thread names, preserving immediate
+  directory fallbacks, batching restoration, and surfacing safe aggregate
+  outcomes in Settings diagnostics.
+- **Changed files and purpose:** `src/runner/attention.ts` selects one redacted
+  512-character input, versions/fingerprints the no-reasoning title prompt,
+  batches structured results, independently validates items, and parses
+  reported subprocess token usage; `src/runner/contracts.ts` adds optional
+  backward-compatible server provenance, per-session attempt metadata, and
+  runner telemetry; `src/runner/manager.ts` applies server names from list,
+  resume, start/fork, and update traffic, enforces precedence/backoff, batches
+  restoration by ten, persists sanitized outcomes, and builds the Automatic
+  titles diagnostic. Fixture and runner/Luna tests cover protocol paths,
+  selection, redaction, batching, retry, partial output, usage, and failure
+  categories. The browser-evidence smoke child uses software rendering so its
+  capture check is independent of the current macOS GPU display surface.
+  Package metadata, README/architecture/UAT, release notes, and task records
+  document the `0.11.1` prerelease.
+- **User-goal mapping:** Manual and generated titles remain immutable; valid
+  server names suppress Luna; unchanged failed fingerprints wait 24 hours;
+  selected-input changes retry immediately; restoration uses serialized 10+1
+  batches; per-session fallbacks survive missing/invalid results; diagnostics
+  disclose only counts, categories, retry time, and actually reported token
+  totals, never prompt or stderr content.
+- **Executable verification:** `npm run typecheck` passed. The final full
+  `npm test` passed all 27 files and 166 tests. `npm run package` produced the
+  macOS arm64 app; packaged baseline, two-launch/two-session restoration, and
+  browser-evidence smokes passed. The browser smoke initially exposed an
+  unavailable hardware display surface three times; the same packaged flow
+  passed with software rendering, the harness was made deterministic, and the
+  ordinary `npm run smoke:browser-evidence` command then passed. Focused final
+  runner/Luna verification passed 39 tests, and `git diff --check` passed.
+- **Skipped tests:** No requested automated lane was skipped. Live authenticated
+  Luna title generation was not used because deterministic subprocess fixtures
+  exercise CLI flags, JSONL bounds, schema cleanup, errors, partial batches,
+  and token usage without consuming credentials or model quota.
+- **Adversarial review:** Failure-oriented review checked precedence conflicts,
+  legacy v1 parsing, duplicate/unknown/missing batch IDs, item-level invalid
+  titles, copy/directory placeholders before truncation, empty/control-only
+  user events, redaction-before-hashing, stable and changed fingerprints,
+  scheduled 24-hour eligibility, serialized 1/10/11 batches, unavailable/zero
+  usage, nested token details, sanitized auth/rate-limit/timeout/malformed/
+  process/schema categories, closed sessions, server-list limits, immutable
+  manual/generated titles, no `thread/name/set`, read-only/never/ephemeral CLI
+  flags, bounded diagnostics, and stable-channel isolation. The strict model
+  output schema was kept separate from defensive item-level parsing so one
+  malformed returned item cannot discard valid siblings; no blocking finding
+  remains.
+- **Residual risk:** Codex CLI token-usage envelope names may evolve; unknown
+  shapes intentionally appear as unavailable rather than estimates. A retry
+  becomes runnable within the manager's ten-second cadence after its stored
+  eligibility time, not at the exact millisecond. Real authenticated Luna and
+  long-running daily-driver restoration remain covered by the existing cutover
+  gate rather than this deterministic release suite.
+- **Rollback note:** Remove GitHub prerelease and tag
+  `chromux-next-v0.11.1`, then revert the v0.11.1 shipping commit. Chromux Next
+  v0.11.0 and the legacy stable release remain available. Deploy skipped: no
+  explicit manual deployment contract exists; GitHub prerelease publication
+  is the required release step. Next command: begin the macOS daily-driver and
+  clean-install evidence tracked by the Chromux Next cutover gate in
+  `tasks/todo.md`.

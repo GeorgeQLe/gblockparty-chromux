@@ -27,7 +27,10 @@ import {
   type RunnerSessionV1,
   type RunnerStateV1
 } from "./contracts";
-import { AttentionCadence, buildAttentionSnapshot, LunaAnalyzer, redact, snapshotHash } from "./attention";
+import {
+  AttentionCadence, automaticTitleInput, buildAttentionSnapshot, LunaAnalyzer, redact, snapshotHash,
+  type AutomaticTitleInput, type LunaTokenUsage
+} from "./attention";
 import type { AppServerTransport } from "./protocol";
 import type { DetectionCandidate, EnrichedDetectionCandidate } from "../detection/contracts";
 
@@ -39,7 +42,9 @@ const HISTORY_SOURCE_METHOD = "thread/turns/list";
 const HISTORY_STATUS_METHOD = "chromux/history-hydration";
 
 export class RunnerManager extends EventEmitter {
-  private state: RunnerStateV1 = { schemaVersion: 1, groups: [], sessions: [], triage: [] };
+  private state: RunnerStateV1 = {
+    schemaVersion: 1, groups: [], sessions: [], triage: [], automaticTitles: automaticTitleTelemetry()
+  };
   private models: ModelOptionV1[] = [];
   private readonly cadence = new AttentionCadence();
   private lastSnapshotHash = "";
@@ -61,13 +66,13 @@ export class RunnerManager extends EventEmitter {
   async initialize(): Promise<void> {
     const local = await this.store.read();
     this.state = RunnerStateV1Schema.parse(local.runner ?? this.state);
+    this.state.automaticTitles ??= automaticTitleTelemetry();
     this.state.sessions.forEach(repairAutomaticTitle);
     try {
       await this.server.start();
       this.models = await this.discoverModels();
       await this.restoreSessions("Could not resume thread");
       await this.persist();
-      this.state.sessions.forEach((session) => this.queueAutomaticTitle(session.id));
       this.timer = setInterval(() => void this.tick(), 10_000);
     } catch (error) {
       await this.server.stop().catch(() => undefined);
@@ -91,10 +96,17 @@ export class RunnerManager extends EventEmitter {
       return rows.map((row) => ({ ...row }));
     }
     const byDirectory = new Map<string, any>();
+    let reusedServerTitle = false;
     for (const thread of threads.slice(0, 100)) {
+      const session = this.state.sessions.find((item) => item.threadId === thread?.id);
+      if (session) reusedServerTitle = this.applyServerTitle(session, thread) || reusedServerTitle;
       const cwd = typeof thread?.cwd === "string" ? await canonicalize(thread.cwd).catch(() => undefined) : undefined;
       if (!cwd || byDirectory.has(cwd)) continue;
       byDirectory.set(cwd, thread);
+    }
+    if (reusedServerTitle) {
+      await this.persist();
+      this.emitState();
     }
     let previewReads = 0;
     return Promise.all(rows.map(async (row) => {
@@ -182,8 +194,8 @@ export class RunnerManager extends EventEmitter {
     const session = RunnerSessionV1Schema.parse({
       schemaVersion: 1,
       id: randomUUID(),
-      title: input.title ?? directoryTitle(canonicalProjectPath),
-      titleSource: input.title ? "manual" : "directory",
+      title: input.title ?? validAutomaticTitle(response?.thread?.name, canonicalProjectPath) ?? directoryTitle(canonicalProjectPath),
+      titleSource: input.title ? "manual" : validAutomaticTitle(response?.thread?.name, canonicalProjectPath) ? "server" : "directory",
       projectPath: canonicalProjectPath,
       canonicalProjectPath,
       groupId: group.id,
@@ -199,6 +211,7 @@ export class RunnerManager extends EventEmitter {
       events: [],
       interactions: []
     });
+    if (session.titleSource === "server") titleTelemetry(next).serverTitleReuse += 1;
     this.appendEvent(session, "system", `${input.mode === "continue" ? "Continuation created" : "Session ready"} · ${session.permissionPreset} · ${session.model ?? "default model"}`);
     next.sessions.push(session);
     group.sessionIds.push(session.id);
@@ -220,7 +233,7 @@ export class RunnerManager extends EventEmitter {
     if (input.mode === "continue") {
       await this.hydrateHistory(session);
       await this.persist();
-      this.queueAutomaticTitle(session.id);
+      this.queueAutomaticTitles([session.id]);
     }
     this.cadence.changed();
     this.emitState();
@@ -269,6 +282,7 @@ export class RunnerManager extends EventEmitter {
           status: this.models.length ? "pass" : "warn",
           detail: this.models.length ? `${this.models.length} compatible model${this.models.length === 1 ? "" : "s"} available.` : "No models discovered."
         },
+        automaticTitleDiagnostic(this.state),
         {
           id: "state-isolation",
           label: "State isolation",
@@ -332,6 +346,7 @@ export class RunnerManager extends EventEmitter {
       }) as any;
       session.threadId = response?.thread?.id;
       if (!session.threadId) throw new Error("thread/start returned no thread id");
+      this.applyServerTitle(session, response?.thread);
       session.status = "idle";
       this.appendEvent(session, "system", `Session ready · ${session.permissionPreset} · ${session.model ?? "default model"}`);
     } catch (error) {
@@ -529,9 +544,12 @@ export class RunnerManager extends EventEmitter {
       return;
     }
     const params = envelope.params ?? {};
-    const session = this.state.sessions.find((item) => item.threadId && item.threadId === params.threadId);
+    const notificationThreadId = params.threadId ?? params.thread?.id;
+    const session = this.state.sessions.find((item) => item.threadId && item.threadId === notificationThreadId);
     if (!session) return;
-    if (envelope.method === "turn/started") {
+    if (envelope.method === "thread/name/updated") {
+      this.applyServerTitle(session, params.thread ?? params);
+    } else if (envelope.method === "turn/started") {
       session.activeTurnId = params.turn?.id;
       session.status = "active";
       this.appendEvent(session, "status", "Turn started", envelope);
@@ -539,7 +557,7 @@ export class RunnerManager extends EventEmitter {
       session.activeTurnId = undefined;
       session.status = params.turn?.status === "failed" ? "failed" : "idle";
       this.appendEvent(session, params.turn?.status === "failed" ? "error" : "status", `Turn ${params.turn?.status ?? "completed"}`, envelope);
-      if (params.turn?.status !== "failed") this.queueAutomaticTitle(session.id);
+      if (params.turn?.status !== "failed") this.queueAutomaticTitles([session.id]);
     } else {
       const normalized = normalizeNotification(session.id, envelope);
       if (normalized) {
@@ -616,43 +634,83 @@ export class RunnerManager extends EventEmitter {
   private emitState(): void { this.emit("state", this.getState()); }
   private async tick(): Promise<void> {
     const openSessions = this.state.sessions.filter((item) => item.status !== "closed");
+    this.queueAutomaticTitles(openSessions.map((session) => session.id));
     const snapshot = buildAttentionSnapshot(openSessions, await collectGit(openSessions));
     const hash = snapshotHash(snapshot);
     if (this.cadence.automaticDue() || this.cadence.heartbeatDue(hash !== this.lastSnapshotHash)) {
       await this.refreshAttention();
     }
   }
-  private queueAutomaticTitle(sessionId: string): void {
+  private queueAutomaticTitles(sessionIds: string[]): void {
     this.titleQueue = this.titleQueue.then(async () => {
-      const session = this.state.sessions.find((item) => item.id === sessionId);
-      if (!session || session.status === "closed" || session.titleSource !== "directory") return;
-      if (!session.events.some((event) => event.kind === "user" || event.kind === "agent")) return;
-      try {
-        const title = await this.titleAnalyzer.summarizeTitle(structuredClone(session));
-        const current = this.state.sessions.find((item) => item.id === sessionId);
-        if (!title || !current || current.status === "closed" || current.titleSource !== "directory") return;
-        current.title = title;
-        current.titleSource = "generated";
-        current.updatedAt = new Date().toISOString();
-        await this.persist();
-        this.emitState();
-      } catch {
-        // Directory titles are the durable, immediate fallback when Luna is unavailable.
+      const eligible = sessionIds.flatMap((id) => {
+        const session = this.state.sessions.find((item) => item.id === id);
+        if (!session || session.status === "closed" || session.titleSource !== "directory") return [];
+        const input = automaticTitleInput(session);
+        if (!input || !automaticTitleEligible(session, input)) return [];
+        return [{ session, input }];
+      });
+      for (let offset = 0; offset < eligible.length; offset += 10) {
+        await this.runAutomaticTitleBatch(eligible.slice(offset, offset + 10));
       }
     }).catch(() => undefined);
   }
+  private async runAutomaticTitleBatch(batch: Array<{ session: RunnerSessionV1; input: AutomaticTitleInput }>): Promise<void> {
+    if (!batch.length) return;
+    titleTelemetry(this.state).subprocesses += 1;
+    try {
+      const run = await this.titleAnalyzer.summarizeTitles(batch.map((item) => item.input));
+      addTitleUsage(this.state, run.usage);
+      const now = new Date().toISOString();
+      for (const { session, input } of batch) {
+        const current = this.state.sessions.find((item) => item.id === session.id);
+        if (!current || current.status === "closed" || current.titleSource !== "directory") continue;
+        const title = validAutomaticTitle(run.titles.get(session.id), current.canonicalProjectPath);
+        if (title) {
+          current.title = title;
+          current.titleSource = "generated";
+          current.automaticTitleAttempt = {
+            fingerprint: input.fingerprint, status: "success", attemptedAt: now,
+            inputCharacters: input.inputCharacters
+          };
+          titleTelemetry(this.state).lunaSuccesses += 1;
+        } else recordTitleFailure(this.state, current, input, "missing-result", now);
+        current.updatedAt = now;
+      }
+    } catch (error) {
+      const category = automaticTitleFailureCategory(error);
+      const now = new Date().toISOString();
+      for (const { session, input } of batch) {
+        const current = this.state.sessions.find((item) => item.id === session.id);
+        if (current?.titleSource === "directory") recordTitleFailure(this.state, current, input, category, now);
+      }
+    }
+    await this.persist();
+    this.emitState();
+  }
   private async restoreSessions(failurePrefix: string, recovered = false): Promise<void> {
-    await Promise.all(this.state.sessions
-      .filter((item) => item.threadId && item.status !== "closed")
+    const restorable = this.state.sessions.filter((item) => item.threadId && item.status !== "closed");
+    if (restorable.length) {
+      try {
+        const response = await this.server.request("thread/list", { limit: 100, sortKey: "updated_at" }) as any;
+        const threads = Array.isArray(response?.data) ? response.data : Array.isArray(response?.threads) ? response.threads : [];
+        const byId = new Map(threads.slice(0, 100).map((thread: any) => [thread?.id, thread]));
+        restorable.forEach((session) => this.applyServerTitle(session, byId.get(session.threadId)));
+      } catch {
+        // Resume responses can still supply names; title discovery never blocks restoration.
+      }
+    }
+    await Promise.all(restorable
       .map(async (restored) => {
         try {
-          await this.server.request("thread/resume", {
+          const response = await this.server.request("thread/resume", {
             threadId: restored.threadId,
             excludeTurns: true,
             cwd: restored.projectPath,
             model: restored.model,
             ...permissionParams(restored.permissionPreset)
-          });
+          }) as any;
+          this.applyServerTitle(restored, response?.thread);
           restored.status = "idle";
           restored.activeTurnId = undefined;
           if (restored.historyHydration === "pending" || restored.historyHydration === "failed") {
@@ -664,6 +722,18 @@ export class RunnerManager extends EventEmitter {
           this.appendEvent(restored, "error", `${failurePrefix}: ${String(error)}`);
         }
       }));
+    this.queueAutomaticTitles(restorable.map((session) => session.id));
+  }
+
+  private applyServerTitle(session: RunnerSessionV1, thread: any): boolean {
+    if (session.titleSource !== "directory") return false;
+    const title = validAutomaticTitle(thread?.name, session.canonicalProjectPath);
+    if (!title) return false;
+    session.title = title;
+    session.titleSource = "server";
+    session.updatedAt = new Date().toISOString();
+    titleTelemetry(this.state).serverTitleReuse += 1;
+    return true;
   }
 
   private async hydrateHistory(session: RunnerSessionV1): Promise<void> {
@@ -760,6 +830,105 @@ export function repairAutomaticTitle(session: RunnerSessionV1): void {
   if (!generatedDirectoryLabel && !copiedDirectoryLabel && !repeatedCopyLabel) return;
   session.title = fallback;
   session.titleSource = "directory";
+}
+
+type AutomaticTitleFailureCategory = NonNullable<NonNullable<RunnerSessionV1["automaticTitleAttempt"]>["failureCategory"]>;
+
+function automaticTitleTelemetry(): NonNullable<RunnerStateV1["automaticTitles"]> {
+  return {
+    serverTitleReuse: 0, lunaSuccesses: 0, fallbacks: 0, failures: 0, subprocesses: 0,
+    usageSubprocesses: 0, inputTokens: 0, cachedInputTokens: 0, outputTokens: 0,
+    reasoningTokens: 0, totalTokens: 0
+  };
+}
+
+function titleTelemetry(state: RunnerStateV1): NonNullable<RunnerStateV1["automaticTitles"]> {
+  return state.automaticTitles ??= automaticTitleTelemetry();
+}
+
+export function validAutomaticTitle(value: unknown, projectPath: string): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
+  if (!normalized || /(?:-copy)+$/i.test(normalized)) return undefined;
+  const title = normalized.slice(0, 48);
+  const fallback = directoryTitle(projectPath);
+  const lower = title.toLocaleLowerCase();
+  const redundant = new Set([
+    fallback, "New session", `Continue · ${fallback}`, `Codex · ${fallback}`
+  ].map((item) => item.toLocaleLowerCase()));
+  if (redundant.has(lower)) return undefined;
+  return title;
+}
+
+function automaticTitleEligible(session: RunnerSessionV1, input: AutomaticTitleInput, now = Date.now()): boolean {
+  const attempt = session.automaticTitleAttempt;
+  if (!attempt || attempt.fingerprint !== input.fingerprint) return true;
+  if (attempt.status === "success") return false;
+  return !attempt.nextRetryAt || Date.parse(attempt.nextRetryAt) <= now;
+}
+
+export function automaticTitleFailureCategory(error: unknown): AutomaticTitleFailureCategory {
+  const message = String(error).toLocaleLowerCase();
+  if (/auth|login|credential/.test(message)) return "authentication";
+  if (/rate.?limit|too many requests|429/.test(message)) return "rate-limit";
+  if (/timed out|timeout/.test(message)) return "timeout";
+  if (/jsonl|json|output/.test(message)) return "malformed-output";
+  if (/spawn|process|exited|enoent/.test(message)) return "process";
+  if (/schema|zod|validation/.test(message)) return "schema";
+  return "unknown";
+}
+
+function recordTitleFailure(
+  state: RunnerStateV1,
+  session: RunnerSessionV1,
+  input: AutomaticTitleInput,
+  category: AutomaticTitleFailureCategory,
+  now: string
+): void {
+  session.automaticTitleAttempt = {
+    fingerprint: input.fingerprint,
+    status: "failure",
+    attemptedAt: now,
+    nextRetryAt: new Date(Date.parse(now) + 24 * 60 * 60 * 1000).toISOString(),
+    failureCategory: category,
+    inputCharacters: input.inputCharacters
+  };
+  session.updatedAt = now;
+  const telemetry = titleTelemetry(state);
+  telemetry.fallbacks += 1;
+  telemetry.failures += 1;
+  telemetry.lastFailureCategory = category;
+}
+
+function addTitleUsage(state: RunnerStateV1, usage: LunaTokenUsage | undefined): void {
+  if (!usage) return;
+  const telemetry = titleTelemetry(state);
+  telemetry.usageSubprocesses += 1;
+  telemetry.inputTokens += usage.inputTokens;
+  telemetry.cachedInputTokens += usage.cachedInputTokens;
+  telemetry.outputTokens += usage.outputTokens;
+  telemetry.reasoningTokens += usage.reasoningTokens;
+  telemetry.totalTokens += usage.totalTokens;
+}
+
+function automaticTitleDiagnostic(state: RunnerStateV1): CompatibilityDiagnosticsV1["checks"][number] {
+  const telemetry = state.automaticTitles ?? automaticTitleTelemetry();
+  const nextRetry = state.sessions
+    .map((session) => session.automaticTitleAttempt?.nextRetryAt)
+    .filter((value): value is string => typeof value === "string" && Date.parse(value) > Date.now())
+    .sort()[0];
+  const usage = telemetry.usageSubprocesses
+    ? `tokens ${telemetry.inputTokens} in (${telemetry.cachedInputTokens} cached), ${telemetry.outputTokens} out, ${telemetry.reasoningTokens} reasoning, ${telemetry.totalTokens} total`
+    : "token usage unavailable";
+  const partialUsage = telemetry.usageSubprocesses < telemetry.subprocesses ? "; some subprocess usage unavailable" : "";
+  const retry = nextRetry ? `; next retry ${nextRetry}` : "";
+  const failure = telemetry.lastFailureCategory ? `; last failure ${telemetry.lastFailureCategory}` : "";
+  return {
+    id: "automatic-titles",
+    label: "Automatic titles",
+    status: telemetry.failures ? "warn" : "pass",
+    detail: `Server reuse ${telemetry.serverTitleReuse}; Luna successes ${telemetry.lunaSuccesses}; fallbacks/failures ${telemetry.fallbacks}/${telemetry.failures}; subprocesses ${telemetry.subprocesses}; ${usage}${partialUsage}${retry}${failure}.`.slice(0, 2048)
+  };
 }
 
 function turnPermissionParams(

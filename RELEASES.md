@@ -1,5 +1,26 @@
 # Release Notes
 
+## GBlockParty Chromux Next v0.11.1 (prerelease)
+
+Tag: `chromux-next-v0.11.1`
+
+- Reuse valid Codex app-server thread names before generating a title, while
+  preserving manual and already-generated titles and retaining the immediate
+  canonical-directory fallback.
+- Reduce title prompts to one redacted 512-character request (or a single
+  agent fallback excerpt), run GPT-5.6 Luna with no reasoning, and fingerprint
+  the prompt contract for immediate changed-input retries plus a 24-hour
+  unchanged-input backoff.
+- Restore automatic titles in serialized batches of at most ten sessions,
+  validate each returned ID/title independently, and keep directory fallbacks
+  for partial or failed results.
+- Persist sanitized attempt outcomes and aggregate subprocess telemetry,
+  including reported token usage when Codex supplies it, and expose the
+  bounded totals and next retry in Settings compatibility diagnostics.
+- Preserve ephemeral read-only execution, denied approvals, bounded JSONL,
+  schema cleanup, successor-only state, legacy Chromux, and the stable
+  `/releases/latest` channel.
+
 ## GBlockParty Chromux Next v0.11.0 (prerelease)
 
 Tag: `chromux-next-v0.11.0`

@@ -59,7 +59,18 @@ export const RunnerSessionV1Schema = z.object({
   schemaVersion: z.literal(1),
   id: Id,
   title: z.string().min(1).max(256),
-  titleSource: z.enum(["manual", "directory", "generated"]).optional(),
+  titleSource: z.enum(["manual", "directory", "generated", "server"]).optional(),
+  automaticTitleAttempt: z.object({
+    fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+    status: z.enum(["success", "failure"]),
+    attemptedAt: Timestamp,
+    nextRetryAt: Timestamp.optional(),
+    failureCategory: z.enum([
+      "authentication", "rate-limit", "timeout", "malformed-output",
+      "process", "schema", "missing-result", "unknown"
+    ]).optional(),
+    inputCharacters: z.number().int().min(1).max(1024)
+  }).optional(),
   projectPath: z.string().min(1).max(4096),
   canonicalProjectPath: z.string().min(1).max(4096),
   groupId: Id,
@@ -195,6 +206,23 @@ export const RunnerStateV1Schema = z.object({
   selectedSessionId: Id.optional(),
   attention: AttentionAnalysisV1Schema.optional(),
   attentionFailure: z.string().max(2048).optional(),
+  automaticTitles: z.object({
+    serverTitleReuse: z.number().int().nonnegative().default(0),
+    lunaSuccesses: z.number().int().nonnegative().default(0),
+    fallbacks: z.number().int().nonnegative().default(0),
+    failures: z.number().int().nonnegative().default(0),
+    subprocesses: z.number().int().nonnegative().default(0),
+    usageSubprocesses: z.number().int().nonnegative().default(0),
+    inputTokens: z.number().int().nonnegative().default(0),
+    cachedInputTokens: z.number().int().nonnegative().default(0),
+    outputTokens: z.number().int().nonnegative().default(0),
+    reasoningTokens: z.number().int().nonnegative().default(0),
+    totalTokens: z.number().int().nonnegative().default(0),
+    lastFailureCategory: z.enum([
+      "authentication", "rate-limit", "timeout", "malformed-output",
+      "process", "schema", "missing-result", "unknown"
+    ]).optional()
+  }).optional(),
   triage: z.array(AttentionTriageV1Schema).max(1000).default([])
 });
 export type RunnerStateV1 = z.infer<typeof RunnerStateV1Schema>;

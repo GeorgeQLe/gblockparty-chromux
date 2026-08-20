@@ -59,6 +59,16 @@ instead of resuming the `prototype/` implementation.
 
 ## Completed Work
 
+- [x] Ship Chromux Next v0.11.1 with Codex server-title reuse, compact
+  fingerprinted no-reasoning Luna inputs, 24-hour unchanged-input backoff,
+  ten-session restoration batches, independently validated partial results,
+  reported token telemetry, and bounded Settings diagnostics. Preserve manual
+  and generated titles, immediate directory fallbacks, successor-only state,
+  legacy Chromux, and the stable `/releases/latest` channel.
+  _(source: user-supplied automatic-title optimization plan; executable
+  evidence: title protocol/manager regressions plus the full packaged verify
+  matrix)_
+
 - [x] Ship Chromux Next v0.11.0 with immediate canonical-directory titles for
   automatic sessions, repair of generic and repeated `-copy` restore labels,
   and one bounded GPT-5.6 Luna work-summary title after useful content exists.
