@@ -59,6 +59,15 @@ instead of resuming the `prototype/` implementation.
 
 ## Completed Work
 
+- [x] Ship Chromux Next v0.11.0 with immediate canonical-directory titles for
+  automatic sessions, repair of generic and repeated `-copy` restore labels,
+  and one bounded GPT-5.6 Luna work-summary title after useful content exists.
+  Preserve explicit user titles, non-blocking restoration, successor-only
+  app-server state, legacy Chromux, and the stable `/releases/latest` channel.
+  _(source: user-reported post-macOS/Codex-update title restoration quibble;
+  successor-only scope; executable evidence: 149 tests, production package,
+  baseline/restoration/browser packaged smokes)_
+
 - [x] Ship Chromux Next v0.10.6 so fractional or otherwise invalid in-memory
   terminal viewports cannot violate xterm's integer scroll contract, and future
   React renderer failures show a persisted-session-safe renderer reload screen

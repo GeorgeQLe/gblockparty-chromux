@@ -1220,7 +1220,7 @@ export function DetectionDialog({
       setMode(nextMode);
       setCreateError("");
       if (!preserveFormRef.current) {
-        setTitle(`${nextMode === "continue" ? "Continue" : "Codex"} · ${row.projectName}`);
+        setTitle("");
       }
       preserveFormRef.current = false;
     }).catch((reason) => {
@@ -1232,13 +1232,13 @@ export function DetectionDialog({
     });
   };
   const create = () => {
-    if (!selected || !leaseId || !leaseValid || !title.trim()) return;
+    if (!selected || !leaseId || !leaseValid) return;
     setCreating(true);
     setCreateError("");
     void window.chromuxNext.runner.createFromDetection({
       leaseId,
       mode,
-      title: title.trim(),
+      ...(title.trim() ? { title: title.trim() } : {}),
       permissionPreset: permission,
       ...(model ? { model } : {}),
       ...(effort ? { reasoningEffort: effort } : {})
@@ -1266,14 +1266,14 @@ export function DetectionDialog({
     dismissible={!onboarding}
     className="detection-modal onboarding-modal"
     footer={selected
-      ? <><Button tone="quiet" disabled={creating} onClick={() => { releaseLease(); setSelected(undefined); }}>Back</Button><Button icon={CirclePlus} tone="primary" disabled={creating || !leaseValid || !title.trim() || !models.length} onClick={create}>{creating ? "Creating…" : mode === "continue" ? "Create continuation" : "Start fresh"}</Button></>
+      ? <><Button tone="quiet" disabled={creating} onClick={() => { releaseLease(); setSelected(undefined); }}>Back</Button><Button icon={CirclePlus} tone="primary" disabled={creating || !leaseValid || !models.length} onClick={create}>{creating ? "Creating…" : mode === "continue" ? "Create continuation" : "Start fresh"}</Button></>
       : <><div className="detection-fallbacks"><Button icon={FolderPlus} tone="quiet" onClick={chooseProject}>Choose Folder</Button>{onboarding && <Button tone="quiet" onClick={complete}>Continue Without Session</Button>}</div><Button icon={RefreshCw} onClick={scan} disabled={loading || Boolean(acquiringTargetId)}>Rescan</Button></>}
   >
     {selected ? <form className="session-form detection-config" onSubmit={(event) => { event.preventDefault(); create(); }}>
       <div className="detected-summary"><Badge tone="sage">{selected.agent}</Badge><strong>{selected.projectName}</strong><small>{selected.directory}</small></div>
       {mode === "continue" && selected.externalActive && <p className="detection-warning"><AlertTriangle size={16} aria-hidden="true" /> Chromux copies safely stored history into a separate thread. It does not share an in-progress partial turn. The external Codex process stays active, and the two threads may diverge.</p>}
       {createError && <div className="detection-error" role="alert"><AlertTriangle size={16} aria-hidden="true" /> <span>{createError}</span>{!leaseValid && <Button icon={RefreshCw} onClick={scan}>Rescan</Button>}</div>}
-      <label>Session title<input autoFocus maxLength={256} value={title} onChange={(event) => setTitle(event.target.value)} /></label>
+      <label>Session title<input autoFocus maxLength={256} placeholder={`${selected.projectName} · automatic if blank`} value={title} onChange={(event) => setTitle(event.target.value)} /></label>
       <div className="modal-grid">
         <label>Permissions<select value={permission} onChange={(event) => setPermission(event.target.value as "workspace" | "read-only")}><option value="workspace">Workspace</option><option value="read-only">Read only</option></select></label>
         <label>Model<select value={model} onChange={(event) => { setModel(event.target.value); setEffort(models.find((item) => item.id === event.target.value)?.defaultReasoningEffort ?? ""); }}><option value="">Recommended</option>{models.map((item) => <option value={item.id} key={item.id}>{item.displayName}</option>)}</select></label>
@@ -1299,7 +1299,7 @@ function NewSessionDialog({ models, workspace, selectedSession, selectedGroupId,
   const recommended = models.find((model) => model.id === workspace.defaultModel) ?? models.find((model) => model.recommended) ?? models[0];
   const preferredProject = workspace.projects.find((project) => project.id === workspace.defaultProjectId) ?? workspace.projects[0];
   const [project, setProject] = useState(selectedSession?.projectPath ?? preferredProject?.path ?? "");
-  const [title, setTitle] = useState("New session");
+  const [title, setTitle] = useState("");
   const [permission, setPermission] = useState<"workspace" | "read-only">(workspace.defaultPermissionPreset);
   const [model, setModel] = useState(recommended?.id ?? "");
   const [effort, setEffort] = useState(workspace.defaultReasoningEffort ?? recommended?.defaultReasoningEffort ?? "");
@@ -1322,7 +1322,7 @@ function NewSessionDialog({ models, workspace, selectedSession, selectedGroupId,
       event.preventDefault();
       void window.chromuxNext.runner.create({
         projectPath: project,
-        title: title || "New session",
+        ...(title.trim() ? { title: title.trim() } : {}),
         permissionPreset: permission,
         ...(selectedGroupId ? { groupId: selectedGroupId } : {}),
         ...(model ? { model } : {}),
@@ -1330,7 +1330,7 @@ function NewSessionDialog({ models, workspace, selectedSession, selectedGroupId,
       }).then(created).catch(fail);
     }}>
       <label>Project or worktree<div className="path-picker"><select autoFocus value={project} onChange={(event) => setProject(event.target.value)}><option value="">Choose a registered folder</option>{workspace.projects.map((item) => <option value={item.path} key={item.id}>{item.name} · {item.kind}</option>)}{project && !workspace.projects.some((item) => item.path === project) && <option value={project}>{project}</option>}</select><Button type="button" icon={FolderPlus} onClick={chooseProject}>Add folder</Button></div></label>
-      <label>Session title<input value={title} onChange={(event) => setTitle(event.target.value)} /></label>
+      <label>Session title<input placeholder={`${project.split("/").filter(Boolean).at(-1) ?? "Project"} · automatic if blank`} value={title} onChange={(event) => setTitle(event.target.value)} /></label>
       <div className="modal-grid"><label>Permissions<select value={permission} onChange={(event) => setPermission(event.target.value as "workspace" | "read-only")}><option value="workspace">Workspace</option><option value="read-only">Read only</option></select></label><label>Model<select value={model} onChange={(event) => { setModel(event.target.value); setEffort(models.find((item) => item.id === event.target.value)?.defaultReasoningEffort ?? ""); }}><option value="">Recommended</option>{models.map((item) => <option value={item.id} key={item.id}>{item.displayName}{item.recommended ? " · recommended" : ""}</option>)}</select></label><label>Reasoning<select value={effort} onChange={(event) => setEffort(event.target.value)}><option value="">Model default</option>{(models.find((item) => item.id === model)?.reasoningEfforts ?? recommended?.reasoningEfforts ?? []).map((item) => <option key={item}>{item}</option>)}</select></label></div>
       <p className="permission-help">{permission === "workspace" ? "Writes are limited to this workspace. Network is off by default and escalations require approval." : "Files are read-only. Network is off and approval prompts are never accepted."}</p>
     </form>

@@ -46,6 +46,21 @@ describe("Luna subprocess", () => {
     expect(result.recommendations[0]?.fingerprint).not.toBe("fixture");
   });
 
+  it("returns a bounded compact session title", async () => {
+    const luna = await analyzer({
+      lunaResult: { title: "Repair startup tab names." }
+    });
+    const title = await luna.summarizeTitle({
+      ...session,
+      events: [{
+        schemaVersion: 1, id: "event", sessionId: session.id,
+        at: "2026-08-05T12:01:00.000Z", kind: "user",
+        text: "Fix session names after a restart", links: []
+      }]
+    });
+    expect(title).toBe("Repair startup tab names");
+  });
+
   it.each([
     ["authentication", { lunaExitCode: 1 }, /authentication failed \[REDACTED\]/],
     ["malformed JSONL", { lunaMalformed: true }, /invalid JSONL/],

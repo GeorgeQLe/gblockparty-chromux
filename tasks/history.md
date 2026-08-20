@@ -3704,3 +3704,50 @@
   is the required release step. Next command: begin the macOS daily-driver and
   clean-install evidence tracked by the Chromux Next cutover gate in
   `tasks/todo.md`.
+## 2026-08-20 — Chromux Next automatic work titles v0.11.0
+
+- **User goal:** Apply the post-restart tab-naming lesson to Chromux Next, not
+  the maintenance-only legacy Chromux app: respect the directory immediately
+  and use GPT-5.6 Luna for a compact nonredundant work summary when possible.
+- **Changed files and purpose:** Runner contracts persist manual, directory,
+  or generated title provenance; session creation and DETECT accept blank
+  titles as automatic; the manager installs a canonical basename before
+  resume, repairs known generic/copy placeholders, and queues one generated
+  title without blocking restoration; the Luna runner now shares one bounded
+  structured-output primitive and has a dedicated production subprocess for
+  title work; UI placeholders explain the blank-title behavior; focused tests,
+  README/UAT, package metadata, release notes, and task records cover the
+  `0.11.0` prerelease.
+- **User-goal mapping:** Every automatic tab has a useful label before Codex
+  resume completes. Multiple sessions in one directory can then diverge into
+  compact 2–6 word work labels. Explicit titles are provenance-marked manual
+  and never replaced. Missing, busy, timed-out, malformed, or unauthenticated
+  Luna leaves the directory label intact.
+- **Executable verification:** `npm run verify` passed TypeScript, all 27
+  Vitest files with 149 tests, Electron Forge macOS arm64 packaging, baseline
+  packaged smoke, two-launch/two-session restoration smoke, and packaged
+  browser-evidence smoke. `git diff --check` passed.
+- **Skipped tests and residual risk:** A live macOS reboot was not repeated,
+  because Chromux Next owns app-server sessions rather than Terminal/iTerm tab
+  restoration. A live authenticated title-generation request was not used in
+  automated verification; the deterministic Codex subprocess fixture proves
+  JSONL fragmentation, structured output, bounds, cleanup, timeout, and error
+  fallback. Visual capture was skipped because the only UI change is input
+  placeholder copy and no geometry or style changed. Generated titles are
+  intentionally stable after the first successful summary rather than being
+  regenerated on every turn.
+- **Adversarial review:** Failure-oriented self-review checked manual-title
+  preservation, blank inputs through both strict IPC paths, generic and
+  repeated-copy repair, canonical basename fallback, empty/punctuation-only
+  summaries, redaction and bounded input/output, independent title/attention
+  subprocess ownership, concurrent persistence, restart behavior, closed
+  sessions, version consistency, successor isolation, and prerelease channel
+  behavior. Dedicated production analyzers prevent title work from starving
+  passive attention; no blocking finding remains.
+- **Rollback note:** Remove GitHub prerelease and tag
+  `chromux-next-v0.11.0`, then revert the v0.11.0 shipping commit. Chromux Next
+  v0.10.6 and the legacy stable release remain available. Deploy skipped: no
+  explicit manual deployment contract exists; GitHub prerelease publication
+  is the required release step. Next command: begin the macOS daily-driver and
+  clean-install evidence tracked by the Chromux Next cutover gate in
+  `tasks/todo.md`.

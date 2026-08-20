@@ -13,6 +13,7 @@ import {
 import { IncrementalJsonlDecoder, terminateChild } from "./protocol";
 
 const MAX_SNAPSHOT_BYTES = 128 * 1024;
+const SessionTitleV1Schema = z.object({ title: z.string().min(1).max(48) });
 export interface LunaAnalyzerOptions {
   command?: string;
   prefixArgs?: string[];
@@ -131,11 +132,58 @@ export class LunaAnalyzer {
   }
 
   async analyze(snapshot: AttentionSnapshotV1): Promise<AttentionAnalysisV1> {
+    const result = await this.runStructured(
+      AttentionAnalysisV1Schema,
+      "attention",
+      [
+        "Analyze the bounded Chromux attention snapshot.",
+        "Return at most five ranked recommendations. Use only source IDs present in the snapshot.",
+        "Return only the JSON object required by the output schema.",
+        JSON.stringify(snapshot)
+      ].join("\n\n")
+    );
+    const sourceIds = new Set<string>();
+    for (const session of snapshot.sessions) {
+      sourceIds.add(session.id);
+      session.latestMessages.forEach((item) => sourceIds.add(item.eventId));
+      session.interactions.forEach((item) => sourceIds.add(item.id));
+    }
+    snapshot.git.forEach((item) => sourceIds.add(item.sourceId));
+    snapshot.alignment.forEach((item) => sourceIds.add(item.sourceId));
+    for (const recommendation of result.recommendations) {
+      if (recommendation.sourceIds.some((id) => !sourceIds.has(id))) {
+        throw new Error("Luna returned a stale or unknown source reference");
+      }
+      recommendation.fingerprint = evidenceFingerprint(recommendation.sourceIds, recommendation.evidence);
+    }
+    return result;
+  }
+
+  async summarizeTitle(session: RunnerSessionV1): Promise<string> {
+    const messages = session.events
+      .filter((event) => event.kind === "user" || event.kind === "agent")
+      .slice(-8)
+      .map((event) => `${event.kind}: ${redact(event.text).slice(0, 2_000)}`);
+    if (!messages.length) throw new Error("Session has no work to summarize");
+    const result = await this.runStructured(
+      SessionTitleV1Schema,
+      "session-title",
+      [
+        "Write a compact tab title that describes the session's actual work.",
+        "Use 2-6 words, no directory name, no quotes, no trailing punctuation, and at most 48 characters.",
+        "Return only the JSON object required by the output schema.",
+        ...messages
+      ].join("\n\n")
+    );
+    return result.title.replace(/\s+/g, " ").replace(/^[\"'`]+|[\"'`.]+$/g, "").trim().slice(0, 48);
+  }
+
+  private async runStructured<T>(schema: z.ZodType<T>, label: string, prompt: string): Promise<T> {
     if (this.active) throw new Error("Attention analysis is already running");
     this.active = true;
     await mkdir(this.workingDirectory, { recursive: true });
-    const schemaPath = path.join(this.workingDirectory, `attention-schema-${process.pid}.json`);
-    await writeFile(schemaPath, JSON.stringify(z.toJSONSchema(AttentionAnalysisV1Schema)), { mode: 0o600 });
+    const schemaPath = path.join(this.workingDirectory, `${label}-schema-${process.pid}.json`);
+    await writeFile(schemaPath, JSON.stringify(z.toJSONSchema(schema)), { mode: 0o600 });
     const args = [
       "exec", "-m", "gpt-5.6-luna", "--json", "--ephemeral",
       "--sandbox", "read-only", "--ignore-user-config", "--ignore-rules",
@@ -197,29 +245,9 @@ export class LunaAnalyzer {
           else if (candidate === undefined) reject(new Error("Luna did not return a valid final JSON object"));
           else resolve(candidate);
         });
-        child.stdin.end([
-          "Analyze the bounded Chromux attention snapshot.",
-          "Return at most five ranked recommendations. Use only source IDs present in the snapshot.",
-          "Return only the JSON object required by the output schema.",
-          JSON.stringify(snapshot)
-        ].join("\n\n"));
+        child.stdin.end(prompt);
       });
-      const sourceIds = new Set<string>();
-      for (const session of snapshot.sessions) {
-        sourceIds.add(session.id);
-        session.latestMessages.forEach((item) => sourceIds.add(item.eventId));
-        session.interactions.forEach((item) => sourceIds.add(item.id));
-      }
-      snapshot.git.forEach((item) => sourceIds.add(item.sourceId));
-      snapshot.alignment.forEach((item) => sourceIds.add(item.sourceId));
-      const validated = AttentionAnalysisV1Schema.parse(result);
-      for (const recommendation of validated.recommendations) {
-        if (recommendation.sourceIds.some((id) => !sourceIds.has(id))) {
-          throw new Error("Luna returned a stale or unknown source reference");
-        }
-        recommendation.fingerprint = evidenceFingerprint(recommendation.sourceIds, recommendation.evidence);
-      }
-      return validated;
+      return schema.parse(result);
     } finally {
       this.active = false;
       this.child = undefined;

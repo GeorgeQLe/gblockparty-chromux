@@ -44,11 +44,13 @@ export class RunnerManager extends EventEmitter {
   private readonly cadence = new AttentionCadence();
   private lastSnapshotHash = "";
   private timer: NodeJS.Timeout | undefined;
+  private titleQueue: Promise<void> = Promise.resolve();
 
   constructor(
     private readonly server: AppServerTransport,
     private readonly store: LocalStore,
-    private readonly analyzer: LunaAnalyzer
+    private readonly analyzer: LunaAnalyzer,
+    private readonly titleAnalyzer: LunaAnalyzer = analyzer
   ) {
     super();
     server.on("notification", (value) => void this.onNotification(value));
@@ -59,11 +61,13 @@ export class RunnerManager extends EventEmitter {
   async initialize(): Promise<void> {
     const local = await this.store.read();
     this.state = RunnerStateV1Schema.parse(local.runner ?? this.state);
+    this.state.sessions.forEach(repairAutomaticTitle);
     try {
       await this.server.start();
       this.models = await this.discoverModels();
       await this.restoreSessions("Could not resume thread");
       await this.persist();
+      this.state.sessions.forEach((session) => this.queueAutomaticTitle(session.id));
       this.timer = setInterval(() => void this.tick(), 10_000);
     } catch (error) {
       await this.server.stop().catch(() => undefined);
@@ -124,7 +128,7 @@ export class RunnerManager extends EventEmitter {
     cwd: string;
     threadId?: string;
     mode: "continue" | "fresh";
-    title: string;
+    title?: string;
     permissionPreset: RunnerSessionV1["permissionPreset"];
     model?: string;
     reasoningEffort?: string;
@@ -178,7 +182,8 @@ export class RunnerManager extends EventEmitter {
     const session = RunnerSessionV1Schema.parse({
       schemaVersion: 1,
       id: randomUUID(),
-      title: input.title,
+      title: input.title ?? directoryTitle(canonicalProjectPath),
+      titleSource: input.title ? "manual" : "directory",
       projectPath: canonicalProjectPath,
       canonicalProjectPath,
       groupId: group.id,
@@ -215,6 +220,7 @@ export class RunnerManager extends EventEmitter {
     if (input.mode === "continue") {
       await this.hydrateHistory(session);
       await this.persist();
+      this.queueAutomaticTitle(session.id);
     }
     this.cadence.changed();
     this.emitState();
@@ -298,7 +304,8 @@ export class RunnerManager extends EventEmitter {
     const session = RunnerSessionV1Schema.parse({
       schemaVersion: 1,
       id: randomUUID(),
-      title: value.title ?? "New session",
+      title: value.title ?? directoryTitle(canonicalProjectPath),
+      titleSource: value.title ? "manual" : "directory",
       projectPath: value.projectPath,
       canonicalProjectPath,
       groupId: group.id,
@@ -532,6 +539,7 @@ export class RunnerManager extends EventEmitter {
       session.activeTurnId = undefined;
       session.status = params.turn?.status === "failed" ? "failed" : "idle";
       this.appendEvent(session, params.turn?.status === "failed" ? "error" : "status", `Turn ${params.turn?.status ?? "completed"}`, envelope);
+      if (params.turn?.status !== "failed") this.queueAutomaticTitle(session.id);
     } else {
       const normalized = normalizeNotification(session.id, envelope);
       if (normalized) {
@@ -613,6 +621,25 @@ export class RunnerManager extends EventEmitter {
     if (this.cadence.automaticDue() || this.cadence.heartbeatDue(hash !== this.lastSnapshotHash)) {
       await this.refreshAttention();
     }
+  }
+  private queueAutomaticTitle(sessionId: string): void {
+    this.titleQueue = this.titleQueue.then(async () => {
+      const session = this.state.sessions.find((item) => item.id === sessionId);
+      if (!session || session.status === "closed" || session.titleSource !== "directory") return;
+      if (!session.events.some((event) => event.kind === "user" || event.kind === "agent")) return;
+      try {
+        const title = await this.titleAnalyzer.summarizeTitle(structuredClone(session));
+        const current = this.state.sessions.find((item) => item.id === sessionId);
+        if (!title || !current || current.status === "closed" || current.titleSource !== "directory") return;
+        current.title = title;
+        current.titleSource = "generated";
+        current.updatedAt = new Date().toISOString();
+        await this.persist();
+        this.emitState();
+      } catch {
+        // Directory titles are the durable, immediate fallback when Luna is unavailable.
+      }
+    }).catch(() => undefined);
   }
   private async restoreSessions(failurePrefix: string, recovered = false): Promise<void> {
     await Promise.all(this.state.sessions
@@ -715,6 +742,24 @@ export function permissionParams(preset: RunnerSessionV1["permissionPreset"]): R
   return preset === "read-only"
     ? { sandbox: "read-only", approvalPolicy: "never" }
     : { sandbox: "workspace-write", approvalPolicy: "on-request" };
+}
+
+export function directoryTitle(projectPath: string): string {
+  return path.basename(projectPath) || projectPath;
+}
+
+export function repairAutomaticTitle(session: RunnerSessionV1): void {
+  if (session.titleSource && session.titleSource !== "manual") return;
+  const fallback = directoryTitle(session.canonicalProjectPath || session.projectPath);
+  const title = session.title.trim();
+  const generatedDirectoryLabel = title === "New session"
+    || title === `Continue · ${fallback}`
+    || title === `Codex · ${fallback}`;
+  const copiedDirectoryLabel = title.toLocaleLowerCase() === `${fallback}-copy`.toLocaleLowerCase();
+  const repeatedCopyLabel = /(?:-copy){2,}$/i.test(title);
+  if (!generatedDirectoryLabel && !copiedDirectoryLabel && !repeatedCopyLabel) return;
+  session.title = fallback;
+  session.titleSource = "directory";
 }
 
 function turnPermissionParams(

@@ -5,7 +5,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { LocalStore } from "../src/persistence/local-store";
 import { LunaAnalyzer } from "../src/runner/attention";
-import { RunnerManager } from "../src/runner/manager";
+import { repairAutomaticTitle, RunnerManager } from "../src/runner/manager";
 import type { AppServerTransport } from "../src/runner/protocol";
 
 class FakeServer extends EventEmitter implements AppServerTransport {
@@ -74,6 +74,37 @@ async function setup() {
 }
 
 describe("runner manager", () => {
+  it("uses directory titles immediately and repairs copied restore placeholders", async () => {
+    const { manager } = await setup();
+    const session = await manager.createSession({ projectPath: "/tmp" });
+    expect(session).toMatchObject({ title: "tmp", titleSource: "directory" });
+    repairAutomaticTitle(Object.assign(session, { title: "chromux-copy-copy", titleSource: undefined }));
+    expect(session).toMatchObject({ title: "tmp", titleSource: "directory" });
+    await manager.shutdown();
+  });
+
+  it("replaces an automatic directory title with a Luna work summary", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "chromux-next-title-"));
+    const server = new FakeServer();
+    const analyzer = {
+      analyze: async () => ({ schemaVersion: 1 as const, generatedAt: new Date().toISOString(), recommendations: [] }),
+      summarizeTitle: async () => "Repair startup titles"
+    };
+    const manager = new RunnerManager(server, new LocalStore(directory), analyzer as unknown as LunaAnalyzer);
+    await manager.initialize();
+    const session = await manager.createSession({ projectPath: "/tmp" });
+    await manager.startOrSteer({ sessionId: session.id, text: "Fix tab names after restart" });
+    server.emit("notification", {
+      method: "turn/completed",
+      params: { threadId: session.threadId, turn: { id: "turn-1", status: "completed" } }
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(manager.getState().sessions[0]).toMatchObject({
+      title: "Repair startup titles", titleSource: "generated"
+    });
+    await manager.shutdown();
+  });
+
   it("auto-groups canonical projects and routes active text through steering", async () => {
     const { manager, server } = await setup();
     const first = await manager.createSession({ projectPath: "/tmp", title: "First" });

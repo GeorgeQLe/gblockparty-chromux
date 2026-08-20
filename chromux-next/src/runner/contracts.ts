@@ -59,6 +59,7 @@ export const RunnerSessionV1Schema = z.object({
   schemaVersion: z.literal(1),
   id: Id,
   title: z.string().min(1).max(256),
+  titleSource: z.enum(["manual", "directory", "generated"]).optional(),
   projectPath: z.string().min(1).max(4096),
   canonicalProjectPath: z.string().min(1).max(4096),
   groupId: Id,

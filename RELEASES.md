@@ -1,5 +1,23 @@
 # Release Notes
 
+## GBlockParty Chromux Next v0.11.0 (prerelease)
+
+Tag: `chromux-next-v0.11.0`
+
+- Give automatic sessions a stable canonical directory title immediately,
+  before any Codex thread restoration or model-generated naming completes.
+- Repair generic and copy-suffixed restored placeholders to that directory
+  fallback, without changing explicit user-authored session titles.
+- Generate a compact 2–6 word tab title with a dedicated GPT-5.6 Luna
+  subprocess after useful session work exists. The bounded, ephemeral,
+  read-only pass never blocks restoration and silently retains the directory
+  title if Luna is unavailable.
+- Make blank titles opt into automatic naming in both New Session and DETECT,
+  persist title provenance, and cover directory fallback, restore repair,
+  generated summaries, output bounds, and existing manual-title behavior.
+- Preserve Chromux Next's app-server-owned restoration, successor-only state,
+  legacy Chromux, and the stable `/releases/latest` channel.
+
 ## GBlockParty Chromux Next v0.10.6 (prerelease)
 
 Tag: `chromux-next-v0.10.6`

@@ -81,7 +81,8 @@ const runnerSmokeOptions = (runnerSmokePhase || browserEvidenceSmokeUrl || (situ
 const runner = new RunnerManager(
   new CodexAppServer(runnerSmokeOptions),
   localStore,
-  new LunaAnalyzer(path.join(app.getPath("userData"), "attention-analyzer"), runnerSmokeOptions)
+  new LunaAnalyzer(path.join(app.getPath("userData"), "attention-analyzer"), runnerSmokeOptions),
+  new LunaAnalyzer(path.join(app.getPath("userData"), "session-title-analyzer"), runnerSmokeOptions)
 );
 const detector = new ExternalTerminalDetector((rows) => runner.enrichDetection(rows));
 const detectionLeases = new DetectionLeaseStore();
@@ -708,7 +709,7 @@ function registerIpc(): void {
       cwd: target.cwd,
       ...(value.mode === "continue" && target.threadId ? { threadId: target.threadId } : {}),
       mode: value.mode,
-      title: value.title,
+      ...(value.title ? { title: value.title } : {}),
       permissionPreset: value.permissionPreset,
       ...(value.model ? { model: value.model } : {}),
       ...(value.reasoningEffort ? { reasoningEffort: value.reasoningEffort } : {})
