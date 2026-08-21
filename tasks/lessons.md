@@ -1,5 +1,18 @@
 # Lessons
 
+## 2026-08-21 — Resolve the active Chromux product before editing
+
+- This repository contains both current Chromux Next in `chromux-next/` and
+  maintenance-only legacy Chromux in `prototype/`.
+- Default new product, integration, test, packaging, and release work to
+  `chromux-next/`. Touch `prototype/` only when the user explicitly requests
+  legacy maintenance.
+- Do not infer the implementation target from `/releases/latest`; that stable
+  channel remains legacy only until the documented successor cutover gates
+  pass.
+- Correction enforcement: root `AGENTS.md`, `CLAUDE.md`, and `README.md` now
+  state the target rule before any legacy release details or quickstart.
+
 ## 2026-08-19 — Renderer-local numeric state must honor downstream contracts
 
 - The `Continue · omega-war` black screen was non-destructive: copied history

@@ -2,12 +2,15 @@
 
 GBlockParty Chromux is an OSS Electron/Chromium desktop front-end for local and GBlockParty-managed agent/browser workspaces.
 
-The current app lives in [`prototype/`](prototype/). It runs parallel Claude Code / Codex / Grok Build terminal sessions, pairs each session with an embedded Chromium browser pane, detects local previews, and packages browser evidence into payloads that can be sent back to an agent.
+The current product is [Chromux Next](chromux-next/README.md), located in
+[`chromux-next/`](chromux-next/). All new product work targets Chromux Next by
+default. The app in [`prototype/`](prototype/) is legacy and maintenance-only;
+work there requires an explicit legacy request.
 
 ## Quickstart
 
 ```sh
-cd prototype
+cd chromux-next
 npm install
 npm start
 ```
@@ -20,7 +23,10 @@ is unsigned, so SmartScreen normally shows **Windows protected your PC**. Use
 **More info → Run anyway** only after verifying the installer came from the
 official GitHub Release; enterprise policy may prevent bypassing the warning.
 
-For the full prototype guide, see [`prototype/README.md`](prototype/README.md).
+For current setup, architecture, development, and release guidance, see the
+[Chromux Next guide](chromux-next/README.md). The
+[legacy prototype guide](prototype/README.md) is retained for maintenance and
+historical reference only.
 
 ## Architecture
 
@@ -33,6 +39,13 @@ for the shipped multiline composer contract and the ordered path toward structur
 agent interactions and a future Monaco editor adapter.
 
 ## Releases
+
+Chromux Next uses its independent `chromux-next-vX.Y.Z` prerelease line while
+the cutover gates remain open. See the Chromux Next guide for its current
+release and update workflow.
+
+The following stable channel belongs to legacy Chromux until those cutover
+gates pass; it is not the default development target.
 
 Chromux checks GitHub Releases at:
 

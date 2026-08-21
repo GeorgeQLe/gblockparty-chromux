@@ -1,5 +1,18 @@
 # Agent Instructions
 
+## Default Implementation Target
+
+- `chromux-next/` is the current product and the only default target for new
+  features, fixes, refactors, tests, documentation, packaging, and integration
+  work.
+- `prototype/` is the legacy Chromux app and is maintenance-only. Do not edit,
+  build, release, or resume deferred work there unless the user explicitly asks
+  for legacy Chromux maintenance.
+- Before changing application code, confirm the target path is under
+  `chromux-next/` and use that package's scripts and documentation. The legacy
+  stable release channel remaining at `/releases/latest` does not make
+  `prototype/` the active development target.
+
 ## Versioning And Releases
 
 - After every feature or refactor, bump the Chromux app SemVer before considering the work complete.

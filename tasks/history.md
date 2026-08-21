@@ -1,5 +1,24 @@
 # Session History
 
+## 2026-08-21 — Chromux Next default-target guidance
+
+- **User goal:** Direct agents and contributors to Chromux Next instead of the
+  legacy Chromux implementation.
+- **Changed files and purpose:** `AGENTS.md` and `CLAUDE.md` make
+  `chromux-next/` the only default implementation target and reserve
+  `prototype/` for explicitly requested legacy maintenance. `README.md` now
+  identifies Chromux Next as current, starts the quickstart there, and explains
+  that the legacy stable release channel does not determine development scope.
+  `tasks/lessons.md` records the repeatable target-selection rule.
+- **Verification:** Targeted searches found no root guidance that calls
+  `prototype/` the current app or enters it in the default quickstart;
+  `git diff --check` passed for the final documentation diff.
+- **Residual risk:** Nested historical documents still describe the legacy app
+  by design; root agent instructions prevent them from becoming the default
+  target. No executable product behavior changed.
+- **Rollback note:** Revert this documentation-only change. Existing Chromux
+  Next v0.12 work and all legacy source remain unaffected.
+
 ## 2026-08-19 — Chromux Next v0.10.6 blank-renderer recovery
 
 - **User goal:** Prevent fractional terminal viewports from crashing xterm,
