@@ -71,6 +71,7 @@ import type {
   AlignmentMutationBatchV1,
   AlignmentMutationOperation
 } from "./domain/schema";
+import { DEFAULT_UPDATE_STATE, type UpdateStateV1, type UpdateTargetState } from "./updates/contracts";
 import {
   createItem,
   humanReview,
@@ -588,6 +589,8 @@ type ShellProps = {
   reportError(reason: unknown): void;
   setSurface(surface: CenterSurface): void;
   openSettings(): void;
+  openUpdates(): void;
+  updates: UpdateStateV1;
   openNewSession(): void;
   openDetect(): void;
   openGroupDialog(group?: RunnerStateV1["groups"][number]): void;
@@ -602,11 +605,13 @@ const SURFACE_ITEMS = [
   { value: "browser", label: "Browser", icon: Globe2 }
 ] satisfies Array<{ value: CenterSurface; label: string; icon: typeof TerminalSquare }>;
 
-function Brand({ approach, surface, setSurface, openSettings, openNewSession, openDetect }: {
+function Brand({ approach, surface, setSurface, openSettings, openUpdates, updates, openNewSession, openDetect }: {
   approach: UiApproachV1;
   surface: CenterSurface;
   setSurface(value: CenterSurface): void;
   openSettings(): void;
+  openUpdates(): void;
+  updates: UpdateStateV1;
   openNewSession(): void;
   openDetect(): void;
 }) {
@@ -614,6 +619,7 @@ function Brand({ approach, surface, setSurface, openSettings, openNewSession, op
     <div className="brand"><img src="./mark.svg" alt="" /><div><span>{approach.replaceAll("-", " ")}</span><h1>Chromux Next</h1></div></div>
     <SurfaceTabs surface={surface} setSurface={setSurface} />
     <div className="brand-actions">
+      {([updates.app.phase, updates.codex.phase] as string[]).some((phase) => ["available", "staged", "blocked", "failed"].includes(phase)) && <button className="update-badge" aria-label="Open Updates settings" onClick={openUpdates}>Update</button>}
       <Button className="settings-button" icon={Settings} tone="quiet" aria-label="Open Settings" onClick={openSettings}>Settings</Button>
       <Button className="detect-button" icon={Search} tone="quiet" onClick={openDetect}>Detect</Button>
       <Button className="new-session" icon={Plus} tone="primary" onClick={openNewSession}>New Session</Button>
@@ -949,7 +955,7 @@ function SituationRoomShell(props: ShellProps) {
     <header className="situation-command-bar">
       <div className="situation-title"><img src="./mark.svg" alt="" /><div><span>Experimental command interface</span><h1>Situation Room</h1></div></div>
       <dl aria-label="Room status"><div><dt>Active</dt><dd>{counts.active}</dd></div><div><dt>Blocked</dt><dd>{counts.blocked}</dd></div><div><dt>Failed</dt><dd>{counts.failed}</dd></div><div className="pending"><dt>Decisions</dt><dd>{counts.pendingRequests}</dd></div></dl>
-      <div className="brand-actions"><Button icon={Settings} tone="quiet" onClick={props.openSettings}>Settings</Button><Button icon={Search} tone="quiet" onClick={props.openDetect}>Detect</Button><Button icon={Plus} tone="primary" onClick={props.openNewSession}>New Session</Button></div>
+      <div className="brand-actions">{([props.updates.app.phase, props.updates.codex.phase] as string[]).some((phase) => ["available", "staged", "blocked", "failed"].includes(phase)) && <button className="update-badge" onClick={props.openUpdates}>Update</button>}<Button icon={Settings} tone="quiet" onClick={props.openSettings}>Settings</Button><Button icon={Search} tone="quiet" onClick={props.openDetect}>Detect</Button><Button icon={Plus} tone="primary" onClick={props.openNewSession}>New Session</Button></div>
     </header>
     <aside className="situation-operations"><header><span>Operations</span><h2>Session theater</h2></header><SessionTree state={props.state} selectedSession={props.selectedSession} openGroupDialog={props.openGroupDialog} compact /></aside>
     <nav className="situation-surfaces"><SurfaceTabs surface={props.surface} setSurface={props.setSurface} /></nav>
@@ -997,7 +1003,28 @@ const APPROACHES: Array<{ id: UiApproachV1; title: string; description: string }
   { id: "spatial-canvas", title: "Spatial Canvas", description: "Project clusters, session nodes, and a docked runner." }
 ];
 
-type SettingsSection = "appearance" | "projects" | "defaults" | "groups" | "diagnostics";
+type SettingsSection = "appearance" | "projects" | "defaults" | "groups" | "updates" | "diagnostics";
+
+function UpdateCard({ title, target, state }: { title: string; target: "app" | "codex"; state: UpdateTargetState }) {
+  const busy = state.phase === "checking" || state.phase === "downloading" || state.phase === "installing";
+  return <article className="update-card" aria-busy={busy}>
+    <header><div><h4>{title}</h4><p>{state.currentVersion ? `Installed ${state.currentVersion}` : "Installed version unavailable"}{state.latestVersion ? ` · Latest ${state.latestVersion}` : ""}</p></div><Badge tone={state.phase === "failed" ? "danger" : state.phase === "available" || state.phase === "blocked" ? "warning" : state.phase === "current" ? "success" : "neutral"}>{state.phase}</Badge></header>
+    {state.progressLabel && <p role="status">{state.progressLabel}</p>}
+    {state.progressPercent !== undefined && <progress value={state.progressPercent} max={100} aria-label={`${title} update progress`} />}
+    {state.failureMessage && <p className="diagnostic-error">{state.failureMessage}</p>}
+    {state.blockers.length > 0 && <div className="update-blockers"><strong>Maintenance is blocked by:</strong><ul>{state.blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}</ul><p>Closing, idle, and failed sessions are safe because their threads and drafts are already persisted.</p></div>}
+    {state.installKind && <p>Install kind: {state.installKind}. {state.managedInstallSupported ? "This Codex build exposes a supported update capability." : "Use the release page and your install manager to update manually."}</p>}
+    {state.checkedAt && <small>Last checked {new Date(state.checkedAt).toLocaleString()}</small>}
+    <div className="button-row">
+      <Button icon={RefreshCw} tone="quiet" disabled={busy} onClick={() => void window.chromuxNext.updates.check(target)}>Check again</Button>
+      {state.releaseUrl && <Button icon={ExternalLink} tone="quiet" onClick={() => void window.chromuxNext.updates.openReleaseNotes(target)}>Release notes</Button>}
+      {target === "app" && state.phase === "available" && <Button tone="primary" onClick={() => void window.chromuxNext.updates.prepareApp()}>Prepare update</Button>}
+      {target === "app" && state.phase === "downloading" && <Button tone="quiet" onClick={() => void window.chromuxNext.updates.cancelApp()}>Cancel</Button>}
+      {target === "app" && state.staged && <Button tone="primary" disabled={state.blockers.length > 0} onClick={() => void window.chromuxNext.updates.installApp()}>Install and restart</Button>}
+      {target === "codex" && state.phase === "available" && state.managedInstallSupported && <Button tone="primary" disabled={state.blockers.length > 0} onClick={() => void window.chromuxNext.updates.installCodex()}>Update Codex</Button>}
+    </div>
+  </article>;
+}
 
 function GroupDialog({
   group,
@@ -1044,6 +1071,8 @@ function SettingsOverlay({
   chooseProject,
   removeProject,
   openGroupDialog,
+  updates,
+  initialSection,
   close
 }: {
   preferences: UiPreferencesV1;
@@ -1055,10 +1084,12 @@ function SettingsOverlay({
   chooseProject(): void;
   removeProject(projectId: string): void;
   openGroupDialog(group?: RunnerStateV1["groups"][number]): void;
+  updates: UpdateStateV1;
+  initialSection?: SettingsSection;
   close(): void;
 }) {
   const dialog = useRef<HTMLDivElement>(null);
-  const [section, setSection] = useState<SettingsSection>("projects");
+  const [section, setSection] = useState<SettingsSection>(initialSection ?? "projects");
   const [diagnostics, setDiagnostics] = useState<CompatibilityDiagnosticsV1>();
   const [diagnosticsError, setDiagnosticsError] = useState("");
   const refreshDiagnostics = () => {
@@ -1091,12 +1122,13 @@ function SettingsOverlay({
     ?? models.find((model) => model.recommended) ?? models[0];
   return <div className="modal-backdrop settings-backdrop" onMouseDown={close}><div ref={dialog} className="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title" onMouseDown={(event) => event.stopPropagation()}>
     <header><div><span>Successor-native preferences</span><h2 id="settings-title">Chromux Next Settings</h2></div><IconButton label="Close Settings" icon={X} onClick={close} /></header>
-    <nav className="settings-tabs" aria-label="Settings sections">{(["projects", "defaults", "groups", "appearance", "diagnostics"] as SettingsSection[]).map((item) => <button key={item} className={section === item ? "active" : ""} onClick={() => setSection(item)}>{item}</button>)}</nav>
+    <nav className="settings-tabs" aria-label="Settings sections">{(["projects", "defaults", "groups", "appearance", "updates", "diagnostics"] as SettingsSection[]).map((item) => <button key={item} className={section === item ? "active" : ""} onClick={() => setSection(item)}>{item}</button>)}</nav>
     <div className="settings-content">
       {section === "appearance" && <><div className="approach-grid" role="radiogroup" aria-label="Interface approach">{APPROACHES.map((approach) => <button role="radio" aria-checked={preferences.approach === approach.id} className={preferences.approach === approach.id ? "active" : ""} key={approach.id} onClick={() => update({ approach: approach.id })}><span className={`approach-preview preview-${approach.id}`}><i /><i /><i /></span><strong>{approach.title}</strong><small>{approach.description}</small></button>)}</div><section className="preference-controls"><fieldset><legend>Density</legend>{(["comfortable", "compact"] as const).map((density) => <label key={density}><input type="radio" name="density" checked={preferences.density === density} onChange={() => update({ density })} />{density}</label>)}</fieldset><fieldset><legend>Motion</legend>{(["system", "full", "reduced"] as const).map((motion) => <label key={motion}><input type="radio" name="motion" checked={preferences.motion === motion} onChange={() => update({ motion })} />{motion}</label>)}</fieldset></section></>}
       {section === "projects" && <section className="settings-section"><header><div><h3>Projects and worktrees</h3><p>Folders registered only in Chromux Next. A Git worktree is identified when its <code>.git</code> entry is a file.</p></div><button className="primary" onClick={chooseProject}>Add folder…</button></header><div className="managed-list">{workspace.projects.map((project) => <article key={project.id}><div><strong>{project.name}</strong><small>{project.kind} · {project.path}</small></div><label><input type="radio" name="default-project" checked={workspace.defaultProjectId === project.id} onChange={() => updateWorkspace({ defaultProjectId: project.id })} /> Default</label><button disabled={state.sessions.some((session) => session.status !== "closed" && session.canonicalProjectPath === project.path)} onClick={() => removeProject(project.id)}>Remove</button></article>)}{!workspace.projects.length && <p className="empty">No projects yet. Add a project or Git worktree to use it from the session picker.</p>}</div></section>}
       {section === "defaults" && <section className="settings-section defaults-grid"><h3>New session defaults</h3><label>Permissions<select value={workspace.defaultPermissionPreset} onChange={(event) => updateWorkspace({ defaultPermissionPreset: event.target.value as "workspace" | "read-only" })}><option value="workspace">Workspace</option><option value="read-only">Read only</option></select></label><label>Model<select value={workspace.defaultModel ?? selectedModel?.id ?? ""} onChange={(event) => { const next = models.find((item) => item.id === event.target.value); updateWorkspace({ defaultModel: event.target.value || null, defaultReasoningEffort: next?.defaultReasoningEffort ?? null }); }}><option value="">Recommended</option>{models.map((model) => <option key={model.id} value={model.id}>{model.displayName}</option>)}</select></label><label>Reasoning<select value={workspace.defaultReasoningEffort ?? selectedModel?.defaultReasoningEffort ?? ""} onChange={(event) => updateWorkspace({ defaultReasoningEffort: event.target.value || null })}><option value="">Model default</option>{selectedModel?.reasoningEfforts.map((effort) => <option key={effort}>{effort}</option>)}</select></label><p>These values seed new sessions and remain editable before creation.</p></section>}
       {section === "groups" && <section className="settings-section"><header><div><h3>Session groups</h3><p>Project groups are created automatically. Custom groups can organize sessions across projects.</p></div><Button icon={FolderPlus} tone="primary" onClick={() => openGroupDialog()}>New custom group</Button></header><div className="managed-list">{state.groups.map((group) => <article key={group.id}><div><strong>{group.title}</strong><small>{group.kind} · {group.sessionIds.length} session{group.sessionIds.length === 1 ? "" : "s"}</small></div><Button tone="quiet" disabled={group.kind !== "custom"} onClick={() => openGroupDialog(group)}>Rename</Button><Button tone="danger" disabled={group.kind !== "custom" || group.sessionIds.length > 0} onClick={() => void window.chromuxNext.runner.mutateGroup({ type: "delete", groupId: group.id })}>Delete</Button></article>)}{!state.groups.length && <EmptyState icon={FolderPlus} title="No groups yet" description="Groups appear when you create a session or add a custom group." />}</div></section>}
+      {section === "updates" && <section className="settings-section updates-section"><header><div><h3>Updates</h3><p>Checks never delay startup. Downloads and installation happen only after explicit confirmation.</p></div><button onClick={() => void window.chromuxNext.updates.check("all")}>Check all</button></header><UpdateCard title="Chromux Next" target="app" state={updates.app} /><UpdateCard title="Codex CLI" target="codex" state={updates.codex} /></section>}
       {section === "diagnostics" && <section className="settings-section diagnostics"><header><div><h3>Compatibility diagnostics</h3><p>Live checks from this successor process. Credential values are never displayed.</p></div><button onClick={refreshDiagnostics}>Refresh</button></header>{diagnosticsError && <p className="diagnostic-error">{diagnosticsError}</p>}{diagnostics && <><div className="diagnostic-summary"><span>Chromux Next {diagnostics.appVersion}</span><span>{diagnostics.platform}</span><span>successor-only state</span></div><div className="managed-list">{diagnostics.checks.map((check) => <article key={check.id}><i className={`diagnostic-${check.status}`} aria-label={check.status} /><div><strong>{check.label}</strong><small>{check.detail}</small></div></article>)}</div></>}</section>}
     </div>
     <footer><button onClick={() => { update({ approach: "control-room", density: "comfortable", motion: "system" }); updateWorkspace({ defaultProjectId: null, defaultPermissionPreset: "workspace", defaultModel: null, defaultReasoningEffort: null }); }}>Reset defaults</button><button className="primary" onClick={close}>Done</button></footer>
@@ -1348,10 +1380,12 @@ function App() {
   const [browserWorkspace, setBrowserWorkspace] = useState<BrowserWorkspaceV1>(
     structuredClone(DEFAULT_BROWSER_WORKSPACE)
   );
+  const [updates, setUpdates] = useState<UpdateStateV1>(structuredClone(DEFAULT_UPDATE_STATE));
   const [settingsReady, setSettingsReady] = useState(false);
   const [surface, setSurface] = useState<CenterSurface>("runner");
   const [error, setError] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<SettingsSection>("projects");
   const [newSessionOpen, setNewSessionOpen] = useState(false);
   const [detectOpen, setDetectOpen] = useState(false);
   const [groupDialog, setGroupDialog] = useState<{ open: boolean; group?: RunnerStateV1["groups"][number] }>({ open: false });
@@ -1377,19 +1411,22 @@ function App() {
       window.chromuxNext.settings.getUiPreferences(),
       window.chromuxNext.settings.getWorkspacePreferences(),
       window.chromuxNext.browser.state()
-    ]).then(([nextState, nextModels, nextPreferences, nextWorkspacePreferences, nextBrowserWorkspace]) => {
+      ,window.chromuxNext.updates.state()
+    ]).then(([nextState, nextModels, nextPreferences, nextWorkspacePreferences, nextBrowserWorkspace, nextUpdates]) => {
       setState(nextState);
       setModels(nextModels);
       setPreferences(nextPreferences);
       setWorkspacePreferences(nextWorkspacePreferences);
       setBrowserWorkspace(nextBrowserWorkspace);
+      setUpdates(nextUpdates);
       setSettingsReady(true);
     }).catch((reason) => setError(String(reason)));
     const offState = window.chromuxNext.runner.onState(setState);
     const offPreferences = window.chromuxNext.settings.onUiPreferencesChanged(setPreferences);
     const offWorkspacePreferences = window.chromuxNext.settings.onWorkspacePreferencesChanged(setWorkspacePreferences);
     const offBrowser = window.chromuxNext.browser.onState(setBrowserWorkspace);
-    return () => { offState(); offPreferences(); offWorkspacePreferences(); offBrowser(); };
+    const offUpdates = window.chromuxNext.updates.onState(setUpdates);
+    return () => { offState(); offPreferences(); offWorkspacePreferences(); offBrowser(); offUpdates(); };
   }, []);
   useEffect(() => window.chromuxNext.agents.onEvent((event) => {
     if (event.runId !== runIdRef.current) return;
@@ -1397,7 +1434,7 @@ function App() {
   }), []);
   useEffect(() => {
     const shortcut = (event: KeyboardEvent) => {
-      if (event.key === "," && (event.metaKey || event.ctrlKey)) { event.preventDefault(); setSettingsOpen(true); }
+      if (event.key === "," && (event.metaKey || event.ctrlKey)) { event.preventDefault(); setSettingsSection("projects"); setSettingsOpen(true); }
     };
     window.addEventListener("keydown", shortcut);
     return () => window.removeEventListener("keydown", shortcut);
@@ -1565,10 +1602,10 @@ function App() {
     setSettingsOpen(false);
     setGroupDialog({ open: true, ...(group ? { group } : {}) });
   };
-  const shellProps: ShellProps = { state, models, surface, selectedSession, error, alignment, browserWorkspace, browserEnabled: !settingsOpen && !newSessionOpen && !detectOpen && !groupDialog.open && workspacePreferences.onboardingComplete, updateBrowserWorkspace: setBrowserWorkspace, reportError: (reason) => setError(String(reason)), setSurface, openSettings: () => setSettingsOpen(true), openNewSession: () => setNewSessionOpen(true), openDetect: () => setDetectOpen(true), openGroupDialog, clearError: () => setError("") };
+  const shellProps: ShellProps = { state, models, surface, selectedSession, error, alignment, browserWorkspace, updates, browserEnabled: !settingsOpen && !newSessionOpen && !detectOpen && !groupDialog.open && workspacePreferences.onboardingComplete, updateBrowserWorkspace: setBrowserWorkspace, reportError: (reason) => setError(String(reason)), setSurface, openSettings: () => { setSettingsSection("projects"); setSettingsOpen(true); }, openUpdates: () => { setSettingsSection("updates"); setSettingsOpen(true); }, openNewSession: () => setNewSessionOpen(true), openDetect: () => setDetectOpen(true), openGroupDialog, clearError: () => setError("") };
   return <div className={`app-root density-${preferences.density} motion-${preferences.motion}`} data-approach={situationRoom ? "situation-room" : preferences.approach}>
     {situationRoom ? <SituationRoomShell {...shellProps} /> : <UnifiedApproachShell approach={preferences.approach} {...shellProps} />}
-    {settingsOpen && <SettingsOverlay preferences={preferences} workspace={workspacePreferences} models={models} state={state} update={updatePreferences} updateWorkspace={updateWorkspacePreferences} chooseProject={chooseProject} removeProject={removeProject} openGroupDialog={openGroupDialog} close={() => setSettingsOpen(false)} />}
+    {settingsOpen && <SettingsOverlay preferences={preferences} workspace={workspacePreferences} models={models} state={state} updates={updates} initialSection={settingsSection} update={updatePreferences} updateWorkspace={updateWorkspacePreferences} chooseProject={chooseProject} removeProject={removeProject} openGroupDialog={openGroupDialog} close={() => setSettingsOpen(false)} />}
     {newSessionOpen && <NewSessionDialog models={models} workspace={workspacePreferences} selectedSession={selectedSession} selectedGroupId={state.groups.find((group) => group.id === selectedSession?.groupId)?.kind === "custom" ? selectedSession?.groupId : undefined} chooseProject={chooseProject} close={() => setNewSessionOpen(false)} created={() => { setNewSessionOpen(false); setSurface("runner"); }} fail={(reason) => setError(String(reason))} />}
     {detectOpen && workspacePreferences.onboardingComplete && <DetectionDialog onboarding={false} workspace={workspacePreferences} models={models} state={state} chooseProject={chooseProject} close={() => setDetectOpen(false)} complete={() => { setDetectOpen(false); setSurface("runner"); }} fail={(reason) => setError(String(reason))} />}
     {groupDialog.open && <GroupDialog {...(groupDialog.group ? { group: groupDialog.group } : {})} close={() => setGroupDialog({ open: false })} />}

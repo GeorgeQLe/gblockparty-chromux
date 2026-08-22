@@ -1,6 +1,6 @@
 {
   "name": "chromux-next",
-  "version": "0.11.1",
+  "version": "0.12.0",
   "productName": "GBlockParty Chromux Next",
   "description": "A structured local-first human and agent alignment workspace.",
   "main": ".vite/build/main.js",
@@ -14,6 +14,7 @@
     "start:situation-room": "electron-forge start -- --situation-room",
     "package": "electron-forge package",
     "make": "electron-forge make",
+    "make:update": "npm run make && node scripts/build-update-artifacts.mjs",
     "icons": "node scripts/build-icons.mjs",
     "smoke:packaged": "node scripts/smoke-packaged.mjs",
     "smoke:runner-restoration": "node scripts/smoke-runner-restoration.mjs",

@@ -25,6 +25,10 @@ import {
   UiPreferencesV1Schema
   ,WorkspacePreferencesPatchV1Schema
   ,WorkspacePreferencesV1Schema
+  ,UpdateActionSchema
+  ,UpdateCheckActionSchema
+  ,UpdateReleaseNotesActionSchema
+  ,UpdateStateV1Schema
 } from "./ipc/contracts";
 import type { ChromuxNextApi } from "./ipc/bridge";
 import { parseMainToRendererEvent } from "./ipc/registry";
@@ -219,6 +223,20 @@ const api: ChromuxNextApi = {
     },
     async triage(input) {
       await ipcRenderer.invoke(IpcChannels.attentionTriage, TriageInputSchema.parse(input));
+    }
+  },
+  updates: {
+    async state() { return UpdateStateV1Schema.parse(await ipcRenderer.invoke(IpcChannels.updateState)); },
+    async check(target = "all") { return UpdateStateV1Schema.parse(await ipcRenderer.invoke(IpcChannels.updateCheck, UpdateCheckActionSchema.parse({ target }))); },
+    async prepareApp() { return UpdateStateV1Schema.parse(await ipcRenderer.invoke(IpcChannels.updatePrepareApp, UpdateActionSchema.parse({}))); },
+    async cancelApp() { return UpdateStateV1Schema.parse(await ipcRenderer.invoke(IpcChannels.updateCancelApp, UpdateActionSchema.parse({}))); },
+    async installApp() { return UpdateStateV1Schema.parse(await ipcRenderer.invoke(IpcChannels.updateInstallApp, UpdateActionSchema.parse({}))); },
+    async installCodex() { return UpdateStateV1Schema.parse(await ipcRenderer.invoke(IpcChannels.updateInstallCodex, UpdateActionSchema.parse({}))); },
+    async openReleaseNotes(target) { return Boolean(await ipcRenderer.invoke(IpcChannels.updateOpenReleaseNotes, UpdateReleaseNotesActionSchema.parse({ target }))); },
+    onState(listener) {
+      const handler = (_event: Electron.IpcRendererEvent, value: unknown) => listener(parseMainToRendererEvent(IpcChannels.updateStateChanged, value));
+      ipcRenderer.on(IpcChannels.updateStateChanged, handler);
+      return () => ipcRenderer.removeListener(IpcChannels.updateStateChanged, handler);
     }
   },
   settings: {

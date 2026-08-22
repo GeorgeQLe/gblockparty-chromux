@@ -24,6 +24,7 @@ import type {
   DetectionResultV1
 } from "../detection/contracts";
 import type { BrowserWorkspaceV1 } from "../browser/contracts";
+import type { UpdateStateV1 } from "../updates/contracts";
 
 export interface DocumentPayload {
   filePath: string;
@@ -100,6 +101,16 @@ export interface ChromuxNextApi {
       action: "snooze" | "dismiss";
       duration?: "15m" | "1h" | "4h" | "tomorrow";
     }): Promise<void>;
+  };
+  updates: {
+    state(): Promise<UpdateStateV1>;
+    check(target?: "all" | "app" | "codex"): Promise<UpdateStateV1>;
+    prepareApp(): Promise<UpdateStateV1>;
+    cancelApp(): Promise<UpdateStateV1>;
+    installApp(): Promise<UpdateStateV1>;
+    installCodex(): Promise<UpdateStateV1>;
+    openReleaseNotes(target: "app" | "codex"): Promise<boolean>;
+    onState(listener: (state: UpdateStateV1) => void): () => void;
   };
   settings: {
     getUiPreferences(): Promise<UiPreferencesV1>;

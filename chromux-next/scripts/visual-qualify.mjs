@@ -89,7 +89,7 @@ await writeFile(path.join(userData, "state-v1.json"), `${JSON.stringify({
     ],
     selectedGroupId: "group-project",
     selectedSessionId: "session-approval",
-    attention: { schemaVersion: 1, generatedAt: at, recommendations: [{ id: "attention-1", priority: "high", title: "Review visual captures", reason: "Twenty-eight packaged views are ready", suggestedAction: "Inspect contrast and clipping", evidence: "Packaged visual qualification", sourceIds: ["session-ready"], fingerprint: "visual-capture-review" }] },
+    attention: { schemaVersion: 1, generatedAt: at, recommendations: [{ id: "attention-1", priority: "high", title: "Review visual captures", reason: "Thirty packaged views are ready", suggestedAction: "Inspect contrast and clipping", evidence: "Packaged visual qualification", sourceIds: ["session-ready"], fingerprint: "visual-capture-review" }] },
     triage: []
   }
 }, null, 2)}\n`);
@@ -106,7 +106,7 @@ const exitCode = await new Promise((resolve, reject) => {
   child.once("exit", resolve);
 });
 clearTimeout(timeout);
-if (exitCode !== 0 || !output.includes("visual qualification captured 28 views")) {
+if (exitCode !== 0 || !output.includes("visual qualification captured 30 views")) {
   throw new Error(`Packaged visual qualification failed (${exitCode}): ${output.slice(-4_000)}`);
 }
 const scenarioPath = path.join(userData, "situation-room-scenario.json");

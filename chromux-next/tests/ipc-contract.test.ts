@@ -30,7 +30,8 @@ describe("preload/main IPC conformance", () => {
       IpcChannels.runnerStateChanged,
       IpcChannels.settingsUiPreferencesChanged,
       IpcChannels.settingsWorkspacePreferencesChanged,
-      IpcChannels.browserStateChanged
+      IpcChannels.browserStateChanged,
+      IpcChannels.updateStateChanged
     ]));
     expect(parseMainToRendererEvent(IpcChannels.runnerStateChanged, {
       schemaVersion: 1,
@@ -45,6 +46,11 @@ describe("preload/main IPC conformance", () => {
       approach: "injected-layout",
       density: "compact",
       motion: "system"
+    })).toThrow();
+    expect(() => parseMainToRendererEvent(IpcChannels.updateStateChanged, {
+      schemaVersion: 1,
+      app: { phase: "staged", staged: true, blockers: [], trust: "verified", managedInstallSupported: true, localPath: "/private/update.app" },
+      codex: { phase: "idle", staged: false, blockers: [], trust: "unknown", managedInstallSupported: false }
     })).toThrow();
   });
 });

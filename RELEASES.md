@@ -1,5 +1,23 @@
 # Release Notes
 
+## GBlockParty Chromux Next v0.12.0 (prerelease)
+
+Tag: `chromux-next-v0.12.0`
+
+- Add typed Chromux Next and Codex update state, independently recoverable
+  persistence, prerelease-only SemVer discovery with bounded Atom fallback,
+  successful-check caching, manual bypass, and sanitized failures.
+- Add explicit confirmations, runner-owned maintenance blockers, signed and
+  notarized macOS arm64 verification, private staging, rollback helper, and
+  manual-only guidance on unsupported or untrusted installations.
+- Port Codex checking to TypeScript with Homebrew/npm/standalone detection,
+  retries, runtime capability probing, verified version increase, failed-
+  runtime recovery, and Chromux-scoped prompt suppression.
+- Add strict action-only IPC, Updates Settings UI, quiet badge, trust/progress/
+  blocker states, artifact-manifest tooling, documentation, and UAT.
+- This is the one-time manual bootstrap from 0.11.1. Managed updates begin with
+  the subsequent release; legacy `/releases/latest` remains unchanged.
+
 ## GBlockParty Chromux Next v0.11.1 (prerelease)
 
 Tag: `chromux-next-v0.11.1`

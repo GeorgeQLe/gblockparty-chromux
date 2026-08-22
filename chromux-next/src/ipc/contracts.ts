@@ -39,6 +39,12 @@ import {
   EvidencePreviewSchema,
   EvidenceReviewInputSchema
 } from "../browser/contracts";
+import {
+  UpdateActionSchema,
+  UpdateCheckActionSchema,
+  UpdateReleaseNotesActionSchema,
+  UpdateStateV1Schema
+} from "../updates/contracts";
 
 export const IpcChannels = {
   documentOpen: "document:open",
@@ -85,6 +91,14 @@ export const IpcChannels = {
   ,settingsChooseProject: "settings:choose-project"
   ,settingsRemoveProject: "settings:remove-project"
   ,settingsCompatibilityDiagnostics: "settings:compatibility-diagnostics"
+  ,updateState: "update:state"
+  ,updateCheck: "update:check"
+  ,updatePrepareApp: "update:prepare-app"
+  ,updateCancelApp: "update:cancel-app"
+  ,updateInstallApp: "update:install-app"
+  ,updateInstallCodex: "update:install-codex"
+  ,updateOpenReleaseNotes: "update:open-release-notes"
+  ,updateStateChanged: "update:state-changed"
 } as const;
 
 export const DocumentPayloadSchema = z.object({
@@ -141,4 +155,8 @@ export {
   ,EvidenceIdInputSchema
   ,EvidencePreviewSchema
   ,EvidenceReviewInputSchema
+  ,UpdateActionSchema
+  ,UpdateCheckActionSchema
+  ,UpdateReleaseNotesActionSchema
+  ,UpdateStateV1Schema
 };

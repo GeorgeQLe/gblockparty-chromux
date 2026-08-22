@@ -6,6 +6,7 @@ import {
   RunnerStateV1Schema,
   UiPreferencesV1Schema,
   WorkspacePreferencesV1Schema
+  ,UpdateStateV1Schema
 } from "./contracts";
 
 export const PreloadInvokeChannels = [
@@ -48,6 +49,13 @@ export const PreloadInvokeChannels = [
   IpcChannels.settingsChooseProject,
   IpcChannels.settingsRemoveProject,
   IpcChannels.settingsCompatibilityDiagnostics
+  ,IpcChannels.updateState
+  ,IpcChannels.updateCheck
+  ,IpcChannels.updatePrepareApp
+  ,IpcChannels.updateCancelApp
+  ,IpcChannels.updateInstallApp
+  ,IpcChannels.updateInstallCodex
+  ,IpcChannels.updateOpenReleaseNotes
 ] as const;
 
 export const MainToRendererChannels = [
@@ -56,6 +64,7 @@ export const MainToRendererChannels = [
   IpcChannels.settingsUiPreferencesChanged,
   IpcChannels.settingsWorkspacePreferencesChanged,
   IpcChannels.browserStateChanged
+  ,IpcChannels.updateStateChanged
 ] as const;
 
 const MainToRendererSchemas = {
@@ -64,6 +73,7 @@ const MainToRendererSchemas = {
   [IpcChannels.settingsUiPreferencesChanged]: UiPreferencesV1Schema,
   [IpcChannels.settingsWorkspacePreferencesChanged]: WorkspacePreferencesV1Schema,
   [IpcChannels.browserStateChanged]: BrowserWorkspaceV1Schema
+  ,[IpcChannels.updateStateChanged]: UpdateStateV1Schema
 } as const;
 
 export function parseMainToRendererEvent<C extends typeof MainToRendererChannels[number]>(

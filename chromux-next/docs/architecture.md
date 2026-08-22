@@ -257,3 +257,23 @@ workflow rechecks Approved status immediately before calling the runner and
 marks Delivered only after `turn/start` or `turn/steer` succeeds. A runner
 failure leaves the evidence Approved for retry. Rejected and delivered records
 remain inspectable, and delivered evidence cannot be reviewed or sent again.
+
+## Update ownership and maintenance
+
+`UpdateService` owns Chromux Next discovery, staging, trust verification, and
+sanitized renderer state. `CodexUpdateService` owns executable discovery,
+install-kind release validation, capability probing, and version verification.
+Renderer IPC carries actions only; release/asset URLs, commands, and staging
+paths remain main-owned, and every returned or pushed state is validated.
+
+`update-state-v1.json` is independently recoverable and contains bounded public
+status, never paths or subprocess output. A restart invalidates staged
+authority. Successful app checks cache for 24 hours. Discovery compares all
+matching prereleases with SemVer and uses the bounded public Atom feed only
+when the API fails.
+
+The runner is the maintenance gate. Starting/active sessions, active turns,
+and unanswered interactions block replacement. Installation persists state
+and stops the app-server. Codex failures restart the prior runtime; app
+replacement uses a detached helper with an adjacent backup, startup marker,
+and rollback. Clearing blockers never authorizes installation.
