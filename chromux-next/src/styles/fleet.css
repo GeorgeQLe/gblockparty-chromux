@@ -1,0 +1,35 @@
+.fleet-dialog { width: min(780px, calc(100vw - 32px)); }
+.fleet-summary, .fleet-row, .fleet-row-main, .fleet-row-meta, .remote-terminal-state { display: flex; align-items: center; gap: 10px; }
+.fleet-summary { color: var(--graphite-400); margin-bottom: 14px; }
+.fleet-summary small { margin-left: auto; }
+.fleet-error, .remote-terminal-error { color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent); border-radius: 8px; padding: 10px 12px; }
+.fleet-list { display: grid; gap: 8px; max-height: min(58vh, 560px); overflow: auto; }
+.fleet-row { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(180px, .7fr) auto; border: 1px solid var(--graphite-700); border-radius: 10px; padding: 12px; background: var(--graphite-850); }
+.fleet-row-main div, .fleet-row-meta { min-width: 0; }
+.fleet-row strong, .fleet-row p, .fleet-row-meta span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fleet-row p { color: var(--graphite-400); margin: 3px 0 0; font-size: 12px; }
+.fleet-row-meta { justify-content: space-between; color: var(--graphite-400); font-size: 12px; }
+.fleet-status { width: 8px; height: 8px; border-radius: 999px; background: var(--graphite-400); flex: 0 0 auto; }
+.fleet-status.online, .fleet-status.connected { background: var(--success); box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 15%, transparent); }
+.fleet-status.degraded, .fleet-status.connecting, .fleet-status.reconnecting { background: var(--warning); }
+.fleet-status.offline, .fleet-status.error, .fleet-status.exited { background: var(--danger); }
+.remote-tab-dock { position: fixed; inset: 0; z-index: 45; pointer-events: none; }
+.remote-tab-dock > nav { pointer-events: auto; position: absolute; top: 8px; left: 50%; transform: translateX(-50%); max-width: calc(100vw - 24px); display: flex; gap: 3px; padding: 4px; overflow-x: auto; border: 1px solid var(--graphite-700); border-radius: 10px; background: color-mix(in srgb, var(--graphite-900) 94%, transparent); box-shadow: var(--shadow-2); }
+.remote-tab-dock > nav > button, .remote-tab > button { border: 0; border-radius: 7px; background: transparent; color: var(--graphite-400); padding: 7px 10px; white-space: nowrap; }
+.remote-tab-dock > nav button.active { background: var(--graphite-850); color: var(--graphite-100); }
+.remote-tab { display: flex; align-items: center; }
+.remote-tab > button:first-child { display: flex; align-items: center; gap: 7px; }
+.remote-tab .ui-icon-button { width: 28px; height: 28px; }
+.remote-terminal-workspace { display: none; pointer-events: auto; position: absolute; inset: 0; padding-top: 54px; background: var(--graphite-950); grid-template-rows: auto auto minmax(0, 1fr); }
+.remote-terminal-workspace.active { display: grid; }
+.remote-terminal-workspace > header { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 12px 18px; border-bottom: 1px solid var(--graphite-700); }
+.remote-terminal-workspace > header span, .remote-terminal-state { color: var(--graphite-400); font-size: 12px; }
+.remote-terminal-workspace h2 { margin: 2px 0 0; font-size: 16px; }
+.remote-terminal-error { margin: 10px 18px 0; display: flex; align-items: center; gap: 8px; }
+.remote-terminal-host { min-height: 0; padding: 12px 14px; background: #0d0f10; overflow: hidden; }
+.remote-terminal-host .xterm { height: 100%; }
+@media (max-width: 680px) {
+  .fleet-row { grid-template-columns: 1fr auto; }
+  .fleet-row-meta { grid-column: 1 / -1; grid-row: 2; }
+  .remote-terminal-workspace > header { align-items: flex-start; flex-direction: column; }
+}

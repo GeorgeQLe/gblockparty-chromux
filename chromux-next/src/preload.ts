@@ -25,6 +25,17 @@ import {
   UiPreferencesV1Schema
   ,WorkspacePreferencesPatchV1Schema
   ,WorkspacePreferencesV1Schema
+  ,UpdateActionSchema
+  ,UpdateCheckActionSchema
+  ,UpdateReleaseNotesActionSchema
+  ,UpdateStateV1Schema
+  ,attachmentEventSchema
+  ,attachmentInputSchema
+  ,attachmentResizeSchema
+  ,fleetAttachInputSchema
+  ,fleetStateSchema
+  ,remoteTabSchema
+  ,surfaceIdInputSchema
 } from "./ipc/contracts";
 import type { ChromuxNextApi } from "./ipc/bridge";
 import { parseMainToRendererEvent } from "./ipc/registry";
@@ -219,6 +230,41 @@ const api: ChromuxNextApi = {
     },
     async triage(input) {
       await ipcRenderer.invoke(IpcChannels.attentionTriage, TriageInputSchema.parse(input));
+    }
+  },
+  updates: {
+    async state() { return UpdateStateV1Schema.parse(await ipcRenderer.invoke(IpcChannels.updateState)); },
+    async check(target = "all") { return UpdateStateV1Schema.parse(await ipcRenderer.invoke(IpcChannels.updateCheck, UpdateCheckActionSchema.parse({ target }))); },
+    async prepareApp() { return UpdateStateV1Schema.parse(await ipcRenderer.invoke(IpcChannels.updatePrepareApp, UpdateActionSchema.parse({}))); },
+    async cancelApp() { return UpdateStateV1Schema.parse(await ipcRenderer.invoke(IpcChannels.updateCancelApp, UpdateActionSchema.parse({}))); },
+    async installApp() { return UpdateStateV1Schema.parse(await ipcRenderer.invoke(IpcChannels.updateInstallApp, UpdateActionSchema.parse({}))); },
+    async installCodex() { return UpdateStateV1Schema.parse(await ipcRenderer.invoke(IpcChannels.updateInstallCodex, UpdateActionSchema.parse({}))); },
+    async openReleaseNotes(target) { return Boolean(await ipcRenderer.invoke(IpcChannels.updateOpenReleaseNotes, UpdateReleaseNotesActionSchema.parse({ target }))); },
+    onState(listener) {
+      const handler = (_event: Electron.IpcRendererEvent, value: unknown) => listener(parseMainToRendererEvent(IpcChannels.updateStateChanged, value));
+      ipcRenderer.on(IpcChannels.updateStateChanged, handler);
+      return () => ipcRenderer.removeListener(IpcChannels.updateStateChanged, handler);
+    }
+  },
+  fleet: {
+    async state() { return fleetStateSchema.parse(await ipcRenderer.invoke(IpcChannels.fleetState)); },
+    async refresh() { return fleetStateSchema.parse(await ipcRenderer.invoke(IpcChannels.fleetRefresh)); },
+    async attach(surfaceId, title) {
+      const input = fleetAttachInputSchema.parse({ surfaceId, title });
+      return remoteTabSchema.parse(await ipcRenderer.invoke(IpcChannels.fleetAttach, input));
+    },
+    async detach(surfaceId) { await ipcRenderer.invoke(IpcChannels.fleetDetach, surfaceIdInputSchema.parse({ surfaceId })); },
+    async input(surfaceId, data) { await ipcRenderer.invoke(IpcChannels.fleetInput, attachmentInputSchema.parse({ surfaceId, data })); },
+    async resize(surfaceId, cols, rows) { await ipcRenderer.invoke(IpcChannels.fleetResize, attachmentResizeSchema.parse({ surfaceId, cols, rows })); },
+    onState(listener) {
+      const handler = (_event: Electron.IpcRendererEvent, value: unknown) => listener(parseMainToRendererEvent(IpcChannels.fleetStateChanged, value));
+      ipcRenderer.on(IpcChannels.fleetStateChanged, handler);
+      return () => ipcRenderer.removeListener(IpcChannels.fleetStateChanged, handler);
+    },
+    onAttachment(listener) {
+      const handler = (_event: Electron.IpcRendererEvent, value: unknown) => listener(attachmentEventSchema.parse(value));
+      ipcRenderer.on(IpcChannels.fleetAttachmentEvent, handler);
+      return () => ipcRenderer.removeListener(IpcChannels.fleetAttachmentEvent, handler);
     }
   },
   settings: {

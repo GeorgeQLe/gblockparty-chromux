@@ -24,6 +24,8 @@ import type {
   DetectionResultV1
 } from "../detection/contracts";
 import type { BrowserWorkspaceV1 } from "../browser/contracts";
+import type { UpdateStateV1 } from "../updates/contracts";
+import type { AttachmentEvent, FleetState, RemoteTab } from "../control-plane/contracts";
 
 export interface DocumentPayload {
   filePath: string;
@@ -100,6 +102,26 @@ export interface ChromuxNextApi {
       action: "snooze" | "dismiss";
       duration?: "15m" | "1h" | "4h" | "tomorrow";
     }): Promise<void>;
+  };
+  updates: {
+    state(): Promise<UpdateStateV1>;
+    check(target?: "all" | "app" | "codex"): Promise<UpdateStateV1>;
+    prepareApp(): Promise<UpdateStateV1>;
+    cancelApp(): Promise<UpdateStateV1>;
+    installApp(): Promise<UpdateStateV1>;
+    installCodex(): Promise<UpdateStateV1>;
+    openReleaseNotes(target: "app" | "codex"): Promise<boolean>;
+    onState(listener: (state: UpdateStateV1) => void): () => void;
+  };
+  fleet: {
+    state(): Promise<FleetState>;
+    refresh(): Promise<FleetState>;
+    attach(surfaceId: string, title: string): Promise<RemoteTab>;
+    detach(surfaceId: string): Promise<void>;
+    input(surfaceId: string, data: string): Promise<void>;
+    resize(surfaceId: string, cols: number, rows: number): Promise<void>;
+    onState(listener: (state: FleetState) => void): () => void;
+    onAttachment(listener: (event: AttachmentEvent) => void): () => void;
   };
   settings: {
     getUiPreferences(): Promise<UiPreferencesV1>;

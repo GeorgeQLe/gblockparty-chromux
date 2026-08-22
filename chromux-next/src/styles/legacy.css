@@ -189,6 +189,14 @@ i.failed { background: var(--danger); }
 .settings-section > header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); }
 .settings-section h3 { margin-top: 0; }
 .settings-section p { color: var(--graphite-400); }
+.update-badge { border-color: #c6a15b88; background: #c6a15b22; color: #f1cf86; }
+.updates-section { display: grid; gap: var(--space-4); }
+.update-card { display: grid; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--graphite-800); border-radius: var(--radius-2); background: var(--graphite-900); }
+.update-card > header { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-3); }
+.update-card h4, .update-card p { margin: 0; }
+.update-card progress { width: 100%; accent-color: var(--sage-400); }
+.update-blockers { padding: var(--space-3); border: 1px solid #c6a15b55; background: #c6a15b12; }
+.update-blockers ul { margin: var(--space-2) 0; padding-left: var(--space-5); }
 .managed-list { display: grid; gap: var(--space-2); }
 .managed-list article { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3); border-radius: var(--radius-sm); background: var(--graphite-850); }
 .managed-list article > div { display: grid; min-width: 0; margin-right: auto; }

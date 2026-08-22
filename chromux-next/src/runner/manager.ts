@@ -50,6 +50,7 @@ export class RunnerManager extends EventEmitter {
   private lastSnapshotHash = "";
   private timer: NodeJS.Timeout | undefined;
   private titleQueue: Promise<void> = Promise.resolve();
+  private maintenance = false;
 
   constructor(
     private readonly server: AppServerTransport,
@@ -82,6 +83,35 @@ export class RunnerManager extends EventEmitter {
 
   getState(): RunnerStateV1 { return structuredClone(this.state); }
   getModels(): ModelOptionV1[] { return structuredClone(this.models); }
+
+  getMaintenanceBlockers(): string[] { return maintenanceBlockers(this.state); }
+
+  async beginMaintenance(): Promise<void> {
+    const blockers = this.getMaintenanceBlockers();
+    if (blockers.length) throw new Error("Workspace is not safe for maintenance");
+    if (this.maintenance) throw new Error("Workspace maintenance is already running");
+    this.maintenance = true;
+    if (this.timer) { clearInterval(this.timer); this.timer = undefined; }
+    try {
+      await this.persist();
+      await this.server.stop();
+    } catch (error) {
+      await this.server.start().catch(() => undefined);
+      this.timer = setInterval(() => void this.tick(), 10_000);
+      this.maintenance = false;
+      throw error;
+    }
+  }
+
+  async resumeAfterMaintenance(): Promise<void> {
+    await this.server.start();
+    this.models = await this.discoverModels();
+    await this.restoreSessions("Could not resume thread after maintenance");
+    await this.persist();
+    this.emitState();
+    this.timer = setInterval(() => void this.tick(), 10_000);
+    this.maintenance = false;
+  }
 
   async enrichDetection(rows: DetectionCandidate[]): Promise<EnrichedDetectionCandidate[]> {
     let threads: any[] = [];
@@ -145,6 +175,7 @@ export class RunnerManager extends EventEmitter {
     model?: string;
     reasoningEffort?: string;
   }): Promise<{ session: RunnerSessionV1; workspacePreferences?: Awaited<ReturnType<LocalStore["getWorkspacePreferences"]>> }> {
+    this.assertNotInMaintenance();
     const canonicalProjectPath = await canonicalize(input.cwd);
     if (canonicalProjectPath !== input.cwd) throw new Error("Detected directory changed. Rescan to continue.");
     if (input.mode === "continue" && !input.threadId) throw new Error("No exact-directory Codex thread is available to continue.");
@@ -294,6 +325,7 @@ export class RunnerManager extends EventEmitter {
   }
 
   async createSession(input: unknown): Promise<RunnerSessionV1> {
+    this.assertNotInMaintenance();
     const value = CreateSessionInputSchema.parse(input);
     const canonicalProjectPath = await canonicalize(value.projectPath);
     let group = value.groupId ? this.group(value.groupId) : this.state.groups.find(
@@ -376,6 +408,7 @@ export class RunnerManager extends EventEmitter {
   }
 
   async startOrSteer(input: unknown): Promise<void> {
+    this.assertNotInMaintenance();
     const value = TurnInputSchema.parse(input);
     const session = this.session(value.sessionId);
     if (!session.threadId) throw new Error("Session has no Codex thread");
@@ -415,6 +448,7 @@ export class RunnerManager extends EventEmitter {
   }
 
   async respond(input: unknown): Promise<void> {
+    this.assertNotInMaintenance();
     const value = ApprovalResponseInputSchema.parse(input);
     const session = this.session(value.sessionId);
     const interaction = session.interactions.find((item) => item.id === value.interactionId);
@@ -806,12 +840,26 @@ export class RunnerManager extends EventEmitter {
     await this.persist();
     await this.server.stop();
   }
+
+  private assertNotInMaintenance(): void {
+    if (this.maintenance) throw new Error("Workspace maintenance is in progress");
+  }
 }
 
 export function permissionParams(preset: RunnerSessionV1["permissionPreset"]): Record<string, unknown> {
   return preset === "read-only"
     ? { sandbox: "read-only", approvalPolicy: "never" }
     : { sandbox: "workspace-write", approvalPolicy: "on-request" };
+}
+
+export function maintenanceBlockers(state: RunnerStateV1): string[] {
+  return state.sessions.flatMap((session) => {
+    if (session.status === "closed" || session.status === "idle" || session.status === "failed") return [];
+    const reason = session.status === "starting" ? "is starting" : session.activeTurnId ? "has an active turn" : "is active";
+    return [`${session.title} ${reason}`];
+  }).concat(state.sessions.flatMap((session) => session.interactions.length
+    ? [`${session.title} has ${session.interactions.length} unanswered interaction${session.interactions.length === 1 ? "" : "s"}`]
+    : []));
 }
 
 export function directoryTitle(projectPath: string): string {

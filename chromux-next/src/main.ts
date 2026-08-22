@@ -5,8 +5,10 @@ import {
   app,
   BrowserWindow,
   dialog,
-  ipcMain
+  ipcMain,
+  shell
 } from "electron";
+import type { MessageBoxOptions } from "electron";
 import started from "electron-squirrel-startup";
 import {
   AgentRunRequestSchema,
@@ -32,6 +34,13 @@ import {
   ,DetectionLeaseIdInputSchema
   ,UiPreferencesPatchV1Schema
   ,WorkspacePreferencesPatchV1Schema
+  ,UpdateActionSchema
+  ,UpdateCheckActionSchema
+  ,UpdateReleaseNotesActionSchema
+  ,attachmentInputSchema
+  ,attachmentResizeSchema
+  ,fleetAttachInputSchema
+  ,surfaceIdInputSchema
 } from "./ipc/contracts";
 import { DocumentStore } from "./persistence/document-store";
 import { CodexProvider } from "./providers/codex-provider";
@@ -47,6 +56,9 @@ import type { EnrichedDetectionCandidate } from "./detection/contracts";
 import { BrowserViewService } from "./main/browser-view-service";
 import { IpcHandlerRegistry } from "./ipc/registry";
 import { BrowserEvidenceWorkflow } from "./browser/workflow";
+import { UpdateService } from "./main/update-service";
+import { CodexUpdateService } from "./main/codex-update-service";
+import { ControlPlaneClient } from "./control-plane/client";
 
 if (started) app.quit();
 
@@ -57,6 +69,12 @@ app.setPath("userData", process.env.CHROMUX_NEXT_SMOKE_USER_DATA
 
 const documents = new DocumentStore();
 const localStore = new LocalStore(app.getPath("userData"));
+const fleet = new ControlPlaneClient({
+  baseUrl: process.env.CHROMUX_NEXT_CONTROL_PLANE_URL ?? "http://127.0.0.1:4400",
+  enabled: process.env.CHROMUX_NEXT_GBP_FLEET === "1",
+  ...(process.env.CHROMUX_NEXT_CONTROL_PLANE_COOKIE ? { cookie: process.env.CHROMUX_NEXT_CONTROL_PLANE_COOKIE } : {}),
+  ...(process.env.CHROMUX_NEXT_CONTROL_PLANE_TOKEN ? { bearerToken: process.env.CHROMUX_NEXT_CONTROL_PLANE_TOKEN } : {})
+});
 const runnerSmokeArgument = process.argv.find((argument) => argument.startsWith("--runner-restoration-smoke="));
 const runnerSmokePhase = runnerSmokeArgument?.slice("--runner-restoration-smoke=".length);
 const browserEvidenceSmokeArgument = process.argv.find((argument) => argument.startsWith("--browser-evidence-smoke="));
@@ -84,6 +102,14 @@ const runner = new RunnerManager(
   new LunaAnalyzer(path.join(app.getPath("userData"), "attention-analyzer"), runnerSmokeOptions),
   new LunaAnalyzer(path.join(app.getPath("userData"), "session-title-analyzer"), runnerSmokeOptions)
 );
+const updates = new UpdateService(localStore, runner, {
+  currentVersion: app.getVersion(), userDataPath: app.getPath("userData"),
+  isPackaged: app.isPackaged, executablePath: process.execPath
+});
+const codexUpdates = new CodexUpdateService(runner, (state) => updates.setCodexState(state));
+const updateHelperPath = app.isPackaged
+  ? path.join(process.resourcesPath, "update-helper.cjs")
+  : path.join(app.getAppPath(), "scripts", "update-helper.cjs");
 const detector = new ExternalTerminalDetector((rows) => runner.enrichDetection(rows));
 const detectionLeases = new DetectionLeaseStore();
 const running = new Map<string, AbortController>();
@@ -493,6 +519,14 @@ function createWindow(): void {
           })()`);
           await capture(`settings-${section}-standard`);
         }
+        await visualWindow.webContents.executeJavaScript(`(() => {
+          const button = [...document.querySelectorAll('.settings-tabs button')]
+            .find((item) => item.textContent === 'updates');
+          if (!button) throw new Error("Updates settings tab was not found");
+          button.click();
+        })()`);
+        await capture("settings-updates-standard");
+        await capture("settings-updates-narrow", 820, 720);
         const diagnosticsDeadline = Date.now() + 3_000;
         while (Date.now() < diagnosticsDeadline) {
           const diagnostics = runner.getCompatibilityDiagnostics(app.getVersion(), `${process.platform} ${process.arch}`);
@@ -555,7 +589,7 @@ function createWindow(): void {
             await capture(`${approach}-${size.name}`, size.width, size.height);
           }
         }
-        if (captureCount !== 28) throw new Error(`Expected 28 visual captures, received ${captureCount}`);
+        if (captureCount !== 30) throw new Error(`Expected 30 visual captures, received ${captureCount}`);
         console.log(`Chromux Next visual qualification captured ${captureCount} views`);
       } catch (error) {
         process.exitCode = 1;
@@ -810,11 +844,95 @@ function registerIpc(): void {
   });
   registry.handle(IpcChannels.settingsCompatibilityDiagnostics, () =>
     runner.getCompatibilityDiagnostics(app.getVersion(), `${process.platform} ${process.arch}`));
+  registry.handle(IpcChannels.updateState, () => updates.getState());
+  registry.handle(IpcChannels.updateCheck, async (_event, input: unknown) => {
+    const { target } = UpdateCheckActionSchema.parse(input);
+    if (target === "all" || target === "app") await updates.checkApp(true);
+    if (target === "all" || target === "codex") await codexUpdates.check();
+    return updates.getState();
+  });
+  registry.handle(IpcChannels.updatePrepareApp, async (_event, input: unknown) => {
+    UpdateActionSchema.parse(input);
+    const state = updates.getState();
+    const messageOptions = {
+      type: "question", buttons: ["Download and verify", "Cancel"], defaultId: 1, cancelId: 1,
+      title: "Prepare Chromux Next update?", message: `Download Chromux Next ${state.app.latestVersion ?? "update"}?`,
+      detail: "The package will be downloaded into Chromux Next user data and independently checked for size, checksum, bundle identity, Developer ID signature, Team ID, architecture, and Gatekeeper acceptance. It will not be installed automatically."
+    } satisfies MessageBoxOptions;
+    const confirmation = mainWindow ? await dialog.showMessageBox(mainWindow, messageOptions) : await dialog.showMessageBox(messageOptions);
+    return confirmation.response === 0 ? updates.prepare() : updates.getState();
+  });
+  registry.handle(IpcChannels.updateCancelApp, (_event, input: unknown) => {
+    UpdateActionSchema.parse(input); return updates.cancel();
+  });
+  registry.handle(IpcChannels.updateInstallApp, async (_event, input: unknown) => {
+    UpdateActionSchema.parse(input);
+    const state = updates.getState();
+    const messageOptions = {
+      type: "warning", buttons: ["Install and restart", "Cancel"], defaultId: 1, cancelId: 1,
+      title: "Install verified Chromux Next update?",
+      message: `Install Chromux Next ${state.app.latestVersion ?? "update"} now?`,
+      detail: "Chromux Next will persist idle sessions and drafts, stop its Codex app-server, replace this signed app bundle, then relaunch. Active turns and unanswered interactions block installation."
+    } satisfies MessageBoxOptions;
+    const confirmation = mainWindow ? await dialog.showMessageBox(mainWindow, messageOptions) : await dialog.showMessageBox(messageOptions);
+    if (confirmation.response !== 0) return updates.getState();
+    const result = await updates.confirmInstall(updateHelperPath);
+    if (result.launched) setImmediate(() => app.quit());
+    return updates.getState();
+  });
+  registry.handle(IpcChannels.updateInstallCodex, async (_event, input: unknown) => {
+    UpdateActionSchema.parse(input);
+    const state = updates.getState();
+    const messageOptions = {
+      type: "warning", buttons: ["Update Codex", "Cancel"], defaultId: 1, cancelId: 1,
+      title: "Update Codex CLI?", message: `Update Codex to ${state.codex.latestVersion ?? "the available version"}?`,
+      detail: "Chromux Next will persist idle sessions and drafts, stop its app-server, run the Codex updater, verify the new version, and restore sessions."
+    } satisfies MessageBoxOptions;
+    const confirmation = mainWindow ? await dialog.showMessageBox(mainWindow, messageOptions) : await dialog.showMessageBox(messageOptions);
+    if (confirmation.response === 0) await codexUpdates.install();
+    return updates.getState();
+  });
+  registry.handle(IpcChannels.updateOpenReleaseNotes, async (_event, input: unknown) => {
+    const { target } = UpdateReleaseNotesActionSchema.parse(input);
+    const url = updates.getState()[target].releaseUrl;
+    if (!url) return false;
+    const parsed = new URL(url);
+    const allowed = target === "app"
+      ? parsed.origin === "https://github.com" && /^\/GeorgeQLe\/gblockparty-chromux\/releases\/tag\/chromux-next-v\d+\.\d+\.\d+$/.test(parsed.pathname)
+      : parsed.origin === "https://github.com" && /^\/openai\/codex\/releases\/(?:latest|tag\/rust-v\d+\.\d+\.\d+)$/.test(parsed.pathname);
+    if (!allowed || parsed.search || parsed.hash) return false;
+    await shell.openExternal(url); return true;
+  });
+  registry.handle(IpcChannels.fleetState, () => fleet.state());
+  registry.handle(IpcChannels.fleetRefresh, () => fleet.refresh());
+  registry.handle(IpcChannels.fleetAttach, (_event, input: unknown) => {
+    const value = fleetAttachInputSchema.parse(input);
+    return fleet.attach(value.surfaceId, value.title);
+  });
+  registry.handle(IpcChannels.fleetDetach, (_event, input: unknown) => {
+    const value = surfaceIdInputSchema.parse(input); fleet.detach(value.surfaceId);
+  });
+  registry.handle(IpcChannels.fleetInput, (_event, input: unknown) => {
+    const value = attachmentInputSchema.parse(input); fleet.input(value.surfaceId, value.data);
+  });
+  registry.handle(IpcChannels.fleetResize, (_event, input: unknown) => {
+    const value = attachmentResizeSchema.parse(input); fleet.resize(value.surfaceId, value.cols, value.rows);
+  });
   registry.assertComplete();
   runner.on("state", (state) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send(IpcChannels.runnerStateChanged, state);
     }
+    void updates.refreshBlockers();
+  });
+  updates.on("state", (state) => {
+    for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) window.webContents.send(IpcChannels.updateStateChanged, state);
+  });
+  fleet.on("fleet", (state) => {
+    for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) window.webContents.send(IpcChannels.fleetStateChanged, state);
+  });
+  fleet.on("attachment", (event) => {
+    for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) window.webContents.send(IpcChannels.fleetAttachmentEvent, event);
   });
 }
 
@@ -826,9 +944,13 @@ app.whenReady().then(async () => {
       console.error("Runner initialization failed:", message);
     }
   });
+  await updates.initialize();
   // Do not let the renderer snapshot empty runner state while model discovery
   // and persisted-session restoration are still in flight.
   createWindow();
+  await writeFile(path.join(app.getPath("userData"), "update-startup-success-v1"), new Date().toISOString(), { mode: 0o600 }).catch(() => undefined);
+  void updates.checkApp(false).then(() => codexUpdates.check()).catch(() => undefined);
+  setInterval(() => void updates.checkApp(false).then(() => codexUpdates.check()), 24 * 60 * 60 * 1000).unref();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -843,6 +965,7 @@ let quitPromise: Promise<void> | undefined;
 app.on("before-quit", (event) => {
   if (quitReady) return;
   event.preventDefault();
+  fleet.close();
   quitPromise ??= runner.shutdown()
     .catch((error) => {
       process.exitCode = 1;

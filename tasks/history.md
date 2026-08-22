@@ -1,5 +1,43 @@
 # Session History
 
+## 2026-08-21 — Chromux Next v0.13.0 GBlockParty fleet attachment
+
+- **User goal:** Implement the GBlockParty host-daemon fleet picker and remote
+  terminal attachment in Chromux Next, while leaving legacy Chromux and all
+  existing local runner/browser/evidence behavior unchanged.
+- **Changed boundary:** Added a main-process control-plane client, bounded and
+  runtime-validated snapshot/surface contracts, narrow preload IPC, an opt-in
+  fleet picker, and persistent replay-aware remote terminal tabs. Network
+  credentials remain outside the renderer; closing a remote tab detaches but
+  never stops the host session. Package and release metadata advance the
+  successor prerelease line to 0.13.0.
+- **Executable verification:** `npm run verify` passed TypeScript, 30 Vitest
+  files/182 tests, macOS arm64 packaging, baseline packaged smoke, two-session
+  restoration, and browser-evidence smoke. `npm run visual:packaged` produced
+  30 standard, 8 Situation Room, and 2 renderer-recovery captures.
+  End-to-end GBlockParty UAT exercised authenticated discovery, replay, input,
+  resize, detach-without-stop, daemon restart reattachment, and control-plane
+  restart reconciliation through real tmux using a deterministic fake Codex
+  executable. `git diff --check` passes.
+- **Adversarial/privacy review:** Checked malformed and oversized frames,
+  replay gaps, relay loss, cross-user surfaces, stale request IDs, sanitized
+  fleet metadata, main-process-only credentials, disabled local-only remote-tab
+  actions, and unchanged local PTY creation. No blocking implementation finding
+  remains; attachment authority is intentionally `unleased` in this phase.
+- **Release blocker:** The existing v0.12.0 signed/notarized bootstrap must be
+  published before v0.13.0. A Developer ID identity is available, but no
+  notarization profile or Apple notarization environment is configured here.
+  Source is safe to commit to `main`, but no tag or GitHub prerelease may be
+  created until that gate passes.
+- **Correction enforcement:** The current shipping base already includes
+  commit `a224cbe`, which updates `AGENTS.md`, `CLAUDE.md`, `README.md`, and
+  `tasks/lessons.md` so new work resolves to `chromux-next/` and treats
+  `prototype/` as maintenance-only. The v0.13.0 diff contains no legacy app
+  mutation.
+- **Rollback:** Before release, discard only the v0.13.0 fleet boundary while
+  preserving the independent v0.12.0 updater work. After release, remove tag
+  and prerelease `chromux-next-v0.13.0` and revert its shipping commit.
+
 ## 2026-08-21 — Chromux Next default-target guidance
 
 - **User goal:** Direct agents and contributors to Chromux Next instead of the
@@ -3723,6 +3761,53 @@
   is the required release step. Next command: begin the macOS daily-driver and
   clean-install evidence tracked by the Chromux Next cutover gate in
   `tasks/todo.md`.
+
+## 2026-08-21 — Chromux Next update parity implementation v0.12.0
+
+- **User goal:** Add session-safe Chromux Next and Codex update parity, signed
+  managed macOS arm64 replacement, strict action-only IPC, Updates UI, and the
+  `0.12.0` prerelease while preserving the legacy stable channel.
+- **Changed files and purpose:** The new `src/updates/` domain validates public
+  state, manifests, SemVer, API/Atom discovery, HTTPS redirects, bounded
+  streaming, and checksums. Main-process app/Codex services own release data,
+  package trust, capability probing, maintenance, and sanitized failures.
+  Runner maintenance locking, independent update persistence, strict IPC,
+  preload APIs, Settings cards/header badges, the detached rollback helper,
+  signed artifact generator, tests, package metadata, README/architecture/
+  privacy/troubleshooting/UAT, release notes, and task state complete the
+  implementation boundary.
+- **User-goal mapping:** App checks select only repository-scoped non-draft
+  successor prereleases, cache success for 24 hours, and never use
+  `/releases/latest`. Explicit confirmation gates download, app replacement,
+  and Codex installation. Renderer state excludes commands, output, and local
+  paths. Starting/active work and unanswered interactions block maintenance;
+  idle/failed/closed state remains restorable. Signed bundle identity, version,
+  architecture, Team ID, Gatekeeper, exact size, and SHA-256 gate managed app
+  replacement, with startup-marker rollback.
+- **Executable verification:** Final TypeScript passed. The full suite passed
+  29 files and 178 tests, including 13 update/helper tests. Unsigned macOS arm64
+  packaging and baseline, Situation Room, two-launch runner restoration, and
+  browser-evidence packaged smokes passed. Visual qualification passed 30 main
+  views, 8 Situation Room views, and 2 renderer-recovery views; standard and
+  narrow Updates captures were inspected. Packaged helper files passed Node
+  syntax checks and `git diff --check` passed.
+- **Adversarial review:** Review tightened repository-scoped release URLs,
+  persisted release authority, streaming archive bounds, live blocker refresh,
+  runner maintenance race locking, concurrent update guards, fail-closed Forge
+  signing, pre-backup helper failure safety, startup rollback, raw output/path
+  exclusion, and stored release-link validation. A silent Forge signing failure
+  was converted into a hard build failure.
+- **Skipped tests and residual risk:** Notarization/stapling, two-signed-version
+  update UAT, public asset reverification, clean install, and publication are
+  blocked. The Developer ID identity exists, but noninteractive signing fails
+  with `errSecInternalComponent` and Apple notarization credentials are not
+  configured. No tag, GitHub prerelease, or `/releases/latest` mutation was
+  made. The live Codex CLI is 0.148.0 and confirms `codex update`; a live update
+  was not forced because it would mutate the user's global CLI.
+- **Rollback note:** No release was published. Revert the uncommitted v0.12.0
+  implementation boundary to return to 0.11.1. Next command after unlocking
+  Developer ID private-key access and configuring notarization credentials:
+  `cd chromux-next && npm run make:update`.
 ## 2026-08-20 — Chromux Next automatic work titles v0.11.0
 
 - **User goal:** Apply the post-restart tab-naming lesson to Chromux Next, not

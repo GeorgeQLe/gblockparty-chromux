@@ -5,9 +5,14 @@ separate Electron app from legacy Chromux in `../prototype/`: it has a distinct
 package, bundle identifier, user-data directory, architecture, and release
 line.
 
-## Current prerelease: v0.10.6
+## Current prerelease: v0.13.0
 
 This runner-first prerelease includes:
+
+- An opt-in GBlockParty Fleet picker and distinct attached-terminal tabs for
+  daemon-owned Codex sessions. Remote tabs reconnect with their last replay
+  cursor, visibly clear history on a replay gap, route input and resize through
+  the main process, and detach without stopping the session.
 
 - Safe transcript viewport recovery: xterm positions are normalized to
   non-negative integers before the in-memory cache can restore them, and
@@ -169,6 +174,49 @@ App-local state lives under the separate Electron user-data directory named
 `GBlockParty Chromux Next`. Alignment documents live only at user-selected JSON
 paths. Codex processes inherit normal authentication, but Chromux Next never
 locates, copies, stores, or logs credentials.
+
+## GBlockParty fleet attachment
+
+Fleet attachment is disabled by default. Start Chromux Next with:
+
+```bash
+CHROMUX_NEXT_GBP_FLEET=1 npm start
+```
+
+The control plane defaults to `http://127.0.0.1:4400`; override it with
+`CHROMUX_NEXT_CONTROL_PLANE_URL`. For non-dev authenticated control planes,
+provide the signed session cookie through `CHROMUX_NEXT_CONTROL_PLANE_COOKIE`.
+The optional cookie/token, URL, snapshot request, and terminal WebSockets stay
+in the main process and never cross renderer IPC.
+
+The renderer receives only bounded host/workspace/session display metadata and
+surface IDs. It never receives host credentials, absolute workspace paths, or
+launch authority. Remote tabs expose terminal input and resize only; they do
+not expose local-only session creation, browser capture, or evidence delivery.
+Closing a tab sends detach and leaves the daemon-owned Codex/tmux session
+running. See [control-plane troubleshooting](docs/control-plane-troubleshooting.md).
+
+## Updates
+
+Chromux Next checks GitHub's prerelease list at startup and every 24 hours for
+the greatest non-draft `chromux-next-vX.Y.Z` tag. Manual checks bypass the
+successful-check cache; failures are immediately retryable. The legacy
+`chromux-v…` channel and GitHub `/releases/latest` are never used.
+
+Settings → Updates shows separate Chromux Next and Codex status. Download and
+installation always require explicit confirmation. Managed macOS arm64
+installation requires exact manifest size/SHA-256, bundle ID
+`dev.georgele.chromux.next`, Developer ID Team `NC56VXK48K`, arm64 code, and
+Gatekeeper acceptance. Other platforms and unsigned or read-only installs
+retain the release link and use manual installation.
+
+Starting or active sessions, active turns, and unanswered interactions block
+maintenance. Idle, failed, and closed sessions are safe because thread IDs and
+drafts are persisted. Clearing blockers never starts installation. Codex
+updates are capability-probed at runtime and otherwise show install guidance.
+
+Chromux Next 0.11.1 has no updater. Install 0.12.0 manually once; managed
+Chromux Next updates begin with the release after 0.12.0.
 
 ## Release convention
 

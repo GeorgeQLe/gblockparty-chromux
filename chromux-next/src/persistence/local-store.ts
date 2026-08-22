@@ -23,6 +23,11 @@ import {
   DEFAULT_BROWSER_WORKSPACE,
   type BrowserWorkspaceV1
 } from "../browser/contracts";
+import {
+  DEFAULT_UPDATE_STATE,
+  UpdateStateV1Schema,
+  type UpdateStateV1
+} from "../updates/contracts";
 
 const AppStateV1Schema = z.object({
   schemaVersion: z.literal(1),
@@ -58,6 +63,7 @@ export type LocalState = AppStateV1 & {
   uiPreferences: UiPreferencesV1;
   workspacePreferences: WorkspacePreferencesV1;
   browserWorkspace: BrowserWorkspaceV1;
+  updateState: UpdateStateV1;
 };
 
 const DEFAULT_APP_STATE: AppStateV1 = {
@@ -74,6 +80,7 @@ type SliceName =
   | "ui-preferences-v1.json"
   | "workspace-preferences-v1.json"
   | "browser-workspace-v1.json"
+  | "update-state-v1.json"
   | "detected-session-transaction-v1.json";
 
 /**
@@ -101,6 +108,7 @@ export class LocalStore {
     const uiValue = await this.readUnknownSlice("ui-preferences-v1.json");
     const workspaceValue = await this.readUnknownSlice("workspace-preferences-v1.json");
     const browserValue = await this.readUnknownSlice("browser-workspace-v1.json");
+    const updateValue = await this.readUnknownSlice("update-state-v1.json");
     const browser = BrowserWorkspaceV1Schema.safeParse(browserValue);
     return {
       ...app,
@@ -110,6 +118,9 @@ export class LocalStore {
         transaction?.workspacePreferences ?? workspaceValue ?? legacy?.workspacePreferences
       ),
       browserWorkspace: browser.success ? browser.data : structuredClone(DEFAULT_BROWSER_WORKSPACE)
+      ,updateState: UpdateStateV1Schema.safeParse(updateValue).success
+        ? UpdateStateV1Schema.parse(updateValue)
+        : structuredClone(DEFAULT_UPDATE_STATE)
     };
   }
 
@@ -121,6 +132,7 @@ export class LocalStore {
       await this.writeSlice("ui-preferences-v1.json", validated.uiPreferences);
       await this.writeSlice("workspace-preferences-v1.json", validated.workspacePreferences);
       await this.writeSlice("browser-workspace-v1.json", validated.browserWorkspace);
+      await this.writeSlice("update-state-v1.json", validated.updateState);
     });
   }
 
@@ -200,6 +212,15 @@ export class LocalStore {
     await this.enqueue(() => this.writeSlice("browser-workspace-v1.json", validated));
   }
 
+  async getUpdateState(): Promise<UpdateStateV1> {
+    return (await this.read()).updateState;
+  }
+
+  async updateUpdateState(state: UpdateStateV1): Promise<void> {
+    const validated = UpdateStateV1Schema.parse(state);
+    await this.enqueue(() => this.writeSlice("update-state-v1.json", validated));
+  }
+
   async registerDetectedSession(
     runner: NonNullable<LocalState["runner"]>,
     project: ProjectEntryV1
@@ -253,6 +274,7 @@ export class LocalStore {
       uiPreferences: UiPreferencesV1Schema.parse(state.uiPreferences),
       workspacePreferences: WorkspacePreferencesV1Schema.parse(state.workspacePreferences),
       browserWorkspace: BrowserWorkspaceV1Schema.parse(state.browserWorkspace)
+      ,updateState: UpdateStateV1Schema.parse(state.updateState)
     };
   }
 

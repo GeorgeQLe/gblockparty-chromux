@@ -39,6 +39,21 @@ import {
   EvidencePreviewSchema,
   EvidenceReviewInputSchema
 } from "../browser/contracts";
+import {
+  UpdateActionSchema,
+  UpdateCheckActionSchema,
+  UpdateReleaseNotesActionSchema,
+  UpdateStateV1Schema
+} from "../updates/contracts";
+import {
+  attachmentEventSchema,
+  attachmentInputSchema,
+  attachmentResizeSchema,
+  fleetAttachInputSchema,
+  fleetStateSchema,
+  remoteTabSchema,
+  surfaceIdInputSchema
+} from "../control-plane/contracts";
 
 export const IpcChannels = {
   documentOpen: "document:open",
@@ -85,6 +100,22 @@ export const IpcChannels = {
   ,settingsChooseProject: "settings:choose-project"
   ,settingsRemoveProject: "settings:remove-project"
   ,settingsCompatibilityDiagnostics: "settings:compatibility-diagnostics"
+  ,updateState: "update:state"
+  ,updateCheck: "update:check"
+  ,updatePrepareApp: "update:prepare-app"
+  ,updateCancelApp: "update:cancel-app"
+  ,updateInstallApp: "update:install-app"
+  ,updateInstallCodex: "update:install-codex"
+  ,updateOpenReleaseNotes: "update:open-release-notes"
+  ,updateStateChanged: "update:state-changed"
+  ,fleetState: "fleet:state"
+  ,fleetRefresh: "fleet:refresh"
+  ,fleetAttach: "fleet:attach"
+  ,fleetDetach: "fleet:detach"
+  ,fleetInput: "fleet:input"
+  ,fleetResize: "fleet:resize"
+  ,fleetStateChanged: "fleet:state-changed"
+  ,fleetAttachmentEvent: "fleet:attachment-event"
 } as const;
 
 export const DocumentPayloadSchema = z.object({
@@ -141,4 +172,15 @@ export {
   ,EvidenceIdInputSchema
   ,EvidencePreviewSchema
   ,EvidenceReviewInputSchema
+  ,UpdateActionSchema
+  ,UpdateCheckActionSchema
+  ,UpdateReleaseNotesActionSchema
+  ,UpdateStateV1Schema
+  ,attachmentEventSchema
+  ,attachmentInputSchema
+  ,attachmentResizeSchema
+  ,fleetAttachInputSchema
+  ,fleetStateSchema
+  ,remoteTabSchema
+  ,surfaceIdInputSchema
 };

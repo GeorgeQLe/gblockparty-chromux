@@ -17,6 +17,32 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [ ] Add the GBlockParty fleet and attached-terminal vertical slice to
+  Chromux Next v0.13.0: keep control-plane credentials and sockets in the main
+  process; expose runtime-validated, sanitized fleet and attachment IPC; add an
+  opt-in fleet picker and distinct replay-aware remote terminal tabs; detach on
+  close without stopping the host session; preserve local runner, browser,
+  evidence, detection, persistence, and legacy Chromux behavior. Publish only
+  after the existing v0.12.0 release gate is resolved, and keep the successor
+  on the `chromux-next-vX.Y.Z` prerelease channel.
+  _(source: GBlockParty local host daemon and attachment protocol plan;
+  successor-only scope: `chromux-next/`; canonical control-plane default:
+  `http://127.0.0.1:4400`)_
+  - Implementation and verification are complete: `npm run verify` passed 30
+    Vitest files/182 tests, macOS arm64 packaging, and all packaged smoke lanes;
+    `npm run visual:packaged` produced 40 qualification captures.
+  - Publication remains open because the pre-existing v0.12.0 signed bootstrap
+    gate must ship first and no Apple notarization profile is configured in the
+    current execution context. The verified source may be committed to `main`,
+    but no v0.12.0/v0.13.0 tag or GitHub prerelease may be created yet.
+
+- [ ] Complete the signed Chromux Next v0.12.0 release gate: notarized/stapled
+  macOS arm64 build, two-version managed-update and rollback UAT, public asset
+  reverification, prerelease publication, and proof that legacy
+  `/releases/latest` is unchanged. Typed updater/Codex flows, IPC/UI,
+  deterministic contracts, artifact tooling, and docs are implemented.
+  _(source: user-supplied Chromux Next Update Parity v0.12.0 plan)_
+
 - [x] Complete the runner-first hardening matrix with deterministic fake
   app-server and Luna processes for fragmented JSONL, crash/backoff/recovery,
   missing or incompatible CLI, authentication failure, malformed and

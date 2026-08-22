@@ -6,6 +6,9 @@ import {
   RunnerStateV1Schema,
   UiPreferencesV1Schema,
   WorkspacePreferencesV1Schema
+  ,UpdateStateV1Schema
+  ,attachmentEventSchema
+  ,fleetStateSchema
 } from "./contracts";
 
 export const PreloadInvokeChannels = [
@@ -48,6 +51,19 @@ export const PreloadInvokeChannels = [
   IpcChannels.settingsChooseProject,
   IpcChannels.settingsRemoveProject,
   IpcChannels.settingsCompatibilityDiagnostics
+  ,IpcChannels.updateState
+  ,IpcChannels.updateCheck
+  ,IpcChannels.updatePrepareApp
+  ,IpcChannels.updateCancelApp
+  ,IpcChannels.updateInstallApp
+  ,IpcChannels.updateInstallCodex
+  ,IpcChannels.updateOpenReleaseNotes
+  ,IpcChannels.fleetState
+  ,IpcChannels.fleetRefresh
+  ,IpcChannels.fleetAttach
+  ,IpcChannels.fleetDetach
+  ,IpcChannels.fleetInput
+  ,IpcChannels.fleetResize
 ] as const;
 
 export const MainToRendererChannels = [
@@ -56,6 +72,9 @@ export const MainToRendererChannels = [
   IpcChannels.settingsUiPreferencesChanged,
   IpcChannels.settingsWorkspacePreferencesChanged,
   IpcChannels.browserStateChanged
+  ,IpcChannels.updateStateChanged
+  ,IpcChannels.fleetStateChanged
+  ,IpcChannels.fleetAttachmentEvent
 ] as const;
 
 const MainToRendererSchemas = {
@@ -64,6 +83,9 @@ const MainToRendererSchemas = {
   [IpcChannels.settingsUiPreferencesChanged]: UiPreferencesV1Schema,
   [IpcChannels.settingsWorkspacePreferencesChanged]: WorkspacePreferencesV1Schema,
   [IpcChannels.browserStateChanged]: BrowserWorkspaceV1Schema
+  ,[IpcChannels.updateStateChanged]: UpdateStateV1Schema
+  ,[IpcChannels.fleetStateChanged]: fleetStateSchema
+  ,[IpcChannels.fleetAttachmentEvent]: attachmentEventSchema
 } as const;
 
 export function parseMainToRendererEvent<C extends typeof MainToRendererChannels[number]>(
