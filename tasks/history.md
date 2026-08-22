@@ -1,5 +1,37 @@
 # Session History
 
+## 2026-08-22 — Chromux Next update parity v0.12.0
+
+- **User goal:** Add typed, session-safe Chromux Next application and Codex CLI
+  updates while preserving the successor prerelease channel, explicit consent,
+  legacy `/releases/latest`, and signed-native trust requirements.
+- **Changed files and purpose:** `src/updates/`, both main-process update
+  services, independent update-state persistence, runner maintenance controls,
+  strict IPC/preload contracts, Settings/header UI, detached helper, artifact
+  builder, Forge signing/notarization configuration, tests, release metadata,
+  privacy/troubleshooting/architecture docs, and UAT implement the complete
+  v0.12.0 bootstrap. The release builder creates its ZIP from the verified
+  stapled app. The signer ignores Electron 43 grammatical-locale `.pak`
+  placeholders because they are resources rather than Mach-O inputs.
+- **Verification:** TypeScript passed; all 29 Vitest files and 179 tests passed.
+  Forge produced an arm64 Developer ID artifact with hardened runtime, Team
+  `NC56VXK48K`, Apple notarization, stapling, Gatekeeper acceptance, exact
+  bundle/version checks, and matching manifest SHA-256. The exact release ZIP
+  passed independent extraction, strict signature, stapler, and Gatekeeper
+  checks. A separately notarized v0.12.1 fixture proved packaged v0.12.0
+  replacement, startup-marker confirmation, backup cleanup, injected timeout,
+  and rollback to v0.12.0.
+- **Adversarial review:** API/Atom discovery, SemVer ordering, caching/manual
+  bypass, malformed manifests, checksum/size/trust rejection, stale staging,
+  unsupported platforms, every maintenance blocker, confirmation boundaries,
+  Codex capability/install-kind/failure recovery, spoofed IPC, persisted slice
+  recovery, and helper pre-backup/marker failures are covered. Renderer state
+  exposes no commands, staging paths, raw output, or unvalidated URLs.
+- **Residual risk and rollback:** v0.11.1 requires the documented one-time
+  manual install. Windows/Linux remain discovery-only. Revert this commit and
+  remove only `chromux-next-v0.12.0` and its prerelease to roll back; legacy
+  stable releases remain untouched.
+
 ## 2026-08-21 — Chromux Next default-target guidance
 
 - **User goal:** Direct agents and contributors to Chromux Next instead of the

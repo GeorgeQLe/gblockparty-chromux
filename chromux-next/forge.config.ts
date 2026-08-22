@@ -7,7 +7,14 @@ import { VitePlugin } from "@electron-forge/plugin-vite";
 import type { OsxSignOptions } from "@electron/packager";
 
 const osxSign = process.env.CHROMUX_NEXT_SIGN_IDENTITY
-  ? { identity: process.env.CHROMUX_NEXT_SIGN_IDENTITY, continueOnError: false } as OsxSignOptions & { continueOnError: false }
+  ? {
+      identity: process.env.CHROMUX_NEXT_SIGN_IDENTITY,
+      continueOnError: false,
+      // Electron 43 includes tiny grammatical-locale .pak placeholders. They
+      // are binary data, not Mach-O, and @electron/osx-sign otherwise asks
+      // codesign to replace them while their parent framework is being sealed.
+      ignore: (file) => file.endsWith(".pak")
+    } as OsxSignOptions & { continueOnError: false }
   : undefined;
 
 const osxNotarize = process.env.CHROMUX_NEXT_NOTARY_PROFILE

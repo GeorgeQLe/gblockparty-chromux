@@ -19,6 +19,7 @@
     "smoke:packaged": "node scripts/smoke-packaged.mjs",
     "smoke:runner-restoration": "node scripts/smoke-runner-restoration.mjs",
     "smoke:browser-evidence": "node scripts/smoke-browser-evidence.mjs",
+    "smoke:update-helper": "node scripts/smoke-update-helper.cjs",
     "visual:packaged": "node scripts/visual-qualify.mjs",
     "test": "vitest run",
     "test:watch": "vitest",

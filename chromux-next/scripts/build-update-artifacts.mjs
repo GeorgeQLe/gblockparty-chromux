@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { execFile as execFileCallback } from "node:child_process";
-import { copyFile, mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 
@@ -15,13 +15,10 @@ const signature = (await execFile("/usr/bin/codesign", ["-dv", "--verbose=4", ap
 if (!signature.includes("TeamIdentifier=NC56VXK48K")) throw new Error("Packaged app has the wrong Team ID");
 await execFile("/usr/sbin/spctl", ["--assess", "--type", "execute", "--verbose=4", appPath]);
 await execFile("/usr/bin/xcrun", ["stapler", "validate", appPath]);
-const makeRoot = path.join(root, "out", "make", "zip", "darwin", "arm64");
-const zipNames = (await readdir(makeRoot)).filter((name) => name.endsWith(".zip"));
-if (zipNames.length !== 1) throw new Error(`Expected one arm64 ZIP, found ${zipNames.length}`);
-const source = path.join(makeRoot, zipNames[0]);
 const destinationRoot = path.join(root, "out", "update-release"); await mkdir(destinationRoot, { recursive: true });
 const asset = `GBlockParty-Chromux-Next-${version}-darwin-arm64.zip`;
-const destination = path.join(destinationRoot, asset); await copyFile(source, destination);
+const destination = path.join(destinationRoot, asset);
+await execFile("/usr/bin/ditto", ["-c", "-k", "--sequesterRsrc", "--keepParent", appPath, destination]);
 const body = await readFile(destination); const metadata = await stat(destination);
 const manifest = {
   schemaVersion: 1,

@@ -17,6 +17,15 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
+- [x] Ship typed, session-safe Chromux Next and Codex update parity in v0.12.0
+  with prerelease-only discovery, strict signed/notarized macOS arm64 staging,
+  explicit confirmations, transactional replacement/rollback, action-only IPC,
+  Updates UI, persisted sanitized state, release artifacts, and qualification.
+  _(source: user-supplied Chromux Next Update Parity v0.12.0 plan; evidence:
+  updater/Codex services, deterministic unit/integration coverage, signed and
+  notarized v0.12.0 artifact, extracted-asset trust checks, and packaged
+  v0.12.0 → v0.12.1 replacement plus rollback smoke)_
+
 - [x] Complete the runner-first hardening matrix with deterministic fake
   app-server and Luna processes for fragmented JSONL, crash/backoff/recovery,
   missing or incompatible CLI, authentication failure, malformed and
