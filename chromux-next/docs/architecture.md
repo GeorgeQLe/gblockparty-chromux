@@ -26,7 +26,7 @@ Five presentations arrange those primitives without owning runner state:
   of the visual map.
 
 Before an approach change, the renderer flushes the active draft. The shared
-workspace, xterm, Composer, draft, selected item, pending interactions, and all
+workspace, DOM transcript, Composer, draft, selected item, pending interactions, and all
 secondary surfaces stay mounted; inactive surfaces are hidden. Selected
 group/session remain runner-owned while the active surface, document state,
 undo stack, contributor state, and bounded viewport map remain renderer-owned.
@@ -48,12 +48,12 @@ document transactions. `src/ipc` is the only renderer/main contract. Existing
 
 ## Renderer-local recovery
 
-Terminal viewport retention remains deliberately renderer-local and
-in-memory-only. Before a viewport enters the cache or is supplied to xterm,
-finite positions are floored and clamped at zero. `NaN` and infinite values
-are discarded; a missing or discarded value restores at the transcript bottom.
-This keeps xterm's integer `scrollToLine` precondition inside the renderer and
-does not add a persistence field or alter a runner/session contract.
+Transcript scroll retention remains deliberately renderer-local and
+in-memory-only. Each session caches a DOM `scrollTop`; a missing value restores
+at the transcript bottom. Event updates follow new output only when the reader
+was already near the bottom. The internal `TranscriptBlock` classifier splits
+prose from full-width code, tables, terminal-sensitive output, and click-only
+graphic links without adding a persistence field or altering runner contracts.
 
 The application root is wrapped in a React error boundary. Unexpected render
 or lifecycle failures are logged with their complete React diagnostic in the
@@ -159,7 +159,8 @@ The v0.7.1 baseline makes ownership enforceable rather than conventional:
 - Approval responses are accepted only for a pending request belonging to the
   selected session's exact thread and only for decisions offered by that
   request.
-- xterm has `disableStdin`; it is a presentation surface, not a shell or PTY.
+- The local runner transcript is inert DOM and accepts no terminal input;
+  interactive xterm remains isolated to explicitly attached Fleet terminals.
 - Events, drafts, caches, protocol messages, analyzer input, and analyzer
   output are size-bounded and runtime validated.
 - Unknown server requests fail closed and create an actionable runner error.

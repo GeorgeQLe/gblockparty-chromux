@@ -3,13 +3,13 @@ import { describe, expect, it } from "vitest";
 
 describe("five-approach shared interface system", () => {
   it("provides five structural shells over shared workflow primitives", async () => {
-    const source = await readFile("src/renderer.tsx", "utf8");
+    const source = `${await readFile("src/renderer.tsx", "utf8")}\n${await readFile("src/renderer/transcript.tsx", "utf8")}`;
     for (const shell of [
       "ControlRoomShell", "IdeWorkbenchShell", "FocusStudioShell",
       "MissionBoardShell", "SpatialCanvasShell"
     ]) expect(source).toContain(`function ${shell}`);
     for (const primitive of [
-      "RunnerTerminal", "Composer", "InteractionCard", "AttentionSidebar",
+      "RunnerTranscript", "Composer", "InteractionCard", "AttentionSidebar",
       "Workspace", "NewSessionDialog", "DetectionDialog", "GroupDialog", "SurfaceTabs"
     ]) expect(source).toContain(`function ${primitive}`);
   });
@@ -66,14 +66,14 @@ describe("five-approach shared interface system", () => {
     }
   });
 
-  it("flushes drafts and preserves transcript viewport before live switching", async () => {
+  it("flushes drafts and preserves DOM transcript scroll before live switching", async () => {
     const [source, surfaces] = await Promise.all([
       readFile("src/renderer.tsx", "utf8"),
       readFile("src/renderer/persistent-surfaces.tsx", "utf8")
     ]);
     expect(source).toContain('new Event("chromux:flush-drafts")');
-    expect(source).toContain("terminalViewports.set");
-    expect(source).toContain("scrollToLine(viewport)");
+    expect(source).toContain("<RunnerTranscript");
+    expect(surfaces).toContain("runner-pane");
     expect(source).toContain('key="persistent-workspace"');
     expect(surfaces).toContain("surface-pane runner-pane");
     expect(surfaces).toContain("Keeps every workspace mounted");

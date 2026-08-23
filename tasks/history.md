@@ -1,5 +1,72 @@
 # Session History
 
+## 2026-08-23 — Chromux Next v0.14.0 conversational transcript
+
+- **User goal:** Replace the local runner's display-only xterm transcript with
+  read-only conversational bubbles and ordered full-width rich/activity
+  blocks, retain safe Browser routing and session behavior, and ship a signed,
+  notarized successor prerelease without changing legacy Chromux.
+- **Changed files and per-file purpose:** `src/renderer/transcript.tsx` owns the
+  bounded internal block classifier, safe React rendering, activity timeline,
+  DOM search/copy, and scroll behavior; `src/renderer.tsx` mounts it in the
+  existing runner workflow; `styles/legacy.css` supplies responsive bubble,
+  rich-block, timeline, search, and ANSI presentation; `control-plane/ui.tsx`
+  now owns xterm CSS beside the only remaining interactive xterm; the obsolete
+  viewport helper and xterm search dependency are removed. Component,
+  interface, security, and visual-fixture changes enforce behavior. Package,
+  lock, README, architecture, UAT, release notes, and task records define the
+  `0.14.0` successor release boundary.
+- **User-goal mapping:** User and agent prose render on opposite sides with
+  consistent internal wrapping. Fenced/indented code, tables, ANSI/ASCII and
+  box-drawing output, and click-only remote graphics retain event order as
+  full-width blocks. Non-message events render as expandable timeline rows;
+  errors begin open without repeating their summary. Search highlights and
+  navigates DOM matches, opens hidden detail, copy reads only DOM selection,
+  session changes restore `scrollTop`, and same-session updates follow only
+  from within 72 pixels of the bottom. Existing event, streaming merge, IPC,
+  persistence, hydration, composer, Fleet-terminal input, and legacy contracts
+  are unchanged.
+- **Executable verification:** TypeScript passes. The complete Vitest run
+  passed 31 files/184 tests; after the final activity-detail correction, the
+  focused transcript suite passed all 12 tests. Production dependency audit
+  reports zero vulnerabilities. Electron Forge packaged macOS arm64 and the
+  baseline, Situation Room, two-session/two-launch restoration, and browser-
+  evidence smokes all passed. Final visual qualification completed 32 product,
+  8 Situation Room, and 2 recovery captures without warnings; the standard and
+  narrow transcript captures were inspected for alignment, wrapping,
+  readability, and clipping. `git diff --check` passes.
+- **Signed release evidence:** `npm run make:update` signed with Developer ID
+  Team `NC56VXK48K`, notarized, stapled, and generated the 120,039,640-byte
+  arm64 ZIP plus schema-v1 manifest. The manifest and independent SHA-256 both
+  report `e317003dc33f8866d92f1446de55d6e0ea1903430dd85d1b3e800d27889f6342`.
+  Both the packaged app and a separately extracted archive passed strict deep
+  codesign, Gatekeeper `Notarized Developer ID`, stapler validation, bundle
+  version `0.14.0`, and arm64-host verification.
+- **Adversarial review:** Applied the quality-gate contract with a changed-file
+  failure review of malformed/unclosed Markdown, bounded long input, nested
+  presentation order, ANSI/OSC control stripping, HTML injection, remote
+  image/network creation, unsafe schemes, streaming duplication, stale search
+  cursors, collapsed matches, error toggling, old-content scroll retention,
+  session switching, narrow wrapping, clipboard selection, xterm input
+  isolation, and stable-channel scope. It found and fixed a stale match cursor,
+  a narrow CSS selector, duplicated activity summaries, and two misleading
+  visual-fixture errors. No blocking finding remains.
+- **Skipped tests and residual risk:** Windows/Linux packaging is part of the
+  separate cutover gate and is not a release target for this macOS arm64
+  successor prerelease. The intentionally small Markdown parser does not aim
+  to implement every CommonMark extension; unsupported syntax remains inert
+  text, which is safer than HTML interpretation. Very complex Markdown may be
+  presented as prose or terminal text but cannot cross the Browser or resource
+  loading boundary.
+- **Accepted warnings:** `npm uninstall` repeated 29 existing development-tree
+  advisories; the production audit is clean, and a breaking Electron Forge
+  dependency migration remains outside this renderer feature.
+- **Rollback note:** Delete the `chromux-next-v0.14.0` prerelease/tag and revert
+  the shipping commit. Chromux Next 0.13.1 and legacy stable remain available;
+  there is no migration or persistence rollback.
+- **Next command:** Commit and push the verified boundary, then publish and
+  independently download/reverify `chromux-next-v0.14.0`.
+
 ## 2026-08-21 — Chromux Next v0.13.0 GBlockParty fleet attachment
 
 - **User goal:** Implement the GBlockParty host-daemon fleet picker and remote

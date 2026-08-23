@@ -1,5 +1,26 @@
 # Release Notes
 
+## GBlockParty Chromux Next v0.14.0 (prerelease)
+
+Tag: `chromux-next-v0.14.0`
+
+- Replace the local runner's display-only xterm with a conversational DOM
+  transcript: user prose is right-aligned, agent prose is left-aligned, and
+  wrapped lines remain inside responsive product-theme bubbles.
+- Keep fenced and indented code, Markdown tables, ANSI/ASCII displays, and
+  click-only remote graphic cards as ordered full-width blocks. Runtime
+  reasoning, commands, tools, file changes, status, system, and errors use a
+  compact expandable timeline; errors begin expanded.
+- Add selection copy and DOM search with highlighted previous/next matches,
+  automatic activity expansion, per-session scroll restoration, and
+  near-bottom-only streaming follow behavior.
+- Keep raw HTML inert and remote transcript resources unloaded. HTTP(S) links
+  and graphics continue through the existing Chromux Browser boundary only.
+- Reserve xterm and fit support for interactive GBlockParty Fleet terminals,
+  and remove the runner-only xterm search add-on.
+- This successor-only release remains a signed/notarized macOS arm64
+  prerelease and does not replace legacy `/releases/latest`.
+
 ## GBlockParty Chromux Next v0.13.1 (prerelease)
 
 Tag: `chromux-next-v0.13.1`

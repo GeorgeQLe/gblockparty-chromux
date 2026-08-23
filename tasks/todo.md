@@ -17,7 +17,7 @@ No active priority documentation items.
 
 ## Implementation And Documentation Todo
 
-- [ ] Add the GBlockParty fleet and attached-terminal vertical slice to
+- [x] Add the GBlockParty fleet and attached-terminal vertical slice to
   Chromux Next v0.13.0: keep control-plane credentials and sockets in the main
   process; expose runtime-validated, sanitized fleet and attachment IPC; add an
   opt-in fleet picker and distinct replay-aware remote terminal tabs; detach on
@@ -31,10 +31,9 @@ No active priority documentation items.
   - Implementation and verification are complete: `npm run verify` passed 30
     Vitest files/182 tests, macOS arm64 packaging, and all packaged smoke lanes;
     `npm run visual:packaged` produced 40 qualification captures.
-  - Publication remains open because the pre-existing v0.12.0 signed bootstrap
-    gate must ship first and no Apple notarization profile is configured in the
-    current execution context. The verified source may be committed to `main`,
-    but no v0.12.0/v0.13.0 tag or GitHub prerelease may be created yet.
+  - Publication completed after the v0.12.0 bootstrap: signed/notarized
+    `chromux-next-v0.13.0` and the follow-up `chromux-next-v0.13.1` are public
+    successor prereleases, while legacy `/releases/latest` remains stable.
 
 - [ ] Complete the signed Chromux Next v0.12.0 release gate: notarized/stapled
   macOS arm64 build, two-version managed-update and rollback UAT, public asset
@@ -84,6 +83,18 @@ If any capability is still valuable, re-scope it as a new Chromux Next task
 instead of resuming the `prototype/` implementation.
 
 ## Completed Work
+
+- [x] Ship Chromux Next v0.14.0 with a read-only conversational runner
+  transcript: right-aligned user bubbles, left-aligned agent bubbles,
+  full-width code/tables/terminal displays/click-only graphics, expandable
+  activity, DOM search and selection copy, session-local scroll restoration,
+  and near-bottom streaming follow. Keep raw HTML inert, remote resources
+  unloaded, xterm isolated to interactive Fleet tabs, runner/IPC/persistence
+  contracts unchanged, and the release successor-only.
+  _(source: user-supplied Conversational Transcript Bubbles v0.14.0 plan;
+  executable evidence: classifier/component/security regressions, full verify,
+  packaged standard/narrow visual qualification, signed/notarized artifact and
+  public prerelease reverification)_
 
 - [x] Ship Chromux Next v0.11.1 with Codex server-title reuse, compact
   fingerprinted no-reasoning Luna inputs, 24-hour unchanged-input backoff,

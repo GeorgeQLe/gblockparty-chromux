@@ -4,6 +4,7 @@ import { Terminal } from "@xterm/xterm";
 import { Cloud, Monitor, RefreshCw, Unplug, X } from "lucide-react";
 import { Badge, Button, Dialog, EmptyState, IconButton } from "../ui/components";
 import type { AttachmentEvent, FleetState, RemoteTab } from "./contracts";
+import "@xterm/xterm/css/xterm.css";
 
 export function FleetFeature({ fleet, open, close, refresh, fail }: {
   fleet: FleetState;

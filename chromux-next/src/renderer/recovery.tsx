@@ -1,10 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
-export function normalizeTerminalViewport(value: unknown): number | undefined {
-  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
-  return Math.max(0, Math.floor(value));
-}
-
 function rendererDiagnostic(error: Error): string {
   const message = (error.message.trim() || error.name).replace(/\s+/g, " ");
   return message.length <= 240 ? message : `${message.slice(0, 239)}…`;

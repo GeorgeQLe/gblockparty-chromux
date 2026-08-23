@@ -547,6 +547,9 @@ function createWindow(): void {
         await visualWindow.webContents.executeJavaScript(
           "document.querySelector('[aria-label=\"Close Settings\"]')?.click()"
         );
+        await visualWindow.webContents.executeJavaScript("document.querySelector('.transcript-scroll')?.scrollTo(0, 0)");
+        await capture("runner-transcript-standard");
+        await capture("runner-transcript-narrow", 820, 720);
         await visualWindow.webContents.executeJavaScript(`(() => {
           const button = [...document.querySelectorAll('.surface-tabs button')]
             .find((item) => item.textContent?.trim().toLowerCase() === 'browser');
@@ -591,7 +594,7 @@ function createWindow(): void {
             await capture(`${approach}-${size.name}`, size.width, size.height);
           }
         }
-        if (captureCount !== 30) throw new Error(`Expected 30 visual captures, received ${captureCount}`);
+        if (captureCount !== 32) throw new Error(`Expected 32 visual captures, received ${captureCount}`);
         console.log(`Chromux Next visual qualification captured ${captureCount} views`);
       } catch (error) {
         process.exitCode = 1;

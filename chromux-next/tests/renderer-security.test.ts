@@ -2,10 +2,20 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
 describe("runner renderer security", () => {
-  it("keeps xterm display-only and routes text through the composer", async () => {
-    const source = await readFile("src/renderer.tsx", "utf8");
-    expect(source).toContain("disableStdin: true");
+  it("keeps the DOM transcript inert and routes all input through the composer", async () => {
+    const [source, transcript, fleet] = await Promise.all([
+      readFile("src/renderer.tsx", "utf8"),
+      readFile("src/renderer/transcript.tsx", "utf8"),
+      readFile("src/control-plane/ui.tsx", "utf8")
+    ]);
+    expect(transcript).not.toContain("dangerouslySetInnerHTML");
+    expect(transcript).not.toContain("<img");
+    expect(transcript).not.toMatch(/fetch\s*\(/);
+    expect(transcript).not.toContain("window.open");
+    expect(transcript).toContain("openBrowser(block.url)");
+    expect(source).not.toContain("disableStdin");
     expect(source).not.toContain(".onData(");
+    expect(fleet).toContain("instance.onData");
     expect(source).toContain("window.chromuxNext.runner.send");
     expect(source).toContain('event.metaKey || event.ctrlKey');
   });

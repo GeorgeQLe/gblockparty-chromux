@@ -1,8 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Terminal } from "@xterm/xterm";
-import { FitAddon } from "@xterm/addon-fit";
-import { SearchAddon } from "@xterm/addon-search";
 import {
   AlertTriangle,
   AlignLeft,
@@ -31,12 +28,10 @@ import {
   TerminalSquare,
   X
 } from "lucide-react";
-import "@xterm/xterm/css/xterm.css";
 import type {
   ModelOptionV1,
   CompatibilityDiagnosticsV1,
   PendingInteractionV1,
-  RunnerEventV1,
   RunnerSessionV1,
   RunnerStateV1
 } from "./runner/contracts";
@@ -92,8 +87,9 @@ import {
   Tabs
 } from "./ui/components";
 import { PersistentSurfaces, type CenterSurface } from "./renderer/persistent-surfaces";
-import { normalizeTerminalViewport, RendererErrorBoundary } from "./renderer/recovery";
+import { RendererErrorBoundary } from "./renderer/recovery";
 import { FleetFeature } from "./control-plane/ui";
+import { RunnerTranscript } from "./renderer/transcript";
 import type { FleetState } from "./control-plane/contracts";
 import {
   DEFAULT_BROWSER_WORKSPACE,
@@ -102,135 +98,12 @@ import {
 } from "./browser/contracts";
 import "./styles.css";
 
-const terminalViewports = new Map<string, number>();
-
-function cacheTerminalViewport(sessionId: string, value: unknown): void {
-  const viewport = normalizeTerminalViewport(value);
-  if (viewport === undefined) terminalViewports.delete(sessionId);
-  else terminalViewports.set(sessionId, viewport);
-}
-
 const EMPTY_STATE: RunnerStateV1 = {
   schemaVersion: 1,
   groups: [],
   sessions: [],
   triage: []
 };
-
-function ansi(event: RunnerEventV1): string {
-  const color = event.kind === "user" ? "38;5;117"
-    : event.kind === "agent" ? "38;5;151"
-    : event.kind === "reasoning" ? "38;5;245"
-    : event.kind === "command" ? "38;5;215"
-    : event.kind === "file-change" ? "38;5;180"
-    : event.kind === "error" ? "38;5;203"
-    : event.kind === "status" ? "38;5;109"
-    : "38;5;250";
-  const label = event.kind.toUpperCase().padEnd(11);
-  return `\x1b[${color}m${label}\x1b[0m ${event.text.replace(/\r?\n/g, "\r\n            ")}\r\n`;
-}
-
-export function RunnerTerminal({ session, openBrowser }: { session?: RunnerSessionV1; openBrowser(url: string): void }) {
-  const host = useRef<HTMLDivElement>(null);
-  const terminal = useRef<Terminal | undefined>(undefined);
-  const fit = useRef<FitAddon | undefined>(undefined);
-  const search = useRef<SearchAddon | undefined>(undefined);
-  const [needle, setNeedle] = useState("");
-  const openBrowserRef = useRef(openBrowser);
-  openBrowserRef.current = openBrowser;
-
-  useEffect(() => {
-    if (!host.current) return;
-    const instance = new Terminal({
-      disableStdin: true,
-      convertEol: true,
-      cursorBlink: false,
-      fontFamily: '"SFMono-Regular", Consolas, "Liberation Mono", monospace',
-      fontSize: 12,
-      lineHeight: 1.35,
-      scrollback: 10_000,
-      theme: {
-        background: "#0b0d0e",
-        foreground: "#d8ddda",
-        selectionBackground: "#48685899",
-        cursor: "#a8c8b2"
-      }
-    });
-    const fitAddon = new FitAddon();
-    const searchAddon = new SearchAddon();
-    instance.loadAddon(fitAddon);
-    instance.loadAddon(searchAddon);
-    instance.open(host.current);
-    instance.registerLinkProvider({
-      provideLinks(lineNumber, callback) {
-        const line = instance.buffer.active.getLine(lineNumber)?.translateToString() ?? "";
-        const links = [...line.matchAll(/https?:\/\/[^\s<>"')\]]+/g)].map((match) => ({
-          text: match[0],
-          range: {
-            start: { x: (match.index ?? 0) + 1, y: lineNumber },
-            end: { x: (match.index ?? 0) + match[0].length + 1, y: lineNumber }
-          },
-          activate: () => openBrowserRef.current(match[0])
-        }));
-        callback(links);
-      }
-    });
-    terminal.current = instance;
-    fit.current = fitAddon;
-    search.current = searchAddon;
-    fitAddon.fit();
-    const observer = new ResizeObserver(() => fitAddon.fit());
-    observer.observe(host.current);
-    return () => {
-      if (session?.id) cacheTerminalViewport(session.id, instance.buffer.active.viewportY);
-      observer.disconnect();
-      instance.dispose();
-    };
-  }, []);
-
-  useEffect(() => {
-    const instance = terminal.current;
-    if (!instance) return;
-    instance.reset();
-    if (!session) {
-      instance.writeln("\x1b[38;5;245mCreate or select a session to begin.\x1b[0m");
-      return;
-    }
-    instance.writeln(`\x1b[1;38;5;151m${session.title}\x1b[0m  \x1b[38;5;245m${session.projectPath}\x1b[0m`);
-    instance.writeln("");
-    session.events.forEach((event) => instance.write(ansi(event)));
-    const viewport = normalizeTerminalViewport(terminalViewports.get(session.id));
-    if (viewport === undefined) instance.scrollToBottom();
-    else instance.scrollToLine(viewport);
-    return () => {
-      cacheTerminalViewport(session.id, instance.buffer.active.viewportY);
-    };
-  }, [session?.id, session?.events]);
-
-  return (
-    <section className="terminal-shell" aria-label="Display-only Codex runner">
-      <div className="terminal-tools">
-        <Badge tone="sage">Display only</Badge>
-        <label className="transcript-search">
-          <Search aria-hidden="true" size={15} />
-          <input
-            aria-label="Search transcript"
-            placeholder="Search transcript"
-            value={needle}
-            onChange={(event) => setNeedle(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") search.current?.findNext(needle);
-            }}
-          />
-        </label>
-        <IconButton label="Previous transcript match" icon={ArrowUp} onClick={() => search.current?.findPrevious(needle)} />
-        <IconButton label="Next transcript match" icon={ArrowDown} onClick={() => search.current?.findNext(needle)} />
-        <Button icon={Copy} tone="quiet" onClick={() => navigator.clipboard.writeText(terminal.current?.getSelection() ?? "")}>Copy</Button>
-      </div>
-      <div className="terminal-host" ref={host} />
-    </section>
-  );
-}
 
 function InteractionCard({
   interaction,
@@ -807,7 +680,7 @@ function Workspace({ state, models, selectedSession, surface, setSurface, error,
     </>}</div>}
     <PersistentSurfaces
       active={surface}
-      runner={<><RunnerTerminal {...(selectedSession ? { session: selectedSession } : {})} openBrowser={openBrowser} /><Composer {...(selectedSession ? { session: selectedSession } : {})} hideInteractions={hideInteractions} /></>}
+      runner={<><RunnerTranscript {...(selectedSession ? { session: selectedSession } : {})} openBrowser={openBrowser} /><Composer {...(selectedSession ? { session: selectedSession } : {})} hideInteractions={hideInteractions} /></>}
       alignment={<AlignmentSurface alignment={alignment} openBrowser={openBrowser} />}
       deck={<DeckSurface document={alignment.document} />}
       canvas={<CanvasSurface document={alignment.document} />}

@@ -5,20 +5,26 @@ separate Electron app from legacy Chromux in `../prototype/`: it has a distinct
 package, bundle identifier, user-data directory, architecture, and release
 line.
 
-## Current prerelease: v0.13.1
+## Current prerelease: v0.14.0
 
 This runner-first prerelease includes:
+
+- A read-only conversational transcript with right-aligned user bubbles,
+  left-aligned agent bubbles, and full-width code, tables, ANSI/ASCII output,
+  graphic links, and expandable runtime activity. DOM search reveals collapsed
+  matches, session-local scrolling follows streaming output only near the
+  bottom, and remote graphics never load without an explicit Browser click.
 
 - An opt-in GBlockParty Fleet picker and distinct attached-terminal tabs for
   daemon-owned Codex sessions. Remote tabs reconnect with their last replay
   cursor, visibly clear history on a replay gap, route input and resize through
   the main process, and detach without stopping the session.
 
-- Safe transcript viewport recovery: xterm positions are normalized to
-  non-negative integers before the in-memory cache can restore them, and
-  missing or non-finite positions return to the transcript bottom. A root
-  renderer error boundary replaces future React blank screens with a concise
-  diagnostic, persisted-session assurance, and a renderer-only reload action.
+- Safe transcript viewport recovery: each session retains its DOM scroll
+  position in memory and restores at the bottom when no position exists. A
+  root renderer error boundary replaces future React blank screens with a
+  concise diagnostic, persisted-session assurance, and a renderer-only reload
+  action.
 
 - An experimental Situation Room (`npm run start:situation-room`) that presents
   all pending agent questions and approvals in one chronological decision queue
@@ -71,7 +77,7 @@ This runner-first prerelease includes:
   handling, and focus restoration.
 - Polished runner, transcript, Composer, approval, attention, detect-first onboarding,
   Settings, New Session, empty/error, renderer-recovery, and Alignment states.
-  Packaged visual qualification now reviews 30 standard and narrow captures.
+  Packaged visual qualification now reviews 32 standard and narrow captures.
 - First-run successor-native onboarding with a native project/worktree folder
   chooser, a persisted project registry, and editable default permission,
   model, and reasoning preferences for new sessions.
@@ -110,9 +116,10 @@ This runner-first prerelease includes:
 
 - Project and custom group tabs with resumable Codex sessions backed by one
   main-process-owned `codex app-server` over JSONL stdio.
-- A display-only xterm transcript, session-specific fixed composer, same-turn
-  steering, interruption, bounded drafts, explicit-click links, search, copy,
-  and scrollback.
+- A DOM-based conversational transcript, session-specific fixed composer,
+  same-turn steering, interruption, bounded drafts, explicit-click links,
+  search, selection copy, and scroll restoration. xterm is reserved for
+  interactive GBlockParty remote terminal tabs.
 - Structured command/file/network approvals and agent questions that are
   correlated to a single thread and fail closed for unknown request types.
 - Workspace and read-only permission presets, Codex model discovery, bounded
@@ -123,8 +130,8 @@ This runner-first prerelease includes:
 - Alignment, Deck, Canvas, and Browser secondary surfaces that preserve runner
   session state.
 
-The runner uses structured app-server events rather than a raw PTY. xterm stdin
-is disabled; all user text enters through the composer.
+The runner uses structured app-server events rather than a raw PTY. Its DOM
+transcript has no input surface; all user text enters through the composer.
 
 ## Run
 

@@ -21,6 +21,48 @@ h1, h2, h3, h4, p { overflow-wrap: anywhere; }
 .transcript-search input { width: 150px; min-height: 28px; padding: 0; border: 0; outline: 0; background: transparent; }
 .terminal-host { min-height: 0; padding: var(--space-3); overflow: hidden; }
 .terminal-host .xterm { height: 100%; }
+.transcript-shell { color: var(--graphite-100); background: var(--graphite-925); }
+.transcript-match-count { min-width: 58px; color: var(--graphite-400); font-size: 11px; text-align: right; }
+.transcript-scroll { min-height: 0; overflow: auto; padding: var(--space-4) clamp(var(--space-3), 3vw, var(--space-6)) var(--space-6); scroll-behavior: smooth; }
+.transcript-scroll:focus-visible { outline: 2px solid var(--sage-500); outline-offset: -2px; }
+.transcript-heading { display: grid; gap: 2px; margin: 0 auto var(--space-5); padding-bottom: var(--space-3); border-bottom: 1px solid var(--graphite-800); }
+.transcript-heading span, .transcript-role { color: var(--graphite-400); font-size: 10px; letter-spacing: .07em; text-transform: uppercase; }
+.transcript-heading span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: none; letter-spacing: 0; }
+.transcript-empty { color: var(--graphite-400); text-align: center; }
+.transcript-message { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; margin: var(--space-4) 0; }
+.transcript-message.user { align-items: flex-end; }
+.transcript-bubble { width: fit-content; max-width: min(76%, 760px); padding: 10px 14px; border: 1px solid #526259; border-radius: 16px 16px 16px 5px; color: var(--graphite-100); background: #26312c; box-shadow: var(--shadow-1); overflow-wrap: anywhere; }
+.transcript-message.user .transcript-bubble { border-color: #53768b; border-radius: 16px 16px 5px 16px; background: #29475a; }
+.transcript-markdown p { margin: 0; }
+.transcript-markdown p + p, .transcript-markdown p + ul, .transcript-markdown p + ol, .transcript-markdown ul + p, .transcript-markdown ol + p { margin-top: var(--space-2); }
+.transcript-markdown ul, .transcript-markdown ol { margin: 0; padding-left: 1.4em; }
+.transcript-markdown li + li { margin-top: 3px; }
+.transcript-rich { align-self: stretch; width: 100%; max-width: 100%; margin: var(--space-2) 0; border: 1px solid var(--graphite-700); border-radius: var(--radius-md); background: #0d1110; }
+.transcript-code { overflow: hidden; }
+.transcript-code figcaption { padding: 6px 12px; border-bottom: 1px solid var(--graphite-700); color: var(--graphite-400); font: 10px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; text-transform: uppercase; }
+.transcript-code pre, .transcript-terminal { margin: 0; padding: 13px 15px; overflow: auto; white-space: pre; tab-size: 4; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.transcript-terminal { color: #d8ddda; }
+.transcript-table-wrap { overflow: auto; }
+.transcript-table-wrap table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.transcript-table-wrap th, .transcript-table-wrap td { padding: 9px 11px; border-right: 1px solid var(--graphite-700); border-bottom: 1px solid var(--graphite-700); text-align: left; vertical-align: top; }
+.transcript-table-wrap th { color: var(--sage-300); background: var(--graphite-850); }
+.transcript-table-wrap tr:last-child td { border-bottom: 0; }
+.transcript-graphic { display: grid; gap: 4px; padding: 13px 15px; color: var(--graphite-100); text-align: left; cursor: pointer; }
+.transcript-graphic span { color: var(--info); font-size: 10px; font-weight: 750; letter-spacing: .07em; text-transform: uppercase; }
+.transcript-graphic small { overflow: hidden; color: var(--graphite-400); text-overflow: ellipsis; white-space: nowrap; }
+.transcript-link { display: inline; min-height: 0; padding: 0; border: 0; color: #9dc9e2; background: transparent; font: inherit; text-decoration: underline; overflow-wrap: anywhere; cursor: pointer; }
+.transcript-activity { margin: var(--space-2) 0; border-top: 1px solid var(--graphite-800); color: var(--graphite-300); }
+.transcript-activity summary { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: var(--space-2); padding: 8px 4px; cursor: pointer; font-size: 12px; }
+.transcript-activity summary > span { color: var(--graphite-400); font-size: 10px; font-weight: 750; letter-spacing: .05em; text-transform: uppercase; }
+.transcript-activity.error { border-color: color-mix(in srgb, var(--danger) 35%, transparent); }
+.transcript-activity.error summary > span { color: var(--danger); }
+.transcript-activity-detail { padding: 0 0 var(--space-2) 100px; }
+.transcript-activity-detail .transcript-markdown { color: var(--graphite-300); font-size: 12px; }
+.transcript-scroll mark { padding: 0 1px; color: #17130a; background: #d8b96c; border-radius: 2px; }
+.transcript-scroll mark[data-current="true"] { color: #fff; background: #b75f36; outline: 2px solid #edc092; }
+.ansi-30, .ansi-90 { color: #77817b; } .ansi-31, .ansi-91 { color: #e5847e; } .ansi-32, .ansi-92 { color: #83bd96; }
+.ansi-33, .ansi-93 { color: #d8b66e; } .ansi-34, .ansi-94 { color: #84acd0; } .ansi-35, .ansi-95 { color: #c69acb; }
+.ansi-36, .ansi-96 { color: #7fc1bf; } .ansi-37, .ansi-97 { color: #edf2ee; }
 .composer-panel { display: grid; gap: var(--space-3); padding: var(--space-3); border-top: 1px solid var(--graphite-800); background: var(--graphite-900); }
 .composer-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-3); align-items: end; }
 .composer-row textarea { min-height: 84px; max-height: 210px; background: var(--graphite-850); }
@@ -269,6 +311,10 @@ i.failed { background: var(--danger); }
   .alignment-toolbar .document-state { display: none; }
 }
 @media (max-width: 700px) {
+  .transcript-shell .terminal-tools { flex-wrap: wrap; }
+  .transcript-bubble { max-width: 90%; }
+  .transcript-activity-detail { padding-left: 0; }
+  .transcript-activity summary { grid-template-columns: 72px minmax(0, 1fr); }
   .terminal-tools > .ui-badge, .terminal-tools .ui-button span { display: none; }
   .transcript-search { margin-left: auto; }
   .composer-row { grid-template-columns: minmax(0, 1fr); }

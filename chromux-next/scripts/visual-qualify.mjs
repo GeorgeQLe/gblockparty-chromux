@@ -18,7 +18,7 @@ await access(executable);
 const destination = path.resolve(process.argv[2] ?? await mkdtemp(path.join(os.tmpdir(), "chromux-next-visual-")));
 const userData = await mkdtemp(path.join(os.tmpdir(), "chromux-next-visual-state-"));
 const at = new Date().toISOString();
-const event = (id, sessionId, kind, text) => ({ schemaVersion: 1, id, sessionId, at, kind, text, links: [] });
+const event = (id, sessionId, kind, text, phase) => ({ schemaVersion: 1, id, sessionId, at, kind, text, links: [], ...(phase ? { phase } : {}) });
 const session = (id, title, groupId, status, extra = {}) => ({
   schemaVersion: 1,
   id,
@@ -80,7 +80,12 @@ await writeFile(path.join(userData, "state-v1.json"), `${JSON.stringify({
       { schemaVersion: 1, id: "group-release", title: "Release qualification", kind: "custom", sessionIds: ["session-failed", "session-idle"], createdAt: at, updatedAt: at }
     ],
     sessions: [
-      session("session-approval", "Resolve package approval", "group-project", "idle", { threadId: "visual-thread-approval", interactions: [approval] }),
+      session("session-approval", "Resolve package approval", "group-project", "idle", { threadId: "visual-thread-approval", interactions: [approval], events: [
+        event("visual-user", "session-approval", "user", "Turn the runner transcript into a calm, conversational workspace."),
+        event("visual-reasoning", "session-approval", "reasoning", "Reviewing transcript structure and responsive behavior."),
+        event("visual-command", "session-approval", "command", "npm run typecheck\nCompleted successfully", "completed"),
+        event("visual-agent", "session-approval", "agent", "The conversational transcript is ready. Wrapped prose stays aligned inside each bubble.\n\n- User messages sit on the right\n- Agent messages sit on the left\n\n```tsx\n<RunnerTranscript session={session} />\n```\n\n| Surface | Presentation |\n| --- | --- |\n| Prose | Bubble |\n| Code and tables | Full width |\n\n![Transcript layout](https://example.com/transcript-layout.png)")
+      ] }),
       session("session-question", "Choose publication strategy", "group-project", "idle", { threadId: "visual-thread-question", interactions: [question] }),
       session("session-active", "Implement five interface approaches", "group-project", "active", { activeTurnId: "visual-turn-active" }),
       session("session-ready", "Review accessibility fallbacks", "group-project", "idle"),
@@ -93,8 +98,10 @@ await writeFile(path.join(userData, "state-v1.json"), `${JSON.stringify({
     triage: []
   }
 }, null, 2)}\n`);
+const scenarioPath = path.join(userData, "situation-room-scenario.json");
+await writeFile(scenarioPath, JSON.stringify({ version: "0.146.0" }));
 const child = spawn(executable, [`--visual-smoke-dir=${destination}`], {
-  env: { ...process.env, CHROMUX_NEXT_SMOKE_USER_DATA: userData },
+  env: { ...process.env, CHROMUX_NEXT_SMOKE_USER_DATA: userData, CHROMUX_NEXT_FIXTURE_SCENARIO: scenarioPath },
   stdio: ["ignore", "pipe", "pipe"]
 });
 let output = "";
@@ -106,11 +113,9 @@ const exitCode = await new Promise((resolve, reject) => {
   child.once("exit", resolve);
 });
 clearTimeout(timeout);
-if (exitCode !== 0 || !output.includes("visual qualification captured 30 views")) {
+if (exitCode !== 0 || !output.includes("visual qualification captured 32 views")) {
   throw new Error(`Packaged visual qualification failed (${exitCode}): ${output.slice(-4_000)}`);
 }
-const scenarioPath = path.join(userData, "situation-room-scenario.json");
-await writeFile(scenarioPath, JSON.stringify({ version: "0.146.0" }));
 const situation = spawn(executable, [`--visual-smoke-dir=${destination}`, "--situation-room"], {
   env: { ...process.env, CHROMUX_NEXT_SMOKE_USER_DATA: userData, CHROMUX_NEXT_FIXTURE_SCENARIO: scenarioPath },
   stdio: ["ignore", "pipe", "pipe"]

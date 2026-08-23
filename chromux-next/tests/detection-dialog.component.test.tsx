@@ -10,7 +10,6 @@ import type { WorkspacePreferencesV1 } from "../src/settings/workspace-preferenc
 
 vi.mock("@xterm/xterm", () => ({ Terminal: class {} }));
 vi.mock("@xterm/addon-fit", () => ({ FitAddon: class {} }));
-vi.mock("@xterm/addon-search", () => ({ SearchAddon: class {} }));
 
 const detection = {
   schemaVersion: 1 as const,
