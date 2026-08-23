@@ -10,6 +10,8 @@ Tag: `chromux-next-v0.13.1`
 - Suppress Codex's duplicate startup update checks only in those owned
   app-server and Luna subprocesses; the user's shell and Codex configuration
   remain unchanged.
+- Preserve macOS extended code-signature data in update ZIPs and independently
+  verify the extracted archive before generating its manifest.
 - This successor-only patch remains on the `chromux-next-vX.Y.Z` prerelease
   channel and does not replace legacy `/releases/latest`.
 
