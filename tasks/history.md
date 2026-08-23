@@ -41,7 +41,12 @@
   report `e317003dc33f8866d92f1446de55d6e0ea1903430dd85d1b3e800d27889f6342`.
   Both the packaged app and a separately extracted archive passed strict deep
   codesign, Gatekeeper `Notarized Developer ID`, stapler validation, bundle
-  version `0.14.0`, and arm64-host verification.
+  version `0.14.0`, and arm64-host verification. The matching tag and
+  non-draft GitHub prerelease are public with the exact ZIP and manifest; a
+  fresh public download matched the manifest and candidate checksum and its
+  extracted app independently passed the same codesign, Gatekeeper, stapler,
+  and version checks. GitHub `/releases/latest` remains legacy
+  `chromux-v0.81.0`.
 - **Adversarial review:** Applied the quality-gate contract with a changed-file
   failure review of malformed/unclosed Markdown, bounded long input, nested
   presentation order, ANSI/OSC control stripping, HTML injection, remote
@@ -64,8 +69,8 @@
 - **Rollback note:** Delete the `chromux-next-v0.14.0` prerelease/tag and revert
   the shipping commit. Chromux Next 0.13.1 and legacy stable remain available;
   there is no migration or persistence rollback.
-- **Next command:** Commit and push the verified boundary, then publish and
-  independently download/reverify `chromux-next-v0.14.0`.
+- **Next command:** None for v0.14.0; continue the separate Chromux Next
+  cutover-gate work when scheduled.
 
 ## 2026-08-21 — Chromux Next v0.13.0 GBlockParty fleet attachment
 
