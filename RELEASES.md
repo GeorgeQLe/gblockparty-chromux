@@ -1,5 +1,18 @@
 # Release Notes
 
+## GBlockParty Chromux Next v0.13.1 (prerelease)
+
+Tag: `chromux-next-v0.13.1`
+
+- Restore Codex CLI discovery in Finder-launched packaged macOS builds by
+  adding the standard Homebrew, local, npm, Bun, and Volta executable locations
+  to Chromux-owned subprocesses.
+- Suppress Codex's duplicate startup update checks only in those owned
+  app-server and Luna subprocesses; the user's shell and Codex configuration
+  remain unchanged.
+- This successor-only patch remains on the `chromux-next-vX.Y.Z` prerelease
+  channel and does not replace legacy `/releases/latest`.
+
 ## GBlockParty Chromux Next v0.13.0 (prerelease)
 
 Tag: `chromux-next-v0.13.0`

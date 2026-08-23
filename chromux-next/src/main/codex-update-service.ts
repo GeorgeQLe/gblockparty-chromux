@@ -1,6 +1,5 @@
 import { execFile } from "node:child_process";
 import { access, realpath } from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { constants } from "node:fs";
 import { promisify } from "node:util";
@@ -8,6 +7,7 @@ import type { RunnerManager } from "../runner/manager";
 import type { UpdateTargetState } from "../updates/contracts";
 import { compareSemver } from "../updates/semver";
 import { getJson } from "../updates/network";
+import { chromuxOwnedCodexEnvironment, codexSearchPath } from "./codex-environment";
 
 const execute = promisify(execFile);
 const RELEASE_API = new URL("https://api.github.com/repos/openai/codex/releases/latest");
@@ -36,7 +36,7 @@ export class CodexUpdateService {
   private installing = false;
   private readonly searchPath: string;
   constructor(private readonly runner: RunnerManager, private readonly changed: (state: UpdateTargetState) => void, private readonly options: CodexUpdateOptions = {}) {
-    this.searchPath = options.path ?? [process.env.PATH, "/opt/homebrew/bin", "/usr/local/bin", path.join(os.homedir(), ".local/bin"), path.join(os.homedir(), ".npm-global/bin"), path.join(os.homedir(), ".bun/bin"), path.join(os.homedir(), ".volta/bin")].filter(Boolean).join(path.delimiter);
+    this.searchPath = options.path ?? codexSearchPath();
   }
 
   getState(): UpdateTargetState { return structuredClone(this.state); }
@@ -63,7 +63,7 @@ export class CodexUpdateService {
     try {
       await this.runner.beginMaintenance(); maintenanceStarted = true;
       this.update({ ...this.state, phase: "installing", blockers: [], progressLabel: "Running the supported Codex updater and verifying the result…" });
-      await (this.options.run ?? execute)(this.executable, ["update"], { timeout: 5 * 60_000, maxBuffer: 32 * 1024, env: { ...process.env, PATH: this.searchPath, CODEX_DISABLE_UPDATE_PROMPT: "1", CODEX_DISABLE_UPDATE_CHECK: "1" } });
+      await (this.options.run ?? execute)(this.executable, ["update"], { timeout: 5 * 60_000, maxBuffer: 32 * 1024, env: { ...chromuxOwnedCodexEnvironment(), PATH: this.searchPath } });
       const version = await this.installedVersion(this.executable);
       if (compareSemver(version, this.state.currentVersion) <= 0 || compareSemver(version, this.state.latestVersion) < 0) throw new Error("Codex version did not increase to the expected release");
       await this.runner.resumeAfterMaintenance();
@@ -93,7 +93,7 @@ export class CodexUpdateService {
       if (parseCodexVersion(npmPayload.version) !== latestVersion) throw new Error("The newest Codex release is not available from npm yet");
     }
     const releaseUrl = installKind !== "homebrew" && typeof payload.html_url === "string" && payload.html_url.startsWith("https://github.com/openai/codex/releases/") ? payload.html_url : RELEASE_URL;
-    const childEnv = { ...process.env, PATH: this.searchPath, CODEX_DISABLE_UPDATE_PROMPT: "1", CODEX_DISABLE_UPDATE_CHECK: "1" };
+    const childEnv = { ...chromuxOwnedCodexEnvironment(), PATH: this.searchPath };
     const help = await (this.options.run ?? execute)(this.executable, ["update", "--help"], { timeout: 10_000, maxBuffer: 32 * 1024, env: childEnv }).catch(() => undefined);
     const supported = Boolean(help && /update/i.test(`${help.stdout}\n${help.stderr}`));
     const available = compareSemver(latestVersion, currentVersion) > 0;
@@ -101,7 +101,7 @@ export class CodexUpdateService {
   }
 
   private async installedVersion(executable: string): Promise<string> {
-    const result = await (this.options.run ?? execute)(executable, ["--version"], { timeout: 10_000, maxBuffer: 32 * 1024, env: { ...process.env, PATH: this.searchPath, CODEX_DISABLE_UPDATE_PROMPT: "1", CODEX_DISABLE_UPDATE_CHECK: "1" } });
+    const result = await (this.options.run ?? execute)(executable, ["--version"], { timeout: 10_000, maxBuffer: 32 * 1024, env: { ...chromuxOwnedCodexEnvironment(), PATH: this.searchPath } });
     const version = parseCodexVersion(`${result.stdout}\n${result.stderr}`); if (!version) throw new Error("Could not read the installed Codex version"); return version;
   }
 

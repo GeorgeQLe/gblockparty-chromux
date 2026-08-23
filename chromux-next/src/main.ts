@@ -58,6 +58,7 @@ import { IpcHandlerRegistry } from "./ipc/registry";
 import { BrowserEvidenceWorkflow } from "./browser/workflow";
 import { UpdateService } from "./main/update-service";
 import { CodexUpdateService } from "./main/codex-update-service";
+import { chromuxOwnedCodexEnvironment } from "./main/codex-environment";
 import { ControlPlaneClient } from "./control-plane/client";
 
 if (started) app.quit();
@@ -96,11 +97,12 @@ const runnerSmokeOptions = (runnerSmokePhase || browserEvidenceSmokeUrl || (situ
   restartDelaysMs: [20, 40, 80],
   shutdownGraceMs: 250
 } : undefined;
+const ownedCodexOptions = runnerSmokeOptions ?? { env: chromuxOwnedCodexEnvironment() };
 const runner = new RunnerManager(
-  new CodexAppServer(runnerSmokeOptions),
+  new CodexAppServer(ownedCodexOptions),
   localStore,
-  new LunaAnalyzer(path.join(app.getPath("userData"), "attention-analyzer"), runnerSmokeOptions),
-  new LunaAnalyzer(path.join(app.getPath("userData"), "session-title-analyzer"), runnerSmokeOptions)
+  new LunaAnalyzer(path.join(app.getPath("userData"), "attention-analyzer"), ownedCodexOptions),
+  new LunaAnalyzer(path.join(app.getPath("userData"), "session-title-analyzer"), ownedCodexOptions)
 );
 const updates = new UpdateService(localStore, runner, {
   currentVersion: app.getVersion(), userDataPath: app.getPath("userData"),
