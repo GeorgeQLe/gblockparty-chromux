@@ -1,5 +1,33 @@
 # Session History
 
+## 2026-08-24 — Chromux Next v0.14.2 manual bootstrap
+
+- Replaced installed signed v0.13.1 with the independently verified public
+  v0.14.2 app after confirming the remaining process used only the isolated UAT
+  profile and had no active turn. Preserved the old bundle both at
+  `/Applications/Chromux Next.app.bootstrap-backup` and under
+  `/private/tmp/chromux-next-bootstrap-0.14.2.oLkLF3` before replacement.
+- The installed copy reports version/build 0.14.2 and arm64, passes strict
+  codesign for bundle `dev.georgele.chromux.next` and Team `NC56VXK48K`, passes
+  Gatekeeper as `Notarized Developer ID`, and has a valid stapled ticket.
+- Launched the exact `/Applications/Chromux Next.app` path. UI inspection showed
+  the normal profile and its prior sessions restored; process inspection showed
+  the normal application-support directory and no `ELECTRON_RUN_AS_NODE`,
+  `CHROMUX_NEXT_SMOKE_USER_DATA`, or injected `CODEX_HOME` environment.
+- **Validation classification:** Executable proof is the installed-bundle trust
+  assessment, exact-path live process, and Computer Use UI/profile inspection.
+  This commit changes documentation/task state only, so application tests were
+  not rerun; the published v0.14.2 executable remains byte-for-byte the already
+  qualified artifact.
+- **Residual gate:** Qualify the next signed successor through the managed
+  updater starting from this corrected v0.14.2 bootstrap. Do not rewrite the
+  immutable public v0.12.0 release; retain its safe-failure result as history.
+- **Rollback:** Quit v0.14.2, move the adjacent v0.13.1 backup back to the exact
+  installed path, and revalidate its signature. The second temporary copy is
+  retained until the bootstrap is no longer considered rollback-sensitive.
+- **Next command:** When a newer successor exists, rerun the signed managed
+  update and rollback matrix from installed v0.14.2.
+
 ## 2026-08-24 — Chromux Next v0.14.2 publication and signed helper gate
 
 - Published annotated tag and non-draft prerelease `chromux-next-v0.14.2`

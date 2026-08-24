@@ -50,7 +50,7 @@ No active priority documentation items.
     Evidence is recorded in `chromux-next/docs/uat-0.12.0.md`; the unique UAT
     directory is preserved. Keep this gate open.
 
-- [ ] Fix and publish Chromux Next v0.14.1 for the managed-update gate: make
+- [x] Fix and publish Chromux Next v0.14.1 for the managed-update gate: make
   stale staged-bundle cleanup reliable, preserve a sanitized actionable
   failure category, and make rollback relaunch the exact restored app as a new
   instance with the intended profile even when the bundle ID is already
@@ -64,10 +64,12 @@ No active priority documentation items.
     inherited `ELECTRON_RUN_AS_NODE` relaunch failure in the real 45-second
     window and was superseded by corrective v0.14.2. Public v0.14.2 passes
     independent trust, successful exact-helper replacement, and real-timeout
-    same-ID rollback with isolated profile continuity. The parent gate remains
-    open because immutable public v0.12.0 uses its own embedded pre-fix helper
-    for forward replacement; choose a new manual bootstrap or explicitly
-    authorize replacing that old artifact before the complete matrix can pass.
+    same-ID rollback with isolated profile continuity. The accepted manual
+    bootstrap route installed independently verified public v0.14.2 into
+    `/Applications` on 2026-08-24, restored the normal profile, and showed no
+    helper/smoke environment leakage. The parent gate remains open only for a
+    future managed update from this corrected bootstrap to a newer signed
+    successor; the immutable v0.12.0 failure remains historical evidence.
 
 - [x] Complete the runner-first hardening matrix with deterministic fake
   app-server and Luna processes for fragmented JSONL, crash/backoff/recovery,

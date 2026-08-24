@@ -1,6 +1,6 @@
 # Chromux Next 0.14.2 Updater UAT
 
-## 2026-08-24 result: PARTIAL PASS — bootstrap gate remains open
+## 2026-08-24 result: PARTIAL PASS — manual bootstrap complete
 
 Public v0.14.2 is correctly published and independently trusted. Its helper
 passes both successful exact replacement and the required real-timeout
@@ -22,6 +22,7 @@ target app code is not available until after that helper relaunches.
 | Public v0.14.2 helper successful replacement | PASS | Exact 0.14.2 process, marker consumed, backup removed, thread/draft retained |
 | Public v0.14.2 helper 45-second rollback | PASS | Signed 0.14.2 restored while same-ID peer stayed live; distinct exact process and isolated marker appeared; backup removed |
 | Relaunch environment | PASS | Restored process retained isolated `CHROMUX_NEXT_SMOKE_USER_DATA` and `CODEX_HOME`; helper mode was absent |
+| Manual installed bootstrap | PASS | `/Applications/Chromux Next.app` replaced with independently verified public 0.14.2; normal profile restored; no helper/smoke environment leakage |
 
 Evidence is preserved at
 `/private/tmp/chromux-next-managed-update-uat-0.14.1.idJjiT`. The first empty-app
@@ -30,10 +31,12 @@ registration cache; the deterministic rerun used a real app bundle with its
 executable unavailable and exercised the full timeout. Both temporary UAT
 processes were stopped after verification.
 
-The next gate decision is explicit: publish a new manually installed bootstrap
-whose embedded helper contains the fix, or accept a controlled replacement of
-the immutable v0.12.0 artifact. Do not close the v0.12.0 gate based only on
-target-version helper proof.
+The manual bootstrap route was accepted and completed on 2026-08-24. The prior
+signed v0.13.1 bundle remains recoverable at
+`/Applications/Chromux Next.app.bootstrap-backup` and in the preserved bootstrap
+evidence directory. The remaining gate is a future managed update from this
+v0.14.2 bootstrap to a newer signed successor; the historical immutable v0.12.0
+forward lane remains documented as a safe failure rather than being rewritten.
 
 ## Corrective gate
 
