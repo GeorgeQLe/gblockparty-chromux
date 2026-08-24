@@ -1,5 +1,58 @@
 # Session History
 
+## 2026-08-24 — Chromux Next v0.14.2 helper-mode correction candidate
+
+- **User goal:** Finish the scoped updater cleanup and exact rollback-relaunch
+  release after the public v0.14.1 real-helper gate exposed an inherited
+  Electron helper-mode failure.
+- **Changed files and per-file purpose:** `scripts/update-helper-core.cjs`
+  removes `ELECTRON_RUN_AS_NODE` only from the `/usr/bin/open` subprocess
+  environment while retaining exact `-n` targeting and explicit isolated
+  profile arguments; its integration test proves the removed flag cannot reach
+  LaunchServices and unrelated parent values remain. Package metadata and
+  release notes define corrective successor v0.14.2. Architecture and the two
+  UAT documents record the public v0.14.1 failure and v0.14.2 gate; task state
+  keeps the parent managed-update gate open until the public rerun completes.
+- **User-goal mapping:** The updater helper itself must run Electron with
+  `ELECTRON_RUN_AS_NODE=1`, but the relaunched app must not inherit that flag.
+  Removing it at the exact child-process boundary lets replacement and rollback
+  start Electron application mode without changing the target path, new-instance
+  guarantee, isolated profiles, backup transaction, or startup-marker timeout.
+- **Tests run:** A real public v0.12.0 managed replacement staged public v0.14.1,
+  preserved its authenticated thread and unsent draft, then timed out and
+  restored signed v0.12.0 with no backup. Reproducing `/usr/bin/open` with the
+  inherited flag produced no process; removing only that flag produced the
+  exact isolated process and startup marker. After the fix, focused typecheck
+  and 2 files/16 updater tests passed. Final-diff `npm run verify` passed all 31
+  files/187 tests, macOS arm64 packaging, baseline/Situation Room smokes,
+  two-launch restoration, and browser-evidence smoke. `npm run make:update`
+  signed, notarized, stapled, and independently verified the packaged/extracted
+  app. The 120,040,322-byte ZIP and manifest agree on SHA-256
+  `07dd99b31dfc77139c473c970f62818573bee0a2654e428bf80945d400df0991`;
+  strict codesign, exact bundle ID/Team, Gatekeeper, stapler, version 0.14.2,
+  and arm64 inspection passed.
+- **Skipped tests:** Visual qualification remains inapplicable because no UI
+  changed. Public redownload and the real replacement/rollback matrix require
+  the new tag/release and follow this exact candidate commit. Windows/Linux
+  packages remain in the separate cutover gate.
+- **Adversarial review:** Extended the v0.14.1 failure-oriented review through
+  the actual helper process tree and environment boundary. It checked removing
+  too much environment, leaving the Node-only flag in `open`, changing exact
+  target/profile arguments, weakening detached launch, and hiding the public
+  failed evidence. The regression fixes the missed child-environment condition;
+  v0.14.1 remains immutable and explicitly superseded rather than retagged.
+- **Residual risk:** The real public v0.14.2 matrix remains the final proof that
+  LaunchServices, startup-marker consumption, backup cleanup, and collision
+  rollback all work with the signed artifact. The candidate does not change
+  the older public v0.12.0 helper, so forward replacement from that bootstrap
+  still requires no other bundle-ID peer; the v0.14.2 rollback lane explicitly
+  exercises the fixed helper with a peer present.
+- **Rollback note:** Before publication, revert this corrective commit. After
+  publication, delete prerelease/tag `chromux-next-v0.14.2` and revert it;
+  public v0.14.1 remains the prior evidence artifact but is not recommended.
+- **Next command:** Commit/tag/push v0.14.2, publish and reverify its two public
+  assets, then rerun `docs/uat-0.14.2.md` using the retained isolated profile.
+
 ## 2026-08-23 — Chromux Next v0.14.1 updater recovery candidate
 
 - **User goal:** Implement and publish the scoped Chromux Next v0.14.1 updater

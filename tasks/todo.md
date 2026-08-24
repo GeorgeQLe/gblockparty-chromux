@@ -59,9 +59,12 @@ No active priority documentation items.
   _(source: 2026-08-23 live managed-update UAT; successor-only scope:
   `chromux-next/`; target patch: `0.14.1`)_
   - Implementation, focused regressions, the complete 31-file/187-test verify
-    matrix, and a signed/notarized/stapled arm64 candidate are complete. Public
-    prerelease publication and the fresh signed managed-update/rollback matrix
-    remain before this item and the parent v0.12.0 gate can close.
+    matrix, and signed/notarized/stapled arm64 candidates are complete. Public
+    v0.14.1 passed trust/staging/blocker/cancellation gates but exposed an
+    inherited `ELECTRON_RUN_AS_NODE` relaunch failure in the real 45-second
+    window and was superseded by corrective v0.14.2. Publish v0.14.2 and finish
+    its fresh signed managed-update/rollback matrix before this item and the
+    parent v0.12.0 gate can close.
 
 - [x] Complete the runner-first hardening matrix with deterministic fake
   app-server and Luna processes for fragmented JSONL, crash/backoff/recovery,

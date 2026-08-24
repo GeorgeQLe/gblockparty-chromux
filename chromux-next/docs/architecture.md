@@ -280,8 +280,9 @@ replacement uses a detached helper with an adjacent backup, startup marker,
 and rollback. Stale staging cleanup retries transient macOS filesystem races,
 and extraction remains a distinct sanitized failure. Replacement and rollback
 launch the exact installed bundle as a new instance while retaining an
-explicit isolated app/Codex profile. Clearing blockers never authorizes
-installation.
+explicit isolated app/Codex profile. The helper removes its Node-only Electron
+flag before relaunch so the installed executable starts in application mode.
+Clearing blockers never authorizes installation.
 
 ## GBlockParty fleet and attached terminals
 

@@ -10,7 +10,9 @@ const openApp = (appPath, environment = process.env, spawnProcess = spawn) => {
     if (environment[name]) args.push('--env', `${name}=${environment[name]}`);
   }
   args.push(appPath);
-  spawnProcess('/usr/bin/open', args, { detached: true, stdio: 'ignore' }).unref();
+  const launchEnvironment = { ...environment };
+  delete launchEnvironment.ELECTRON_RUN_AS_NODE;
+  spawnProcess('/usr/bin/open', args, { detached: true, stdio: 'ignore', env: launchEnvironment }).unref();
 };
 const isProcessAlive = (value) => { try { process.kill(value, 0); return true; } catch { return false; } };
 

@@ -41,13 +41,13 @@ describe("update replacement helper", () => {
 
   it("opens the exact bundle as a new instance with the isolated profile", () => {
     let invocation: unknown[] = []; let detached = false;
-    openApp("/tmp/rollback/Chromux Next.app", { CHROMUX_NEXT_SMOKE_USER_DATA: "/tmp/isolated profile", CODEX_HOME: "/tmp/isolated codex" }, (...args: unknown[]) => {
+    openApp("/tmp/rollback/Chromux Next.app", { CHROMUX_NEXT_SMOKE_USER_DATA: "/tmp/isolated profile", CODEX_HOME: "/tmp/isolated codex", ELECTRON_RUN_AS_NODE: "1", SAFE_PARENT_VALUE: "retained" }, (...args: unknown[]) => {
       invocation = args; return { unref: () => { detached = true; } };
     });
     expect(invocation).toEqual([
       "/usr/bin/open",
       ["-n", "--env", "CHROMUX_NEXT_SMOKE_USER_DATA=/tmp/isolated profile", "--env", "CODEX_HOME=/tmp/isolated codex", "/tmp/rollback/Chromux Next.app"],
-      { detached: true, stdio: "ignore" }
+      { detached: true, stdio: "ignore", env: { CHROMUX_NEXT_SMOKE_USER_DATA: "/tmp/isolated profile", CODEX_HOME: "/tmp/isolated codex", SAFE_PARENT_VALUE: "retained" } }
     ]);
     expect(detached).toBe(true);
   });

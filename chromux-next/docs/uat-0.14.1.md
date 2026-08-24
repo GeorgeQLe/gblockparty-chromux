@@ -1,5 +1,15 @@
 # Chromux Next 0.14.1 Updater UAT
 
+## Public result: superseded
+
+The signed/public 0.14.1 artifact passed trust, staging, blockers, cancellations,
+and state persistence, but the real managed replacement rolled back after its
+45-second timeout. The helper inherited `ELECTRON_RUN_AS_NODE=1`; LaunchServices
+therefore started the installed executable in Node mode and it exited before
+writing the startup marker. Clearing that helper-only variable produced the
+exact isolated process and marker. Public 0.14.1 remains available for evidence
+integrity but is superseded by corrective patch 0.14.2.
+
 ## Automated gate
 
 1. Run `npm run verify`.

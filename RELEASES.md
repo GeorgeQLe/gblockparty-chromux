@@ -1,5 +1,18 @@
 # Release Notes
 
+## GBlockParty Chromux Next v0.14.2 (prerelease)
+
+Tag: `chromux-next-v0.14.2`
+
+- Remove the helper-only `ELECTRON_RUN_AS_NODE` flag before asking
+  LaunchServices to reopen the installed app, so successful replacement and
+  rollback start Electron instead of immediately exiting in Node mode.
+- Retain the v0.14.1 stale-stage retries, sanitized retryable failure
+  categories, exact new-instance bundle targeting, and isolated profile
+  continuity.
+- This successor-only corrective patch remains a signed/notarized macOS arm64
+  prerelease and does not replace legacy `/releases/latest`.
+
 ## GBlockParty Chromux Next v0.14.1 (prerelease)
 
 Tag: `chromux-next-v0.14.1`
