@@ -11,22 +11,30 @@ import { compareSemver } from "../updates/semver";
 import { selectNextRelease, selectNextReleaseFromAtom, type NextRelease } from "../updates/release-discovery";
 import { downloadFile, getJson, getText } from "../updates/network";
 
-const run = promisify(execFile);
+type Command = (file: string, args: string[], options: { timeout: number; maxBuffer: number }) => Promise<{ stdout: string; stderr: string }>;
+const run = promisify(execFile) as Command;
 const API = new URL("https://api.github.com/repos/GeorgeQLe/gblockparty-chromux/releases?per_page=100");
 const ATOM = new URL("https://github.com/GeorgeQLe/gblockparty-chromux/releases.atom");
 const DAY_MS = 86_400_000;
 type Failure = NonNullable<UpdateStateV1["app"]["failure"]>;
+type SafeProblem = { failure: Failure; failureMessage: string; manualOnly: boolean };
 
-function safeFailure(error: unknown): { failure: Failure; failureMessage: string } {
+class UpdateOperationError extends Error {
+  constructor(readonly problem: SafeProblem) { super(problem.failureMessage); }
+}
+
+export function safeFailure(error: unknown): SafeProblem {
+  if (error instanceof UpdateOperationError) return error.problem;
   const message = error instanceof Error ? error.message : String(error);
-  if (/cancel/i.test(message)) return { failure: "cancelled", failureMessage: "The update operation was cancelled." };
-  if (/timed out/i.test(message)) return { failure: "timeout", failureMessage: "The update source did not respond in time." };
-  if (/checksum|size/i.test(message)) return { failure: "checksum", failureMessage: "The package did not match its release manifest." };
-  if (/signature|team|notari|Gatekeeper|bundle|architecture|identity/i.test(message)) return { failure: "untrusted-package", failureMessage: "The package failed macOS trust verification." };
-  if (/malformed|manifest|release/i.test(message)) return { failure: "malformed-release", failureMessage: "The release metadata was invalid." };
-  if (/HTTP|network|ENOTFOUND|ECONN/i.test(message)) return { failure: "network", failureMessage: "The update service is temporarily unavailable." };
-  if (/EACCES|EPERM|writable/i.test(message)) return { failure: "filesystem", failureMessage: "This app location is not writable. Use the release page to update manually." };
-  return { failure: "unknown", failureMessage: "The update operation failed safely." };
+  const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
+  if (/cancel/i.test(message)) return { failure: "cancelled", failureMessage: "The update operation was cancelled.", manualOnly: false };
+  if (/timed out/i.test(message)) return { failure: "timeout", failureMessage: "The update source did not respond in time.", manualOnly: false };
+  if (/checksum|size/i.test(message)) return { failure: "checksum", failureMessage: "The package did not match its release manifest.", manualOnly: false };
+  if (/signature|team|notari|Gatekeeper|bundle|architecture|identity/i.test(message)) return { failure: "untrusted-package", failureMessage: "The package failed macOS trust verification.", manualOnly: true };
+  if (/malformed|manifest|release/i.test(message)) return { failure: "malformed-release", failureMessage: "The release metadata was invalid.", manualOnly: false };
+  if (/HTTP|network|ENOTFOUND|ECONN/i.test(message)) return { failure: "network", failureMessage: "The update service is temporarily unavailable.", manualOnly: false };
+  if (/^(?:EACCES|EPERM|EROFS|ENOSPC|ENOTEMPTY|EBUSY|EMFILE|ENFILE|EIO)$/.test(code) || /EACCES|EPERM|EROFS|ENOSPC|ENOTEMPTY|EBUSY|EMFILE|ENFILE|EIO|writable/i.test(message)) return { failure: "filesystem", failureMessage: "Chromux Next could not write its private update staging area. Check free disk space and retry.", manualOnly: false };
+  return { failure: "unknown", failureMessage: "The update operation failed safely.", manualOnly: false };
 }
 
 function bundlePath(executable = process.execPath): string | undefined { return executable.match(/^(.*\.app)\/Contents\/MacOS\//)?.[1]; }
@@ -35,6 +43,7 @@ export interface UpdateServiceOptions {
   currentVersion: string; userDataPath: string; isPackaged: boolean;
   platform?: NodeJS.Platform; arch?: string; executablePath?: string; now?: () => Date;
   api?: typeof getJson; text?: typeof getText; download?: typeof downloadFile;
+  command?: Command;
 }
 
 /** Main-process-owned app updater. Renderer-visible state never contains commands or local paths. */
@@ -98,18 +107,19 @@ export class UpdateService extends EventEmitter {
     try {
       await this.verifyCurrentInstall();
       this.state.app = { ...this.state.app, phase: "downloading", progressPercent: 0, progressLabel: "Downloading and verifying the signed package…", staged: false, trust: "unknown" }; await this.publish();
-      await rm(root, { recursive: true, force: true }); await mkdir(root, { recursive: true, mode: 0o700 });
+      await rm(root, { recursive: true, force: true, maxRetries: 12, retryDelay: 250 }); await mkdir(root, { recursive: true, mode: 0o700 });
       const manifest = AppUpdateManifestSchema.parse(await (this.options.api ?? getJson)(new URL(this.release.manifestUrl), this.controller.signal));
       if (manifest.version !== version || compareSemver(manifest.version, this.options.currentVersion) <= 0) throw new Error("Manifest would not install a newer version");
       const assetUrl = new URL(`https://github.com/GeorgeQLe/gblockparty-chromux/releases/download/${manifest.tag}/${manifest.asset}`);
       const result = await (this.options.download ?? downloadFile)(assetUrl, archive, this.controller.signal, manifest.size, (bytes, total) => { if (total) this.state.app.progressPercent = Math.min(99, Math.floor(bytes / total * 100)); });
       if (result.bytes !== manifest.size || result.sha256 !== manifest.sha256) throw new Error("Package checksum or size mismatch");
       await mkdir(extracted, { mode: 0o700 });
-      await run("/usr/bin/ditto", ["-x", "-k", "--sequesterRsrc", "--rsrc", archive, extracted], { timeout: 120_000, maxBuffer: 64 * 1024 });
+      try { await this.command("/usr/bin/ditto", ["-x", "-k", "--sequesterRsrc", "--rsrc", archive, extracted], { timeout: 120_000, maxBuffer: 64 * 1024 }); }
+      catch { throw new UpdateOperationError({ failure: "extraction", failureMessage: "The verified download could not be extracted. Retry preparation; if it repeats, use the release page.", manualOnly: false }); }
       this.stagedAppPath = await this.verifyStaged(extracted, manifest.version);
       const blockers = this.runner.getMaintenanceBlockers();
       this.state.app = { ...this.state.app, phase: blockers.length ? "blocked" : "staged", progressPercent: 100, progressLabel: "Signed, notarized package verified. Installation still requires confirmation.", blockers, staged: true, trust: "verified", managedInstallSupported: true };
-    } catch (error) { this.stagedAppPath = undefined; const problem = safeFailure(error); this.state.app = { ...this.state.app, phase: "failed", staged: false, trust: problem.failure === "untrusted-package" || problem.failure === "filesystem" ? "manual-only" : "unknown", managedInstallSupported: problem.failure === "untrusted-package" || problem.failure === "filesystem" ? false : this.state.app.managedInstallSupported, ...problem, progressPercent: undefined, progressLabel: undefined }; }
+    } catch (error) { this.stagedAppPath = undefined; const problem = safeFailure(error); this.state.app = { ...this.state.app, phase: "failed", staged: false, trust: problem.manualOnly ? "manual-only" : "unknown", managedInstallSupported: problem.manualOnly ? false : this.state.app.managedInstallSupported, failure: problem.failure, failureMessage: problem.failureMessage, progressPercent: undefined, progressLabel: undefined }; }
     finally { this.controller = undefined; this.preparing = false; }
     await this.publish(); return this.getState();
   }
@@ -144,9 +154,10 @@ export class UpdateService extends EventEmitter {
 
   private async verifyCurrentInstall(): Promise<void> {
     const current = bundlePath(this.options.executablePath); if (!current) throw new Error("Current bundle identity is unavailable");
-    await access(path.dirname(current), constants.W_OK);
-    await run("/usr/bin/codesign", ["--verify", "--deep", "--strict", current], { timeout: 30_000, maxBuffer: 32 * 1024 });
-    const details = (await run("/usr/bin/codesign", ["-dv", "--verbose=4", current], { timeout: 10_000, maxBuffer: 32 * 1024 })).stderr;
+    try { await access(path.dirname(current), constants.W_OK); }
+    catch { throw new UpdateOperationError({ failure: "filesystem", failureMessage: "This app location is not writable. Use the release page to update manually.", manualOnly: true }); }
+    await this.command("/usr/bin/codesign", ["--verify", "--deep", "--strict", current], { timeout: 30_000, maxBuffer: 32 * 1024 });
+    const details = (await this.command("/usr/bin/codesign", ["-dv", "--verbose=4", current], { timeout: 10_000, maxBuffer: 32 * 1024 })).stderr;
     if (!details.includes("TeamIdentifier=NC56VXK48K")) throw new Error("Current bundle has the wrong signing Team ID");
   }
 
@@ -154,18 +165,19 @@ export class UpdateService extends EventEmitter {
     const entries = (await readdir(directory, { withFileTypes: true })).filter((entry) => entry.isDirectory() && entry.name.endsWith(".app"));
     if (entries.length !== 1) throw new Error("Package must contain exactly one app bundle");
     const bundle = path.join(directory, entries[0]!.name); const plist = path.join(bundle, "Contents", "Info.plist");
-    const readPlist = async (key: string) => (await run("/usr/bin/plutil", ["-extract", key, "raw", "-o", "-", plist], { timeout: 10_000, maxBuffer: 4096 })).stdout.trim();
+    const readPlist = async (key: string) => (await this.command("/usr/bin/plutil", ["-extract", key, "raw", "-o", "-", plist], { timeout: 10_000, maxBuffer: 4096 })).stdout.trim();
     if (await readPlist("CFBundleIdentifier") !== "dev.georgele.chromux.next") throw new Error("Wrong bundle identity");
     if (await readPlist("CFBundleShortVersionString") !== version) throw new Error("Wrong bundle version");
-    await run("/usr/bin/codesign", ["--verify", "--deep", "--strict", "--verbose=2", bundle], { timeout: 30_000, maxBuffer: 32 * 1024 });
-    const details = (await run("/usr/bin/codesign", ["-dv", "--verbose=4", bundle], { timeout: 10_000, maxBuffer: 32 * 1024 })).stderr;
+    await this.command("/usr/bin/codesign", ["--verify", "--deep", "--strict", "--verbose=2", bundle], { timeout: 30_000, maxBuffer: 32 * 1024 });
+    const details = (await this.command("/usr/bin/codesign", ["-dv", "--verbose=4", bundle], { timeout: 10_000, maxBuffer: 32 * 1024 })).stderr;
     if (!details.includes("TeamIdentifier=NC56VXK48K")) throw new Error("Wrong signing Team ID");
-    await run("/usr/sbin/spctl", ["--assess", "--type", "execute", "--verbose=4", bundle], { timeout: 30_000, maxBuffer: 32 * 1024 });
+    await this.command("/usr/sbin/spctl", ["--assess", "--type", "execute", "--verbose=4", bundle], { timeout: 30_000, maxBuffer: 32 * 1024 });
     const executable = path.join(bundle, "Contents", "MacOS", "chromux-next");
     if (!(await stat(executable)).isFile()) throw new Error("Bundle executable is missing");
-    if (!(await run("/usr/bin/file", [executable], { timeout: 10_000, maxBuffer: 4096 })).stdout.includes("arm64")) throw new Error("Wrong package architecture");
+    if (!(await this.command("/usr/bin/file", [executable], { timeout: 10_000, maxBuffer: 4096 })).stdout.includes("arm64")) throw new Error("Wrong package architecture");
     return bundle;
   }
 
+  private command(file: string, args: string[], options: { timeout: number; maxBuffer: number }): Promise<{ stdout: string; stderr: string }> { return (this.options.command ?? run)(file, args, options); }
   private async publish(): Promise<void> { this.state = UpdateStateV1Schema.parse(this.state); await this.store.updateUpdateState(this.state); this.emit("state", this.getState()); }
 }

@@ -10,8 +10,9 @@ import helperModule from "../scripts/update-helper-core.cjs";
 
 const helper: {
   applyUpdate(input: Record<string, unknown>): boolean;
+  openApp(appPath: string, environment: NodeJS.ProcessEnv, spawnProcess: (...args: unknown[]) => { unref(): void }): void;
 } = helperModule;
-const { applyUpdate } = helper;
+const { applyUpdate, openApp } = helper;
 
 async function fixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), "chromux-next-helper-"));
@@ -29,10 +30,26 @@ describe("update replacement helper", () => {
   });
 
   it("rolls back and reopens the prior bundle when startup never succeeds", async () => {
-    const value = await fixture(); let launches = 0;
-    expect(() => applyUpdate({ pid: 1, ...value, startupTimeoutMs: 0, processAlive: () => false, launch: () => { launches += 1; }, sleep: () => undefined })).toThrow(/startup marker/);
+    const value = await fixture(); const launches: Array<{ target: string; profile: string | undefined }> = [];
+    expect(() => applyUpdate({ pid: 1, ...value, startupTimeoutMs: 0, processAlive: () => false, launchEnvironment: { CHROMUX_NEXT_SMOKE_USER_DATA: "/tmp/isolated-profile" }, launch: (target: string, environment: NodeJS.ProcessEnv) => { launches.push({ target, profile: environment.CHROMUX_NEXT_SMOKE_USER_DATA }); }, sleep: () => undefined })).toThrow(/startup marker/);
     expect(await readFile(path.join(value.current, "version"), "utf8")).toBe("old");
-    expect(launches).toBe(2);
+    expect(launches).toEqual([
+      { target: value.current, profile: "/tmp/isolated-profile" },
+      { target: value.current, profile: "/tmp/isolated-profile" }
+    ]);
+  });
+
+  it("opens the exact bundle as a new instance with the isolated profile", () => {
+    let invocation: unknown[] = []; let detached = false;
+    openApp("/tmp/rollback/Chromux Next.app", { CHROMUX_NEXT_SMOKE_USER_DATA: "/tmp/isolated profile", CODEX_HOME: "/tmp/isolated codex" }, (...args: unknown[]) => {
+      invocation = args; return { unref: () => { detached = true; } };
+    });
+    expect(invocation).toEqual([
+      "/usr/bin/open",
+      ["-n", "--env", "CHROMUX_NEXT_SMOKE_USER_DATA=/tmp/isolated profile", "--env", "CODEX_HOME=/tmp/isolated codex", "/tmp/rollback/Chromux Next.app"],
+      { detached: true, stdio: "ignore" }
+    ]);
+    expect(detached).toBe(true);
   });
 
   it("never deletes the current bundle when failure happens before backup", async () => {

@@ -1,5 +1,73 @@
 # Session History
 
+## 2026-08-23 — Chromux Next v0.14.1 updater recovery candidate
+
+- **User goal:** Implement and publish the scoped Chromux Next v0.14.1 updater
+  cleanup and exact rollback-relaunch fixes, then rerun the signed v0.12.0
+  managed-update gate against the greatest successor.
+- **Changed files and per-file purpose:** `src/main/update-service.ts` retries
+  transient stale-tree removal, preserves retryable versus manual-only
+  authority, assigns extraction its own sanitized category, and exposes only a
+  test command seam; `src/updates/contracts.ts` validates that category.
+  `scripts/update-helper-core.cjs` launches the exact installed app with
+  `/usr/bin/open -n` and retains only explicit isolated Chromux/Codex profile
+  variables. The two focused test files lock persisted-stage restart,
+  same-successor restaging, path/output redaction, retry authority, exact app
+  targeting, new-instance launch, profile continuity, rollback restoration,
+  and pre-backup safety. Package metadata, release notes, architecture,
+  troubleshooting, and `docs/uat-0.14.1.md` define the 0.14.1 successor-only
+  release and fresh public gate.
+- **User-goal mapping:** A restart still invalidates in-memory staged authority,
+  but preparing the same successor now gives macOS `ENOTEMPTY`, `EBUSY`, and
+  related transient cleanup races twelve bounded retries before a sanitized,
+  actionable filesystem failure. Staging filesystem and extraction failures
+  remain retryable instead of disabling managed updates. Both initial launch
+  and rollback use the exact restored path with `-n`; another running copy with
+  the same bundle ID cannot absorb the relaunch, and the isolated app/Codex
+  profiles reach the new process without passing credentials or control-plane
+  tokens.
+- **Tests run:** Final-diff `npm run verify` passed TypeScript, all 31 Vitest
+  files/187 tests, macOS arm64 packaging, baseline and Situation Room packaged
+  smokes, two-launch/two-session restoration, and packaged browser-evidence
+  smoke. The focused updater/helper boundary passed 2 files/16 tests before
+  the complete run. `git diff --check` passed. `npm run make:update` signed with
+  Developer ID Team `NC56VXK48K`, notarized, stapled, and produced a
+  120,040,183-byte ZIP whose independent and manifest SHA-256 is
+  `d4114052a90bd61801023c34cd47a488dbcdc9155013017a1ea512647511a1e3`.
+  The packaged app passed strict deep codesign, exact identity/Team, Gatekeeper
+  `Notarized Developer ID`, stapler validation, version 0.14.1, and arm64 file
+  inspection; artifact construction independently reverified the extracted
+  ZIP app through the same trust gates.
+- **Skipped tests:** Visual qualification is not applicable because no renderer
+  markup, styling, layout, or visible control changed. Windows/Linux packaging
+  remains in the separate cutover gate; this release is the documented macOS
+  arm64 successor prerelease. Public redownload verification and the real
+  signed 0.12.0-to-greatest-successor update/rollback matrix require the release
+  to exist and therefore follow the tagged implementation commit.
+- **Adversarial review:** Applied the quality-gate contract through a
+  failure-oriented exact-diff and call-site review. It traced stale nested app
+  trees, every retryable Node filesystem code, write-protected installed apps,
+  extraction output/path leakage, trust/manual-only precedence, restart
+  authority invalidation, success and pre/post-backup failures, missing startup
+  markers, exact bundle-path targeting, same-bundle-ID peers, detached launch,
+  profile values containing spaces, and environment leakage. Findings fixed
+  before ship were reading `error.code` instead of assuming codes appear in
+  messages, separating retryable staging failures from read-only installs, and
+  retaining explicit `CODEX_HOME` without forwarding tokens or cookies. No
+  blocking finding remains in the candidate diff.
+- **Residual risk:** Node's bounded `fs.rm` retries address the observed
+  transient `ENOTEMPTY` class, but only the fresh signed matrix can prove the
+  original macOS timing under LaunchServices. The public v0.12.0 bootstrap uses
+  its own older helper for the one-time forward replacement; the exact
+  new-instance rollback proof must be run from public v0.14.1 after that update.
+- **Rollback note:** Before publication, revert the candidate commit. After
+  publication, delete GitHub prerelease/tag `chromux-next-v0.14.1` and revert
+  the commit; v0.14.0 and legacy stable `chromux-v0.81.0` remain available.
+  Deploy is the GitHub prerelease; no explicit manual deploy contract exists.
+- **Next command:** Commit and tag the exact candidate, push `main` and
+  `chromux-next-v0.14.1`, publish the verified ZIP/manifest, then run
+  `docs/uat-0.14.1.md` from a fresh unique directory.
+
 ## 2026-08-23 — Chromux Next v0.14.0 conversational transcript
 
 - **User goal:** Replace the local runner's display-only xterm transcript with

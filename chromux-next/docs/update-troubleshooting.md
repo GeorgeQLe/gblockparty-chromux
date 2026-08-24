@@ -9,6 +9,11 @@
   interactions. Clearing blockers does not install; select Install explicitly.
 - **Verification failed:** retry preparation. Identity, checksum, architecture,
   signature, Team ID, or Gatekeeper mismatches are never installed.
+- **Staging filesystem failed:** check free disk space, quit other Chromux Next
+  copies, and retry. Transient busy/nonempty cleanup is retried automatically;
+  staging failures do not expose local paths or disable managed updates.
+- **Extraction failed:** retry preparation. If the sanitized extraction category
+  repeats, download the signed release manually from Release notes.
 - **Codex updater unsupported:** use the release link and displayed Homebrew,
   npm, or standalone guidance. The command runs only after its help probe.
 - **Codex update failed:** the previous app-server is restarted and stored

@@ -58,6 +58,10 @@ No active priority documentation items.
   greatest-successor update/rollback matrix before closing the v0.12.0 gate.
   _(source: 2026-08-23 live managed-update UAT; successor-only scope:
   `chromux-next/`; target patch: `0.14.1`)_
+  - Implementation, focused regressions, the complete 31-file/187-test verify
+    matrix, and a signed/notarized/stapled arm64 candidate are complete. Public
+    prerelease publication and the fresh signed managed-update/rollback matrix
+    remain before this item and the parent v0.12.0 gate can close.
 
 - [x] Complete the runner-first hardening matrix with deterministic fake
   app-server and Luna processes for fragmented JSONL, crash/backoff/recovery,

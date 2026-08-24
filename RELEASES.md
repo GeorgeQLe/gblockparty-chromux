@@ -1,5 +1,19 @@
 # Release Notes
 
+## GBlockParty Chromux Next v0.14.1 (prerelease)
+
+Tag: `chromux-next-v0.14.1`
+
+- Retry removal of a stale staged app tree before preparing the same successor,
+  including transient macOS busy and nonempty-directory failures.
+- Preserve sanitized, actionable filesystem and extraction failure categories;
+  retryable staging failures no longer disable managed updates.
+- Launch the exact installed bundle with a new macOS application instance after
+  replacement or rollback, preserving the isolated update-qualification profile
+  even when another Chromux Next bundle-ID instance is already running.
+- This successor-only patch remains a signed/notarized macOS arm64 prerelease
+  and does not replace legacy `/releases/latest`.
+
 ## GBlockParty Chromux Next v0.14.0 (prerelease)
 
 Tag: `chromux-next-v0.14.0`

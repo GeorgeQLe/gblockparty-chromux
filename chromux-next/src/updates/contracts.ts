@@ -11,7 +11,7 @@ const SafeUrlSchema = z.string().url().max(4096).refine((value) => new URL(value
 
 export const UpdateFailureSchema = z.enum([
   "network", "timeout", "cancelled", "malformed-release", "unsupported",
-  "untrusted-package", "checksum", "filesystem", "process", "verification", "unknown"
+  "untrusted-package", "checksum", "filesystem", "extraction", "process", "verification", "unknown"
 ]);
 
 export const UpdateTargetStateSchema = z.object({

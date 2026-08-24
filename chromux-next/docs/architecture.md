@@ -277,7 +277,11 @@ The runner is the maintenance gate. Starting/active sessions, active turns,
 and unanswered interactions block replacement. Installation persists state
 and stops the app-server. Codex failures restart the prior runtime; app
 replacement uses a detached helper with an adjacent backup, startup marker,
-and rollback. Clearing blockers never authorizes installation.
+and rollback. Stale staging cleanup retries transient macOS filesystem races,
+and extraction remains a distinct sanitized failure. Replacement and rollback
+launch the exact installed bundle as a new instance while retaining an
+explicit isolated app/Codex profile. Clearing blockers never authorizes
+installation.
 
 ## GBlockParty fleet and attached terminals
 
