@@ -62,9 +62,12 @@ No active priority documentation items.
     matrix, and signed/notarized/stapled arm64 candidates are complete. Public
     v0.14.1 passed trust/staging/blocker/cancellation gates but exposed an
     inherited `ELECTRON_RUN_AS_NODE` relaunch failure in the real 45-second
-    window and was superseded by corrective v0.14.2. Publish v0.14.2 and finish
-    its fresh signed managed-update/rollback matrix before this item and the
-    parent v0.12.0 gate can close.
+    window and was superseded by corrective v0.14.2. Public v0.14.2 passes
+    independent trust, successful exact-helper replacement, and real-timeout
+    same-ID rollback with isolated profile continuity. The parent gate remains
+    open because immutable public v0.12.0 uses its own embedded pre-fix helper
+    for forward replacement; choose a new manual bootstrap or explicitly
+    authorize replacing that old artifact before the complete matrix can pass.
 
 - [x] Complete the runner-first hardening matrix with deterministic fake
   app-server and Luna processes for fragmented JSONL, crash/backoff/recovery,

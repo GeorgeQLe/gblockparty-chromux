@@ -1,5 +1,20 @@
 # Chromux Next 0.12.0 Managed-Update UAT
 
+## 2026-08-24 corrective rerun: still blocked by bootstrap helper
+
+Public v0.14.1 and corrective v0.14.2 resolved stale staging, sanitized failure
+classification, exact new-instance targeting, isolated profile continuity, and
+the helper-only Electron environment leak. Public v0.14.2 independently passes
+successful replacement and 45-second same-bundle-ID rollback when its own
+helper is used.
+
+The public v0.12.0 forward lane still fails safely: v0.12.0 invokes the helper
+embedded in its current bundle, not the helper inside the staged successor.
+That old helper inherits `ELECTRON_RUN_AS_NODE=1`, so the staged app exits before
+writing its startup marker and v0.12.0 is restored after the real timeout. A
+target-only release cannot retrofit this pre-relaunch code path. See
+`docs/uat-0.14.2.md` for the signed result matrix and preserved evidence.
+
 ## 2026-08-23 result: FAIL
 
 The public bootstrap and successor artifacts are trustworthy, the focused

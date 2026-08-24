@@ -1,5 +1,44 @@
 # Session History
 
+## 2026-08-24 — Chromux Next v0.14.2 publication and signed helper gate
+
+- Published annotated tag and non-draft prerelease `chromux-next-v0.14.2`
+  titled `GBlockParty Chromux Next v0.14.2`. GitHub reports exact ZIP/manifest
+  digests; a fresh download matched 120,040,322 bytes and SHA-256
+  `07dd99b31dfc77139c473c970f62818573bee0a2654e428bf80945d400df0991`.
+  The extracted public app passed strict codesign, exact bundle ID/Team,
+  Gatekeeper `Notarized Developer ID`, stapler, version 0.14.2, and arm64.
+  Legacy `/releases/latest` remained `chromux-v0.81.0`.
+- The retained isolated public v0.12.0 profile passed authenticated response,
+  thread/draft persistence, download and install cancellation, active-turn
+  blocking/Stop recovery, genuine `request_user_input` blocking/cancellation,
+  and staging of greatest successor 0.14.2. Its managed forward install failed
+  safely and restored signed 0.12.0 because the immutable bootstrap runs its
+  own old helper before successor code is available.
+- The public v0.14.2 helper then passed a successful exact replacement: signed
+  0.14.2 relaunched, its isolated thread/draft remained, the startup marker was
+  consumed, and the adjacent backup disappeared. It also passed the real
+  timeout rollback while another same-bundle-ID signed copy remained running:
+  signed 0.14.2 was restored, a distinct exact-path process relaunched with the
+  intended app/Codex profiles and no `ELECTRON_RUN_AS_NODE`, the marker appeared,
+  and no backup remained. Both temporary processes were stopped; evidence is
+  preserved at `/private/tmp/chromux-next-managed-update-uat-0.14.1.idJjiT`.
+- **Validation classification:** Executable proof includes the final-diff
+  31-file/187-test verify matrix, all packaged smokes, signed artifact trust,
+  fresh public artifact verification, authenticated live UI blockers and
+  cancellations, exact process/environment checks, successful helper
+  replacement, and real 45-second collision rollback. Documentation checks and
+  `git diff --check` supplement but do not substitute for those gates.
+- **Residual blocker:** The v0.12.0 gate cannot close without a new manually
+  installed bootstrap containing the corrected helper or explicit authority to
+  replace the immutable old release artifact. A successor-only release cannot
+  change code that executes from v0.12.0 before the first relaunch.
+- **Rollback:** Delete public prerelease/tag `chromux-next-v0.14.2` and revert
+  commit `4492aa3`; v0.14.1 remains public evidence but is superseded. No manual
+  deploy contract exists; GitHub prerelease publication is the deployment.
+- **Next command:** Decide and document the bootstrap route before rerunning the
+  public v0.12 gate; do not republish v0.12.0 without explicit authorization.
+
 ## 2026-08-24 — Chromux Next v0.14.2 helper-mode correction candidate
 
 - **User goal:** Finish the scoped updater cleanup and exact rollback-relaunch
