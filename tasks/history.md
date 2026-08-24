@@ -3991,3 +3991,39 @@
   is the required release step. Next command: begin the macOS daily-driver and
   clean-install evidence tracked by the Chromux Next cutover gate in
   `tasks/todo.md`.
+
+## 2026-08-23 — Chromux Next managed-update gate UAT
+
+- **User goal:** Close the remaining v0.12.0 signed managed-update gate using
+  isolated public `0.12.0` and `0.14.0` bundles without replacing the installed
+  app, touching its profile, changing code, or republishing releases.
+- **Passing evidence:** Public ZIPs and manifests matched their sizes and
+  SHA-256 values. Both bundles passed version, bundle ID, arm64, Developer ID
+  Team `NC56VXK48K`, strict codesign, Gatekeeper, and stapler checks. Both
+  releases are non-draft prereleases and legacy `/releases/latest` remains
+  `chromux-v0.81.0`. Focused updater/helper automation passed 13 tests. An
+  isolated signed `0.12.0` session completed an authenticated Codex turn,
+  retained a draft, cancelled download confirmation safely, staged signed
+  `0.14.0`, blocked install during an active turn, and returned to staged after
+  Stop. A genuine `item/tool/requestUserInput` interaction appeared and was
+  cancelable. The shipped helper exercised its real 45-second timeout,
+  restored signed `0.12.0`, passed trust checks, and left no adjacent backup.
+- **Gate failures:** Restarting after staging invalidated the in-memory stage as
+  designed, but every requested restaging attempt failed while deleting the
+  prior staged bundle and left only a 1.1 MB partial app tree. Therefore
+  question-cancel-to-staged, install cancellation, managed replacement,
+  relaunch persistence, marker consumption, and success cleanup were not run.
+  Separately, rollback restoration did not reopen the exact isolated app copy:
+  the helper's plain `/usr/bin/open` reused another running bundle-ID instance,
+  leaving no rollback-copy process or isolated-profile startup marker.
+- **Disposition:** The v0.12.0 release gate remains open. No application code,
+  version, tag, release, installed bundle, or real Chromux profile changed.
+  The unique `/private/tmp/chromux-next-managed-update-uat.Zomtw6` evidence is
+  preserved. A separate v0.14.1 task owns reliable staged-tree cleanup,
+  actionable sanitized failure classification, exact new-instance rollback
+  relaunch/profile continuity, focused regressions, and a full signed rerun.
+- **Validation classification:** Executable verification includes 13 focused
+  automated tests, public artifact hashes/trust, live authenticated UI flows,
+  and the real-timeout rollback helper. `git diff --check` passed; no task-doc
+  audit script exists. Rollback for these documentation-only changes is a
+  single commit revert; public releases remain untouched.

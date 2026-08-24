@@ -41,6 +41,23 @@ No active priority documentation items.
   `/releases/latest` is unchanged. Typed updater/Codex flows, IPC/UI,
   deterministic contracts, artifact tooling, and docs are implemented.
   _(source: user-supplied Chromux Next Update Parity v0.12.0 plan)_
+  - 2026-08-23 live UAT result: **FAIL**. Public artifact trust, focused tests,
+    authenticated Codex, download cancellation, initial staging, active-turn
+    blocking, real `request_user_input` blocking, and rollback restoration all
+    passed. Restaging after restart left a partial app tree and failed safely;
+    the rollback helper restored trust and removed its backup but did not
+    reopen the exact isolated bundle while another bundle-ID instance ran.
+    Evidence is recorded in `chromux-next/docs/uat-0.12.0.md`; the unique UAT
+    directory is preserved. Keep this gate open.
+
+- [ ] Fix and publish Chromux Next v0.14.1 for the managed-update gate: make
+  stale staged-bundle cleanup reliable, preserve a sanitized actionable
+  failure category, and make rollback relaunch the exact restored app as a new
+  instance with the intended profile even when the bundle ID is already
+  running. Add focused regressions and rerun the complete signed `0.12.0` to
+  greatest-successor update/rollback matrix before closing the v0.12.0 gate.
+  _(source: 2026-08-23 live managed-update UAT; successor-only scope:
+  `chromux-next/`; target patch: `0.14.1`)_
 
 - [x] Complete the runner-first hardening matrix with deterministic fake
   app-server and Luna processes for fragmented JSONL, crash/backoff/recovery,
