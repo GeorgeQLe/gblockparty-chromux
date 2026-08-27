@@ -1,5 +1,32 @@
 # Session History
 
+## 2026-08-26 — Chromux Next continuity roadmap expansion
+
+- Expanded the macOS continuity milestone into explicit device identity and
+  leased-control, remote-launch, and restart-restoration workstreams, followed
+  by a physical Mac acceptance gate.
+- Kept the phone PWA and evidence-gated native-mobile milestones after Mac
+  acceptance and required both to reuse the same enrollment, attachment,
+  replay, and lease contracts.
+- Documentation-only shipping boundary; no runtime code, version, dependency,
+  release artifact, credential, infrastructure, or deployment state changed.
+- Ship manifest — User goal: make the remaining Chromux Next continuity work
+  and its acceptance boundary independently actionable in the owning Chromux
+  roadmap. Changed files: `tasks/roadmap.md` expands the milestone and
+  `tasks/history.md` records the change. User-goal mapping: every requested Mac
+  workstream, failure state, and physical acceptance check is explicit, while
+  mobile sequencing remains contract-compatible and evidence-gated. Tests run:
+  relative-link, conflict-marker, Markdown whitespace, and `git diff --check`
+  validation. Skipped tests: runtime tests and builds are not relevant because
+  executable source, schemas, dependencies, and generated assets are unchanged.
+  Adversarial review: compared the expanded milestone with the canonical remote
+  client plan and current TODO, checking ordering, fail-closed launch, detach
+  versus stop, replay-only-missed semantics, and visible failure handling.
+  Residual risk: all listed continuity capabilities and physical-device checks
+  remain implementation work. Rollback: revert this documentation commit; no
+  runtime or infrastructure rollback is needed. Next command: implement the
+  Chromux Next device identity and leased-control workstream.
+
 ## 2026-08-26 — Remote desktop and phone MVP roadmap
 
 - Rebased the audit onto current Chromux Next through the v0.14.2 release line
