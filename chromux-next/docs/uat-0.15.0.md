@@ -19,9 +19,18 @@ changing legacy Chromux or the stable GitHub release channel.
 - [x] Signed/notarized/stapled arm64 update ZIP and manifest verification:
   118,681,609 bytes, SHA-256
   `239d061c837f8c5dbbafdc6f8e71ed88fad68318eff97ba51e29a9d7f47acb59`.
-- [ ] Public prerelease assets redownloaded and independently reverified.
+- [x] Public prerelease assets redownloaded and independently reverified from
+  `/private/tmp/chromux-next-0.15.0-public.YamBff`; GitHub digests, local hashes,
+  manifest metadata, strict codesign, Team ID, Gatekeeper, stapler, version, and
+  arm64 inspection all match the candidate.
 - [ ] Managed update from installed v0.14.2, followed by rollback/relaunch proof.
-- [ ] Legacy `/releases/latest` remains unchanged.
+- [x] Legacy `/releases/latest` remains `chromux-v0.81.0`.
+
+The installed v0.14.2 bootstrap remains signed, notarized, stapled, arm64, and
+running from `/Applications/Chromux Next.app`. Managed update UAT was not
+attempted blindly: Computer Use could not start its native pipe after a clean
+reconnect, so active-turn and pending-interaction state could not be inspected.
+Resume this one gate when UI inspection is available.
 
 ## Failure-oriented coverage
 

@@ -1,5 +1,32 @@
 # Session History
 
+## 2026-08-27 — Chromux Next v0.15.0 publication
+
+- Published annotated tag and non-draft prerelease `chromux-next-v0.15.0`
+  titled `GBlockParty Chromux Next v0.15.0` from commit `fba71ca`. GitHub reports
+  the 118,681,609-byte ZIP digest
+  `239d061c837f8c5dbbafdc6f8e71ed88fad68318eff97ba51e29a9d7f47acb59`
+  and the 365-byte manifest digest
+  `8fa38d6ca5195accf9b37e149d96e7afd4aeb7649f8d344c03ddbb6f566c627b`.
+  A fresh public download matched both hashes and the manifest; its extracted
+  app passed strict codesign, exact bundle ID/Team, Gatekeeper `Notarized
+  Developer ID`, stapler, version 0.15.0, and arm64 inspection. Legacy
+  `/releases/latest` remains stable `chromux-v0.81.0`.
+- The installed `/Applications/Chromux Next.app` remains trusted v0.14.2 and is
+  running. Managed forward-update UAT was intentionally deferred because the
+  Computer Use native pipe failed to start after a clean reconnect, preventing
+  safe inspection of active turns and pending interactions. No blind clicks,
+  forced quit, or manual bundle replacement was substituted.
+- **Validation classification:** Public download/hash/trust inspection is
+  executable release evidence. This follow-up changes UAT/history only, so the
+  already final-diff-qualified 33-file/191-test candidate was not rebuilt.
+- **Residual gate:** Run the v0.14.2-to-v0.15.0 managed update and exact
+  rollback/relaunch proof when installed-app UI inspection is available.
+- **Rollback:** Delete the v0.15.0 prerelease/tag and revert `fba71ca`; v0.14.2
+  remains installed and legacy stable is unchanged.
+- **Next command:** Resume `chromux-next/docs/uat-0.15.0.md` at the managed
+  update gate with Computer Use available.
+
 ## 2026-08-26 — Chromux Next continuity roadmap expansion
 
 - Expanded the macOS continuity milestone into explicit device identity and
