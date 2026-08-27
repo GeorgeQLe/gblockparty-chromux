@@ -11,6 +11,38 @@ deferred feature or release work unless a user explicitly reactivates a legacy
 task. Legacy state and `/releases/latest` remain unchanged until the Chromux
 Next cutover gates are complete.
 
+## GBlockParty Remote Desktop and Phone MVP
+
+Canonical plan: [`docs/gblockparty-remote-clients.md`](../docs/gblockparty-remote-clients.md)
+
+### Execution Profile
+
+- Parallel mode: `serial` until shared client-contract boundaries make desktop
+  and PWA implementation lanes independently writable and reviewable.
+
+### Planned work
+
+- [ ] Extend the existing Chromux Next Fleet transport to accept external
+  device authority, enroll/store a revocable credential, and request, renew,
+  release, and visibly enforce terminal input leases.
+- [ ] Persist attached remote-tab identity and replay cursors so Chromux Next
+  can reopen the same daemon-owned session after app restart.
+- [ ] Add remote Codex launch from an eligible fleet host without silently
+  falling back to the local app-server runner.
+- [ ] Pass the physical macOS remote-session workflow against a daemon-owned
+  Codex/tmux session.
+- [ ] Wire the existing GBlockParty PWA to the same contracts and pass the
+  physical Mac → phone → Mac continuity workflow.
+- [ ] Decide whether native mobile packaging is justified by measured gaps in
+  the PWA proof; do not create a second protocol for a native client.
+
+### First-MVP boundary
+
+- Persistent host-owned Codex session, bounded missed-output replay, visible
+  local/remote authority, and server-enforced single-writer control are in.
+- Native mobile packaging, managed browser surfaces, durable raw-output
+  history, checkpoint recovery, and cross-host migration are out.
+
 ## Priority Documentation Todo
 
 No active priority documentation items.

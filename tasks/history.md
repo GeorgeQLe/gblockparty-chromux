@@ -1,5 +1,19 @@
 # Session History
 
+## 2026-08-26 — Remote desktop and phone MVP roadmap
+
+- Rebased the audit onto current Chromux Next through the v0.14.2 release line
+  and verified that its opt-in Fleet terminal already lists, attaches, accepts
+  input/resize, reconnects with in-process replay cursors, and detaches without
+  stopping daemon-owned sessions.
+- Recorded the remaining Mac acceptance gaps: external-device enrollment and
+  leased authority, remote launch, remote-tab/cursor restoration after app
+  restart, and a physical persistent-session UAT.
+- Distinguished the seven static mobile prototypes from a production phone
+  client and selected the existing GBlockParty PWA as the first phone proof.
+- Documentation-only change: no app behavior, package version, release, or
+  deployment changed.
+
 ## 2026-08-24 — Chromux Next v0.14.2 manual bootstrap
 
 - Replaced installed signed v0.13.1 with the independently verified public

@@ -38,6 +38,20 @@ See [`docs/terminal-interaction-roadmap.md`](docs/terminal-interaction-roadmap.m
 for the shipped multiline composer contract and the ordered path toward structured
 agent interactions and a future Monaco editor adapter.
 
+## Remote desktop and phone roadmap
+
+Chromux Next includes an opt-in, attach-only GBlockParty Fleet terminal slice:
+it lists sanitized remote sessions, attaches through the main process, accepts
+input and resize, reconnects with bounded replay during the app process, and
+detaches without stopping the host-owned session.
+
+The full Mac → phone → Mac MVP still needs production device enrollment and
+leased control in Chromux, persisted remote-tab/replay state across app
+restart, remote launch, and a working phone client. The repository's seven
+mobile variations remain static product prototypes. See
+[`docs/gblockparty-remote-clients.md`](docs/gblockparty-remote-clients.md) and
+[`tasks/roadmap.md`](tasks/roadmap.md) for the verified gap and delivery order.
+
 ## Releases
 
 Chromux Next uses its independent `chromux-next-vX.Y.Z` prerelease line while
