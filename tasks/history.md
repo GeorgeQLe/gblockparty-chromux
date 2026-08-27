@@ -1,5 +1,45 @@
 # Session History
 
+## 2026-08-27 — Chromux Next v0.15.0 real-helper update and rollback gate
+
+- **User goal:** Run the remaining v0.14.2-to-v0.15.0 managed-update and exact
+  rollback/relaunch proof after publishing the directory-autocomplete release.
+- **Executable evidence:** Computer Use remained unavailable because its native
+  pipe could not start, including after three orphaned workspace kernels were
+  stopped. The purpose-built updater contract was therefore exercised against
+  trusted isolated app copies rather than through blind UI actions. The public
+  v0.14.2 embedded helper replaced its clone with the public v0.15.0 app,
+  relaunched the exact path, preserved isolated Chromux/Codex profiles without
+  `ELECTRON_RUN_AS_NODE`, consumed the startup marker, and removed the backup.
+  The public v0.15.0 helper then hit the real 45-second timeout against a
+  deliberately nonlaunchable staged copy while installed v0.14.2 stayed active
+  as a same-bundle-ID peer. It restored signed/notarized/stapled v0.15.0,
+  relaunched the exact isolated path as distinct PID 24506 with both intended
+  profiles and no helper-mode flag, wrote the marker, and left no backup.
+  Gatekeeper, strict codesign, bundle ID, Team `NC56VXK48K`, and stapler passed.
+  The isolated process was stopped; evidence remains at
+  `/private/tmp/chromux-next-managed-final.stGGRF`.
+- **Documentation boundary:** This follow-up changes only
+  `chromux-next/docs/uat-0.15.0.md`, `tasks/todo.md`, and `tasks/history.md` to
+  distinguish the passed real-helper lanes from the still-unrun live installed
+  UI lane. Application source, packages, release assets, tags, and GitHub
+  release state are unchanged, so the already qualified 33-file/191-test
+  executable was not rebuilt.
+- **Adversarial review:** Required a same-bundle-ID peer, real timeout rather
+  than a zero-duration seam, exact-path PID evidence, profile inspection, an
+  explicit negative check for helper-mode leakage, trust verification after
+  restoration, marker evidence, backup cleanup, and isolation from the running
+  `/Applications` copy. The first evidence directory disappeared after an
+  interrupted turn, so the rollback lane was recreated and rerun instead of
+  relying on partial output.
+- **Residual gate:** The live `/Applications` forward install still requires UI
+  inspection to prove there is no active turn or pending interaction before the
+  updater quits the app. Installed trusted v0.14.2 remains running and untouched.
+- **Rollback:** Revert this documentation commit only; the test used temporary
+  isolated copies and did not alter installed or public artifacts.
+- **Next command:** When Computer Use can inspect the installed app, complete
+  the live v0.14.2-to-v0.15.0 UI update lane in `docs/uat-0.15.0.md`.
+
 ## 2026-08-27 — Chromux Next v0.15.0 publication
 
 - Published annotated tag and non-draft prerelease `chromux-next-v0.15.0`

@@ -23,14 +23,26 @@ changing legacy Chromux or the stable GitHub release channel.
   `/private/tmp/chromux-next-0.15.0-public.YamBff`; GitHub digests, local hashes,
   manifest metadata, strict codesign, Team ID, Gatekeeper, stapler, version, and
   arm64 inspection all match the candidate.
-- [ ] Managed update from installed v0.14.2, followed by rollback/relaunch proof.
+- [x] Public v0.14.2 embedded helper replaced a trusted isolated v0.14.2 clone
+  with public v0.15.0, relaunched the exact path with isolated Chromux/Codex
+  profiles and no helper-mode flag, consumed the startup marker, and removed
+  the adjacent backup.
+- [x] Public v0.15.0 embedded helper passed the real 45-second timeout rollback
+  while installed v0.14.2 remained active as a same-bundle-ID peer: trusted
+  v0.15.0 was restored and relaunched as a distinct exact-path process, the
+  intended isolated profiles reached it without `ELECTRON_RUN_AS_NODE`, the
+  startup marker appeared, and no adjacent backup remained.
+- [ ] Run the same forward-install lane through the live
+  `/Applications/Chromux Next.app` UI after active-turn and pending-interaction
+  inspection is available.
 - [x] Legacy `/releases/latest` remains `chromux-v0.81.0`.
 
-The installed v0.14.2 bootstrap remains signed, notarized, stapled, arm64, and
-running from `/Applications/Chromux Next.app`. Managed update UAT was not
-attempted blindly: Computer Use could not start its native pipe after a clean
-reconnect, so active-turn and pending-interaction state could not be inspected.
-Resume this one gate when UI inspection is available.
+The real-helper evidence is preserved at
+`/private/tmp/chromux-next-managed-final.stGGRF`. The isolated test process was
+stopped afterward. The installed v0.14.2 bootstrap remains signed, notarized,
+stapled, arm64, and running from `/Applications/Chromux Next.app`; it was not
+quit or replaced blindly because Computer Use still could not inspect active
+turns or pending interactions.
 
 ## Failure-oriented coverage
 

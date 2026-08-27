@@ -100,8 +100,10 @@ No active priority documentation items.
     bootstrap route installed independently verified public v0.14.2 into
     `/Applications` on 2026-08-24, restored the normal profile, and showed no
     helper/smoke environment leakage. The parent gate remains open only for a
-    future managed update from this corrected bootstrap to a newer signed
-    successor; the immutable v0.12.0 failure remains historical evidence.
+    live-UI managed update from this corrected bootstrap to a newer signed
+    successor; the public v0.14.2 helper has now passed isolated exact forward
+    replacement to public v0.15.0 and the real-timeout same-ID rollback lane.
+    The immutable v0.12.0 failure remains historical evidence.
 
 - [x] Complete the runner-first hardening matrix with deterministic fake
   app-server and Luna processes for fragmented JSONL, crash/backoff/recovery,
