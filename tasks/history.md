@@ -13,6 +13,25 @@
   client and selected the existing GBlockParty PWA as the first phone proof.
 - Documentation-only change: no app behavior, package version, release, or
   deployment changed.
+- Ship manifest — User goal: add the verified macOS and mobile findings to
+  Chromux documentation. Changed files: `README.md` links and summarizes the
+  gap; `docs/gblockparty-remote-clients.md` owns the audit, acceptance matrix,
+  delivery order, and physical workflow; `tasks/roadmap.md` records milestones;
+  `tasks/todo.md` makes the next implementation work explicit; this entry
+  records the result. User-goal mapping: the docs distinguish the shipped
+  attach-only Fleet slice from the remaining end-to-end continuity work and
+  distinguish static mobile prototypes from the PWA-first phone plan. Tests
+  run: relative Markdown links, conflict-marker scan, `git diff --check`, and
+  final commit whitespace inspection passed. Skipped tests: Chromux Next
+  runtime tests were not run because no runtime files changed and dependencies
+  are not installed in this refreshed checkout. Adversarial review: fetching
+  current `origin/main` exposed a 169-commit stale checkout; the initial local
+  audit was discarded, the documentation was rebased onto current Chromux Next
+  v0.14.2, and claims were rechecked against the Fleet client/contracts/UI.
+  Residual risk: physical leased-device and app-restart continuity remain
+  unaccepted until the planned UAT. Rollback: revert this documentation commit;
+  application and release state are unaffected. Next command: plan the first
+  Chromux Next leased-device and remote-restoration implementation phase.
 
 ## 2026-08-24 — Chromux Next v0.14.2 manual bootstrap
 
