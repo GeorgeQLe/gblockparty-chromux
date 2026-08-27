@@ -1,5 +1,40 @@
 # Session History
 
+## 2026-08-27 — Chromux Next v0.15.0 live managed installation
+
+- **User goal:** Update the live installed Chromux Next from corrected v0.14.2
+  to the published v0.15.0 directory-autocomplete release.
+- **Executable evidence:** Computer Use recovered and showed the selected Omega
+  War session idle, Send and Stop disabled, and no approval or question control
+  awaiting action. Updates discovered v0.15.0, downloaded it into private app
+  state, and reported the signed/notarized package verified before enabling
+  installation. After explicit install confirmation, the detached helper
+  replaced `/Applications/Chromux Next.app`, relaunched the exact path, and
+  restored the normal session/profile. The app now reports `Installed 0.15.0 ·
+  Latest 0.15.0 current`. The installed bundle passes strict codesign, bundle
+  `dev.georgele.chromux.next`, Team `NC56VXK48K`, Gatekeeper `Notarized
+  Developer ID`, stapler, version 0.15.0, and arm64 inspection. PID 43905 runs
+  the exact installed executable with no `CHROMUX_NEXT_SMOKE_USER_DATA`,
+  injected `CODEX_HOME`, or `ELECTRON_RUN_AS_NODE`; the adjacent backup is gone.
+- **Documentation boundary:** This follow-up changes only
+  `chromux-next/docs/uat-0.15.0.md`, `tasks/todo.md`, and `tasks/history.md` to
+  record the live installation and close the corrected managed-update gate.
+  Application source, packages, public release assets, and tag are unchanged,
+  so the already qualified 33-file/191-test v0.15.0 executable was not rebuilt.
+- **Adversarial review:** Checked idle/pending-interaction state before install,
+  required the app's own size/checksum/identity/signature/Team/architecture/
+  Gatekeeper preparation phase, rechecked trust independently after relaunch,
+  verified exact-path PID and normal profile restoration, filtered the process
+  environment for helper/profile leakage, refreshed Updates to `current`, and
+  confirmed backup cleanup. No blocking finding remains.
+- **Residual risk:** None specific to the completed macOS arm64 managed-update
+  gate. Windows/Linux and successor cutover remain separate roadmap work.
+- **Rollback:** Use the already qualified public v0.14.2 artifact for manual
+  recovery if a later issue appears; the managed helper removed its adjacent
+  backup only after v0.15.0 wrote the startup marker.
+- **Next command:** Continue with the first active Chromux Next continuity item
+  in `tasks/todo.md`; no updater follow-up remains.
+
 ## 2026-08-27 — Chromux Next v0.15.0 real-helper update and rollback gate
 
 - **User goal:** Run the remaining v0.14.2-to-v0.15.0 managed-update and exact

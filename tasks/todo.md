@@ -67,7 +67,7 @@ No active priority documentation items.
     `chromux-next-v0.13.0` and the follow-up `chromux-next-v0.13.1` are public
     successor prereleases, while legacy `/releases/latest` remains stable.
 
-- [ ] Complete the signed Chromux Next v0.12.0 release gate: notarized/stapled
+- [x] Complete the signed Chromux Next v0.12.0 release gate: notarized/stapled
   macOS arm64 build, two-version managed-update and rollback UAT, public asset
   reverification, prerelease publication, and proof that legacy
   `/releases/latest` is unchanged. Typed updater/Codex flows, IPC/UI,
@@ -79,8 +79,10 @@ No active priority documentation items.
     passed. Restaging after restart left a partial app tree and failed safely;
     the rollback helper restored trust and removed its backup but did not
     reopen the exact isolated bundle while another bundle-ID instance ran.
-    Evidence is recorded in `chromux-next/docs/uat-0.12.0.md`; the unique UAT
-    directory is preserved. Keep this gate open.
+    Evidence is recorded in `chromux-next/docs/uat-0.12.0.md`; the immutable
+    bootstrap failure remains historical evidence. The accepted manual v0.14.2
+    bootstrap plus the successful live managed v0.14.2-to-v0.15.0 update and
+    exact rollback/relaunch matrix now close the corrected successor gate.
 
 - [x] Fix and publish Chromux Next v0.14.1 for the managed-update gate: make
   stale staged-bundle cleanup reliable, preserve a sanitized actionable
@@ -99,11 +101,11 @@ No active priority documentation items.
     same-ID rollback with isolated profile continuity. The accepted manual
     bootstrap route installed independently verified public v0.14.2 into
     `/Applications` on 2026-08-24, restored the normal profile, and showed no
-    helper/smoke environment leakage. The parent gate remains open only for a
-    live-UI managed update from this corrected bootstrap to a newer signed
-    successor; the public v0.14.2 helper has now passed isolated exact forward
-    replacement to public v0.15.0 and the real-timeout same-ID rollback lane.
-    The immutable v0.12.0 failure remains historical evidence.
+    helper/smoke environment leakage. Public v0.14.2 then passed isolated exact
+    forward replacement to public v0.15.0, the real-timeout same-ID rollback
+    lane, and the live installed UI update with restored normal profile and no
+    helper/smoke environment leakage. The corrected parent gate is closed; the
+    immutable v0.12.0 failure remains historical evidence.
 
 - [x] Complete the runner-first hardening matrix with deterministic fake
   app-server and Luna processes for fragmented JSONL, crash/backoff/recovery,

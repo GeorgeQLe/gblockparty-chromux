@@ -32,17 +32,20 @@ changing legacy Chromux or the stable GitHub release channel.
   v0.15.0 was restored and relaunched as a distinct exact-path process, the
   intended isolated profiles reached it without `ELECTRON_RUN_AS_NODE`, the
   startup marker appeared, and no adjacent backup remained.
-- [ ] Run the same forward-install lane through the live
-  `/Applications/Chromux Next.app` UI after active-turn and pending-interaction
-  inspection is available.
+- [x] Live `/Applications/Chromux Next.app` UI forward install: confirmed the
+  selected session was idle with disabled Send/Stop and no interaction prompt;
+  checked, downloaded, independently verified, installed, and relaunched
+  v0.15.0 through the managed updater.
 - [x] Legacy `/releases/latest` remains `chromux-v0.81.0`.
 
 The real-helper evidence is preserved at
 `/private/tmp/chromux-next-managed-final.stGGRF`. The isolated test process was
-stopped afterward. The installed v0.14.2 bootstrap remains signed, notarized,
-stapled, arm64, and running from `/Applications/Chromux Next.app`; it was not
-quit or replaced blindly because Computer Use still could not inspect active
-turns or pending interactions.
+stopped afterward. The live installed app now reports `Installed 0.15.0 · Latest
+0.15.0 current`; its normal Omega War session/profile restored after relaunch.
+The exact installed process has no smoke-profile, injected `CODEX_HOME`, or
+`ELECTRON_RUN_AS_NODE` environment. Strict codesign, bundle ID, Team ID,
+Gatekeeper, stapler, arm64, exact-path process, and adjacent-backup cleanup all
+passed.
 
 ## Failure-oriented coverage
 
