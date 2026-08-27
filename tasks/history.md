@@ -59,7 +59,73 @@
   unaccepted until the planned UAT. Rollback: revert this documentation commit;
   application and release state are unaffected. Next command: plan the first
   Chromux Next leased-device and remote-restoration implementation phase.
+## 2026-08-26 — Chromux Next v0.15.0 project autocomplete candidate
 
+- **User goal:** Add p-script-like directory search and completion when creating
+  a Chromux Next session, then publish it on the successor prerelease channel.
+- **Changed files and purpose:** The project-suggestion contract and main-process
+  service provide bounded, cached discovery from registered projects, valid
+  `p_history`, and Git repositories under `P_BASE` or `~/projects`, with literal
+  path completion and canonical path deduplication. Typed IPC/preload bindings
+  expose only validated query/results. New Session now uses an accessible,
+  debounced combobox with mouse and keyboard selection, stale-response
+  suppression, and the existing Add folder and literal-path fallbacks. Focused
+  unit/component tests cover ranking, history, worktrees, excluded dependency
+  trees, canonical aliases, exact creation, keyboard selection, and request
+  races. The process-table read cap increases to a still-bounded 1 MiB so busy
+  developer machines do not emit a child-process buffer warning before the
+  existing parsed-row cap applies. Metadata, release notes, README, architecture,
+  and UAT records define successor v0.15.0.
+- **Exact ship boundary:** `RELEASES.md`; `tasks/todo.md`;
+  `tasks/history.md`; and under `chromux-next/`, `README.md`,
+  `docs/architecture.md`, `docs/uat-0.15.0.md`, `package.json`,
+  `package-lock.json`, `src/detection/external.ts`, `src/ipc/bridge.ts`,
+  `src/ipc/contracts.ts`, `src/ipc/registry.ts`, `src/main.ts`,
+  `src/main/project-suggestion-service.ts`, `src/preload.ts`,
+  `src/renderer.tsx`, `src/settings/project-suggestions.ts`,
+  `src/styles/legacy.css`, `tests/detection.test.ts`,
+  `tests/new-session-dialog.component.test.tsx`, and
+  `tests/project-suggestions.test.ts`. No pre-existing or unrelated worktree
+  change is included.
+- **Executable verification:** Final-diff `npm run verify` passed TypeScript, all
+  33 Vitest files/191 tests, macOS arm64 packaging, both packaged baseline lanes,
+  two-launch/two-session restoration, and browser-evidence smoke. The first full
+  run exposed the process-table buffer warning; the bounded-cap regression was
+  added and the complete matrix rerun cleanly. `git diff --check` passed.
+  Packaged UI UAT with an isolated profile and `P_BASE` set to the real project
+  tree showed `chromux` from recent history and `chromux-desktop` from p-style
+  discovery, then selected `chromux` into its canonical absolute path without
+  creating an external Codex thread. The signed `npm run make:update` build,
+  packaged app, and fresh ZIP extraction passed strict codesign for bundle
+  `dev.georgele.chromux.next` and Team `NC56VXK48K`, Gatekeeper `Notarized
+  Developer ID`, stapler, version 0.15.0, and arm64 inspection. The
+  118,681,609-byte ZIP independently matches manifest SHA-256
+  `239d061c837f8c5dbbafdc6f8e71ed88fad68318eff97ba51e29a9d7f47acb59`.
+- **Adversarial review:** Checked path alias duplication, missing/unreadable
+  bases and history, `.git` files used by worktrees, dependency/hidden-tree
+  traversal, result/query/output bounds, shell injection avoidance, stale async
+  UI responses, accessible naming, literal paths, and Enter/Tab/Escape behavior.
+  Findings fixed before ship were the label leaking into the combobox accessible
+  name, `/var` versus `/private/var` duplicates, and the packaged process-table
+  buffer warning. An initial release command without the documented signing
+  variables correctly failed strict verification on its ad-hoc bundle; the
+  build was rerun with the verified Developer ID and Keychain profile, and only
+  that signed/notarized artifact is in the release boundary. No blocking finding
+  remains in the candidate diff.
+- **Skipped tests:** Windows/Linux packaging remains in the separate cutover
+  gate. A session was not created during UI UAT because that would unnecessarily
+  create an external Codex thread; component tests cover creation with selected
+  and exact literal directories. Signed artifact trust, public redownload, and
+  managed update/rollback follow the candidate commit.
+- **Residual risk:** First search may traverse a large project base before the
+  five-minute cache is warm, though depth and result count are bounded. Projects
+  deeper than the p-compatible scan boundary remain available through literal
+  absolute path input or Add folder.
+- **Rollback:** Remove the v0.15.0 prerelease/tag and revert the implementation
+  commit; v0.14.2 remains the corrected installed bootstrap and legacy stable
+  `chromux-v0.81.0` remains untouched.
+- **Next command:** Commit/tag/push, publish and reverify the prerelease, then
+  exercise the managed updater from installed v0.14.2.
 ## 2026-08-24 — Chromux Next v0.14.2 manual bootstrap
 
 - Replaced installed signed v0.13.1 with the independently verified public

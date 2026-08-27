@@ -34,6 +34,7 @@ import {
   ,DetectionLeaseIdInputSchema
   ,UiPreferencesPatchV1Schema
   ,WorkspacePreferencesPatchV1Schema
+  ,ProjectSuggestionQuerySchema
   ,UpdateActionSchema
   ,UpdateCheckActionSchema
   ,UpdateReleaseNotesActionSchema
@@ -60,6 +61,7 @@ import { UpdateService } from "./main/update-service";
 import { CodexUpdateService } from "./main/codex-update-service";
 import { chromuxOwnedCodexEnvironment } from "./main/codex-environment";
 import { ControlPlaneClient } from "./control-plane/client";
+import { ProjectSuggestionService } from "./main/project-suggestion-service";
 
 if (started) app.quit();
 
@@ -70,6 +72,10 @@ app.setPath("userData", process.env.CHROMUX_NEXT_SMOKE_USER_DATA
 
 const documents = new DocumentStore();
 const localStore = new LocalStore(app.getPath("userData"));
+const projectSuggestions = new ProjectSuggestionService({
+  homeDirectory: app.getPath("home"),
+  environment: process.env
+});
 const fleet = new ControlPlaneClient({
   baseUrl: process.env.CHROMUX_NEXT_CONTROL_PLANE_URL ?? "http://127.0.0.1:4400",
   enabled: process.env.CHROMUX_NEXT_GBP_FLEET === "1",
@@ -714,6 +720,11 @@ function registerIpc(): void {
   });
   registry.handle(IpcChannels.runnerState, () => runner.getState());
   registry.handle(IpcChannels.runnerModels, () => runner.getModels());
+  registry.handle(IpcChannels.runnerSuggestProjects, async (_event, input: unknown) => {
+    const value = ProjectSuggestionQuerySchema.parse(input);
+    const preferences = await localStore.getWorkspacePreferences();
+    return projectSuggestions.suggest(value.query, preferences.projects, value.limit);
+  });
   registry.handle(IpcChannels.runnerCreate, (_event, input: unknown) =>
     runner.createSession(CreateSessionInputSchema.parse(input)));
   registry.handle(IpcChannels.runnerDetectExternal, () => {

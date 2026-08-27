@@ -145,6 +145,15 @@ instead of resuming the `prototype/` implementation.
 
 ## Completed Work
 
+- [x] Ship Chromux Next v0.15.0 with p-style project directory autocomplete in
+  New Session: prioritize registered and recent projects, discover Git
+  worktrees beneath `P_BASE` or `~/projects`, rank basename before relative-path
+  matches, retain literal paths and Add folder, and keep traversal bounded in
+  the main process behind validated IPC. Preserve successor-only state, legacy
+  Chromux, and the stable `/releases/latest` channel.
+  _(source: user request; executable evidence: focused ranking/component tests,
+  full verify/package/smoke matrix, and packaged macOS combobox UAT)_
+
 - [x] Ship Chromux Next v0.14.0 with a read-only conversational runner
   transcript: right-aligned user bubbles, left-aligned agent bubbles,
   full-width code/tables/terminal displays/click-only graphics, expandable

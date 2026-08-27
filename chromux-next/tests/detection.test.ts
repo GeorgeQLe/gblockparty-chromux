@@ -33,6 +33,7 @@ describe("external terminal detection", () => {
   it("continues without titles after Automation denial, deduplicates, enriches, and expires its cache", async () => {
     let now = Date.parse("2026-08-06T12:00:00.000Z");
     const calls: string[] = [];
+    let processBuffer = 0;
     const detector = new ExternalTerminalDetector(async (rows) => rows.map((row) => ({
       ...row,
       threadId: "thread-exact",
@@ -42,16 +43,19 @@ describe("external terminal detection", () => {
       ownPid: 999,
       now: () => now,
       canonicalize: async (value) => value,
-      run: async (command, args) => {
+      run: async (command, args, options) => {
         calls.push(`${command} ${args[0] ?? ""}`);
-        if (command.endsWith("ps")) return {
+        if (command.endsWith("ps")) {
+          processBuffer = options.maxBuffer;
+          return {
           stdout: [
             " 10 1 ttys001 /bin/zsh -l",
             " 20 10 ttys001 /usr/bin/env node /usr/local/bin/codex",
             " 999 1 ttys002 Chromux Chromux",
             " 1000 999 ttys002 codex codex"
           ].join("\n")
-        };
+          };
+        }
         if (command.endsWith("osascript")) throw new Error("Not authorized to send Apple events. (-1743)");
         if (command.endsWith("lsof")) return { stdout: "p20\nfcwd\nn/tmp/project\n" };
         throw new Error("unexpected command");
@@ -68,6 +72,7 @@ describe("external terminal detection", () => {
       resumePreview: "Latest agent reply"
     });
     expect(calls.filter((call) => call.includes("lsof"))).toHaveLength(1);
+    expect(processBuffer).toBe(1024 * 1024);
     expect(detector.resolve(result.scanId, result.rows[0]!.targetId).threadId).toBe("thread-exact");
     now += 120_001;
     expect(() => detector.resolve(result.scanId, result.rows[0]!.targetId)).toThrow("expired");

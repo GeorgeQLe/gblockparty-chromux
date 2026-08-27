@@ -17,6 +17,7 @@ import type {
   WorkspacePreferencesPatchV1,
   WorkspacePreferencesV1
 } from "../settings/workspace-preferences";
+import type { ProjectSuggestionV1 } from "../settings/project-suggestions";
 import type {
   AcquireDetectionLeaseInput,
   CreateFromDetectionInput,
@@ -63,6 +64,7 @@ export interface ChromuxNextApi {
   runner: {
     state(): Promise<RunnerStateV1>;
     models(): Promise<ModelOptionV1[]>;
+    suggestProjects(query: string): Promise<ProjectSuggestionV1[]>;
     create(input: {
       projectPath: string;
       title?: string;

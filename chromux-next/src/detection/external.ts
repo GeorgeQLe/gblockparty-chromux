@@ -12,7 +12,7 @@ import {
 
 const runFile = promisify(execFile);
 const MAX_ROWS = 100;
-const MAX_OUTPUT = 256 * 1024;
+const MAX_OUTPUT = 1024 * 1024;
 const CACHE_TTL_MS = 2 * 60_000;
 
 type ProcessRow = { pid: number; ppid: number; tty: string; command: string; args: string };

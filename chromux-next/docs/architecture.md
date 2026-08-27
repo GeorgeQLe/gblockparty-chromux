@@ -125,6 +125,21 @@ The v0.7.1 baseline makes ownership enforceable rather than conventional:
 
 ## Runner lifecycle
 
+### Project suggestion boundary
+
+- New Session project discovery is main-process-owned. The renderer sends only
+  a bounded query and receives at most 20 runtime-validated display rows.
+- Registered projects rank first, followed by existing paths in local
+  `p_history`, then Git projects discovered under `P_BASE` or `~/projects`.
+  Basename exact/prefix/substring matches precede relative-path matches.
+- Discovery mirrors `p` behavior without sourcing or executing shell code. It
+  skips `.git`, hidden, and `node_modules` traversal, caps the index at 5,000
+  projects, and caches it for five minutes. Literal `/…` and `~/…` input lists
+  only matching child directories from the exact parent.
+- Every returned path is canonicalized before deduplication. Search failures are
+  nonfatal: users can keep typing an absolute path or use Add folder. Renderer
+  request sequencing prevents a slower result from replacing a newer query.
+
 - The main process validates Codex CLI 0.146.0+, initializes one app-server,
   and verifies `model/list` before sessions are used.
 - Stdout passes through an incremental, 1 MiB-per-line JSONL decoder. Partial,

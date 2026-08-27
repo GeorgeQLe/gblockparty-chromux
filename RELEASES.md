@@ -1,5 +1,24 @@
 # Release Notes
 
+## GBlockParty Chromux Next v0.15.0 (prerelease)
+
+Tag: `chromux-next-v0.15.0`
+
+- Replace the New Session registered-folder dropdown with an accessible project
+  combobox that searches as you type, supports mouse, arrow-key, Enter, Tab,
+  and Escape interaction, and still accepts literal absolute paths.
+- Mirror local `p` discovery semantics without executing shell code: registered
+  folders and valid recent `p_history` entries are prioritized, Git projects
+  under `P_BASE` (or `~/projects`) are discovered with bounded traversal, and
+  basename matches rank before relative-path matches.
+- Keep discovery in the main process behind bounded runtime-validated IPC,
+  canonicalize macOS path aliases, ignore dependency trees, cache scans for five
+  minutes, suppress stale renderer responses, and retain Add folder fallback.
+- Keep terminal detection reliable on busy developer machines by accepting a
+  bounded 1 MiB macOS process table before parsing and row caps are applied.
+- This successor-only feature release remains a macOS arm64 prerelease and does
+  not replace legacy `/releases/latest`.
+
 ## GBlockParty Chromux Next v0.14.2 (prerelease)
 
 Tag: `chromux-next-v0.14.2`

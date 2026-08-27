@@ -25,6 +25,8 @@ import {
   UiPreferencesV1Schema
   ,WorkspacePreferencesPatchV1Schema
   ,WorkspacePreferencesV1Schema
+  ,ProjectSuggestionQuerySchema
+  ,ProjectSuggestionV1Schema
   ,UpdateActionSchema
   ,UpdateCheckActionSchema
   ,UpdateReleaseNotesActionSchema
@@ -158,6 +160,12 @@ const api: ChromuxNextApi = {
     },
     async models() {
       return ModelOptionV1Schema.array().parse(await ipcRenderer.invoke(IpcChannels.runnerModels));
+    },
+    async suggestProjects(query) {
+      const input = ProjectSuggestionQuerySchema.parse({ query, limit: 12 });
+      return ProjectSuggestionV1Schema.array().parse(
+        await ipcRenderer.invoke(IpcChannels.runnerSuggestProjects, input)
+      );
     },
     async create(input) {
       return RunnerSessionV1Schema.parse(await ipcRenderer.invoke(

@@ -22,6 +22,10 @@ import {
   WorkspacePreferencesV1Schema
 } from "../settings/workspace-preferences";
 import {
+  ProjectSuggestionQuerySchema,
+  ProjectSuggestionV1Schema
+} from "../settings/project-suggestions";
+import {
   AcquireDetectionLeaseInputSchema,
   CreateFromDetectionInputSchema,
   DetectionLeaseIdInputSchema,
@@ -82,6 +86,7 @@ export const IpcChannels = {
   ,runnerDraft: "runner:draft"
   ,runnerRespond: "runner:respond"
   ,runnerModels: "runner:models"
+  ,runnerSuggestProjects: "runner:suggest-projects"
   ,runnerGroup: "runner:group"
   ,runnerSelect: "runner:select"
   ,runnerDetectExternal: "runner:detect-external"
@@ -158,6 +163,8 @@ export {
   ,UiPreferencesV1Schema
   ,WorkspacePreferencesPatchV1Schema
   ,WorkspacePreferencesV1Schema
+  ,ProjectSuggestionQuerySchema
+  ,ProjectSuggestionV1Schema
   ,CreateFromDetectionInputSchema
   ,AcquireDetectionLeaseInputSchema
   ,DetectionLeaseIdInputSchema

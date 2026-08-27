@@ -29,6 +29,7 @@ export const PreloadInvokeChannels = [
   IpcChannels.browserDeliver,
   IpcChannels.runnerState,
   IpcChannels.runnerModels,
+  IpcChannels.runnerSuggestProjects,
   IpcChannels.runnerCreate,
   IpcChannels.runnerDetectExternal,
   IpcChannels.runnerAcquireDetectionLease,
