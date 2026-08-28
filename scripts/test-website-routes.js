@@ -69,18 +69,50 @@ function verifyGeneratedDesigns(designs) {
 function verifyMobileGallery() {
   const sourceGallery = fs.readFileSync(path.join(root, "mobile-prototypes", "index.html"), "utf8");
   const generatedGallery = fs.readFileSync(path.join(root, "dist-site", "mobile", "index.html"), "utf8");
-  const localLinks = cardLinks(sourceGallery);
-  const routes = cardLinks(generatedGallery);
+  const sourceArchive = fs.readFileSync(path.join(root, "mobile-prototypes", "archive", "index.html"), "utf8");
+  const generatedArchive = fs.readFileSync(path.join(root, "dist-site", "mobile", "archive", "index.html"), "utf8");
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, "mobile-prototypes", "routes.json"), "utf8"));
+  const generatedManifest = JSON.parse(fs.readFileSync(path.join(root, "dist-site", "mobile", "routes.json"), "utf8"));
+  const labRoutes = cardLinks(sourceGallery);
+  const builtLabRoutes = cardLinks(generatedGallery);
+  const historicalRoutes = cardLinks(sourceArchive);
+  const builtHistoricalRoutes = cardLinks(generatedArchive);
 
-  assert.equal(localLinks.length, 7, "local mobile gallery should retain all seven routes");
-  assert.equal(routes.length, 7, "production mobile gallery should retain all seven routes");
-  assert.deepEqual(routes, localLinks, "mobile gallery routing should remain unchanged by the desktop viewer build");
-  for (const route of routes) {
+  assert.equal(labRoutes.length, 3, "mobile lab should contain exactly three MVP cards");
+  assert.deepEqual(labRoutes, manifest.lab, "lab cards should match the route manifest");
+  assert.deepEqual(builtLabRoutes, labRoutes, "production mobile lab should preserve all MVP routes");
+  assert.equal(manifest.archive, "/mobile/archive/", "manifest should expose the archive index");
+  assert.equal(historicalRoutes.length, 7, "archive should retain all seven historical routes");
+  assert.deepEqual(historicalRoutes, manifest.historical, "archive cards should match the historical manifest");
+  assert.deepEqual(builtHistoricalRoutes, historicalRoutes, "production archive should preserve historical routes");
+  assert.deepEqual(generatedManifest, manifest, "generated route manifest should be byte-equivalent JSON data");
+
+  for (const route of [...labRoutes, ...historicalRoutes]) {
     assert.match(route, /^\/mobile\/[a-z0-9-]+$/, `${route} should remain a clean mobile URL`);
-    assert.ok(fs.statSync(path.join(root, "dist-site", `${route}.html`)).isFile());
+    const source = path.join(root, "mobile-prototypes", `${route.split("/").pop()}.html`);
+    const output = path.join(root, "dist-site", `${route}.html`);
+    assert.ok(fs.statSync(output).isFile(), `${route} should be built`);
+    assert.equal(fs.readFileSync(output, "utf8"), fs.readFileSync(source, "utf8"), `${route} should be copied byte-identically`);
   }
 
-  return routes.length;
+  assert.equal(generatedGallery, sourceGallery, "mobile lab index should be copied byte-identically");
+  assert.equal(generatedArchive, sourceArchive, "archive index should be copied byte-identically");
+
+  const forbidden = [
+    "browser evidence", "project navigation", "file navigation", "alignment", "deck", "canvas",
+    "repository", "local pty", "launch session", "stop session", "package scripts", "voice", "camera",
+    "timeline branch", "dashboard",
+  ];
+  for (const route of labRoutes) {
+    const content = fs.readFileSync(path.join(root, "dist-site", `${route}.html`), "utf8").toLowerCase();
+    for (const phrase of forbidden) assert.ok(!content.includes(phrase), `${route} should exclude ${phrase}`);
+    assert.match(content, /← mobile lab/i, `${route} should have a clearly labeled lab back control`);
+    assert.match(content, /data-attach/, `${route} should support read-only attachment`);
+    assert.match(content, /data-confirm/, `${route} should require control confirmation`);
+    assert.match(content, /data-release/, `${route} should support explicit control release`);
+  }
+
+  return labRoutes.length + historicalRoutes.length;
 }
 
 const designs = desktopDesigns();
@@ -89,4 +121,4 @@ verifyLocalDesignGallery(designs);
 const designCount = verifyGeneratedDesigns(designs);
 const mobileCount = verifyMobileGallery();
 
-console.log(`Verified ${designCount} responsive design routes and ${mobileCount} unchanged mobile routes.`);
+console.log(`Verified ${designCount} responsive design routes, 3 mobile MVP routes, and ${mobileCount - 3} archived mobile routes.`);

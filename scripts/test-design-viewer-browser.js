@@ -15,11 +15,25 @@ const viewports = [
   { width: 1100, height: 800 },
   { width: 768, height: 1024 },
 ];
+const mobileViewports = [
+  { width: 393, height: 852, mobile: true },
+  { width: 1280, height: 900, mobile: false },
+];
+const mobileSlugs = ["mvp-signal-inbox", "mvp-session-relay", "mvp-command-lens"];
 
 function findChromium() {
   if (process.env.CHROMUX_CHROME && fs.existsSync(process.env.CHROMUX_CHROME)) {
     return process.env.CHROMUX_CHROME;
   }
+
+  const installedBrowsers = [
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
+    "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+    "/Applications/Chromium.app/Contents/MacOS/Chromium",
+  ];
+  const installedBrowser = installedBrowsers.find((candidate) => fs.existsSync(candidate));
+  if (installedBrowser) return installedBrowser;
 
   const cache = path.join(os.homedir(), "Library", "Caches", "ms-playwright");
   if (!fs.existsSync(cache)) return null;
@@ -43,6 +57,7 @@ function serveStatic() {
       const pathname = decodeURIComponent(new URL(request.url, "http://localhost").pathname);
       let candidate = path.join(siteRoot, pathname === "/" ? "index.html" : pathname);
       if (!path.extname(candidate) && fs.existsSync(`${candidate}.html`)) candidate += ".html";
+      if (fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) candidate = path.join(candidate, "index.html");
       if (!candidate.startsWith(siteRoot + path.sep) || !fs.existsSync(candidate)) {
         response.writeHead(404).end("Not found");
         return;
@@ -223,6 +238,80 @@ async function verifyModal(cdp) {
   })()`), true, "Escape should close the Capture modal inside the iframe");
 }
 
+async function verifyMobileFlow(cdp, origin, slug, viewport) {
+  await cdp.send("Emulation.setDeviceMetricsOverride", {
+    width: viewport.width,
+    height: viewport.height,
+    deviceScaleFactor: 1,
+    mobile: viewport.mobile,
+  });
+  await navigateDocument(cdp, `${origin}/mobile/${slug}`);
+
+  const initial = await evaluate(cdp, `(() => {
+    const command = document.querySelector('[data-command]');
+    const send = document.querySelector('[data-send]');
+    const back = document.querySelector('.lab-link').getBoundingClientRect();
+    const first = document.querySelector('[data-open="session"]');
+    first.focus();
+    const focus = getComputedStyle(first);
+    return {
+      overflow: document.documentElement.scrollWidth <= innerWidth,
+      inputDisabled: command.disabled,
+      sendDisabled: send.disabled,
+      homeActive: document.getElementById('home').classList.contains('active'),
+      backInsideViewport: back.left >= 0 && back.top >= 0 && back.right <= innerWidth && back.bottom <= innerHeight,
+      focused: document.activeElement === first,
+      visibleFocus: focus.outlineStyle !== 'none' && focus.outlineWidth !== '0px',
+    };
+  })()`);
+  assert.deepEqual(initial, {
+    overflow: true, inputDisabled: true, sendDisabled: true, homeActive: true,
+    backInsideViewport: true, focused: true, visibleFocus: true,
+  }, `${slug} should fit ${viewport.width}px, expose focus, and fail closed`);
+
+  assert.equal(await evaluate(cdp, `(() => {
+    document.querySelector('[data-open="session"]').click();
+    return location.hash === '#session' && document.getElementById('session').classList.contains('active');
+  })()`), true, `${slug} attention item should deep-link to its session`);
+  await evaluate(cdp, "document.querySelector('[data-attach]').click()");
+  assert.deepEqual(await evaluate(cdp, `(() => ({
+    terminal: document.getElementById('terminal').classList.contains('active'),
+    hash: location.hash,
+    inputDisabled: document.querySelector('[data-command]').disabled,
+    replayed: /replay|retained/i.test(document.getElementById('terminal').textContent),
+  }))()`), { terminal: true, hash: "#terminal", inputDisabled: true, replayed: true }, `${slug} should attach read-only with replay`);
+
+  await evaluate(cdp, "document.querySelector('[data-request]').click()");
+  assert.equal(await evaluate(cdp, "document.querySelector('dialog').open"), true, `${slug} should confirm control in a modal`);
+  await cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape" });
+  await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape" });
+  assert.equal(await evaluate(cdp, "document.querySelector('dialog').open"), false, `${slug} modal should dismiss with Escape`);
+  assert.equal(await evaluate(cdp, "document.querySelector('[data-command]').disabled"), true, `${slug} dismissal should not grant control`);
+
+  await evaluate(cdp, "document.querySelector('[data-request]').click(); document.querySelector('[data-confirm]').click()");
+  assert.deepEqual(await evaluate(cdp, `(() => ({
+    inputDisabled: document.querySelector('[data-command]').disabled,
+    sendDisabled: document.querySelector('[data-send]').disabled,
+    releaseDisabled: document.querySelector('[data-release]').disabled,
+  }))()`), { inputDisabled: false, sendDisabled: false, releaseDisabled: false }, `${slug} should enable input only after confirmed lease`);
+  await evaluate(cdp, "document.querySelector('[data-send]').click()");
+  assert.match(await evaluate(cdp, "document.querySelector('[data-output]').textContent"), /MOBILE_OK/, `${slug} should append bounded command output`);
+  await evaluate(cdp, "document.querySelector('[data-release]').click()");
+  assert.deepEqual(await evaluate(cdp, `(() => ({
+    inputDisabled: document.querySelector('[data-command]').disabled,
+    sendDisabled: document.querySelector('[data-send]').disabled,
+  }))()`), { inputDisabled: true, sendDisabled: true }, `${slug} should fail closed after release`);
+
+  await evaluate(cdp, "location.hash = '#offline'");
+  assert.deepEqual(await evaluate(cdp, `(() => ({
+    offline: document.getElementById('offline').classList.contains('active'),
+    noInput: !document.querySelector('#offline [data-command]'),
+  }))()`), { offline: true, noInput: true }, `${slug} should restore offline recovery from its hash without input`);
+  await evaluate(cdp, "location.hash = '#reconnect'");
+  await evaluate(cdp, "document.querySelector('[data-resume]').click()");
+  assert.match(await evaluate(cdp, "document.querySelector('[data-output]').textContent"), /41/, `${slug} should resume replay after the displayed cursor`);
+}
+
 async function main() {
   execFileSync(path.join(root, "scripts", "build-website.sh"), { stdio: "inherit" });
   const chromium = findChromium();
@@ -246,28 +335,47 @@ async function main() {
 
     const designs = fs.readdirSync(path.join(siteRoot, "designs", "raw"))
       .filter((name) => /^\d{2}-[a-z0-9-]+\.html$/.test(name)).sort();
+    const mobileOnly = process.argv.includes("--mobile-only");
 
-    for (const filename of designs) {
-      const slug = filename.replace(/\.html$/, "");
-      await navigate(pageCdp, `${origin}/designs/${slug}`);
-      for (const viewport of viewports) await verifyViewport(pageCdp, filename, viewport);
+    if (!mobileOnly) {
+      for (const filename of designs) {
+        const slug = filename.replace(/\.html$/, "");
+        await navigate(pageCdp, `${origin}/designs/${slug}`);
+        for (const viewport of viewports) await verifyViewport(pageCdp, filename, viewport);
+      }
+
+      await navigate(pageCdp, `${origin}/designs/14-streak`);
+      await verifyViewport(pageCdp, "14-streak.html", viewports[2]);
+      await verifyModal(pageCdp);
+
+      await navigate(pageCdp, `${origin}/designs/viewer?design=33-japanese-station.html`);
+      assert.equal(
+        await evaluate(pageCdp, "document.getElementById('design-canvas').getAttribute('src')"),
+        "raw/33-japanese-station.html",
+        "generic viewer should resolve an allowlisted filename",
+      );
+      await navigateDocument(pageCdp, `${origin}/designs/viewer?design=https://example.com/not-allowed`);
+      assert.deepEqual(await evaluate(pageCdp, `(() => ({
+        errorVisible: !document.getElementById('viewer-error').hidden,
+        iframeCount: document.querySelectorAll('iframe').length,
+      }))()`), { errorVisible: true, iframeCount: 0 }, "invalid viewer input should show an error without creating an iframe");
     }
 
-    await navigate(pageCdp, `${origin}/designs/14-streak`);
-    await verifyViewport(pageCdp, "14-streak.html", viewports[2]);
-    await verifyModal(pageCdp);
+    for (const viewport of mobileViewports) {
+      await pageCdp.send("Emulation.setDeviceMetricsOverride", {
+        width: viewport.width, height: viewport.height, deviceScaleFactor: 1, mobile: viewport.mobile,
+      });
+      await navigateDocument(pageCdp, `${origin}/mobile/?viewport=${viewport.width}`);
+      assert.deepEqual(await evaluate(pageCdp, `(() => ({
+        cards: document.querySelectorAll('a.card').length,
+        overflow: document.documentElement.scrollWidth <= innerWidth,
+        archive: document.querySelector('a.archive').getAttribute('href'),
+      }))()`), { cards: 3, overflow: true, archive: "/mobile/archive/" }, `mobile lab should fit ${viewport.width}px and expose three directions`);
+    }
 
-    await navigate(pageCdp, `${origin}/designs/viewer?design=33-japanese-station.html`);
-    assert.equal(
-      await evaluate(pageCdp, "document.getElementById('design-canvas').getAttribute('src')"),
-      "raw/33-japanese-station.html",
-      "generic viewer should resolve an allowlisted filename",
-    );
-    await navigateDocument(pageCdp, `${origin}/designs/viewer?design=https://example.com/not-allowed`);
-    assert.deepEqual(await evaluate(pageCdp, `(() => ({
-      errorVisible: !document.getElementById('viewer-error').hidden,
-      iframeCount: document.querySelectorAll('iframe').length,
-    }))()`), { errorVisible: true, iframeCount: 0 }, "invalid viewer input should show an error without creating an iframe");
+    for (const slug of mobileSlugs) {
+      for (const viewport of mobileViewports) await verifyMobileFlow(pageCdp, origin, slug, viewport);
+    }
 
     if (process.argv.includes("--screenshots")) {
       const outputDir = path.join(os.tmpdir(), "chromux-viewer-visuals");
@@ -281,10 +389,26 @@ async function main() {
           fs.writeFileSync(path.join(outputDir, `${slug}-${viewport.width}x${viewport.height}.png`), image.data, "base64");
         }
       }
+      for (const slug of mobileSlugs) {
+        for (const state of ["home", "session", "terminal", "offline"]) {
+          await pageCdp.send("Emulation.setDeviceMetricsOverride", { width: 393, height: 852, deviceScaleFactor: 1, mobile: true });
+          await navigateDocument(pageCdp, `${origin}/mobile/${slug}?capture=${state}#${state}`);
+          const image = await pageCdp.send("Page.captureScreenshot", { format: "png", fromSurface: true });
+          fs.writeFileSync(path.join(outputDir, `${slug}-${state}-393x852.png`), image.data, "base64");
+        }
+      }
+      for (const viewport of mobileViewports) {
+        await pageCdp.send("Emulation.setDeviceMetricsOverride", {
+          width: viewport.width, height: viewport.height, deviceScaleFactor: 1, mobile: viewport.mobile,
+        });
+        await navigateDocument(pageCdp, `${origin}/mobile/?capture=${viewport.width}`);
+        const image = await pageCdp.send("Page.captureScreenshot", { format: "png", fromSurface: true });
+        fs.writeFileSync(path.join(outputDir, `mobile-lab-${viewport.width}x${viewport.height}.png`), image.data, "base64");
+      }
       console.log(`Captured representative visual checks in ${outputDir}`);
     }
 
-    console.log(`Verified all 36 desktop viewers at ${viewports.length} viewport sizes and Capture modal interaction.`);
+    console.log(`Verified all 36 desktop viewers and 3 interactive mobile MVP variants at phone and desktop sizes.`);
   } finally {
     if (browserCdp) await browserCdp.send("Browser.close").catch(() => {});
     server.close();

@@ -1,0 +1,17 @@
+{
+  "lab": [
+    "/mobile/mvp-signal-inbox",
+    "/mobile/mvp-session-relay",
+    "/mobile/mvp-command-lens"
+  ],
+  "archive": "/mobile/archive/",
+  "historical": [
+    "/mobile/01-mission-control",
+    "/mobile/02-agent-inbox",
+    "/mobile/03-browser-field-kit",
+    "/mobile/04-timeline",
+    "/mobile/05-deck-of-agents",
+    "/mobile/06-command-lens",
+    "/mobile/07-remote-workbench"
+  ]
+}

@@ -1,4 +1,9 @@
-# Chromux Mobile — Shared Prototype Spec
+# Chromux Mobile — Historical Prototype Spec
+
+> Archive note: this document specifies the seven historical explorations now
+> indexed at `/mobile/archive/`. The active lab and its smaller read-only →
+> control-lease → bounded-input loop are documented in `README.md`. Existing
+> historical files and direct URLs remain unchanged for comparison.
 
 Seven prototypes (A–G) explore what a **mobile Chromux** should be: a remote
 agent command center, not a miniature desktop IDE. The primary loop:

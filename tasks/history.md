@@ -1,5 +1,96 @@
 # Session History
 
+## 2026-08-28 — Chromux Mobile MVP Lab
+
+- **User goal:** Replace `/mobile/` with three independent, interactive phone
+  mockups that compare the same realistic first-MVP remote-session loop;
+  preserve all seven historical routes under an archive; extend the existing
+  static build and tests; publish the verified `dist-site` output to the linked
+  `chromux-landing` production project; and leave both application release
+  lines untouched.
+- **Changed files and purpose:** `mobile-prototypes/index.html` is the three-card
+  comparison lab; `mvp-signal-inbox.html`, `mvp-session-relay.html`, and
+  `mvp-command-lens.html` are self-contained editorial, industrial, and OLED
+  interaction directions; `archive/index.html` indexes the unchanged seven
+  historical pages; `routes.json` is the explicit lab/archive route manifest;
+  `README.md` documents the active MVP boundary; `SPEC.md` marks the broader
+  seven-design contract as historical. `landing/index.html` names the Mobile
+  MVP lab. `scripts/build-website.sh` copies the archive and manifest;
+  `scripts/test-website-routes.js` verifies exactly three MVPs, seven preserved
+  historical routes, clean paths, byte-identical copies, required interaction
+  hooks, and forbidden later-phase surfaces. `scripts/test-design-viewer-browser.js`
+  exercises the lab and all variants at phone and desktop sizes, captures
+  representative states, and discovers common installed macOS Chromium
+  browsers. `vercel.json` resolves root, lab, and archive indexes after clean-URL
+  canonicalization. `tasks/roadmap.md`, `tasks/todo.md`, and this entry record
+  the completed static-design milestone and exact shipping boundary.
+- **User-goal mapping:** Each MVP implements attention/session discovery,
+  read-only attach, bounded missed-output replay, explicit single-writer lease
+  confirmation, disabled input without control, the harmless
+  `printf 'MOBILE_OK\\n'` fixture, appended output, release, and fail-closed
+  contention/offline/revoked/reconnect/replay-gap states. Notification rows
+  restore the correct session through hashes. Every page has one clearly
+  labeled Mobile Lab back control with desktop-outside and narrow-safe-area
+  placement. Historical HTML files remain byte-identical at their original
+  `/mobile/01-*` through `/mobile/07-*` routes. No `chromux-next/`,
+  `prototype/`, package version, tag, GitHub Release, or `/releases/latest`
+  state is part of the boundary.
+- **Executable verification:** `npm test` passed the deterministic static build,
+  36 desktop route/viewer checks, exactly 3 MVP routes, all 7 archive routes,
+  and the real-browser mobile flow at 393×852 and 1280×900. Browser assertions
+  cover horizontal fit, visible focus, safe back-link placement, deep links,
+  read-only enforcement, replay, Escape dismissal, confirmed control, bounded
+  send/output, release, offline fail-closed state, and cursor recovery.
+  The final sandboxed browser run was denied a loopback listener with `EPERM`;
+  the identical approved outside-sandbox command passed with no application
+  assertion failure or warning.
+  `node --check` passed both changed test scripts. `git diff --check` passed.
+  The screenshot lane captured the lab at phone/desktop sizes and home,
+  summary, terminal, and offline states for all three directions; all fourteen
+  captures were visually inspected for hierarchy, clipping, safe areas, and
+  art-direction separation. Production smoke checks returned 200 for `/`,
+  `/mobile/`, all three MVP routes, `/mobile/archive/`, all seven historical
+  routes, and `/mobile/routes.json`; the lab response includes `nosniff`, the
+  configured referrer policy, and the camera/microphone/geolocation-denying
+  permissions policy.
+- **Skipped tests:** Electron runtime, package, signing, notarization, and app
+  update tests are outside this static website boundary because neither app
+  package, dependency, runtime source, metadata, nor release channel changed.
+  No real remote host, credentials, terminal, or control-plane protocol was
+  invoked because these are fabricated, credential-free UX prototypes rather
+  than a second implementation of the eventual GBlockParty contracts.
+- **Adversarial review:** The installed quality-sweep and expert-review skills
+  are absent, so the repository quality-gate contract's explicit-equivalent
+  path was used: exact-diff review plus route inventory, forbidden-surface
+  scans, byte-identity assertions, failure-oriented browser automation, visual
+  inspection, and production route/header probes. The review checked silent
+  control theft, input before/after authority, modal cancellation, stale hash
+  restoration, same-document hash navigation, replay gaps, revoked/offline
+  leakage, safe-area overlap, clean-URL redirect loops, archive drift, build
+  scope, app-release contamination, and secret-like fixture content. Findings
+  fixed before ship were explicit Escape handling, same-document hash-test
+  hangs, directory-index serving in the local harness, narrow status/back-link
+  overlap, Vercel clean-URL index rewrites, and automatic installed-browser
+  discovery. No blocking finding remains.
+- **Residual risk:** These pages validate interaction language and simulated
+  state only; they do not prove real enrollment, server-enforced leases,
+  durable replay retention, or physical-phone ergonomics. Those remain the
+  first active implementation and acceptance items in `tasks/todo.md`. The
+  clean-URL rewrites are production-smoked, but any future output-layout change
+  must keep their internal `/index` destinations aligned.
+- **Rollback note:** Revert this shipping commit and redeploy the preceding
+  `main` commit to `chromux-landing`; the unchanged historical prototype files
+  remain recoverable from Git history. No application tag or GitHub Release
+  needs removal. Production deployment `dpl_FtEtfTkBPx9kY7YL5NwPbKh5Aynm`
+  is the verified current artifact. Deploy during `$ship-end` is skipped
+  because this repository has no `deploy.md` or `tasks/deploy.md`; the user-
+  authorized production deployment and public smoke tests were completed
+  earlier in the session.
+- **Next command:** Use `$exec` for the first active GBlockParty item: extend
+  Chromux Next Fleet transport with external device enrollment, revocation,
+  protected credential storage, and request/renew/release/expiry enforcement
+  for visible single-writer terminal leases.
+
 ## 2026-08-28 — Chromux Next v0.16.0 parity release
 
 - **User goal:** Ship one cohesive successor prerelease with explicitly scoped

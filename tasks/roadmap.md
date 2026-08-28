@@ -16,7 +16,9 @@ continued from a phone.
     input/resize, in-process reconnect/replay, explicit reset, and detach
     without stop.
 - [x] Mobile product-direction prototypes
-  - Seven static variations establish an attention-first remote command center.
+  - Three interactive MVP directions compare one safe read-only, replay,
+    single-writer lease, bounded-input, release, and recovery loop; the seven
+    broader historical explorations remain archived at their original routes.
 - [ ] Complete Chromux Next macOS continuity
   - **Device identity and leased control**
     - Add one-time device enrollment and revocation with protected credential

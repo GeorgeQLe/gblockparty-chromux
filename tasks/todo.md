@@ -22,6 +22,17 @@ Canonical plan: [`docs/gblockparty-remote-clients.md`](../docs/gblockparty-remot
 
 ### Planned work
 
+- [x] Replace the broad public mobile gallery with a focused MVP lab containing
+  Signal Inbox, Session Relay, and Command Lens; preserve the seven historical
+  routes under an archive; verify the full read-only/replay/control/send/release
+  loop and failure states at phone and desktop sizes; and publish the static
+  output to the linked `chromux-landing` production project without changing
+  either app package, SemVer line, tag, or GitHub Release.
+  _(source: user-supplied Chromux Mobile MVP Lab plan; evidence:
+  `mobile-prototypes/`, `scripts/build-website.sh`,
+  `scripts/test-website-routes.js`, `scripts/test-design-viewer-browser.js`,
+  `vercel.json`, and production route/header smoke checks)_
+
 - [ ] Extend the existing Chromux Next Fleet transport to accept external
   device authority, enroll/store a revocable credential, and request, renew,
   release, and visibly enforce terminal input leases.
