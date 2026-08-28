@@ -1,6 +1,6 @@
 # Session History
 
-## 2026-08-28 — Chromux Next v0.16.0 parity release candidate
+## 2026-08-28 — Chromux Next v0.16.0 parity release
 
 - **User goal:** Ship one cohesive successor prerelease with explicitly scoped
   attention, a read-only Repository surface, reliable native folder selection,
@@ -29,7 +29,11 @@
   qualification passed 46 primary, 8 Situation Room, and 2 renderer-recovery
   captures. The signed candidate and fresh extracted ZIP passed strict
   codesign, Team `NC56VXK48K`, bundle `dev.georgele.chromux.next`, Gatekeeper
-  `Notarized Developer ID`, stapler, version `0.16.0`, and arm64 checks.
+  `Notarized Developer ID`, stapler, version `0.16.0`, and arm64 checks. Commit
+  `bba58cb` and annotated tag `chromux-next-v0.16.0` are pushed; the matching
+  GitHub release is a non-draft prerelease. Public ZIP and manifest downloads
+  match the candidate hashes and GitHub digests exactly, and a fresh extraction
+  repeated the complete trust check.
 - **Adversarial review:** Rechecked canonical deduplication, non-Git, detached,
   unborn, dirty/conflict parsing, command time/buffer bounds, zero repository
   write APIs, legacy context-free recommendation recovery, selection/scope race
@@ -39,21 +43,27 @@
   prototype changes, and diff whitespace. Findings fixed were the unborn-branch
   marker, stale visual toolbar assertion, concurrent attention refresh race,
   and test cleanup/xterm warning isolation.
-- **Skipped tests:** Windows/Linux packaging and stable cutover remain separate
-  roadmap gates. Live `/Applications` managed-update UAT waits for the public
-  prerelease because update discovery intentionally consumes GitHub releases.
-  The repository dummy UAT is automated against disposable real Git state; no
+- **Managed-update evidence:** Computer Use confirmed the selected installed
+  0.15.0 session was idle with disabled Send/Stop and no pending interaction.
+  The app discovered public 0.16.0, downloaded and independently verified it,
+  staged it, replaced `/Applications/Chromux Next.app`, relaunched the exact app
+  with the session restored, and removed the adjacent backup. A new check
+  reports `Installed 0.16.0 · Latest 0.16.0 current`; the installed bundle
+  independently passes deep strict codesign, Gatekeeper, stapler, version, and
+  arm64 checks.
+- **Skipped tests:** No requested release lane was skipped. Windows/Linux
+  packaging and stable-channel cutover remain separate roadmap gates. The
+  repository dummy UAT is automated against disposable real Git state; no
   valuable working tree was mutated.
-- **Residual risk:** The broad renderer remains a large component and the live
-  installed forward-update lane is not meaningful until the public release is
-  available. Public asset redownload and the live/isolated managed-update proof
-  follow publication.
+- **Residual risk:** The broad renderer remains a large component. Windows,
+  Linux, and stable cutover are deliberately outside this macOS arm64
+  successor prerelease.
 - **Rollback:** Remove the `chromux-next-v0.16.0` prerelease/tag and revert the
   release commit. Existing project documents remain ordinary JSON files;
   successor binding state can be removed independently. Legacy stable remains
-  untouched.
-- **Next command:** Commit/tag/push, publish the prerelease, redownload and
-  independently verify its two assets, then run managed-update qualification.
+  untouched at `chromux-v0.81.0`.
+- **Next command:** Continue with the first active GBlockParty Remote Desktop
+  and Phone MVP item in `tasks/todo.md`.
 
 ## 2026-08-27 — Chromux Next v0.15.0 live managed installation
 

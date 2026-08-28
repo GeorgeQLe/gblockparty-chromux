@@ -77,9 +77,21 @@ mutation checks at a valuable working tree. Record screenshots for standard
   codesign, bundle ID, Team ID, Gatekeeper, stapler, version, and arm64 checks.
   ZIP: 119,025,109 bytes, SHA-256
   `2bcd6f82426e30753394b4ece48c2b668cc9080af96745b9b9258e982ab9e4f7`.
-- [ ] Public asset redownload and managed-update qualification follow
-  publication because update discovery intentionally consumes GitHub releases.
-- Confirm GitHub prerelease `chromux-next-v0.16.0` is visible with title
-  `GBlockParty Chromux Next v0.16.0`.
-- Confirm GitHub `/releases/latest` still resolves to the unchanged legacy
-  stable Chromux release.
+- [x] Public ZIP and manifest redownloaded to
+  `/private/tmp/chromux-next-0.16.0-public.7QBS5F`. Their SHA-256 values match
+  the local candidate and GitHub asset digests exactly; the manifest is
+  byte-identical. A fresh public extraction passed deep strict codesign, Team
+  and bundle identity, Gatekeeper `Notarized Developer ID`, stapler, version
+  `0.16.0`, and arm64 checks.
+- [x] Live managed update from installed `0.15.0`: the selected session was
+  idle with Send and Stop disabled and no pending interaction. The app
+  discovered `0.16.0`, downloaded and independently verified the package,
+  staged it, replaced `/Applications/Chromux Next.app`, relaunched the exact
+  app with the session restored, and removed the adjacent backup. A fresh
+  update check reports `Installed 0.16.0 · Latest 0.16.0 current`; the installed
+  app independently passes deep strict codesign, Gatekeeper, stapler, version,
+  and arm64 checks.
+- [x] GitHub prerelease `chromux-next-v0.16.0` is non-draft and visible with
+  title `GBlockParty Chromux Next v0.16.0`.
+- [x] GitHub `/releases/latest` still resolves to unchanged legacy stable
+  `chromux-v0.81.0`.

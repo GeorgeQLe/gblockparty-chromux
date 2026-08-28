@@ -158,8 +158,9 @@ instead of resuming the `prototype/` implementation.
   successor-only state, legacy Chromux, and `/releases/latest`.
   _(source: user-supplied UI/UX parity release plan; executable evidence: 37
   Vitest files/203 tests, packaged verification/smokes, 56 packaged visual
-  captures, signed/notarized/stapled arm64 artifact and independent extraction
-  trust checks; publication and public redownload are recorded separately)_
+  captures, signed/notarized/stapled arm64 artifact, public-asset redownload
+  and trust checks, and a successful live managed update from 0.15.0; legacy
+  `/releases/latest` remains `chromux-v0.81.0`)_
 
 - [x] Ship Chromux Next v0.15.0 with p-style project directory autocomplete in
   New Session: prioritize registered and recent projects, discover Git
