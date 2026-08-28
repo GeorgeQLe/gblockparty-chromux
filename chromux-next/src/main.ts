@@ -23,11 +23,15 @@ import {
   CreateSessionInputSchema,
   DraftInputSchema,
   DocumentPathSchema,
+  ProjectPathSchema,
+  ProjectDocumentSaveAsSchema,
+  ProjectChooserInputSchema,
   GroupMutationInputSchema,
   IpcChannels,
   MutationPayloadSchema,
   SavePayloadSchema,
   TriageInputSchema,
+  AttentionScopeInputSchema,
   TurnInputSchema
   ,AcquireDetectionLeaseInputSchema
   ,CreateFromDetectionInputSchema
@@ -42,6 +46,7 @@ import {
   ,attachmentResizeSchema
   ,fleetAttachInputSchema
   ,surfaceIdInputSchema
+  ,RepositoryInspectionRequestSchema
 } from "./ipc/contracts";
 import { DocumentStore } from "./persistence/document-store";
 import { CodexProvider } from "./providers/codex-provider";
@@ -62,6 +67,7 @@ import { CodexUpdateService } from "./main/codex-update-service";
 import { chromuxOwnedCodexEnvironment } from "./main/codex-environment";
 import { ControlPlaneClient } from "./control-plane/client";
 import { ProjectSuggestionService } from "./main/project-suggestion-service";
+import { RepositoryInspector } from "./main/repository-inspector";
 
 if (started) app.quit();
 
@@ -71,6 +77,7 @@ app.setPath("userData", process.env.CHROMUX_NEXT_SMOKE_USER_DATA
   : path.join(app.getPath("appData"), "GBlockParty Chromux Next"));
 
 const documents = new DocumentStore();
+const repositoryInspector = new RepositoryInspector();
 const localStore = new LocalStore(app.getPath("userData"));
 const projectSuggestions = new ProjectSuggestionService({
   homeDirectory: app.getPath("home"),
@@ -564,6 +571,16 @@ function createWindow(): void {
         })()`);
         await capture("session-browser-standard");
         await capture("session-browser-narrow", 820, 720);
+        await visualWindow.webContents.executeJavaScript("document.querySelector('[aria-label=\"Search sessions\"]')?.click()");
+        await capture("command-search-standard");
+        await capture("command-search-narrow", 820, 720);
+        await visualWindow.webContents.executeJavaScript("document.querySelector('[aria-label=\"Close Search sessions\"]')?.click()");
+        await visualWindow.webContents.executeJavaScript(`(() => {
+          const button = [...document.querySelectorAll('.surface-tabs button')].find((item) => item.textContent?.trim().toLowerCase() === 'repository');
+          if (!button) throw new Error('Repository surface control was not found'); button.click();
+        })()`);
+        await capture("repository-current-standard");
+        await capture("repository-current-narrow", 820, 720);
         const approaches = ["control-room", "ide-workbench", "focus-studio", "mission-board", "spatial-canvas"] as const;
         const sizes = [{ name: "standard", width: 1440, height: 900 }, { name: "narrow", width: 820, height: 720 }];
         for (const approach of approaches) {
@@ -589,18 +606,23 @@ function createWindow(): void {
               return {
                 viewport: innerWidth,
                 alignment: rect('.surface-pane.active .alignment-workspace'),
-                toolbar: rect('.surface-pane.active .alignment-toolbar')
+                content: rect('.surface-pane.active .alignment-toolbar') ?? rect('.surface-pane.active .alignment-empty')
               };
             })()`);
-            if (!geometry?.alignment || !geometry?.toolbar
+            if (!geometry?.alignment || !geometry?.content
               || geometry.alignment.left < 0 || geometry.alignment.right > geometry.viewport + 1
-              || geometry.toolbar.left < 0 || geometry.toolbar.right > geometry.viewport + 1) {
+              || geometry.content.left < 0 || geometry.content.right > geometry.viewport + 1) {
               throw new Error(`Alignment workspace clipped for ${approach} ${size.name}: ${JSON.stringify(geometry)}`);
             }
             await capture(`${approach}-${size.name}`, size.width, size.height);
           }
+          const collapsed = await localStore.updateUiPreferences({ attentionPanelOpen: false });
+          mainWindow?.webContents.send(IpcChannels.settingsUiPreferencesChanged, collapsed);
+          for (const size of sizes) await capture(`${approach}-attention-collapsed-${size.name}`, size.width, size.height);
+          const reopened = await localStore.updateUiPreferences({ attentionPanelOpen: true });
+          mainWindow?.webContents.send(IpcChannels.settingsUiPreferencesChanged, reopened);
         }
-        if (captureCount !== 32) throw new Error(`Expected 32 visual captures, received ${captureCount}`);
+        if (captureCount !== 46) throw new Error(`Expected 46 visual captures, received ${captureCount}`);
         console.log(`Chromux Next visual qualification captured ${captureCount} views`);
       } catch (error) {
         process.exitCode = 1;
@@ -617,16 +639,51 @@ function createWindow(): void {
   });
 }
 
+function blankAlignmentDocument(projectName: string) {
+  const now = new Date().toISOString();
+  return AlignmentDocumentV1Schema.parse({
+    schemaVersion: 1, id: randomUUID(), revision: 0, title: `${projectName} alignment`, status: "draft",
+    provenance: { kind: "human", actor: "Chromux Next", createdAt: now }, updatedAt: now,
+    items: [], views: [
+      { kind: "document", sections: [] }, { kind: "deck", slides: [] }, { kind: "canvas", nodes: [] }
+    ], history: []
+  });
+}
+
 function registerIpc(): void {
   const registry = new IpcHandlerRegistry(ipcMain);
-  registry.handle(IpcChannels.documentOpen, async () => {
+  registry.handle(IpcChannels.documentCurrent, async (_event, input: unknown) => {
+    const projectPath = ProjectPathSchema.parse(input);
+    const filePath = await localStore.getAlignmentDocumentPath(projectPath);
+    if (!filePath) return null;
+    try { return { filePath, document: await documents.read(filePath) }; }
+    catch { await localStore.dropAlignmentDocument(projectPath); return null; }
+  });
+  registry.handle(IpcChannels.documentOpen, async (_event, input: unknown) => {
+    const projectPath = ProjectPathSchema.parse(input);
     const result = await dialog.showOpenDialog({
       title: "Open alignment document",
       properties: ["openFile"],
       filters: [{ name: "Alignment documents", extensions: ["json"] }]
     });
     const filePath = result.filePaths[0];
-    return result.canceled || !filePath ? null : { filePath, document: await documents.read(filePath) };
+    if (result.canceled || !filePath) return null;
+    const document = await documents.read(filePath);
+    await localStore.bindAlignmentDocument(projectPath, filePath);
+    return { filePath, document };
+  });
+  registry.handle(IpcChannels.documentCreate, async (_event, input: unknown) => {
+    const projectPath = ProjectPathSchema.parse(input);
+    const document = blankAlignmentDocument(path.basename(projectPath) || "Project");
+    const result = await dialog.showSaveDialog({
+      title: "Create alignment document",
+      defaultPath: `${path.basename(projectPath) || "alignment"}-alignment.json`,
+      filters: [{ name: "Alignment documents", extensions: ["json"] }]
+    });
+    if (result.canceled || !result.filePath) return null;
+    await documents.write(result.filePath, document);
+    await localStore.bindAlignmentDocument(projectPath, result.filePath);
+    return { filePath: result.filePath, document };
   });
   registry.handle(IpcChannels.documentRead, async (_event, input: unknown) => {
     const filePath = DocumentPathSchema.parse(input);
@@ -638,7 +695,7 @@ function registerIpc(): void {
     return payload;
   });
   registry.handle(IpcChannels.documentSaveAs, async (_event, input: unknown) => {
-    const document = AlignmentDocumentV1Schema.parse(input);
+    const { projectPath, document } = ProjectDocumentSaveAsSchema.parse(input);
     const result = await dialog.showSaveDialog({
       title: "Save alignment document",
       defaultPath: `${document.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.json`,
@@ -646,6 +703,7 @@ function registerIpc(): void {
     });
     if (result.canceled || !result.filePath) return null;
     await documents.write(result.filePath, document);
+    await localStore.bindAlignmentDocument(projectPath, result.filePath);
     return { filePath: result.filePath, document };
   });
   registry.handle(IpcChannels.mutationApply, async (_event, input: unknown) => {
@@ -801,6 +859,10 @@ function registerIpc(): void {
   registry.handle(IpcChannels.attentionRefresh, () => runner.refreshAttention());
   registry.handle(IpcChannels.attentionTriage, (_event, input: unknown) =>
     runner.triage(TriageInputSchema.parse(input)));
+  registry.handle(IpcChannels.attentionSetScope, (_event, input: unknown) =>
+    runner.setAttentionScope(AttentionScopeInputSchema.parse(input)));
+  registry.handle(IpcChannels.repositoryInspect, (_event, input: unknown) =>
+    repositoryInspector.inspect(RepositoryInspectionRequestSchema.parse(input)));
   registry.handle(IpcChannels.settingsGetUiPreferences, () => localStore.getUiPreferences());
   registry.handle(IpcChannels.settingsUpdateUiPreferences, async (_event, input: unknown) => {
     const preferences = await localStore.updateUiPreferences(UiPreferencesPatchV1Schema.parse(input));
@@ -824,11 +886,16 @@ function registerIpc(): void {
     broadcastWorkspacePreferences(preferences);
     return preferences;
   });
-  registry.handle(IpcChannels.settingsChooseProject, async () => {
+  registry.handle(IpcChannels.settingsChooseProject, async (_event, input: unknown) => {
+    const { defaultPath } = ProjectChooserInputSchema.parse(input ?? {});
+    const validatedDefaultPath = defaultPath
+      ? await stat(defaultPath).then((value) => value.isDirectory() ? defaultPath : undefined).catch(() => undefined)
+      : undefined;
     const result = await dialog.showOpenDialog({
       title: "Add a project or worktree",
       buttonLabel: "Add to Chromux Next",
-      properties: ["openDirectory", "createDirectory"]
+      ...(validatedDefaultPath ? { defaultPath: validatedDefaultPath } : {}),
+      properties: ["openDirectory"]
     });
     const selectedPath = result.filePaths[0];
     if (result.canceled || !selectedPath) return null;
@@ -850,7 +917,8 @@ function registerIpc(): void {
       lastUsedAt: now
     });
     broadcastWorkspacePreferences(preferences);
-    return preferences;
+    const selectedProject = preferences.projects.find((project) => project.path === canonicalPath)!;
+    return { preferences, selectedProject: { path: canonicalPath, id: selectedProject.id } };
   });
   registry.handle(IpcChannels.settingsRemoveProject, async (_event, input: unknown) => {
     if (typeof input !== "string") throw new Error("Invalid project id");

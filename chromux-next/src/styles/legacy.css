@@ -94,6 +94,24 @@ h1, h2, h3, h4, p { overflow-wrap: anywhere; }
 .attention-card footer, .attention-sidebar > footer { display: flex; flex-wrap: wrap; gap: var(--space-2); color: var(--graphite-400); font-size: 11px; }
 .attention-drawer { position: fixed; z-index: 50; top: 58px; right: 0; bottom: 0; width: min(360px, 92vw); padding-top: 48px; border-left: 1px solid var(--graphite-700); background: var(--graphite-900); box-shadow: var(--shadow-2); }
 .attention-drawer .drawer-close { position: absolute; top: var(--space-2); right: var(--space-2); }
+.attention-reopen { position: fixed; z-index: 45; right: 12px; bottom: 12px; border-color: var(--sage-500); box-shadow: var(--shadow-2); }
+.repository-surface { height: 100%; overflow: auto; padding: var(--space-5); }
+.repository-surface > header, .repository-card > header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.repository-surface > header p, .repository-card p { margin: 4px 0; color: var(--graphite-400); }
+.repository-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--space-4); margin-top: var(--space-4); }
+.repository-card { padding: var(--space-4); border: 1px solid var(--graphite-700); border-radius: var(--radius-2); background: var(--graphite-900); }
+.repository-card > header > div { display: flex; align-items: center; gap: var(--space-2); }
+.repository-card dl { display: grid; grid-template-columns: 1fr auto; gap: 6px var(--space-4); }
+.repository-card dt { color: var(--graphite-400); }
+.repository-card dd { margin: 0; font-family: var(--font-mono); }
+.command-palette { align-self: start; margin-top: min(12vh, 100px); }
+.command-palette input[role="combobox"] { width: 100%; padding: 14px; font-size: 16px; }
+.command-results { display: grid; gap: 4px; margin-top: var(--space-3); }
+.command-results button { display: flex; justify-content: space-between; gap: var(--space-4); width: 100%; padding: var(--space-3); text-align: left; }
+.command-results button.active { border-color: var(--sage-500); background: color-mix(in srgb, var(--sage-500) 15%, transparent); }
+.command-results button span { display: grid; gap: 2px; }
+.command-results code { overflow: hidden; color: var(--graphite-400); text-overflow: ellipsis; white-space: nowrap; }
+.search-button kbd { margin-left: 5px; color: var(--graphite-400); }
 .blocker-banner { width: 100%; min-height: 34px; border: 0; border-radius: 0; color: #f0d09b; background: #5b4428; }
 
 .session-tree { min-height: 0; overflow: auto; padding: var(--space-3); background: var(--graphite-900); }

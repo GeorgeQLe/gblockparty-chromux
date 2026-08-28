@@ -1,13 +1,12 @@
 import { EventEmitter } from "node:events";
 import { createHash, randomUUID } from "node:crypto";
 import { realpath } from "node:fs/promises";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import path from "node:path";
 import { extractSafeLinks } from "../domain/links";
 import type { LocalStore } from "../persistence/local-store";
 import {
   ApprovalResponseInputSchema,
+  AttentionScopeInputSchema,
   CreateSessionInputSchema,
   DraftInputSchema,
   GroupMutationInputSchema,
@@ -19,6 +18,7 @@ import {
   TriageInputSchema,
   TurnInputSchema,
   type AttentionAnalysisV1,
+  type AttentionContextV1,
   type CompatibilityDiagnosticsV1,
   type ModelOptionV1,
   type PendingInteractionV1,
@@ -27,6 +27,7 @@ import {
   type RunnerSessionV1,
   type RunnerStateV1
 } from "./contracts";
+import { RepositoryInspector } from "../main/repository-inspector";
 import {
   AttentionCadence, automaticTitleInput, buildAttentionSnapshot, LunaAnalyzer, redact, snapshotHash,
   type AutomaticTitleInput, type LunaTokenUsage
@@ -35,7 +36,6 @@ import type { AppServerTransport } from "./protocol";
 import type { DetectionCandidate, EnrichedDetectionCandidate } from "../detection/contracts";
 
 type Envelope = { id?: string | number; method: string; params?: any };
-const execFileAsync = promisify(execFile);
 const MAX_SESSION_EVENTS = 1000;
 const HISTORY_PAGE_LIMIT = 100;
 const HISTORY_SOURCE_METHOD = "thread/turns/list";
@@ -50,7 +50,9 @@ export class RunnerManager extends EventEmitter {
   private lastSnapshotHash = "";
   private timer: NodeJS.Timeout | undefined;
   private titleQueue: Promise<void> = Promise.resolve();
+  private attentionRefreshQueue: Promise<AttentionAnalysisV1 | undefined> = Promise.resolve(undefined);
   private maintenance = false;
+  private readonly repositories = new RepositoryInspector();
 
   constructor(
     private readonly server: AppServerTransport,
@@ -67,6 +69,8 @@ export class RunnerManager extends EventEmitter {
   async initialize(): Promise<void> {
     const local = await this.store.read();
     this.state = RunnerStateV1Schema.parse(local.runner ?? this.state);
+    this.state.attentionScope ??= "session";
+    this.clearMismatchedAttention();
     this.state.automaticTitles ??= automaticTitleTelemetry();
     this.state.sessions.forEach(repairAutomaticTitle);
     try {
@@ -516,6 +520,7 @@ export class RunnerManager extends EventEmitter {
     this.state.selectedGroupId = groupId;
     this.state.selectedSessionId = sessionId;
     try {
+      this.clearMismatchedAttention();
       await this.persist();
     } catch (error) {
       this.state.selectedGroupId = previousGroupId;
@@ -523,23 +528,62 @@ export class RunnerManager extends EventEmitter {
       throw error;
     }
     this.emitState();
+    void this.refreshAttention();
   }
 
-  async refreshAttention(): Promise<AttentionAnalysisV1 | undefined> {
-    const openSessions = this.state.sessions.filter((item) => item.status !== "closed");
-    const snapshot = buildAttentionSnapshot(openSessions, await collectGit(openSessions));
+  async setAttentionScope(input: unknown): Promise<void> {
+    const { scope } = AttentionScopeInputSchema.parse(input);
+    if (this.state.attentionScope === scope) return;
+    this.state.attentionScope = scope;
+    this.clearMismatchedAttention();
+    await this.persist();
+    this.emitState();
+    void this.refreshAttention();
+  }
+
+  refreshAttention(): Promise<AttentionAnalysisV1 | undefined> {
+    const next = this.attentionRefreshQueue.then(() => this.performAttentionRefresh());
+    this.attentionRefreshQueue = next.catch(() => undefined);
+    return next;
+  }
+
+  private async performAttentionRefresh(): Promise<AttentionAnalysisV1 | undefined> {
+    const context = resolveAttentionContext(this.state);
+    const openSessions = this.state.sessions.filter((item) => context.targetSessionIds.includes(item.id));
+    const inspection = context.targetProjectPaths.length ? await this.repositories.inspect({
+      projectPaths: context.targetProjectPaths,
+      sessionProjectPaths: openSessions.map((session) => session.canonicalProjectPath)
+    }) : { repositories: [] };
+    const git = inspection.repositories.map((repository) => ({
+      sourceId: `git-${repository.repositoryPath}`.slice(0, 256),
+      projectPath: repository.projectPath,
+      branch: repository.branch || (repository.detached ? "detached" : ""),
+      status: repository.status === "clean" ? "clean" : `${repository.status}: staged ${repository.staged}, unstaged ${repository.unstaged}, untracked ${repository.untracked}, conflicted ${repository.conflicted}`
+    }));
+    const snapshot = buildAttentionSnapshot(openSessions, git);
     try {
       const analysis = await this.analyzer.analyze(snapshot);
-      this.state.attention = analysis;
+      const currentContext = resolveAttentionContext(this.state);
+      if (!sameAttentionContext(context, currentContext)) return this.state.attention;
+      this.state.attention = { ...analysis, context };
       this.state.attentionFailure = undefined;
       this.lastSnapshotHash = snapshotHash(snapshot);
       this.cadence.ran();
     } catch (error) {
       this.state.attentionFailure = redact(String(error)).slice(0, 2048);
+      if (!sameAttentionContext(context, resolveAttentionContext(this.state))) this.state.attention = undefined;
     }
     await this.persist();
     this.emitState();
     return this.state.attention;
+  }
+
+  private clearMismatchedAttention(): void {
+    if (this.state.attention && !sameAttentionContext(this.state.attention.context, resolveAttentionContext(this.state))) {
+      this.state.attention = undefined;
+      this.state.attentionFailure = undefined;
+    }
+    this.cadence.changed();
   }
 
   async triage(input: unknown): Promise<void> {
@@ -658,7 +702,7 @@ export class RunnerManager extends EventEmitter {
     return value;
   }
   private async changed(attention = true): Promise<void> {
-    if (attention) this.cadence.changed();
+    if (attention) this.clearMismatchedAttention();
     await this.persist();
     this.emitState();
   }
@@ -669,9 +713,7 @@ export class RunnerManager extends EventEmitter {
   private async tick(): Promise<void> {
     const openSessions = this.state.sessions.filter((item) => item.status !== "closed");
     this.queueAutomaticTitles(openSessions.map((session) => session.id));
-    const snapshot = buildAttentionSnapshot(openSessions, await collectGit(openSessions));
-    const hash = snapshotHash(snapshot);
-    if (this.cadence.automaticDue() || this.cadence.heartbeatDue(hash !== this.lastSnapshotHash)) {
+    if (this.cadence.automaticDue() || this.cadence.heartbeatDue(true)) {
       await this.refreshAttention();
     }
   }
@@ -1268,27 +1310,21 @@ function snoozeUntil(duration: "15m" | "1h" | "4h" | "tomorrow", now: Date): Dat
   return new Date(now.getTime() + milliseconds);
 }
 
-async function collectGit(sessions: RunnerSessionV1[]) {
-  const paths = [...new Set(sessions.map((session) => session.canonicalProjectPath))].slice(0, 50);
-  return Promise.all(paths.map(async (projectPath) => {
-    const sourceId = `git-${createHash("sha256").update(projectPath).digest("hex").slice(0, 24)}`;
-    try {
-      const [{ stdout: branch }, { stdout: status }] = await Promise.all([
-        execFileAsync("git", ["branch", "--show-current"], {
-          cwd: projectPath, timeout: 5_000, maxBuffer: 16 * 1024
-        }),
-        execFileAsync("git", ["status", "--short", "--branch"], {
-          cwd: projectPath, timeout: 5_000, maxBuffer: 32 * 1024
-        })
-      ]);
-      return {
-        sourceId,
-        projectPath,
-        branch: String(branch).trim().slice(0, 512),
-        status: String(status).trim().slice(0, 8192)
-      };
-    } catch {
-      return { sourceId, projectPath, branch: "", status: "Git status unavailable" };
-    }
-  }));
+export function resolveAttentionContext(state: RunnerStateV1): AttentionContextV1 {
+  const open = state.sessions.filter((session) => session.status !== "closed");
+  const selected = open.find((session) => session.id === state.selectedSessionId) ?? open[0];
+  const scope = state.attentionScope ?? "session";
+  const sessions = scope === "all" ? open : scope === "group"
+    ? open.filter((session) => session.groupId === (selected?.groupId ?? state.selectedGroupId))
+    : selected ? [selected] : [];
+  return {
+    scope,
+    targetSessionIds: sessions.map((session) => session.id).sort(),
+    targetGroupIds: [...new Set(sessions.map((session) => session.groupId))].sort(),
+    targetProjectPaths: [...new Set(sessions.map((session) => session.canonicalProjectPath))].sort()
+  };
+}
+
+export function sameAttentionContext(left: AttentionContextV1, right: AttentionContextV1): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }

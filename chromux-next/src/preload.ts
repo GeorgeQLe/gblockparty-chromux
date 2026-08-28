@@ -4,6 +4,10 @@ import {
   AgentRunRequestSchema,
   AgentRunResultSchema,
   DocumentPayloadSchema,
+  ProjectPathSchema,
+  ProjectDocumentSaveAsSchema,
+  ProjectChooserInputSchema,
+  ProjectChooserResultSchema,
   IpcChannels,
   MutationResultSchema,
   RunnerStateV1Schema,
@@ -38,12 +42,15 @@ import {
   ,fleetStateSchema
   ,remoteTabSchema
   ,surfaceIdInputSchema
+  ,RepositoryInspectionRequestSchema
+  ,RepositoryInspectionResultSchema
 } from "./ipc/contracts";
 import type { ChromuxNextApi } from "./ipc/bridge";
 import { parseMainToRendererEvent } from "./ipc/registry";
 import { AlignmentDocumentV1Schema, AlignmentMutationBatchV1Schema } from "./domain/schema";
 import {
   AttentionAnalysisV1Schema,
+  AttentionScopeInputSchema,
   ApprovalResponseInputSchema,
   CreateSessionInputSchema,
   DraftInputSchema,
@@ -56,8 +63,16 @@ import {
 
 const api: ChromuxNextApi = {
   documents: {
-    async open() {
-      const value: unknown = await ipcRenderer.invoke(IpcChannels.documentOpen);
+    async current(projectPath) {
+      const value: unknown = await ipcRenderer.invoke(IpcChannels.documentCurrent, ProjectPathSchema.parse(projectPath));
+      return value === null ? null : DocumentPayloadSchema.parse(value);
+    },
+    async open(projectPath) {
+      const value: unknown = await ipcRenderer.invoke(IpcChannels.documentOpen, ProjectPathSchema.parse(projectPath));
+      return value === null ? null : DocumentPayloadSchema.parse(value);
+    },
+    async create(projectPath) {
+      const value: unknown = await ipcRenderer.invoke(IpcChannels.documentCreate, ProjectPathSchema.parse(projectPath));
       return value === null ? null : DocumentPayloadSchema.parse(value);
     },
     async read(filePath) {
@@ -71,10 +86,10 @@ const api: ChromuxNextApi = {
       });
       return DocumentPayloadSchema.parse(value);
     },
-    async saveAs(document) {
+    async saveAs(projectPath, document) {
       const value: unknown = await ipcRenderer.invoke(
         IpcChannels.documentSaveAs,
-        AlignmentDocumentV1Schema.parse(document)
+        ProjectDocumentSaveAsSchema.parse({ projectPath, document })
       );
       return value === null ? null : DocumentPayloadSchema.parse(value);
     },
@@ -238,6 +253,13 @@ const api: ChromuxNextApi = {
     },
     async triage(input) {
       await ipcRenderer.invoke(IpcChannels.attentionTriage, TriageInputSchema.parse(input));
+    },
+    async setScope(scope) { await ipcRenderer.invoke(IpcChannels.attentionSetScope, AttentionScopeInputSchema.parse({ scope })); }
+  },
+  repository: {
+    async inspect(projectPaths, sessionProjectPaths) {
+      return RepositoryInspectionResultSchema.parse(await ipcRenderer.invoke(IpcChannels.repositoryInspect,
+        RepositoryInspectionRequestSchema.parse({ projectPaths, sessionProjectPaths })));
     }
   },
   updates: {
@@ -303,9 +325,9 @@ const api: ChromuxNextApi = {
         WorkspacePreferencesPatchV1Schema.parse(patch)
       ));
     },
-    async chooseProject() {
-      const value: unknown = await ipcRenderer.invoke(IpcChannels.settingsChooseProject);
-      return value === null ? null : WorkspacePreferencesV1Schema.parse(value);
+    async chooseProject(defaultPath) {
+      const value: unknown = await ipcRenderer.invoke(IpcChannels.settingsChooseProject, ProjectChooserInputSchema.parse({ defaultPath }));
+      return value === null ? null : ProjectChooserResultSchema.parse(value);
     },
     async removeProject(projectId) {
       return WorkspacePreferencesV1Schema.parse(

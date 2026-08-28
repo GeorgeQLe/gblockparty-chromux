@@ -13,6 +13,8 @@ import {
 
 export const PreloadInvokeChannels = [
   IpcChannels.documentOpen,
+  IpcChannels.documentCurrent,
+  IpcChannels.documentCreate,
   IpcChannels.documentRead,
   IpcChannels.documentSave,
   IpcChannels.documentSaveAs,
@@ -45,6 +47,8 @@ export const PreloadInvokeChannels = [
   IpcChannels.runnerSelect,
   IpcChannels.attentionRefresh,
   IpcChannels.attentionTriage,
+  IpcChannels.attentionSetScope,
+  IpcChannels.repositoryInspect,
   IpcChannels.settingsGetUiPreferences,
   IpcChannels.settingsUpdateUiPreferences,
   IpcChannels.settingsGetWorkspacePreferences,

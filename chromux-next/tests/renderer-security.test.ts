@@ -26,7 +26,7 @@ describe("runner renderer security", () => {
       readFile("src/renderer/persistent-surfaces.tsx", "utf8")
     ]);
     expect(source).toContain("cannot dismiss");
-    expect(surfaces).toContain('type CenterSurface = "runner" | "alignment" | "deck" | "canvas" | "browser"');
+    expect(surfaces).toContain('type CenterSurface = "runner" | "repository" | "alignment" | "deck" | "canvas" | "browser"');
   });
 
   it("keeps settings narrow and runtime validated across the preload boundary", async () => {

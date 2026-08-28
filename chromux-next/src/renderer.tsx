@@ -21,6 +21,7 @@ import {
   PanelTop,
   Plus,
   RefreshCw,
+  GitBranch,
   Search,
   Send,
   Settings,
@@ -78,7 +79,6 @@ import {
   normalizeTable,
   type AlignmentItemKind
 } from "./alignment/editor-model";
-import { sampleDocument } from "./fixtures/sample-document";
 import {
   Badge,
   Button,
@@ -91,7 +91,8 @@ import { PersistentSurfaces, type CenterSurface } from "./renderer/persistent-su
 import { RendererErrorBoundary } from "./renderer/recovery";
 import { FleetFeature } from "./control-plane/ui";
 import { RunnerTranscript } from "./renderer/transcript";
-import type { FleetState } from "./control-plane/contracts";
+import type { FleetState, RemoteTab } from "./control-plane/contracts";
+import type { RepositoryInspectionResult } from "./repository/contracts";
 import {
   DEFAULT_BROWSER_WORKSPACE,
   type BrowserEvidenceV1,
@@ -105,6 +106,15 @@ const EMPTY_STATE: RunnerStateV1 = {
   sessions: [],
   triage: []
 };
+
+function emptyAlignmentDocument(projectName = "Project"): AlignmentDocumentV1 {
+  const now = new Date().toISOString();
+  return {
+    schemaVersion: 1, id: "unbound-alignment", revision: 0, title: `${projectName} alignment`, status: "draft",
+    provenance: { kind: "human", actor: "Chromux Next", createdAt: now }, updatedAt: now,
+    items: [], views: [{ kind: "document", sections: [] }, { kind: "deck", slides: [] }, { kind: "canvas", nodes: [] }], history: []
+  };
+}
 
 function InteractionCard({
   interaction,
@@ -246,6 +256,7 @@ type AlignmentWorkspaceProps = {
   proposals: AlignmentMutationBatchV1[];
   select(itemId: string): void;
   open(): void;
+  create(): void;
   save(): void;
   saveAs(): void;
   apply(summary: string, operations: AlignmentMutationOperation[]): void;
@@ -325,6 +336,7 @@ function ContributorPanel({ alignment, openBrowser }: { alignment: AlignmentWork
 }
 
 function AlignmentSurface({ alignment, openBrowser }: { alignment: AlignmentWorkspaceProps; openBrowser(url: string): void }) {
+  if (!alignment.filePath) return <section className="alignment-workspace alignment-empty"><EmptyState icon={FileText} title="No Alignment document for this project" description="Open an existing validated document or create a blank project document." action={<div className="button-row"><Button onClick={alignment.open}>Open document</Button><Button tone="primary" onClick={alignment.create}>Create document</Button></div>} /></section>;
   const selected = alignment.document.items.find((item) => item.id === alignment.selectedItemId) ?? alignment.document.items[0];
   const [insertKind, setInsertKind] = useState<AlignmentItemKind>("text");
   const selectedIndex = selected ? alignment.document.items.findIndex((item) => item.id === selected.id) : -1;
@@ -369,7 +381,7 @@ function CanvasSurface({ document }: { document: AlignmentDocumentV1 }) {
   })}</div></section>;
 }
 
-function AttentionSidebar({ state }: { state: RunnerStateV1 }) {
+function AttentionSidebar({ state, onClose }: { state: RunnerStateV1; onClose?: () => void }) {
   const now = Date.now();
   const visible = (state.attention?.recommendations ?? []).filter((recommendation) => {
     const triage = [...state.triage].reverse().find((item) => item.fingerprint === recommendation.fingerprint);
@@ -377,7 +389,13 @@ function AttentionSidebar({ state }: { state: RunnerStateV1 }) {
     if (triage.action === "dismiss") return false;
     return !triage.until || Date.parse(triage.until) <= now;
   });
-  const blockers = state.sessions.flatMap((session) => [
+  const targetIds = state.attention?.context.targetSessionIds ?? (() => {
+    const selected = state.sessions.find((session) => session.id === state.selectedSessionId) ?? state.sessions.find((session) => session.status !== "closed");
+    return state.attentionScope === "all" ? state.sessions.filter((session) => session.status !== "closed").map((session) => session.id)
+      : state.attentionScope === "group" ? state.sessions.filter((session) => session.status !== "closed" && session.groupId === selected?.groupId).map((session) => session.id)
+      : selected ? [selected.id] : [];
+  })();
+  const blockers = state.sessions.filter((session) => targetIds.includes(session.id)).flatMap((session) => [
     ...session.interactions.map((interaction) => ({
       id: interaction.id,
       title: interaction.title,
@@ -399,12 +417,12 @@ function AttentionSidebar({ state }: { state: RunnerStateV1 }) {
     <aside className="attention-sidebar">
       <header>
         <div><span>Contextual</span><h2>Attention</h2></div>
-        <button title="Refresh attention" onClick={() => void window.chromuxNext.attention.refresh()}>↻</button>
+        <div><select aria-label="Attention scope" value={state.attentionScope ?? "session"} onChange={(event) => void window.chromuxNext.attention.setScope(event.target.value as "session" | "group" | "all")}><option value="session">Session</option><option value="group">Group</option><option value="all">All</option></select><button title="Refresh attention" onClick={() => void window.chromuxNext.attention.refresh()}>↻</button>{onClose && <IconButton label="Collapse attention panel" icon={ChevronRight} onClick={onClose} />}</div>
       </header>
       {blockers.map((blocker) => (
         <article className="attention-card blocker" key={blocker.id} onClick={() => void window.chromuxNext.runner.select(blocker.groupId, blocker.sessionId)}>
           <span>BLOCKER</span><h3>{blocker.title}</h3><p>{blocker.reason}</p>
-          <small>Resolve in session · cannot dismiss</small>
+          <small>{state.sessions.find((session) => session.id === blocker.sessionId)?.title} · resolve in session · cannot dismiss</small>
         </article>
       ))}
       {visible.map((recommendation) => (
@@ -423,6 +441,7 @@ function AttentionSidebar({ state }: { state: RunnerStateV1 }) {
         >
           <span>{recommendation.priority}</span><h3>{recommendation.title}</h3>
           <p>{recommendation.reason}</p><strong>{recommendation.suggestedAction}</strong>
+          {(state.attention?.context.scope ?? "session") !== "session" && <small>{recommendation.sourceIds.map((id) => state.sessions.find((session) => session.id === id)?.title).filter(Boolean).join(" · ") || "Project context"}</small>}
           <details><summary>Evidence</summary>{recommendation.evidence}</details>
           <div>
             <select
@@ -455,6 +474,10 @@ function AttentionSidebar({ state }: { state: RunnerStateV1 }) {
 
 type ShellProps = {
   state: RunnerStateV1;
+  workspacePreferences: WorkspacePreferencesV1;
+  attentionPanelOpen: boolean;
+  setAttentionPanelOpen(open: boolean): void;
+  openSearch(): void;
   models: ModelOptionV1[];
   surface: CenterSurface;
   selectedSession: RunnerSessionV1 | undefined;
@@ -478,13 +501,44 @@ type ShellProps = {
 
 const SURFACE_ITEMS = [
   { value: "runner", label: "Runner", icon: TerminalSquare },
+  { value: "repository", label: "Repository", icon: GitBranch },
   { value: "alignment", label: "Alignment", icon: AlignLeft },
   { value: "deck", label: "Deck", icon: PanelTop },
   { value: "canvas", label: "Canvas", icon: Boxes },
   { value: "browser", label: "Browser", icon: Globe2 }
 ] satisfies Array<{ value: CenterSurface; label: string; icon: typeof TerminalSquare }>;
 
-function Brand({ approach, surface, setSurface, openSettings, openUpdates, updates, openNewSession, openDetect, fleetEnabled, openFleet }: {
+function RepositorySurface({ state, workspace, selectedSession, fail }: {
+  state: RunnerStateV1; workspace: WorkspacePreferencesV1; selectedSession?: RunnerSessionV1; fail(reason: unknown): void;
+}) {
+  const [allProjects, setAllProjects] = useState(false);
+  const [filter, setFilter] = useState("");
+  const [result, setResult] = useState<RepositoryInspectionResult>();
+  const [loading, setLoading] = useState(false);
+  const paths = allProjects
+    ? [...new Set([...workspace.projects.map((project) => project.path), ...state.sessions.filter((session) => session.status !== "closed").map((session) => session.canonicalProjectPath)])]
+    : selectedSession ? [selectedSession.canonicalProjectPath] : [];
+  const pathKey = paths.join("\0");
+  const refresh = () => {
+    if (!paths.length) { setResult(undefined); return; }
+    setLoading(true);
+    void window.chromuxNext.repository.inspect(paths, state.sessions.filter((session) => session.status !== "closed").map((session) => session.canonicalProjectPath))
+      .then(setResult).catch(fail).finally(() => setLoading(false));
+  };
+  useEffect(refresh, [pathKey]);
+  const query = filter.trim().toLowerCase();
+  const repositories = (result?.repositories ?? []).filter((item) => !query || `${item.branch} ${item.projectPath} ${item.repositoryPath}`.toLowerCase().includes(query));
+  return <section className="repository-surface" aria-label="Repository inspector">
+    <header><div><span>Read only</span><h2>Repository</h2><p>{allProjects ? "Registered projects and repositories attached to open sessions" : "Selected session repository"}</p></div>
+      <div className="button-row"><label><input type="checkbox" checked={allProjects} onChange={(event) => setAllProjects(event.target.checked)} /> All projects</label><input aria-label="Filter repositories" placeholder="Filter branch or path" value={filter} onChange={(event) => setFilter(event.target.value)} /><Button icon={RefreshCw} loading={loading} onClick={refresh}>Refresh</Button></div></header>
+    <div className="repository-list">{repositories.map((repository) => <article key={repository.projectPath} className={`repository-card ${repository.status}`}>
+      <header><div><GitBranch size={18} /><strong>{repository.detached ? `Detached ${repository.head}` : repository.unborn ? "Unborn branch" : repository.branch || "No branch"}</strong></div><Badge tone={repository.status === "clean" ? "success" : repository.status === "dirty" ? "warning" : "neutral"}>{repository.status}</Badge></header>
+      <p title={repository.repositoryPath}>{repository.repositoryPath}</p><dl><dt>HEAD</dt><dd>{repository.head || "—"}</dd><dt>Upstream</dt><dd>{repository.upstream || "—"}</dd><dt>Ahead / behind</dt><dd>{repository.ahead} / {repository.behind}</dd><dt>Staged</dt><dd>{repository.staged}</dd><dt>Unstaged</dt><dd>{repository.unstaged}</dd><dt>Untracked</dt><dd>{repository.untracked}</dd><dt>Conflicts</dt><dd>{repository.conflicted}</dd><dt>Worktree</dt><dd>{repository.worktree}</dd><dt>Sessions</dt><dd>{repository.attachedSessions}</dd></dl>{repository.error && <small>{repository.error}</small>}
+    </article>)}{!loading && !repositories.length && <EmptyState icon={GitBranch} title="No repositories" description={paths.length ? "No repository matches this filter." : "Select a session or enable All projects."} />}</div>
+  </section>;
+}
+
+function Brand({ approach, surface, setSurface, openSettings, openUpdates, updates, openNewSession, openDetect, fleetEnabled, openFleet, openSearch }: {
   approach: UiApproachV1;
   surface: CenterSurface;
   setSurface(value: CenterSurface): void;
@@ -495,11 +549,13 @@ function Brand({ approach, surface, setSurface, openSettings, openUpdates, updat
   openDetect(): void;
   fleetEnabled: boolean;
   openFleet(): void;
+  openSearch(): void;
 }) {
   return <header className="shell-brand">
     <div className="brand"><img src="./mark.svg" alt="" /><div><span>{approach.replaceAll("-", " ")}</span><h1>Chromux Next</h1></div></div>
     <SurfaceTabs surface={surface} setSurface={setSurface} />
     <div className="brand-actions">
+      <Button className="search-button" icon={Search} tone="quiet" aria-label="Search sessions" onClick={openSearch}>Search <kbd>⌘K</kbd></Button>
       {([updates.app.phase, updates.codex.phase] as string[]).some((phase) => ["available", "staged", "blocked", "failed"].includes(phase)) && <button className="update-badge" aria-label="Open Updates settings" onClick={openUpdates}>Update</button>}
       <Button className="settings-button" icon={Settings} tone="quiet" aria-label="Open Settings" onClick={openSettings}>Settings</Button>
       <Button className="detect-button" icon={Search} tone="quiet" onClick={openDetect}>Detect</Button>
@@ -666,7 +722,7 @@ function BrowserSurface({
   </section>;
 }
 
-function Workspace({ state, models, selectedSession, surface, setSurface, error, clearError, alignment, browserWorkspace, browserEnabled, updateBrowserWorkspace, reportError, hideHeader = false, hideInteractions = false }: Omit<ShellProps, "openSettings" | "openNewSession"> & { hideHeader?: boolean; hideInteractions?: boolean }) {
+function Workspace({ state, workspacePreferences, models, selectedSession, surface, setSurface, error, clearError, alignment, browserWorkspace, browserEnabled, updateBrowserWorkspace, reportError, hideHeader = false, hideInteractions = false }: Omit<ShellProps, "openSettings" | "openNewSession"> & { hideHeader?: boolean; hideInteractions?: boolean }) {
   const openBrowser = (url: string) => {
     if (!selectedSession) return;
     setSurface("browser");
@@ -682,9 +738,10 @@ function Workspace({ state, models, selectedSession, surface, setSurface, error,
     <PersistentSurfaces
       active={surface}
       runner={<><RunnerTranscript {...(selectedSession ? { session: selectedSession } : {})} openBrowser={openBrowser} /><Composer {...(selectedSession ? { session: selectedSession } : {})} hideInteractions={hideInteractions} /></>}
+      repository={<RepositorySurface state={state} workspace={workspacePreferences} {...(selectedSession ? { selectedSession } : {})} fail={reportError} />}
       alignment={<AlignmentSurface alignment={alignment} openBrowser={openBrowser} />}
-      deck={<DeckSurface document={alignment.document} />}
-      canvas={<CanvasSurface document={alignment.document} />}
+      deck={alignment.filePath ? <DeckSurface document={alignment.document} /> : <EmptyState icon={PanelTop} title="No Deck for this project" description="Open or create this project's Alignment document first." />}
+      canvas={alignment.filePath ? <CanvasSurface document={alignment.document} /> : <EmptyState icon={Boxes} title="No Canvas for this project" description="Open or create this project's Alignment document first." />}
       browser={<BrowserSurface active={surface === "browser" && browserEnabled} {...(selectedSession ? { session: selectedSession } : {})} workspace={browserWorkspace} update={updateBrowserWorkspace} fail={reportError} />}
     />
     {error && <button className="error-banner" onClick={clearError}><AlertTriangle aria-hidden="true" size={16} /><span>{error}</span><X aria-hidden="true" size={16} /></button>}
@@ -853,27 +910,27 @@ function SituationRoomShell(props: ShellProps) {
 }
 
 function UnifiedApproachShell({ approach, ...props }: ShellProps & { approach: UiApproachV1 }) {
-  const [attentionOpen, setAttentionOpen] = useState(false);
   const blockers = props.state.sessions.reduce((total, session) => total + session.interactions.length + (session.status === "failed" ? 1 : 0), 0);
   const shellClass = approach === "mission-board" ? "mission-board-shell"
     : approach === "spatial-canvas" ? "spatial-canvas-shell"
       : approach;
-  return <main className={`approach-shell ${shellClass}`}>
+  return <main className={`approach-shell ${shellClass} ${props.attentionPanelOpen ? "attention-open" : "attention-collapsed"}`}>
     <Brand approach={approach} {...props} />
     {approach === "ide-workbench" && <SessionTree {...props} />}
     {approach === "control-room" && <TabNavigation {...props} />}
     {approach === "focus-studio" && <header className="focus-nav"><span>{props.state.groups.find((group) => group.id === props.selectedSession?.groupId)?.title ?? "Workspace"} /</span><select aria-label="Switch session" value={props.selectedSession?.id ?? ""} onChange={(event) => {
       const session = props.state.sessions.find((item) => item.id === event.target.value);
       if (session) void window.chromuxNext.runner.select(session.groupId, session.id);
-    }}>{props.state.sessions.filter((session) => session.status !== "closed").map((session) => <option value={session.id} key={session.id}>{session.title}</option>)}</select><SurfaceTabs {...props} /><button className={blockers ? "blocker-toggle has-blockers" : "blocker-toggle"} onClick={() => setAttentionOpen((open) => !open)}>{blockers ? `${blockers} blocker${blockers === 1 ? "" : "s"}` : "Attention"}</button></header>}
-    {approach === "focus-studio" && blockers > 0 && <button className="blocker-banner" onClick={() => setAttentionOpen(true)}>Action required — open the attention drawer to resolve pending work.</button>}
+    }}>{props.state.sessions.filter((session) => session.status !== "closed").map((session) => <option value={session.id} key={session.id}>{session.title}</option>)}</select><SurfaceTabs {...props} /><button className={blockers ? "blocker-toggle has-blockers" : "blocker-toggle"} onClick={() => props.setAttentionPanelOpen(!props.attentionPanelOpen)}>{blockers ? `${blockers} blocker${blockers === 1 ? "" : "s"}` : "Attention"}</button></header>}
+    {approach === "focus-studio" && blockers > 0 && <button className="blocker-banner" onClick={() => props.setAttentionPanelOpen(true)}>Action required — open the attention drawer to resolve pending work.</button>}
     {approach === "mission-board" && <MissionBoard {...props} />}
     {approach === "spatial-canvas" && <SpatialMap {...props} />}
     <section className={`workspace-host ${approach === "spatial-canvas" ? "spatial-dock" : ""}`}><Workspace key="persistent-workspace" {...props} /></section>
-    {approach === "control-room" && <AttentionSidebar state={props.state} />}
-    {approach === "ide-workbench" && <aside className="inspector"><h2>Inspector</h2><dl><dt>Thread</dt><dd>{props.selectedSession?.threadId ?? "Not started"}</dd><dt>Status</dt><dd>{props.selectedSession?.status ?? "No selection"}</dd><dt>Surface</dt><dd>{props.surface}</dd></dl><AttentionSidebar state={props.state} /></aside>}
-    {approach === "focus-studio" && attentionOpen && <div className="attention-drawer"><IconButton className="drawer-close" label="Close attention drawer" icon={X} onClick={() => setAttentionOpen(false)} /><AttentionSidebar state={props.state} /></div>}
-    {approach === "spatial-canvas" && <aside className="spatial-attention"><AttentionSidebar state={props.state} /></aside>}
+    {approach === "control-room" && props.attentionPanelOpen && <AttentionSidebar state={props.state} onClose={() => props.setAttentionPanelOpen(false)} />}
+    {approach === "ide-workbench" && <aside className="inspector"><h2>Inspector</h2><dl><dt>Thread</dt><dd>{props.selectedSession?.threadId ?? "Not started"}</dd><dt>Status</dt><dd>{props.selectedSession?.status ?? "No selection"}</dd><dt>Surface</dt><dd>{props.surface}</dd></dl>{props.attentionPanelOpen && <AttentionSidebar state={props.state} />}</aside>}
+    {(approach === "focus-studio" || approach === "mission-board") && props.attentionPanelOpen && <div className="attention-drawer"><IconButton className="drawer-close" label="Close attention drawer" icon={X} onClick={() => props.setAttentionPanelOpen(false)} /><AttentionSidebar state={props.state} /></div>}
+    {approach === "spatial-canvas" && props.attentionPanelOpen && <aside className="spatial-attention"><AttentionSidebar state={props.state} onClose={() => props.setAttentionPanelOpen(false)} /></aside>}
+    {!props.attentionPanelOpen && <button className="attention-reopen" aria-label="Open attention panel" onClick={() => props.setAttentionPanelOpen(true)}>Attention{blockers ? ` · ${blockers}` : ""}</button>}
   </main>;
 }
 
@@ -963,7 +1020,7 @@ function SettingsOverlay({
   state: RunnerStateV1;
   update(patch: UiPreferencesPatchV1): void;
   updateWorkspace(patch: WorkspacePreferencesPatchV1): void;
-  chooseProject(): void;
+  chooseProject(defaultPath?: string | React.MouseEvent): Promise<string | undefined>;
   removeProject(projectId: string): void;
   openGroupDialog(group?: RunnerStateV1["groups"][number]): void;
   updates: UpdateStateV1;
@@ -1031,7 +1088,7 @@ export function DetectionDialog({
   workspace: WorkspacePreferencesV1;
   models: ModelOptionV1[];
   state: RunnerStateV1;
-  chooseProject(): void;
+  chooseProject(defaultPath?: string | React.MouseEvent): Promise<string | undefined>;
   close(): void;
   complete(): void;
   fail(reason: unknown): void;
@@ -1209,7 +1266,7 @@ export function DetectionDialog({
   </Dialog>;
 }
 
-export function NewSessionDialog({ models, workspace, selectedSession, selectedGroupId, chooseProject, close, created, fail }: { models: ModelOptionV1[]; workspace: WorkspacePreferencesV1; selectedSession: RunnerSessionV1 | undefined; selectedGroupId: string | undefined; chooseProject(): void; close(): void; created(): void; fail(reason: unknown): void }) {
+export function NewSessionDialog({ models, workspace, selectedSession, selectedGroupId, chooseProject, close, created, fail }: { models: ModelOptionV1[]; workspace: WorkspacePreferencesV1; selectedSession: RunnerSessionV1 | undefined; selectedGroupId: string | undefined; chooseProject(defaultPath?: string | React.MouseEvent): Promise<string | undefined>; close(): void; created(): void; fail(reason: unknown): void }) {
   const recommended = models.find((model) => model.id === workspace.defaultModel) ?? models.find((model) => model.recommended) ?? models[0];
   const preferredProject = workspace.projects.find((project) => project.id === workspace.defaultProjectId) ?? workspace.projects[0];
   const [project, setProject] = useState(selectedSession?.projectPath ?? preferredProject?.path ?? "");
@@ -1312,11 +1369,47 @@ export function NewSessionDialog({ models, workspace, selectedSession, selectedG
           onClick={() => chooseSuggestion(suggestion)}
         ><span><strong>{suggestion.name}</strong><small>{suggestion.source === "p" ? "p project" : suggestion.source}</small></span><code>{suggestion.detail}</code></button>)}
         {!suggestions.length && <p>{suggestionsLoading ? "Searching projects…" : "No matching project directories"}</p>}
-      </div>}</div><Button type="button" icon={FolderPlus} onClick={chooseProject}>Add folder</Button></div></label>
+      </div>}</div><Button type="button" icon={FolderPlus} onClick={() => void chooseProject(project).then((selected) => { if (selected) setProject(selected); })}>Add folder</Button></div></label>
       <label>Session title<input placeholder={`${project.split("/").filter(Boolean).at(-1) ?? "Project"} · automatic if blank`} value={title} onChange={(event) => setTitle(event.target.value)} /></label>
       <div className="modal-grid"><label>Permissions<select value={permission} onChange={(event) => setPermission(event.target.value as "workspace" | "read-only")}><option value="workspace">Workspace</option><option value="read-only">Read only</option></select></label><label>Model<select value={model} onChange={(event) => { setModel(event.target.value); setEffort(models.find((item) => item.id === event.target.value)?.defaultReasoningEffort ?? ""); }}><option value="">Recommended</option>{models.map((item) => <option value={item.id} key={item.id}>{item.displayName}{item.recommended ? " · recommended" : ""}</option>)}</select></label><label>Reasoning<select value={effort} onChange={(event) => setEffort(event.target.value)}><option value="">Model default</option>{(models.find((item) => item.id === model)?.reasoningEfforts ?? recommended?.reasoningEfforts ?? []).map((item) => <option key={item}>{item}</option>)}</select></label></div>
       <p className="permission-help">{permission === "workspace" ? "Writes are limited to this workspace. Network is off by default and escalations require approval." : "Files are read-only. Network is off and approval prompts are never accepted."}</p>
     </form>
+  </Dialog>;
+}
+
+type SearchResult = { id: string; kind: "local" | "fleet"; title: string; detail: string; session?: RunnerSessionV1; surfaceId?: string; score: number };
+export function CommandPalette({ state, fleetTabs, close, activateLocal }: { state: RunnerStateV1; fleetTabs: RemoteTab[]; close(): void; activateLocal(session: RunnerSessionV1): void }) {
+  const [query, setQuery] = useState("");
+  const [active, setActive] = useState(0);
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => { input.current?.focus(); }, []);
+  const normalized = query.trim().toLowerCase();
+  const results = useMemo(() => {
+    const local: SearchResult[] = state.sessions.filter((session) => session.status !== "closed").map((session) => {
+      const group = state.groups.find((candidate) => candidate.id === session.groupId)?.title ?? "";
+      const title = session.title.toLowerCase();
+      const fields = `${group} ${session.projectPath} ${session.status}`.toLowerCase();
+      const score = !normalized ? 10 : title.startsWith(normalized) ? 100 : title.includes(normalized) ? 80 : group.toLowerCase().includes(normalized) ? 60 : fields.includes(normalized) ? 40 : -1;
+      return { id: session.id, kind: "local" as const, title: session.title, detail: `${group} · ${session.status} · ${session.projectPath}`, session, score };
+    });
+    const remote: SearchResult[] = fleetTabs.map((tab) => ({ id: tab.surfaceId, kind: "fleet" as const, title: tab.title, detail: `Fleet · ${tab.status}`, surfaceId: tab.surfaceId,
+      score: !normalized ? 5 : tab.title.toLowerCase().startsWith(normalized) ? 95 : tab.title.toLowerCase().includes(normalized) ? 75 : tab.status.includes(normalized) ? 35 : -1 }));
+    return [...local, ...remote].filter((result) => result.score >= 0).sort((left, right) => right.score - left.score || left.title.localeCompare(right.title)).slice(0, 50);
+  }, [state.sessions, state.groups, fleetTabs, normalized]);
+  useEffect(() => setActive(0), [normalized]);
+  const choose = (result = results[active]) => {
+    if (!result) return;
+    if (result.kind === "local" && result.session) activateLocal(result.session);
+    else if (result.surfaceId) window.dispatchEvent(new CustomEvent("chromux:fleet-activate", { detail: result.surfaceId }));
+    close();
+  };
+  return <Dialog className="command-palette" eyebrow="Global" title="Search sessions" description="Find local sessions or activate an attached Fleet terminal." close={close}>
+    <input ref={input} role="combobox" aria-label="Search sessions, groups, projects, status, and Fleet tabs" aria-expanded="true" value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => {
+      if (event.key === "ArrowDown") { event.preventDefault(); setActive((index) => Math.min(index + 1, results.length - 1)); }
+      else if (event.key === "ArrowUp") { event.preventDefault(); setActive((index) => Math.max(index - 1, 0)); }
+      else if (event.key === "Enter") { event.preventDefault(); choose(); }
+    }} />
+    <div role="listbox" className="command-results">{results.map((result, index) => <button role="option" aria-selected={index === active} className={index === active ? "active" : ""} key={`${result.kind}-${result.id}`} onMouseEnter={() => setActive(index)} onClick={() => choose(result)}><span><strong>{result.title}</strong><small>{result.kind === "fleet" ? "Fleet terminal" : "Local session"}</small></span><code>{result.detail}</code></button>)}{!results.length && <p className="empty">No matching sessions.</p>}</div>
   </Dialog>;
 }
 
@@ -1333,6 +1426,8 @@ function App() {
   );
   const [updates, setUpdates] = useState<UpdateStateV1>(structuredClone(DEFAULT_UPDATE_STATE));
   const [fleet, setFleet] = useState<FleetState>({ enabled: false, connection: "disabled", refreshedAt: null, items: [], error: null });
+  const [fleetTabs, setFleetTabs] = useState<RemoteTab[]>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [settingsReady, setSettingsReady] = useState(false);
   const [surface, setSurface] = useState<CenterSurface>("runner");
   const [error, setError] = useState("");
@@ -1342,11 +1437,11 @@ function App() {
   const [detectOpen, setDetectOpen] = useState(false);
   const [fleetOpen, setFleetOpen] = useState(false);
   const [groupDialog, setGroupDialog] = useState<{ open: boolean; group?: RunnerStateV1["groups"][number] }>({ open: false });
-  const [alignmentDocument, setAlignmentDocument] = useState<AlignmentDocumentV1>(() => structuredClone(sampleDocument));
+  const [alignmentDocument, setAlignmentDocument] = useState<AlignmentDocumentV1>(() => emptyAlignmentDocument());
   const alignmentDocumentRef = useRef(alignmentDocument);
   const [alignmentPath, setAlignmentPath] = useState<string>();
   const alignmentPathRef = useRef<string | undefined>(undefined);
-  const [selectedItemId, setSelectedItemId] = useState<string | undefined>(sampleDocument.items[0]?.id);
+  const [selectedItemId, setSelectedItemId] = useState<string>();
   const [mutationStatus, setMutationStatus] = useState("Ready");
   const [undoStack, setUndoStack] = useState<AlignmentMutationBatchV1[]>([]);
   const undoStackRef = useRef<AlignmentMutationBatchV1[]>([]);
@@ -1392,6 +1487,7 @@ function App() {
   useEffect(() => {
     const shortcut = (event: KeyboardEvent) => {
       if (event.key === "," && (event.metaKey || event.ctrlKey)) { event.preventDefault(); setSettingsSection("projects"); setSettingsOpen(true); }
+      if (event.key.toLowerCase() === "k" && (event.metaKey || event.ctrlKey)) { event.preventDefault(); setSearchOpen(true); }
     };
     window.addEventListener("keydown", shortcut);
     return () => window.removeEventListener("keydown", shortcut);
@@ -1406,10 +1502,13 @@ function App() {
       .then(setWorkspacePreferences)
       .catch((reason) => setError(String(reason)));
   };
-  const chooseProject = () => {
-    void window.chromuxNext.settings.chooseProject()
-      .then((next) => { if (next) setWorkspacePreferences(next); })
-      .catch((reason) => setError(String(reason)));
+  const chooseProject = async (defaultPath?: string | React.MouseEvent) => {
+    try {
+      const next = await window.chromuxNext.settings.chooseProject(typeof defaultPath === "string" ? defaultPath : undefined);
+      if (!next) return undefined;
+      setWorkspacePreferences(next.preferences);
+      return next.selectedProject.path;
+    } catch (reason) { setError(String(reason)); return undefined; }
   };
   const removeProject = (projectId: string) => {
     void window.chromuxNext.settings.removeProject(projectId)
@@ -1428,6 +1527,19 @@ function App() {
     setUndoStack([]);
     setMutationStatus("Ready");
   };
+  useEffect(() => {
+    const projectPath = selectedSession?.canonicalProjectPath;
+    if (runIdRef.current) void window.chromuxNext.agents.cancel(runIdRef.current);
+    runIdRef.current = undefined;
+    setRunId(undefined); setRunStatus("idle"); setAgentEvents([]); setAgentResponse(""); setProposals([]);
+    replaceAlignment(undefined, emptyAlignmentDocument(selectedSession?.title ?? "Project"));
+    if (!projectPath) return;
+    let current = true;
+    void window.chromuxNext.documents.current(projectPath).then((payload) => {
+      if (current && payload) replaceAlignment(payload.filePath, payload.document);
+    }).catch((reason) => current && setError(String(reason)));
+    return () => { current = false; };
+  }, [selectedSession?.canonicalProjectPath]);
   const addUndo = (inverse: AlignmentMutationBatchV1) => {
     const next = [...undoStackRef.current, inverse].slice(-100);
     undoStackRef.current = next;
@@ -1438,7 +1550,8 @@ function App() {
     let current = alignmentDocumentRef.current;
     if (!filePath) {
       setMutationStatus("Choose a location to continue…");
-      const saved = await window.chromuxNext.documents.saveAs(current);
+      if (!selectedSession) return false;
+      const saved = await window.chromuxNext.documents.saveAs(selectedSession.canonicalProjectPath, current);
       if (!saved) { setMutationStatus("Save As cancelled · no changes applied"); return false; }
       filePath = saved.filePath;
       current = saved.document;
@@ -1489,18 +1602,21 @@ function App() {
     response: agentResponse,
     proposals,
     select: setSelectedItemId,
-    open: () => void window.chromuxNext.documents.open().then((payload) => {
+    open: () => selectedSession && void window.chromuxNext.documents.open(selectedSession.canonicalProjectPath).then((payload) => {
+      if (payload) replaceAlignment(payload.filePath, payload.document);
+    }).catch((reason) => setError(String(reason))),
+    create: () => selectedSession && void window.chromuxNext.documents.create(selectedSession.canonicalProjectPath).then((payload) => {
       if (payload) replaceAlignment(payload.filePath, payload.document);
     }).catch((reason) => setError(String(reason))),
     save: () => void (alignmentPathRef.current
       ? window.chromuxNext.documents.save(alignmentPathRef.current, alignmentDocumentRef.current).then((payload) => {
         alignmentDocumentRef.current = payload.document; setAlignmentDocument(payload.document); setMutationStatus("Saved");
       })
-      : window.chromuxNext.documents.saveAs(alignmentDocumentRef.current).then((payload) => {
+      : selectedSession ? window.chromuxNext.documents.saveAs(selectedSession.canonicalProjectPath, alignmentDocumentRef.current).then((payload) => {
         if (payload) { alignmentPathRef.current = payload.filePath; setAlignmentPath(payload.filePath); setMutationStatus("Saved"); }
         else setMutationStatus("Save As cancelled");
-      })).catch((reason) => setError(String(reason))),
-    saveAs: () => void window.chromuxNext.documents.saveAs(alignmentDocumentRef.current).then((payload) => {
+      }) : Promise.resolve()).catch((reason) => setError(String(reason))),
+    saveAs: () => selectedSession && void window.chromuxNext.documents.saveAs(selectedSession.canonicalProjectPath, alignmentDocumentRef.current).then((payload) => {
       if (payload) { alignmentPathRef.current = payload.filePath; setAlignmentPath(payload.filePath); setMutationStatus("Saved"); }
       else setMutationStatus("Save As cancelled");
     }).catch((reason) => setError(String(reason))),
@@ -1559,14 +1675,15 @@ function App() {
     setSettingsOpen(false);
     setGroupDialog({ open: true, ...(group ? { group } : {}) });
   };
-  const shellProps: ShellProps = { state, models, surface, selectedSession, error, alignment, browserWorkspace, updates, fleetEnabled: fleet.enabled, browserEnabled: !settingsOpen && !newSessionOpen && !detectOpen && !fleetOpen && !groupDialog.open && workspacePreferences.onboardingComplete, updateBrowserWorkspace: setBrowserWorkspace, reportError: (reason) => setError(String(reason)), setSurface, openSettings: () => { setSettingsSection("projects"); setSettingsOpen(true); }, openUpdates: () => { setSettingsSection("updates"); setSettingsOpen(true); }, openNewSession: () => setNewSessionOpen(true), openDetect: () => setDetectOpen(true), openFleet: () => setFleetOpen(true), openGroupDialog, clearError: () => setError("") };
+  const shellProps: ShellProps = { state, workspacePreferences, attentionPanelOpen: preferences.attentionPanelOpen, setAttentionPanelOpen: (open) => updatePreferences({ attentionPanelOpen: open }), openSearch: () => setSearchOpen(true), models, surface, selectedSession, error, alignment, browserWorkspace, updates, fleetEnabled: fleet.enabled, browserEnabled: !settingsOpen && !newSessionOpen && !detectOpen && !fleetOpen && !searchOpen && !groupDialog.open && workspacePreferences.onboardingComplete, updateBrowserWorkspace: setBrowserWorkspace, reportError: (reason) => setError(String(reason)), setSurface, openSettings: () => { setSettingsSection("projects"); setSettingsOpen(true); }, openUpdates: () => { setSettingsSection("updates"); setSettingsOpen(true); }, openNewSession: () => setNewSessionOpen(true), openDetect: () => setDetectOpen(true), openFleet: () => setFleetOpen(true), openGroupDialog, clearError: () => setError("") };
   return <div className={`app-root density-${preferences.density} motion-${preferences.motion}`} data-approach={situationRoom ? "situation-room" : preferences.approach}>
     {situationRoom ? <SituationRoomShell {...shellProps} /> : <UnifiedApproachShell approach={preferences.approach} {...shellProps} />}
     {settingsOpen && <SettingsOverlay preferences={preferences} workspace={workspacePreferences} models={models} state={state} updates={updates} initialSection={settingsSection} update={updatePreferences} updateWorkspace={updateWorkspacePreferences} chooseProject={chooseProject} removeProject={removeProject} openGroupDialog={openGroupDialog} close={() => setSettingsOpen(false)} />}
     {newSessionOpen && <NewSessionDialog models={models} workspace={workspacePreferences} selectedSession={selectedSession} selectedGroupId={state.groups.find((group) => group.id === selectedSession?.groupId)?.kind === "custom" ? selectedSession?.groupId : undefined} chooseProject={chooseProject} close={() => setNewSessionOpen(false)} created={() => { setNewSessionOpen(false); setSurface("runner"); }} fail={(reason) => setError(String(reason))} />}
     {detectOpen && workspacePreferences.onboardingComplete && <DetectionDialog onboarding={false} workspace={workspacePreferences} models={models} state={state} chooseProject={chooseProject} close={() => setDetectOpen(false)} complete={() => { setDetectOpen(false); setSurface("runner"); }} fail={(reason) => setError(String(reason))} />}
     {groupDialog.open && <GroupDialog {...(groupDialog.group ? { group: groupDialog.group } : {})} close={() => setGroupDialog({ open: false })} />}
-    <FleetFeature fleet={fleet} open={fleetOpen} close={() => setFleetOpen(false)} refresh={() => void window.chromuxNext.fleet.refresh().catch((reason) => setError(String(reason)))} fail={(reason) => setError(String(reason))} />
+    <FleetFeature fleet={fleet} open={fleetOpen} close={() => setFleetOpen(false)} refresh={() => void window.chromuxNext.fleet.refresh().catch((reason) => setError(String(reason)))} fail={(reason) => setError(String(reason))} onTabsChanged={setFleetTabs} />
+    {searchOpen && <CommandPalette state={state} fleetTabs={fleetTabs} close={() => setSearchOpen(false)} activateLocal={(session) => { void window.chromuxNext.runner.select(session.groupId, session.id); setSurface("runner"); }} />}
     {settingsReady && !workspacePreferences.onboardingComplete && <DetectionDialog onboarding workspace={workspacePreferences} models={models} state={state} chooseProject={chooseProject} close={() => undefined} complete={() => { updateWorkspacePreferences({ onboardingComplete: true }); setSurface("runner"); }} fail={(reason) => setError(String(reason))} />}
   </div>;
 }

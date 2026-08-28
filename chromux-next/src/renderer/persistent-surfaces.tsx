@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 
-export type CenterSurface = "runner" | "alignment" | "deck" | "canvas" | "browser";
+export type CenterSurface = "runner" | "repository" | "alignment" | "deck" | "canvas" | "browser";
 
 interface PersistentSurfacesProps {
   active: CenterSurface;
   runner: ReactNode;
+  repository: ReactNode;
   alignment: ReactNode;
   deck: ReactNode;
   canvas: ReactNode;
@@ -15,9 +16,10 @@ interface PersistentSurfacesProps {
  * Keeps every workspace mounted while presentations change. Hidden surfaces
  * retain terminal viewports, drafts, selection, and document editor state.
  */
-export function PersistentSurfaces({ active, runner, alignment, deck, canvas, browser }: PersistentSurfacesProps) {
+export function PersistentSurfaces({ active, runner, repository, alignment, deck, canvas, browser }: PersistentSurfacesProps) {
   return <>
     <div className={`surface-pane runner-pane ${active === "runner" ? "active" : ""}`} aria-hidden={active !== "runner"}>{runner}</div>
+    <div className={`surface-pane ${active === "repository" ? "active" : ""}`} aria-hidden={active !== "repository"}>{repository}</div>
     <div className={`surface-pane ${active === "alignment" ? "active" : ""}`} aria-hidden={active !== "alignment"}>{alignment}</div>
     <div className={`surface-pane ${active === "deck" ? "active" : ""}`} aria-hidden={active !== "deck"}>{deck}</div>
     <div className={`surface-pane ${active === "canvas" ? "active" : ""}`} aria-hidden={active !== "canvas"}>{canvas}</div>

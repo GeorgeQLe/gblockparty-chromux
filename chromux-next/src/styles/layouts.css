@@ -69,6 +69,7 @@
 
 .control-room { grid-template: "brand brand brand" 58px "sessions sessions sessions" auto "workspace workspace attention" minmax(0, 1fr) / minmax(0, 1fr) 0 300px; }
 .control-room > .attention-sidebar { grid-area: attention; }
+.control-room.attention-collapsed { grid-template-columns: minmax(0, 1fr); grid-template-areas: "brand" "sessions" "workspace"; }
 .ide-workbench { grid-template: "brand brand brand" 58px "tree workspace inspector" minmax(0, 1fr) / 232px minmax(0, 1fr) 280px; }
 .ide-workbench > .session-tree { grid-area: tree; }
 .ide-workbench > .inspector { grid-area: inspector; }
@@ -79,6 +80,7 @@
 .spatial-canvas-shell { grid-template: "brand brand" 58px "map attention" 220px "workspace attention" minmax(0, 1fr) / minmax(0, 1fr) 280px; }
 .spatial-canvas-shell > .spatial-map { grid-area: map; }
 .spatial-canvas-shell > .spatial-attention { grid-area: attention; }
+.spatial-canvas-shell.attention-collapsed { grid-template-columns: minmax(0, 1fr); grid-template-areas: "brand" "map" "workspace"; }
 
 @media (max-width: 960px) {
   .brand { min-width: auto; }
@@ -90,6 +92,7 @@
   .ide-workbench > .inspector { display: none; }
   .spatial-canvas-shell { grid-template-columns: minmax(0, 1fr); grid-template-areas: "brand" "map" "workspace"; }
   .spatial-canvas-shell > .spatial-attention { display: none; }
+  .control-room > .attention-sidebar, .spatial-canvas-shell > .spatial-attention, .ide-workbench .attention-sidebar { position: fixed; z-index: 50; display: block; top: 58px; right: 0; bottom: 0; width: min(360px, 92vw); border-left: 1px solid var(--graphite-700); box-shadow: var(--shadow-2); }
 }
 @media (max-width: 700px) {
   .shell-brand { gap: var(--space-2); padding: 0 var(--space-2); }

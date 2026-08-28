@@ -149,6 +149,18 @@ instead of resuming the `prototype/` implementation.
 
 ## Completed Work
 
+- [x] Ship Chromux Next v0.16.0 with safe Session/Group/All attention scope,
+  context-bound recommendation caching, a collapsible responsive attention
+  rail, a bounded read-only Repository surface, canonical project-to-Alignment
+  document bindings and empty states, exact-result native folder selection,
+  and global Cmd-K routing for local sessions and attached Fleet tabs. Preserve
+  structured app-server ownership, Fleet-only interactive terminals,
+  successor-only state, legacy Chromux, and `/releases/latest`.
+  _(source: user-supplied UI/UX parity release plan; executable evidence: 37
+  Vitest files/203 tests, packaged verification/smokes, 56 packaged visual
+  captures, signed/notarized/stapled arm64 artifact and independent extraction
+  trust checks; publication and public redownload are recorded separately)_
+
 - [x] Ship Chromux Next v0.15.0 with p-style project directory autocomplete in
   New Session: prioritize registered and recent projects, discover Git
   worktrees beneath `P_BASE` or `~/projects`, rank basename before relative-path

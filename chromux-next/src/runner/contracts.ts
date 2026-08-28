@@ -182,12 +182,23 @@ export const AttentionRecommendationV1Schema = z.object({
   fingerprint: Id
 });
 
-export const AttentionAnalysisV1Schema = z.object({
+export const AttentionScopeV1Schema = z.enum(["session", "group", "all"]);
+export const AttentionContextV1Schema = z.object({
+  scope: AttentionScopeV1Schema,
+  targetSessionIds: z.array(Id).max(100),
+  targetGroupIds: z.array(Id).max(100),
+  targetProjectPaths: z.array(z.string().min(1).max(4096)).max(100)
+}).strict();
+export const AttentionResultV1Schema = z.object({
   schemaVersion: z.literal(1),
   generatedAt: Timestamp,
   recommendations: z.array(AttentionRecommendationV1Schema).max(5)
 });
+export const AttentionAnalysisV1Schema = AttentionResultV1Schema.extend({ context: AttentionContextV1Schema });
 export type AttentionAnalysisV1 = z.infer<typeof AttentionAnalysisV1Schema>;
+export type AttentionResultV1 = z.infer<typeof AttentionResultV1Schema>;
+export type AttentionScopeV1 = z.infer<typeof AttentionScopeV1Schema>;
+export type AttentionContextV1 = z.infer<typeof AttentionContextV1Schema>;
 
 export const AttentionTriageV1Schema = z.object({
   schemaVersion: z.literal(1),
@@ -198,12 +209,13 @@ export const AttentionTriageV1Schema = z.object({
 });
 export type AttentionTriageV1 = z.infer<typeof AttentionTriageV1Schema>;
 
-export const RunnerStateV1Schema = z.object({
+const RunnerStateV1ObjectSchema = z.object({
   schemaVersion: z.literal(1),
   groups: z.array(RunnerGroupV1Schema).max(100),
   sessions: z.array(RunnerSessionV1Schema).max(100),
   selectedGroupId: Id.optional(),
   selectedSessionId: Id.optional(),
+  attentionScope: AttentionScopeV1Schema.optional(),
   attention: AttentionAnalysisV1Schema.optional(),
   attentionFailure: z.string().max(2048).optional(),
   automaticTitles: z.object({
@@ -225,6 +237,13 @@ export const RunnerStateV1Schema = z.object({
   }).optional(),
   triage: z.array(AttentionTriageV1Schema).max(1000).default([])
 });
+export const RunnerStateV1Schema = z.preprocess((input) => {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return input;
+  const value = { ...(input as Record<string, unknown>) };
+  const attention = value.attention;
+  if (attention && typeof attention === "object" && !("context" in attention)) delete value.attention;
+  return value;
+}, RunnerStateV1ObjectSchema);
 export type RunnerStateV1 = z.infer<typeof RunnerStateV1Schema>;
 
 export const CreateSessionInputSchema = z.object({
@@ -262,3 +281,4 @@ export const TriageInputSchema = z.object({
   action: z.enum(["snooze", "dismiss"]),
   duration: z.enum(["15m", "1h", "4h", "tomorrow"]).optional()
 });
+export const AttentionScopeInputSchema = z.object({ scope: AttentionScopeV1Schema }).strict();

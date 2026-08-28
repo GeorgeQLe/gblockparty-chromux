@@ -113,7 +113,8 @@ describe("five-approach shared interface system", () => {
       "DetectionDialog", "Find your work", "Continue Without Session", "Projects and worktrees", "New session defaults",
       "Session groups", "Compatibility diagnostics", "chooseProject"
     ]) expect(renderer).toContain(feature);
-    expect(main).toContain('properties: ["openDirectory", "createDirectory"]');
+    expect(main).toContain('properties: ["openDirectory"]');
+    expect(main).toContain("validatedDefaultPath");
     expect(main).toContain("getCompatibilityDiagnostics");
     expect(store).toContain("workspacePreferences");
     expect(store).not.toContain("prototype");

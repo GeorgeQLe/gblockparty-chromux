@@ -7,6 +7,7 @@ import {
   AlignmentMutationBatchV1Schema
 } from "../domain/schema";
 import {
+  AttentionScopeInputSchema,
   ApprovalResponseInputSchema,
   CreateSessionInputSchema,
   DraftInputSchema,
@@ -58,8 +59,11 @@ import {
   remoteTabSchema,
   surfaceIdInputSchema
 } from "../control-plane/contracts";
+import { RepositoryInspectionRequestSchema, RepositoryInspectionResultSchema } from "../repository/contracts";
 
 export const IpcChannels = {
+  documentCurrent: "document:current",
+  documentCreate: "document:create",
   documentOpen: "document:open",
   documentRead: "document:read",
   documentSave: "document:save",
@@ -96,6 +100,8 @@ export const IpcChannels = {
   ,runnerCreateFromDetection: "runner:create-from-detection"
   ,attentionRefresh: "attention:refresh"
   ,attentionTriage: "attention:triage"
+  ,attentionSetScope: "attention:set-scope"
+  ,repositoryInspect: "repository:inspect"
   ,settingsGetUiPreferences: "settings:get-ui-preferences"
   ,settingsUpdateUiPreferences: "settings:update-ui-preferences"
   ,settingsUiPreferencesChanged: "settings:ui-preferences-changed"
@@ -134,6 +140,13 @@ export const SavePayloadSchema = z.object({
 });
 
 export const DocumentPathSchema = z.string().min(1);
+export const ProjectPathSchema = z.string().min(1).max(4096);
+export const ProjectDocumentSaveAsSchema = z.object({ projectPath: ProjectPathSchema, document: AlignmentDocumentV1Schema });
+export const ProjectChooserInputSchema = z.object({ defaultPath: z.string().min(1).max(4096).optional() }).strict();
+export const ProjectChooserResultSchema = z.object({
+  preferences: WorkspacePreferencesV1Schema,
+  selectedProject: z.object({ path: ProjectPathSchema, id: z.string().min(1).max(256) })
+}).strict();
 
 export const MutationPayloadSchema = z.object({
   filePath: z.string().min(1),
@@ -157,6 +170,7 @@ export {
   GroupMutationInputSchema,
   RunnerStateV1Schema,
   TriageInputSchema,
+  AttentionScopeInputSchema,
   TurnInputSchema
   ,CompatibilityDiagnosticsV1Schema
   ,UiPreferencesPatchV1Schema
@@ -190,4 +204,6 @@ export {
   ,fleetStateSchema
   ,remoteTabSchema
   ,surfaceIdInputSchema
+  ,RepositoryInspectionRequestSchema
+  ,RepositoryInspectionResultSchema
 };

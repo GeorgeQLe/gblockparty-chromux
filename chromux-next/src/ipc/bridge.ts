@@ -7,6 +7,7 @@ import type {
 } from "../domain/schema";
 import type {
   AttentionAnalysisV1,
+  AttentionScopeV1,
   CompatibilityDiagnosticsV1,
   ModelOptionV1,
   RunnerSessionV1,
@@ -27,6 +28,7 @@ import type {
 import type { BrowserWorkspaceV1 } from "../browser/contracts";
 import type { UpdateStateV1 } from "../updates/contracts";
 import type { AttachmentEvent, FleetState, RemoteTab } from "../control-plane/contracts";
+import type { RepositoryInspectionResult } from "../repository/contracts";
 
 export interface DocumentPayload {
   filePath: string;
@@ -39,10 +41,12 @@ export interface MutationResult extends DocumentPayload {
 
 export interface ChromuxNextApi {
   documents: {
-    open(): Promise<DocumentPayload | null>;
+    current(projectPath: string): Promise<DocumentPayload | null>;
+    open(projectPath: string): Promise<DocumentPayload | null>;
+    create(projectPath: string): Promise<DocumentPayload | null>;
     read(filePath: string): Promise<DocumentPayload>;
     save(filePath: string, document: AlignmentDocumentV1): Promise<DocumentPayload>;
-    saveAs(document: AlignmentDocumentV1): Promise<DocumentPayload | null>;
+    saveAs(projectPath: string, document: AlignmentDocumentV1): Promise<DocumentPayload | null>;
     apply(filePath: string, batch: AlignmentMutationBatchV1): Promise<MutationResult>;
   };
   agents: {
@@ -104,6 +108,10 @@ export interface ChromuxNextApi {
       action: "snooze" | "dismiss";
       duration?: "15m" | "1h" | "4h" | "tomorrow";
     }): Promise<void>;
+    setScope(scope: AttentionScopeV1): Promise<void>;
+  };
+  repository: {
+    inspect(projectPaths: string[], sessionProjectPaths: string[]): Promise<RepositoryInspectionResult>;
   };
   updates: {
     state(): Promise<UpdateStateV1>;
@@ -131,7 +139,7 @@ export interface ChromuxNextApi {
     onUiPreferencesChanged(listener: (preferences: UiPreferencesV1) => void): () => void;
     getWorkspacePreferences(): Promise<WorkspacePreferencesV1>;
     updateWorkspacePreferences(patch: WorkspacePreferencesPatchV1): Promise<WorkspacePreferencesV1>;
-    chooseProject(): Promise<WorkspacePreferencesV1 | null>;
+    chooseProject(defaultPath?: string): Promise<{ preferences: WorkspacePreferencesV1; selectedProject: { path: string; id: string } } | null>;
     removeProject(projectId: string): Promise<WorkspacePreferencesV1>;
     compatibilityDiagnostics(): Promise<CompatibilityDiagnosticsV1>;
     onWorkspacePreferencesChanged(listener: (preferences: WorkspacePreferencesV1) => void): () => void;

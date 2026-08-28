@@ -1,5 +1,60 @@
 # Session History
 
+## 2026-08-28 — Chromux Next v0.16.0 parity release candidate
+
+- **User goal:** Ship one cohesive successor prerelease with explicitly scoped
+  attention, a read-only Repository surface, reliable native folder selection,
+  project-scoped Alignment/Deck/Canvas documents, global Cmd-K session search,
+  and collapsible attention UI while retaining app-server/Fleet authority.
+- **Changed files and purpose:** Runtime-validated Repository and attention
+  scope/context contracts, IPC, preload, main-process inspection, runner
+  resolution, isolated Alignment bindings, UI preferences, shared surface/Fleet
+  state, renderer controls, and responsive styling implement the six parity
+  priorities. Focused unit/component tests cover scope recovery and target
+  changes, porcelain parsing and real disposable repositories, independent
+  binding recovery, and Cmd-K keyboard/Fleet activation. Release notes,
+  architecture, UAT, package metadata, and packaged visual automation define
+  the `0.16.0` successor release boundary.
+- **User-goal mapping:** Session is the migration-safe default; every attention
+  result records exact scope targets and stale contexts are cleared. Repository
+  exposes only bounded inspection and no mutation channel. Alignment never
+  falls back across canonical projects and clears contributor/editor transients
+  on switches. The chooser returns its exact canonical selection. Cmd-K opens
+  Runner for exact local sessions or activates an existing Fleet attachment.
+  Desktop attention state persists and narrow layouts use a drawer.
+- **Executable verification:** `npm run verify` passed TypeScript, 36 test
+  files/200 tests, arm64 packaging, baseline packaged startup, two-launch
+  restoration, and browser-evidence smoke. The later Cmd-K component lane adds
+  3 passing tests (final total 37 files/203 tests). Packaged visual
+  qualification passed 46 primary, 8 Situation Room, and 2 renderer-recovery
+  captures. The signed candidate and fresh extracted ZIP passed strict
+  codesign, Team `NC56VXK48K`, bundle `dev.georgele.chromux.next`, Gatekeeper
+  `Notarized Developer ID`, stapler, version `0.16.0`, and arm64 checks.
+- **Adversarial review:** Rechecked canonical deduplication, non-Git, detached,
+  unborn, dirty/conflict parsing, command time/buffer bounds, zero repository
+  write APIs, legacy context-free recommendation recovery, selection/scope race
+  suppression and serialized refresh, per-binding recovery, project-switch
+  cancellation/clearing, exact chooser result flow, Fleet transport ownership,
+  sample-document production removal, narrow attention geometry, forbidden
+  prototype changes, and diff whitespace. Findings fixed were the unborn-branch
+  marker, stale visual toolbar assertion, concurrent attention refresh race,
+  and test cleanup/xterm warning isolation.
+- **Skipped tests:** Windows/Linux packaging and stable cutover remain separate
+  roadmap gates. Live `/Applications` managed-update UAT waits for the public
+  prerelease because update discovery intentionally consumes GitHub releases.
+  The repository dummy UAT is automated against disposable real Git state; no
+  valuable working tree was mutated.
+- **Residual risk:** The broad renderer remains a large component and the live
+  installed forward-update lane is not meaningful until the public release is
+  available. Public asset redownload and the live/isolated managed-update proof
+  follow publication.
+- **Rollback:** Remove the `chromux-next-v0.16.0` prerelease/tag and revert the
+  release commit. Existing project documents remain ordinary JSON files;
+  successor binding state can be removed independently. Legacy stable remains
+  untouched.
+- **Next command:** Commit/tag/push, publish the prerelease, redownload and
+  independently verify its two assets, then run managed-update qualification.
+
 ## 2026-08-27 — Chromux Next v0.15.0 live managed installation
 
 - **User goal:** Update the live installed Chromux Next from corrected v0.14.2

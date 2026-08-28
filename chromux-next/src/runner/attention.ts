@@ -4,9 +4,9 @@ import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
 import {
-  AttentionAnalysisV1Schema,
+  AttentionResultV1Schema,
   AttentionSnapshotV1Schema,
-  type AttentionAnalysisV1,
+  type AttentionResultV1,
   type AttentionSnapshotV1,
   type RunnerSessionV1
 } from "./contracts";
@@ -160,9 +160,9 @@ export class LunaAnalyzer {
     };
   }
 
-  async analyze(snapshot: AttentionSnapshotV1): Promise<AttentionAnalysisV1> {
+  async analyze(snapshot: AttentionSnapshotV1): Promise<AttentionResultV1> {
     const result = await this.runStructured(
-      AttentionAnalysisV1Schema,
+      AttentionResultV1Schema,
       "attention",
       [
         "Analyze the bounded Chromux attention snapshot.",

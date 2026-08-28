@@ -57,6 +57,13 @@ const DetectedSessionTransactionV1Schema = z.object({
   workspacePreferences: WorkspacePreferencesV1Schema
 });
 
+const AlignmentBindingsV1Schema = z.object({
+  schemaVersion: z.literal(1),
+  bindings: z.record(z.string().min(1).max(4096), z.string().min(1).max(4096))
+});
+export type AlignmentBindingsV1 = z.infer<typeof AlignmentBindingsV1Schema>;
+const DEFAULT_ALIGNMENT_BINDINGS: AlignmentBindingsV1 = { schemaVersion: 1, bindings: {} };
+
 type AppStateV1 = z.infer<typeof AppStateV1Schema>;
 export type LocalState = AppStateV1 & {
   runner?: RunnerStateV1;
@@ -64,6 +71,7 @@ export type LocalState = AppStateV1 & {
   workspacePreferences: WorkspacePreferencesV1;
   browserWorkspace: BrowserWorkspaceV1;
   updateState: UpdateStateV1;
+  alignmentBindings: AlignmentBindingsV1;
 };
 
 const DEFAULT_APP_STATE: AppStateV1 = {
@@ -81,6 +89,7 @@ type SliceName =
   | "workspace-preferences-v1.json"
   | "browser-workspace-v1.json"
   | "update-state-v1.json"
+  | "alignment-bindings-v1.json"
   | "detected-session-transaction-v1.json";
 
 /**
@@ -109,6 +118,7 @@ export class LocalStore {
     const workspaceValue = await this.readUnknownSlice("workspace-preferences-v1.json");
     const browserValue = await this.readUnknownSlice("browser-workspace-v1.json");
     const updateValue = await this.readUnknownSlice("update-state-v1.json");
+    const alignmentBindingsValue = await this.readUnknownSlice("alignment-bindings-v1.json");
     const browser = BrowserWorkspaceV1Schema.safeParse(browserValue);
     return {
       ...app,
@@ -121,6 +131,7 @@ export class LocalStore {
       ,updateState: UpdateStateV1Schema.safeParse(updateValue).success
         ? UpdateStateV1Schema.parse(updateValue)
         : structuredClone(DEFAULT_UPDATE_STATE)
+      ,alignmentBindings: recoverAlignmentBindings(alignmentBindingsValue)
     };
   }
 
@@ -133,6 +144,7 @@ export class LocalStore {
       await this.writeSlice("workspace-preferences-v1.json", validated.workspacePreferences);
       await this.writeSlice("browser-workspace-v1.json", validated.browserWorkspace);
       await this.writeSlice("update-state-v1.json", validated.updateState);
+      await this.writeSlice("alignment-bindings-v1.json", validated.alignmentBindings);
     });
   }
 
@@ -221,6 +233,30 @@ export class LocalStore {
     await this.enqueue(() => this.writeSlice("update-state-v1.json", validated));
   }
 
+  async getAlignmentDocumentPath(projectPath: string): Promise<string | undefined> {
+    return (await this.read()).alignmentBindings.bindings[projectPath];
+  }
+
+  async bindAlignmentDocument(projectPath: string, filePath: string): Promise<void> {
+    const key = z.string().min(1).max(4096).parse(projectPath);
+    const value = z.string().min(1).max(4096).parse(filePath);
+    await this.enqueue(async () => {
+      const current = (await this.read()).alignmentBindings;
+      await this.writeSlice("alignment-bindings-v1.json", AlignmentBindingsV1Schema.parse({
+        schemaVersion: 1, bindings: { ...current.bindings, [key]: value }
+      }));
+    });
+  }
+
+  async dropAlignmentDocument(projectPath: string): Promise<void> {
+    await this.enqueue(async () => {
+      const current = (await this.read()).alignmentBindings;
+      const bindings = { ...current.bindings };
+      delete bindings[projectPath];
+      await this.writeSlice("alignment-bindings-v1.json", { schemaVersion: 1, bindings });
+    });
+  }
+
   async registerDetectedSession(
     runner: NonNullable<LocalState["runner"]>,
     project: ProjectEntryV1
@@ -275,6 +311,7 @@ export class LocalStore {
       workspacePreferences: WorkspacePreferencesV1Schema.parse(state.workspacePreferences),
       browserWorkspace: BrowserWorkspaceV1Schema.parse(state.browserWorkspace)
       ,updateState: UpdateStateV1Schema.parse(state.updateState)
+      ,alignmentBindings: AlignmentBindingsV1Schema.parse(state.alignmentBindings)
     };
   }
 
@@ -331,4 +368,17 @@ export class LocalStore {
     await writeFile(temporaryPath, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
     await rename(temporaryPath, filePath);
   }
+}
+
+function recoverAlignmentBindings(input: unknown): AlignmentBindingsV1 {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return structuredClone(DEFAULT_ALIGNMENT_BINDINGS);
+  const raw = (input as { bindings?: unknown }).bindings;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return structuredClone(DEFAULT_ALIGNMENT_BINDINGS);
+  const bindings: Record<string, string> = {};
+  for (const [projectPath, filePath] of Object.entries(raw)) {
+    if (projectPath.length > 0 && projectPath.length <= 4096 && typeof filePath === "string" && filePath.length > 0 && filePath.length <= 4096) {
+      bindings[projectPath] = filePath;
+    }
+  }
+  return { schemaVersion: 1, bindings };
 }

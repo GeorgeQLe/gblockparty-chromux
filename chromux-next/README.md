@@ -83,7 +83,9 @@ This runner-first prerelease includes:
   handling, and focus restoration.
 - Polished runner, transcript, Composer, approval, attention, detect-first onboarding,
   Settings, New Session, empty/error, renderer-recovery, and Alignment states.
-  Packaged visual qualification now reviews 32 standard and narrow captures.
+  Packaged visual qualification now reviews 56 standard, narrow, Situation
+  Room, and renderer-recovery captures, including Repository, Cmd-K,
+  project-empty Alignment, and open/collapsed attention states.
 - First-run successor-native onboarding with a native project/worktree folder
   chooser, a persisted project registry, and editable default permission,
   model, and reasoning preferences for new sessions.

@@ -36,7 +36,8 @@ describe("UI preferences", () => {
       schemaVersion: 1,
       approach: "spatial-canvas",
       density: "compact",
-      motion: "system"
+      motion: "system",
+      attentionPanelOpen: true
     });
   });
 

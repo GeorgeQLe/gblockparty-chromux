@@ -1,5 +1,38 @@
 # Release Notes
 
+## GBlockParty Chromux Next v0.16.0 (prerelease)
+
+Tag: `chromux-next-v0.16.0`
+
+- Make attention explicitly safe by defaulting to the selected session and its
+  canonical project, adding persisted Session, Group, and All scopes, applying
+  one target resolver to blockers, Git context, Luna input, and cards, and
+  suppressing cached or failed results whose context no longer matches.
+- Add a collapsible, persisted attention rail with a visible reopen control and
+  narrow-window drawer behavior, plus source labels and exact session routing
+  for broader-scope work.
+- Add a strictly read-only Repository surface across all five interface
+  approaches. Bounded Git inspection reports branches, detached/unborn state,
+  HEAD/upstream/divergence, staged, unstaged, untracked, conflicts, worktree
+  classification, attached sessions, clean/error state, filtering, and an
+  explicit All projects view without mutating repositories.
+- Scope Alignment documents to canonical projects with independently
+  recoverable bindings, explicit Open/Create empty states, Save As-first blank
+  creation, same-project sharing, and full transient editor/contributor cleanup
+  on project changes. Deck and Canvas no longer borrow a sample or another
+  project's document.
+- Add global Cmd-K search for open local sessions and currently attached Fleet
+  terminals, with ranked title/group/path/status matching, complete keyboard
+  control, focus restoration, exact Runner selection, and attached-tab
+  activation.
+- Make Add folder use an existing-directory-only chooser, a validated default
+  path, and an exact canonical result that immediately fills New Session.
+- Local PTYs, package-script launching, and the legacy Host Resource Broker are
+  intentional non-goals. Structured Codex remains app-server based and Fleet is
+  the sole interactive terminal boundary.
+- This successor-only feature release remains a prerelease and does not replace
+  legacy `/releases/latest`.
+
 ## GBlockParty Chromux Next v0.15.0 (prerelease)
 
 Tag: `chromux-next-v0.15.0`

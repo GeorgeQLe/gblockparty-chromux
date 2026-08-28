@@ -6,12 +6,13 @@ import { Badge, Button, Dialog, EmptyState, IconButton } from "../ui/components"
 import type { AttachmentEvent, FleetState, RemoteTab } from "./contracts";
 import "@xterm/xterm/css/xterm.css";
 
-export function FleetFeature({ fleet, open, close, refresh, fail }: {
+export function FleetFeature({ fleet, open, close, refresh, fail, onTabsChanged }: {
   fleet: FleetState;
   open: boolean;
   close(): void;
   refresh(): void;
   fail(reason: unknown): void;
+  onTabsChanged?(tabs: RemoteTab[]): void;
 }) {
   const [tabs, setTabs] = useState<RemoteTab[]>([]);
   const [activeSurfaceId, setActiveSurfaceId] = useState<string>();
@@ -22,6 +23,15 @@ export function FleetFeature({ fleet, open, close, refresh, fail }: {
       ? current.map((tab) => tab.surfaceId === event.tab.surfaceId ? event.tab : tab)
       : [...current, event.tab]);
   }), []);
+  useEffect(() => onTabsChanged?.(tabs), [tabs, onTabsChanged]);
+  useEffect(() => {
+    const activate = (event: Event) => {
+      const surfaceId = (event as CustomEvent<string>).detail;
+      if (tabs.some((tab) => tab.surfaceId === surfaceId)) setActiveSurfaceId(surfaceId);
+    };
+    window.addEventListener("chromux:fleet-activate", activate);
+    return () => window.removeEventListener("chromux:fleet-activate", activate);
+  }, [tabs]);
 
   const attach = (surfaceId: string, title: string) => {
     const existing = tabs.find((tab) => tab.surfaceId === surfaceId);

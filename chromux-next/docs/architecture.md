@@ -215,6 +215,23 @@ selected proposal.
 
 ## Contextual attention
 
+Attention has an authoritative persisted scope: Session (the default), Group,
+or All. The resolver records the exact session, group, and canonical-project
+targets beside each Luna result. The renderer does not show a cached result when
+those targets differ from the current selection, and deterministic blockers and
+read-only Repository summaries use the same target set. The desktop rail can be
+collapsed persistently; narrow layouts present it as an overlay drawer.
+
+## Read-only Repository inspection
+
+Repository is a shared center surface in every interface approach. The main
+process runs only bounded, timeout-controlled Git inspection commands and
+returns parsed branch, HEAD, upstream/divergence, worktree, status-count, and
+attached-session fields. The current-session view inspects one canonical
+project; All projects deduplicates registered projects and repositories attached
+to open sessions. There are deliberately no stage, restore, commit, delete,
+forget, prune, or other mutation operations.
+
 Attention snapshots contain bounded recent runner events, pending
 interactions, and read-only Git summaries. Credential-like values are redacted
 before the snapshot is hashed or passed to a separate ephemeral
@@ -314,5 +331,10 @@ call runner creation, browser, capture, or evidence APIs. Relay loss retains
 the tab, applies bounded reconnect backoff, and reattaches with `sinceSeq`.
 Output is monotonic, duplicate sequences are ignored, replay gaps clear the
 terminal visibly, and closing a tab sends detach without stop. Attachment
+
+Chromux Next does not create local PTYs, launch package scripts, or revive the
+legacy Host Resource Broker. Local Codex sessions stay on structured app-server
+transport; explicitly attached Fleet surfaces are the only interactive terminal
+boundary.
 authority is explicitly `unleased`; this release offers no multi-writer
 guarantee.
