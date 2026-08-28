@@ -1,5 +1,27 @@
 # Release Notes
 
+## GBlockParty Chromux Next v0.17.0 (prerelease)
+
+Tag: `chromux-next-v0.17.0`
+
+- Add one-time external-device enrollment against the versioned GBlockParty
+  capability and exchange endpoints. The scoped bearer credential remains in
+  the main process and is encrypted with Electron protected storage in a
+  user-only app-local file; credential values never enter Fleet state or IPC.
+- Treat HTTP and WebSocket authentication revocation as an authority failure:
+  close attachments, clear the protected local credential, remove fleet
+  resources, and require explicit re-enrollment without affecting local Codex.
+- Align attached terminals with the server's leased-authority protocol. New
+  attachments are visibly read-only, request and renew the 15-second
+  single-writer lease, expose contention and expiry, release ownership on
+  request or detach, and recover read-only after relay loss.
+- Block renderer and main-process input unless control is active while
+  retaining the control plane's independent `lease_required` enforcement as
+  the authoritative boundary. Resize, observation, bounded replay, reset, and
+  detach-without-stop remain available to observers.
+- This successor-only feature release remains a prerelease and does not replace
+  legacy `/releases/latest`.
+
 ## GBlockParty Chromux Next v0.16.0 (prerelease)
 
 Tag: `chromux-next-v0.16.0`

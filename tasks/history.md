@@ -1,5 +1,69 @@
 # Session History
 
+## 2026-08-28 — Chromux Next v0.17.0 Fleet device authority
+
+- **User goal:** Extend the existing Chromux Next Fleet transport with
+  one-time device enrollment, revocation handling, protected credentials, and
+  server-enforced single-writer terminal leases without changing the local
+  runner or legacy Chromux.
+- **Changed files and per-file purpose:** `chromux-next/src/control-plane/`
+  adds the authoritative GBlockParty client/enrollment/lease schemas, protected
+  credential store, and main-process transport state machine;
+  `src/ipc/{contracts,registry,bridge}.ts`, `src/preload.ts`, and `src/main.ts`
+  expose validated enrollment and control actions while keeping credentials
+  main-only; `src/control-plane/ui.tsx`, `src/styles/fleet.css`, and the Fleet
+  initializer in `src/renderer.tsx` add enrollment, revoked, read-only,
+  controlled, contended, and release UI; `tests/control-plane.test.ts`,
+  `tests/fleet-credential-store.test.ts`, and the updated command-palette
+  fixture prove the new boundary; package metadata, `RELEASES.md`, Chromux Next
+  README/architecture/privacy/troubleshooting, the canonical remote-client
+  matrix, roadmap, and todo record version `0.17.0` and the completed phase.
+- **User-goal mapping:** The one-time exchange validates exact capability,
+  scope, and authority declarations before storing a device. The endpoint,
+  device metadata, and scoped bearer credential are encrypted together through
+  Electron `safeStorage` before an atomic mode-`0600` write. HTTP `401` and
+  WebSocket `4401` clear that record and surface revoked state. Leased terminals
+  attach read-only, explicitly request control, renew every eight seconds,
+  release on action/detach, expire locally at the server deadline, show a
+  contending holder, and block input in both xterm and main while the server's
+  independent `lease_required` check remains authoritative.
+- **Executable verification:** `npm run typecheck` passed. `npm test` passed
+  the full suite, including real local HTTP/WebSocket enrollment, revocation,
+  lease grant/renew/release/contention, blocked-input, and encrypted-storage
+  fixtures. `npm run package` produced the macOS arm64 app; subsequent
+  `npm run smoke:packaged`, `npm run smoke:runner-restoration`, and
+  `npm run smoke:browser-evidence` passed the packaged app, Situation Room,
+  two-launch restoration, and browser/evidence lanes. `git diff --check`
+  passed. The first combined verifier's smoke invocation raced Forge output;
+  the package completed and every smoke was rerun individually to a pass.
+- **Skipped tests:** No live production GBlockParty credential was used because
+  the deterministic fixture exercises the same pinned server schemas without
+  consuming or exposing a real enrollment. Physical two-device contention and
+  signed/notarized release qualification remain release/UAT gates. A separate
+  visual capture suite was skipped because the new compact Fleet states are
+  contract/component covered and the packaged renderer smoke passed; physical
+  leased-terminal ergonomics remain the more meaningful manual check.
+- **Adversarial review:** A failure-oriented changed-file review compared all
+  enrollment and lease frames with the pinned `@gbp/shared` schemas, scanned
+  renderer/preload/IPC for credential exposure, and traced disconnect,
+  contention, expiry, release, and revocation races. It found that encrypting
+  only the credential left its destination endpoint locally mutable; the store
+  now encrypts and validates endpoint, identity metadata, and credential as one
+  protected payload, with a regression assertion that neither endpoint nor
+  credential appears in the file. Request/release/detach socket races were also
+  made fail-closed.
+- **Residual risk:** Deterministic tests cannot prove the physical macOS
+  Keychain prompt/backend, production TLS/Tailscale routing, or contention with
+  a real phone. The first operator to notice a mismatch would see enrollment
+  failure, read-only state, or revocation; use the `0.17.0` physical UAT against
+  one daemon-owned session before promoting the next continuity phase.
+- **Rollback note:** Revert the v0.17.0 feature commit and remove its prerelease
+  and tag. Existing local runner state is independent; deleting
+  `fleet-device-v1.json` only forgets the Fleet device locally and server
+  authority expires or can be revoked from GBlockParty.
+- **Next command:** Continue with persisted remote-tab identity and replay
+  cursors after v0.17.0 release qualification.
+
 ## 2026-08-28 — Chromux Mobile MVP Lab
 
 - **User goal:** Replace `/mobile/` with three independent, interactive phone

@@ -21,10 +21,10 @@ continued from a phone.
     broader historical explorations remain archived at their original routes.
 - [ ] Complete Chromux Next macOS continuity
   - **Device identity and leased control**
-    - Add one-time device enrollment and revocation with protected credential
+    - [x] Add one-time device enrollment and revocation with protected credential
       storage.
-    - Add lease request, renewal, release, expiry, and visible read-only UI.
-    - Block local input without a lease and preserve server-side enforcement
+    - [x] Add lease request, renewal, release, expiry, and visible read-only UI.
+    - [x] Block local input without a lease and preserve server-side enforcement
       as the authority boundary.
   - **Remote Codex launch**
     - Require explicit Local versus GBlockParty Host selection and discover

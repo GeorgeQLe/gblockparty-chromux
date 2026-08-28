@@ -27,7 +27,7 @@ import type {
 } from "../detection/contracts";
 import type { BrowserWorkspaceV1 } from "../browser/contracts";
 import type { UpdateStateV1 } from "../updates/contracts";
-import type { AttachmentEvent, FleetState, RemoteTab } from "../control-plane/contracts";
+import type { AttachmentEvent, FleetEnrollmentInput, FleetState, RemoteTab } from "../control-plane/contracts";
 import type { RepositoryInspectionResult } from "../repository/contracts";
 
 export interface DocumentPayload {
@@ -125,10 +125,14 @@ export interface ChromuxNextApi {
   };
   fleet: {
     state(): Promise<FleetState>;
+    enroll(input: FleetEnrollmentInput): Promise<FleetState>;
+    forgetEnrollment(): Promise<FleetState>;
     refresh(): Promise<FleetState>;
     attach(surfaceId: string, title: string): Promise<RemoteTab>;
     detach(surfaceId: string): Promise<void>;
     input(surfaceId: string, data: string): Promise<void>;
+    requestControl(surfaceId: string): Promise<void>;
+    releaseControl(surfaceId: string): Promise<void>;
     resize(surfaceId: string, cols: number, rows: number): Promise<void>;
     onState(listener: (state: FleetState) => void): () => void;
     onAttachment(listener: (event: AttachmentEvent) => void): () => void;

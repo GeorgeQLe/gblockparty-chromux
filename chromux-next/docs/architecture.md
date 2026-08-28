@@ -319,9 +319,11 @@ Clearing blockers never authorizes installation.
 ## GBlockParty fleet and attached terminals
 
 `ControlPlaneClient` is an opt-in main-process service. It owns the configurable
-control-plane URL, optional authentication material, snapshot fetches, and one
-bounded WebSocket per attached surface. The preload exposes only validated
-fleet state and attach/detach/input/resize methods; credentials, transport
+control-plane URL, one-time device enrollment, protected credentials, snapshot
+fetches, and one bounded WebSocket per attached surface. `FleetCredentialStore`
+encrypts the scoped bearer credential through Electron `safeStorage` before an
+atomic mode-`0600` app-local write. The preload exposes only validated fleet
+state and enrollment/attach/control/input/resize actions; credentials, transport
 headers, raw snapshot resources, and local filesystem paths never enter the
 renderer.
 
@@ -330,11 +332,18 @@ sanitized display row. Remote tabs are separate from runner sessions and never
 call runner creation, browser, capture, or evidence APIs. Relay loss retains
 the tab, applies bounded reconnect backoff, and reattaches with `sinceSeq`.
 Output is monotonic, duplicate sequences are ignored, replay gaps clear the
-terminal visibly, and closing a tab sends detach without stop. Attachment
+terminal visibly, and closing a tab sends lease release then detach without
+stop. A `leased` attachment begins read-only. Explicit request, eight-second
+renewal, release, denial/holder, expiry, and reconnect transitions remain
+main-owned and runtime-validated. Renderer xterm input and main-process input
+both fail closed without active control; the server independently checks the
+device lease and is authoritative. HTTP `401` or WebSocket `4401` revocation
+closes attachments, deletes the protected credential, clears fleet projection,
+and requires re-enrollment.
 
 Chromux Next does not create local PTYs, launch package scripts, or revive the
 legacy Host Resource Broker. Local Codex sessions stay on structured app-server
 transport; explicitly attached Fleet surfaces are the only interactive terminal
-boundary.
-authority is explicitly `unleased`; this release offers no multi-writer
-guarantee.
+boundary. Process-provided cookie authentication retains the legacy `unleased`
+compatibility path for local development; enrolled external devices always use
+server-enforced single-writer authority.

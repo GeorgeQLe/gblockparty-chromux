@@ -39,6 +39,7 @@ import {
   ,attachmentInputSchema
   ,attachmentResizeSchema
   ,fleetAttachInputSchema
+  ,fleetEnrollmentInputSchema
   ,fleetStateSchema
   ,remoteTabSchema
   ,surfaceIdInputSchema
@@ -278,6 +279,8 @@ const api: ChromuxNextApi = {
   },
   fleet: {
     async state() { return fleetStateSchema.parse(await ipcRenderer.invoke(IpcChannels.fleetState)); },
+    async enroll(input) { return fleetStateSchema.parse(await ipcRenderer.invoke(IpcChannels.fleetEnroll, fleetEnrollmentInputSchema.parse(input))); },
+    async forgetEnrollment() { return fleetStateSchema.parse(await ipcRenderer.invoke(IpcChannels.fleetForgetEnrollment)); },
     async refresh() { return fleetStateSchema.parse(await ipcRenderer.invoke(IpcChannels.fleetRefresh)); },
     async attach(surfaceId, title) {
       const input = fleetAttachInputSchema.parse({ surfaceId, title });
@@ -285,6 +288,8 @@ const api: ChromuxNextApi = {
     },
     async detach(surfaceId) { await ipcRenderer.invoke(IpcChannels.fleetDetach, surfaceIdInputSchema.parse({ surfaceId })); },
     async input(surfaceId, data) { await ipcRenderer.invoke(IpcChannels.fleetInput, attachmentInputSchema.parse({ surfaceId, data })); },
+    async requestControl(surfaceId) { await ipcRenderer.invoke(IpcChannels.fleetRequestControl, surfaceIdInputSchema.parse({ surfaceId })); },
+    async releaseControl(surfaceId) { await ipcRenderer.invoke(IpcChannels.fleetReleaseControl, surfaceIdInputSchema.parse({ surfaceId })); },
     async resize(surfaceId, cols, rows) { await ipcRenderer.invoke(IpcChannels.fleetResize, attachmentResizeSchema.parse({ surfaceId, cols, rows })); },
     onState(listener) {
       const handler = (_event: Electron.IpcRendererEvent, value: unknown) => listener(parseMainToRendererEvent(IpcChannels.fleetStateChanged, value));

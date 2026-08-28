@@ -5,7 +5,7 @@ import {
   app,
   BrowserWindow,
   dialog,
-  ipcMain,
+  ipcMain, safeStorage,
   shell
 } from "electron";
 import type { MessageBoxOptions } from "electron";
@@ -45,6 +45,7 @@ import {
   ,attachmentInputSchema
   ,attachmentResizeSchema
   ,fleetAttachInputSchema
+  ,fleetEnrollmentInputSchema
   ,surfaceIdInputSchema
   ,RepositoryInspectionRequestSchema
 } from "./ipc/contracts";
@@ -66,6 +67,7 @@ import { UpdateService } from "./main/update-service";
 import { CodexUpdateService } from "./main/codex-update-service";
 import { chromuxOwnedCodexEnvironment } from "./main/codex-environment";
 import { ControlPlaneClient } from "./control-plane/client";
+import { FleetCredentialStore } from "./control-plane/credential-store";
 import { ProjectSuggestionService } from "./main/project-suggestion-service";
 import { RepositoryInspector } from "./main/repository-inspector";
 
@@ -86,6 +88,7 @@ const projectSuggestions = new ProjectSuggestionService({
 const fleet = new ControlPlaneClient({
   baseUrl: process.env.CHROMUX_NEXT_CONTROL_PLANE_URL ?? "http://127.0.0.1:4400",
   enabled: process.env.CHROMUX_NEXT_GBP_FLEET === "1",
+  credentialStore: new FleetCredentialStore(app.getPath("userData"), safeStorage),
   ...(process.env.CHROMUX_NEXT_CONTROL_PLANE_COOKIE ? { cookie: process.env.CHROMUX_NEXT_CONTROL_PLANE_COOKIE } : {}),
   ...(process.env.CHROMUX_NEXT_CONTROL_PLANE_TOKEN ? { bearerToken: process.env.CHROMUX_NEXT_CONTROL_PLANE_TOKEN } : {})
 });
@@ -988,6 +991,8 @@ function registerIpc(): void {
     await shell.openExternal(url); return true;
   });
   registry.handle(IpcChannels.fleetState, () => fleet.state());
+  registry.handle(IpcChannels.fleetEnroll, (_event, input: unknown) => fleet.enroll(fleetEnrollmentInputSchema.parse(input)));
+  registry.handle(IpcChannels.fleetForgetEnrollment, () => fleet.forgetEnrollment());
   registry.handle(IpcChannels.fleetRefresh, () => fleet.refresh());
   registry.handle(IpcChannels.fleetAttach, (_event, input: unknown) => {
     const value = fleetAttachInputSchema.parse(input);
@@ -998,6 +1003,12 @@ function registerIpc(): void {
   });
   registry.handle(IpcChannels.fleetInput, (_event, input: unknown) => {
     const value = attachmentInputSchema.parse(input); fleet.input(value.surfaceId, value.data);
+  });
+  registry.handle(IpcChannels.fleetRequestControl, (_event, input: unknown) => {
+    const value = surfaceIdInputSchema.parse(input); fleet.requestControl(value.surfaceId);
+  });
+  registry.handle(IpcChannels.fleetReleaseControl, (_event, input: unknown) => {
+    const value = surfaceIdInputSchema.parse(input); fleet.releaseControl(value.surfaceId);
   });
   registry.handle(IpcChannels.fleetResize, (_event, input: unknown) => {
     const value = attachmentResizeSchema.parse(input); fleet.resize(value.surfaceId, value.cols, value.rows);
@@ -1022,6 +1033,7 @@ function registerIpc(): void {
 
 app.whenReady().then(async () => {
   registerIpc();
+  await fleet.initialize();
   await runner.initialize().catch((error) => {
     const message = error instanceof Error ? error.message : String(error);
     if (!isSmoke || !/is stopping|app-server stopped/.test(message)) {

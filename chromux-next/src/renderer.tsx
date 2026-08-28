@@ -1425,7 +1425,7 @@ function App() {
     structuredClone(DEFAULT_BROWSER_WORKSPACE)
   );
   const [updates, setUpdates] = useState<UpdateStateV1>(structuredClone(DEFAULT_UPDATE_STATE));
-  const [fleet, setFleet] = useState<FleetState>({ enabled: false, connection: "disabled", refreshedAt: null, items: [], error: null });
+  const [fleet, setFleet] = useState<FleetState>({ enabled: false, connection: "disabled", enrollment: { status: "not_enrolled", deviceId: null, deviceLabel: null, endpoint: null, error: null }, refreshedAt: null, items: [], error: null });
   const [fleetTabs, setFleetTabs] = useState<RemoteTab[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [settingsReady, setSettingsReady] = useState(false);

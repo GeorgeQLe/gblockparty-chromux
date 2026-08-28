@@ -12,15 +12,20 @@ Chromux-owned subprocess environments.
 ## GBlockParty fleet privacy
 
 Fleet integration is disabled unless `CHROMUX_NEXT_GBP_FLEET=1`. When enabled,
-the main process connects to the configured GBlockParty control plane and may
-hold an optional signed session cookie or bearer token supplied through the
-process environment. These values are never persisted by Chromux Next, logged,
-included in renderer events, or exposed through preload.
+the renderer may submit an endpoint, one-time enrollment code, and device label
+to the main process. The returned scoped bearer credential never comes back
+through IPC: Electron protected storage encrypts it into the independent app
+profile with mode `0600`. A server revocation deletes that local encrypted
+record and requires re-enrollment. Process-supplied compatibility cookies and
+tokens remain non-persistent. No authentication value is logged or exposed in
+renderer events or preload results.
 
 The renderer receives only bounded display names, opaque resource IDs, tool,
 status, attention, and availability fields. Absolute host workspace paths and
 host-daemon credentials are excluded by the server projection and by the
-Chromux Next IPC schema. Terminal output is retained only by xterm's bounded
+Chromux Next IPC schema. Terminal input is disabled unless a short-lived
+server lease names this enrolled device; observers retain read-only output and
+resize. Terminal output is retained only by xterm's bounded
 in-memory scrollback for the open tab; closing the tab detaches without stopping
 or deleting the remote session.
 

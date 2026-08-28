@@ -33,7 +33,7 @@ Canonical plan: [`docs/gblockparty-remote-clients.md`](../docs/gblockparty-remot
   `scripts/test-website-routes.js`, `scripts/test-design-viewer-browser.js`,
   `vercel.json`, and production route/header smoke checks)_
 
-- [ ] Extend the existing Chromux Next Fleet transport to accept external
+- [x] Extend the existing Chromux Next Fleet transport to accept external
   device authority, enroll/store a revocable credential, and request, renew,
   release, and visibly enforce terminal input leases.
 - [ ] Persist attached remote-tab identity and replay cursors so Chromux Next

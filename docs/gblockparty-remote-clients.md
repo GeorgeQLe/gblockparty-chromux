@@ -1,8 +1,8 @@
 # GBlockParty Remote Clients: Current State and MVP Roadmap
 
 Status: planned continuation. Last verified against Chromux Next `main`
-through the `0.14.2` release line and the pinned GBlockParty control-plane
-checkout on 2026-08-26.
+through the `0.17.0` release line and the pinned GBlockParty control-plane
+checkout on 2026-08-28.
 
 ## MVP outcome
 
@@ -31,12 +31,14 @@ The opt-in GBlockParty Fleet vertical slice already:
   and visibly clears history on an explicit replay reset; and
 - detaches without sending stop, leaving the host-owned Codex/tmux session alive.
 
-It is attach-only and disabled by default. It does not launch or stop a remote
-session, enroll a device, manage a credential, request/renew/release an input
-lease, or persist remote tabs/replay cursors across app restart. Its checked-in
-client schema accepts only `authority: "unleased"`; the current GBlockParty
-server reports leased authority for enrolled bearer-token devices. Closing the
-app closes all Fleet attachments, and there is no remote-tab restoration path.
+It remains attach-only and disabled by default, but now exchanges one-time
+external-device codes, encrypts the scoped credential with macOS protected
+storage, handles server revocation, accepts leased authority, and implements
+visible lease request/renew/release/contention/expiry. Renderer and main input
+both fail closed without control while the server independently enforces the
+lease. It still does not launch or stop a remote session or persist remote
+tabs/replay cursors across app restart. Closing the app closes all Fleet
+attachments, and there is no remote-tab restoration path.
 
 Therefore the current implementation proves the remote terminal UI and
 in-process reconnect slice, but not the complete persistent Mac workflow.
@@ -70,8 +72,8 @@ browser surfaces, artifacts, checkpoints, and recovery remain later work.
 | Launch Codex on a fleet host | Missing | Missing | Mac launches; phone may remain attach-first |
 | Attach/read daemon terminal | Implemented | Missing | Both attach to one host-owned surface |
 | Input and resize | Implemented only on current authority path | Missing | Require server-enforced ownership |
-| Enroll/revoke device | Missing | Missing | Revocable per-device credentials |
-| Acquire/renew/release control | Missing | Missing | One writer; concurrent observers |
+| Enroll/revoke device | Implemented | Missing | Revocable per-device credentials |
+| Acquire/renew/release control | Implemented | Missing | One writer; concurrent observers |
 | Reconnect with bounded replay | Implemented during one app process | Missing | Persist `sinceSeq` across client restart |
 | Detach without stopping work | Implemented | Missing | Host tmux remains alive |
 | Reopen same remote tab after app restart | Missing | Not applicable | Restore surface identity and cursor |
@@ -81,9 +83,8 @@ browser surfaces, artifacts, checkpoints, and recovery remain later work.
 
 ### Phase 1 — Complete the Chromux Next Mac client
 
-- Align the client protocol with the current external-device and lease frames.
-- Add device enrollment, user-only credential storage, revocation handling,
-  lease request/renew/release, read-only UI, and blocked-input behavior.
+- Continue using the aligned external-device and lease frames now implemented
+  by the Mac client, including protected credentials and blocked-input behavior.
 - Persist remote surface identity and the next replay cursor; restore attached
   remote tabs without launching, stopping, or resuming a different provider
   conversation.

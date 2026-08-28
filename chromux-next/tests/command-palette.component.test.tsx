@@ -34,7 +34,7 @@ describe("Cmd-K command palette", () => {
     const close = vi.fn();
     const activated = vi.fn();
     window.addEventListener("chromux:fleet-activate", activated, { once: true });
-    render(<CommandPalette state={state} fleetTabs={[{ surfaceId: "surface-1", sessionId: "remote", title: "Remote deploy", status: "connected", authority: "unleased", lastSeq: 1, resetCount: 0, error: null }]} close={close} activateLocal={vi.fn()} />);
+    render(<CommandPalette state={state} fleetTabs={[{ surfaceId: "surface-1", sessionId: "remote", title: "Remote deploy", status: "connected", authority: "unleased", control: "unleased", leaseHolder: null, leaseExpiresAt: null, lastSeq: 1, resetCount: 0, error: null }]} close={close} activateLocal={vi.fn()} />);
     const search = screen.getByRole("combobox");
     fireEvent.change(search, { target: { value: "remote" } });
     fireEvent.keyDown(search, { key: "Enter" });

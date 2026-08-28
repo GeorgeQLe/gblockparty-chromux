@@ -64,10 +64,14 @@ export const PreloadInvokeChannels = [
   ,IpcChannels.updateInstallCodex
   ,IpcChannels.updateOpenReleaseNotes
   ,IpcChannels.fleetState
+  ,IpcChannels.fleetEnroll
+  ,IpcChannels.fleetForgetEnrollment
   ,IpcChannels.fleetRefresh
   ,IpcChannels.fleetAttach
   ,IpcChannels.fleetDetach
   ,IpcChannels.fleetInput
+  ,IpcChannels.fleetRequestControl
+  ,IpcChannels.fleetReleaseControl
   ,IpcChannels.fleetResize
 ] as const;
 

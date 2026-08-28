@@ -55,6 +55,7 @@ import {
   attachmentInputSchema,
   attachmentResizeSchema,
   fleetAttachInputSchema,
+  fleetEnrollmentInputSchema,
   fleetStateSchema,
   remoteTabSchema,
   surfaceIdInputSchema
@@ -120,10 +121,14 @@ export const IpcChannels = {
   ,updateOpenReleaseNotes: "update:open-release-notes"
   ,updateStateChanged: "update:state-changed"
   ,fleetState: "fleet:state"
+  ,fleetEnroll: "fleet:enroll"
+  ,fleetForgetEnrollment: "fleet:forget-enrollment"
   ,fleetRefresh: "fleet:refresh"
   ,fleetAttach: "fleet:attach"
   ,fleetDetach: "fleet:detach"
   ,fleetInput: "fleet:input"
+  ,fleetRequestControl: "fleet:request-control"
+  ,fleetReleaseControl: "fleet:release-control"
   ,fleetResize: "fleet:resize"
   ,fleetStateChanged: "fleet:state-changed"
   ,fleetAttachmentEvent: "fleet:attachment-event"
@@ -201,6 +206,7 @@ export {
   ,attachmentInputSchema
   ,attachmentResizeSchema
   ,fleetAttachInputSchema
+  ,fleetEnrollmentInputSchema
   ,fleetStateSchema
   ,remoteTabSchema
   ,surfaceIdInputSchema

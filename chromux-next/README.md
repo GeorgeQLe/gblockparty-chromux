@@ -5,7 +5,7 @@ separate Electron app from legacy Chromux in `../prototype/`: it has a distinct
 package, bundle identifier, user-data directory, architecture, and release
 line.
 
-## Current prerelease: v0.15.0
+## Current prerelease: v0.17.0
 
 This runner-first prerelease includes:
 
@@ -23,8 +23,10 @@ This runner-first prerelease includes:
 
 - An opt-in GBlockParty Fleet picker and distinct attached-terminal tabs for
   daemon-owned Codex sessions. Remote tabs reconnect with their last replay
-  cursor, visibly clear history on a replay gap, route input and resize through
-  the main process, and detach without stopping the session.
+  cursor, visibly clear history on a replay gap, and detach without stopping
+  the session. One-time device enrollment stores its scoped credential with
+  macOS protected storage; terminals attach read-only and accept input only
+  while the server grants this device its renewable single-writer lease.
 
 - Safe transcript viewport recovery: each session retains its DOM scroll
   position in memory and restores at the bottom when no position exists. A
@@ -199,14 +201,20 @@ CHROMUX_NEXT_GBP_FLEET=1 npm start
 ```
 
 The control plane defaults to `http://127.0.0.1:4400`; override it with
-`CHROMUX_NEXT_CONTROL_PLANE_URL`. For non-dev authenticated control planes,
-provide the signed session cookie through `CHROMUX_NEXT_CONTROL_PLANE_COOKIE`.
-The optional cookie/token, URL, snapshot request, and terminal WebSockets stay
-in the main process and never cross renderer IPC.
+`CHROMUX_NEXT_CONTROL_PLANE_URL`. For an authenticated control plane, open
+Fleet and exchange a one-time device code. Chromux validates server
+capabilities, then stores the returned scoped credential encrypted with
+Electron protected storage in a mode-`0600` file. Process-provided cookie/token
+variables remain available for development and compatibility. Authentication
+material, URL ownership, snapshot requests, and terminal WebSockets stay in
+the main process and never cross renderer IPC.
 
 The renderer receives only bounded host/workspace/session display metadata and
 surface IDs. It never receives host credentials, absolute workspace paths, or
-launch authority. Remote tabs expose terminal input and resize only; they do
+launch authority. Remote tabs expose resize and read-only output immediately.
+Input is enabled only after **Request control** receives the server's
+single-writer lease; it is disabled again on contention, release, expiry,
+disconnect, or revocation. They do
 not expose local-only session creation, browser capture, or evidence delivery.
 Closing a tab sends detach and leaves the daemon-owned Codex/tmux session
 running. See [control-plane troubleshooting](docs/control-plane-troubleshooting.md).
