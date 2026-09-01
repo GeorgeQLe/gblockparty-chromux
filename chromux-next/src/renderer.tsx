@@ -90,6 +90,7 @@ import { PersistentSurfaces, type CenterSurface } from "./renderer/persistent-su
 import { RendererErrorBoundary } from "./renderer/recovery";
 import { FleetFeature } from "./control-plane/ui";
 import { RunnerTranscript } from "./renderer/transcript";
+import { ProjectPicker } from "./renderer/project-picker";
 import type { FleetState } from "./control-plane/contracts";
 import {
   DEFAULT_BROWSER_WORKSPACE,
@@ -1233,16 +1234,21 @@ function NewSessionDialog({ models, workspace, selectedSession, selectedGroupId,
   >
     <form id="new-session-form" className="session-form" onSubmit={(event) => {
       event.preventDefault();
-      void window.chromuxNext.runner.create({
-        projectPath: project,
-        ...(title.trim() ? { title: title.trim() } : {}),
-        permissionPreset: permission,
-        ...(selectedGroupId ? { groupId: selectedGroupId } : {}),
-        ...(model ? { model } : {}),
-        ...(effort ? { reasoningEffort: effort } : {})
-      }).then(created).catch(fail);
+      void (async () => {
+        if (!workspace.projects.some((item) => item.path === project)) {
+          await window.chromuxNext.settings.registerProject(project);
+        }
+        await window.chromuxNext.runner.create({
+          projectPath: project,
+          ...(title.trim() ? { title: title.trim() } : {}),
+          permissionPreset: permission,
+          ...(selectedGroupId ? { groupId: selectedGroupId } : {}),
+          ...(model ? { model } : {}),
+          ...(effort ? { reasoningEffort: effort } : {})
+        });
+      })().then(created).catch(fail);
     }}>
-      <label>Project or worktree<div className="path-picker"><select autoFocus value={project} onChange={(event) => setProject(event.target.value)}><option value="">Choose a registered folder</option>{workspace.projects.map((item) => <option value={item.path} key={item.id}>{item.name} · {item.kind}</option>)}{project && !workspace.projects.some((item) => item.path === project) && <option value={project}>{project}</option>}</select><Button type="button" icon={FolderPlus} onClick={chooseProject}>Add folder</Button></div></label>
+      <label>Project or worktree<ProjectPicker projects={workspace.projects} value={project} onChange={setProject} chooseProject={chooseProject} /></label>
       <label>Session title<input placeholder={`${project.split("/").filter(Boolean).at(-1) ?? "Project"} · automatic if blank`} value={title} onChange={(event) => setTitle(event.target.value)} /></label>
       <div className="modal-grid"><label>Permissions<select value={permission} onChange={(event) => setPermission(event.target.value as "workspace" | "read-only")}><option value="workspace">Workspace</option><option value="read-only">Read only</option></select></label><label>Model<select value={model} onChange={(event) => { setModel(event.target.value); setEffort(models.find((item) => item.id === event.target.value)?.defaultReasoningEffort ?? ""); }}><option value="">Recommended</option>{models.map((item) => <option value={item.id} key={item.id}>{item.displayName}{item.recommended ? " · recommended" : ""}</option>)}</select></label><label>Reasoning<select value={effort} onChange={(event) => setEffort(event.target.value)}><option value="">Model default</option>{(models.find((item) => item.id === model)?.reasoningEfforts ?? recommended?.reasoningEfforts ?? []).map((item) => <option key={item}>{item}</option>)}</select></label></div>
       <p className="permission-help">{permission === "workspace" ? "Writes are limited to this workspace. Network is off by default and escalations require approval." : "Files are read-only. Network is off and approval prompts are never accepted."}</p>

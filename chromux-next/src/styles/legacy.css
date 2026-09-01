@@ -300,6 +300,26 @@ i.failed { background: var(--danger); }
 .onboarding-modal > footer { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .session-form { display: grid; gap: var(--space-4); }
 .path-picker { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2); }
+.project-picker { position: relative; display: grid; gap: var(--space-2); }
+.project-combobox {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: var(--space-2);
+  padding: 0 var(--space-3); border: 1px solid var(--graphite-700); border-radius: var(--radius-sm);
+  color: var(--graphite-400); background: var(--graphite-850);
+}
+.project-combobox:focus-within { border-color: var(--sage-500); }
+.project-combobox input { width: 100%; border: 0; padding-left: 0; background: transparent; }
+.project-search-results {
+  position: absolute; z-index: 20; top: calc(100% - 24px); left: 0; right: 0;
+  max-height: 280px; overflow: auto; padding: var(--space-2);
+  border: 1px solid var(--graphite-700); border-radius: var(--radius-sm);
+  background: var(--graphite-900); box-shadow: 0 18px 44px #0008;
+}
+.project-search-results > button { display: grid; width: 100%; gap: 3px; padding: var(--space-2) var(--space-3); border: 0; text-align: left; background: transparent; }
+.project-search-results > button:hover, .project-search-results > button.active { background: var(--sage-soft); }
+.project-search-results > button > span { display: flex; align-items: center; gap: var(--space-2); }
+.project-search-results small, .project-search-results p, .project-search-help { color: var(--graphite-400); font-weight: 450; }
+.project-search-results p { margin: var(--space-2); }
+.project-search-help { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .modal-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
 .permission-help { margin: 0; padding: var(--space-3); border-radius: var(--radius-sm); color: var(--graphite-300); background: var(--graphite-850); }
 

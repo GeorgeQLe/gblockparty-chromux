@@ -49,6 +49,8 @@ export const PreloadInvokeChannels = [
   IpcChannels.settingsGetWorkspacePreferences,
   IpcChannels.settingsUpdateWorkspacePreferences,
   IpcChannels.settingsChooseProject,
+  IpcChannels.settingsSearchProjects,
+  IpcChannels.settingsRegisterProject,
   IpcChannels.settingsRemoveProject,
   IpcChannels.settingsCompatibilityDiagnostics
   ,IpcChannels.updateState

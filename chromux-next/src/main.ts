@@ -34,6 +34,7 @@ import {
   ,DetectionLeaseIdInputSchema
   ,UiPreferencesPatchV1Schema
   ,WorkspacePreferencesPatchV1Schema
+  ,ProjectDirectoryPathSchema
   ,UpdateActionSchema
   ,UpdateCheckActionSchema
   ,UpdateReleaseNotesActionSchema
@@ -60,6 +61,7 @@ import { UpdateService } from "./main/update-service";
 import { CodexUpdateService } from "./main/codex-update-service";
 import { chromuxOwnedCodexEnvironment } from "./main/codex-environment";
 import { ControlPlaneClient } from "./control-plane/client";
+import { discoverProjectDirectories } from "./settings/project-directory-search";
 
 if (started) app.quit();
 
@@ -827,6 +829,32 @@ function registerIpc(): void {
       if ((await stat(path.join(canonicalPath, ".git"))).isFile()) kind = "worktree";
     } catch {
       // Non-Git folders remain valid projects.
+    }
+    const now = new Date().toISOString();
+    const preferences = await localStore.addProject({
+      schemaVersion: 1,
+      id: randomUUID(),
+      name: path.basename(canonicalPath) || canonicalPath,
+      path: canonicalPath,
+      kind,
+      addedAt: now,
+      lastUsedAt: now
+    });
+    broadcastWorkspacePreferences(preferences);
+    return preferences;
+  });
+  registry.handle(IpcChannels.settingsSearchProjects, () => discoverProjectDirectories({
+    ...(process.env.P_BASE ? { configuredBase: process.env.P_BASE } : {})
+  }));
+  registry.handle(IpcChannels.settingsRegisterProject, async (_event, input: unknown) => {
+    const selectedPath = ProjectDirectoryPathSchema.parse(input);
+    const canonicalPath = await realpath(selectedPath);
+    if (!(await stat(canonicalPath)).isDirectory()) throw new Error("Project path is not a directory");
+    let kind: "project" | "worktree" = "project";
+    try {
+      if ((await stat(path.join(canonicalPath, ".git"))).isFile()) kind = "worktree";
+    } catch {
+      // Ordinary folders remain valid projects.
     }
     const now = new Date().toISOString();
     const preferences = await localStore.addProject({

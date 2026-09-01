@@ -98,6 +98,8 @@ export const IpcChannels = {
   ,settingsUpdateWorkspacePreferences: "settings:update-workspace-preferences"
   ,settingsWorkspacePreferencesChanged: "settings:workspace-preferences-changed"
   ,settingsChooseProject: "settings:choose-project"
+  ,settingsSearchProjects: "settings:search-projects"
+  ,settingsRegisterProject: "settings:register-project"
   ,settingsRemoveProject: "settings:remove-project"
   ,settingsCompatibilityDiagnostics: "settings:compatibility-diagnostics"
   ,updateState: "update:state"
@@ -140,6 +142,21 @@ export const MutationResultSchema = z.object({
   document: AlignmentDocumentV1Schema,
   inverseBatch: AlignmentMutationBatchV1Schema
 });
+
+export const ProjectDirectoryCandidateV1Schema = z.object({
+  name: z.string().min(1).max(512),
+  path: z.string().min(1).max(4096),
+  relativePath: z.string().min(1).max(4096),
+  basePath: z.string().min(1).max(4096),
+  nested: z.boolean()
+}).strict();
+
+export const ProjectDirectorySearchResultV1Schema = z.object({
+  basePaths: z.array(z.string().min(1).max(4096)).max(16),
+  candidates: z.array(ProjectDirectoryCandidateV1Schema).max(2000)
+}).strict();
+
+export const ProjectDirectoryPathSchema = z.string().min(1).max(4096);
 
 export {
   AgentRunEventSchema,

@@ -26,6 +26,7 @@ import type {
 import type { BrowserWorkspaceV1 } from "../browser/contracts";
 import type { UpdateStateV1 } from "../updates/contracts";
 import type { AttachmentEvent, FleetState, RemoteTab } from "../control-plane/contracts";
+import type { ProjectDirectorySearchResultV1 } from "../settings/project-search";
 
 export interface DocumentPayload {
   filePath: string;
@@ -130,6 +131,8 @@ export interface ChromuxNextApi {
     getWorkspacePreferences(): Promise<WorkspacePreferencesV1>;
     updateWorkspacePreferences(patch: WorkspacePreferencesPatchV1): Promise<WorkspacePreferencesV1>;
     chooseProject(): Promise<WorkspacePreferencesV1 | null>;
+    searchProjects(): Promise<ProjectDirectorySearchResultV1>;
+    registerProject(projectPath: string): Promise<WorkspacePreferencesV1>;
     removeProject(projectId: string): Promise<WorkspacePreferencesV1>;
     compatibilityDiagnostics(): Promise<CompatibilityDiagnosticsV1>;
     onWorkspacePreferencesChanged(listener: (preferences: WorkspacePreferencesV1) => void): () => void;

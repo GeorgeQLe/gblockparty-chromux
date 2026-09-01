@@ -21,6 +21,8 @@ import {
   EvidenceIdInputSchema,
   EvidencePreviewSchema,
   EvidenceReviewInputSchema,
+  ProjectDirectoryPathSchema,
+  ProjectDirectorySearchResultV1Schema,
   UiPreferencesPatchV1Schema,
   UiPreferencesV1Schema
   ,WorkspacePreferencesPatchV1Schema
@@ -298,6 +300,17 @@ const api: ChromuxNextApi = {
     async chooseProject() {
       const value: unknown = await ipcRenderer.invoke(IpcChannels.settingsChooseProject);
       return value === null ? null : WorkspacePreferencesV1Schema.parse(value);
+    },
+    async searchProjects() {
+      return ProjectDirectorySearchResultV1Schema.parse(
+        await ipcRenderer.invoke(IpcChannels.settingsSearchProjects)
+      );
+    },
+    async registerProject(projectPath) {
+      return WorkspacePreferencesV1Schema.parse(await ipcRenderer.invoke(
+        IpcChannels.settingsRegisterProject,
+        ProjectDirectoryPathSchema.parse(projectPath)
+      ));
     },
     async removeProject(projectId) {
       return WorkspacePreferencesV1Schema.parse(

@@ -1,5 +1,22 @@
 # Release Notes
 
+## GBlockParty Chromux Next v0.15.0 (prerelease)
+
+Tag: `chromux-next-v0.15.0`
+
+- Replace the New Session registered-folder select with a searchable project
+  combobox modeled on the `p` project jumper: scan Git roots through depth
+  five, prune `node_modules`, rank standalone repositories before nested
+  repositories, prefer case-insensitive basename substring matches, and fall
+  back to relative-path matching.
+- Add Arrow Up/Down navigation plus Tab and Enter completion, Escape dismissal,
+  project-root visibility, registered/nested labels, and a non-blocking scan
+  fallback that keeps registered folders usable.
+- Register discovered projects when their session is submitted while retaining
+  the native Add Folder path for non-Git directories and worktrees.
+- This successor-only feature release remains a prerelease and does not replace
+  legacy `/releases/latest`.
+
 ## GBlockParty Chromux Next v0.14.2 (prerelease)
 
 Tag: `chromux-next-v0.14.2`
