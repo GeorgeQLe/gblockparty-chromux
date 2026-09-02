@@ -5,15 +5,16 @@ separate Electron app from legacy Chromux in `../prototype/`: it has a distinct
 package, bundle identifier, user-data directory, architecture, and release
 line.
 
-## Current prerelease: v0.17.0
+## Current prerelease: v0.18.0
 
 This runner-first prerelease includes:
 
-- A p-style New Session project search that prioritizes registered folders and
-  recent `p_history`, discovers Git projects under `P_BASE` or `~/projects`,
+- A front-and-center, p-style New Session project search that prioritizes
+  registered folders and recent `p_history`, discovers Git projects under `P_BASE` or `~/projects`,
   matches names before relative paths, and completes literal absolute paths.
-  The accessible combobox supports mouse, arrow keys, Enter, Tab, and Escape;
-  the native Add folder picker remains available.
+  Its dedicated “Find a project” card explains search sources and keyboard
+  controls; the accessible combobox supports mouse, arrow keys, Enter, Tab,
+  and Escape, while the native folder browser remains available.
 
 - A read-only conversational transcript with right-aligned user bubbles,
   left-aligned agent bubbles, and full-width code, tables, ANSI/ASCII output,

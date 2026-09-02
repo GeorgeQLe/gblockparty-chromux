@@ -1,5 +1,21 @@
 # Release Notes
 
+## GBlockParty Chromux Next v0.18.0 (prerelease)
+
+Tag: `chromux-next-v0.18.0`
+
+- Make project discovery the primary New Session action with a dedicated
+  “Find a project” card, prominent full-width search bar, search icon, and
+  selected session-directory summary above secondary session settings.
+- Explain the search sources and keyboard interaction in the modal itself,
+  rename the native fallback to “Browse folders…”, and select the prefilled
+  project path on focus so typing immediately begins a new search.
+- Preserve the bounded main-process `p`-style discovery, registered/recent/Git
+  ranking, literal absolute paths, stale-response protection, and accessible
+  mouse, Arrow, Tab, Enter, and Escape behavior introduced in v0.15.0.
+- This successor-only usability release remains a prerelease and does not
+  replace legacy `/releases/latest`.
+
 ## GBlockParty Chromux Next v0.17.0 (prerelease)
 
 Tag: `chromux-next-v0.17.0`

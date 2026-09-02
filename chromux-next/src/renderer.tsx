@@ -1281,6 +1281,8 @@ export function NewSessionDialog({ models, workspace, selectedSession, selectedG
   const projectCount = useRef(workspace.projects.length);
   const suggestionRequest = useRef(0);
   const suggestionListId = React.useId();
+  const projectSearchHelpId = React.useId();
+  const projectSelectionId = React.useId();
   useEffect(() => {
     if (workspace.projects.length > projectCount.current) {
       setProject(workspace.projects.at(-1)?.path ?? project);
@@ -1313,7 +1315,7 @@ export function NewSessionDialog({ models, workspace, selectedSession, selectedG
   return <Dialog
     title="New session"
     eyebrow="Codex app-server"
-    description="Start a structured Codex session in a registered project or worktree."
+    description="Search your projects, choose a directory, and start Codex."
     close={close}
     className="session-dialog"
     footer={<><Button tone="quiet" onClick={close}>Cancel</Button><Button form="new-session-form" type="submit" icon={CirclePlus} tone="primary" disabled={!project.trim() || !models.length}>Create session</Button></>}
@@ -1329,47 +1331,57 @@ export function NewSessionDialog({ models, workspace, selectedSession, selectedG
         ...(effort ? { reasoningEffort: effort } : {})
       }).then(created).catch(fail);
     }}>
-      <label>Project or worktree<div className="path-picker"><div className="project-combobox" onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setSuggestionsOpen(false);
-      }}><input
-        autoFocus
-        role="combobox"
-        aria-label="Project or worktree"
-        aria-autocomplete="list"
-        aria-expanded={suggestionsOpen}
-        aria-controls={suggestionListId}
-        {...(activeSuggestion >= 0 && suggestions[activeSuggestion] ? { "aria-activedescendant": `${suggestionListId}-${activeSuggestion}` } : {})}
-        placeholder="Search projects or type an absolute path"
-        value={project}
-        onFocus={() => setSuggestionsOpen(true)}
-        onChange={(event) => { setProject(event.target.value); setSuggestionsOpen(true); setActiveSuggestion(-1); }}
-        onKeyDown={(event) => {
-          if (event.key === "ArrowDown") {
-            event.preventDefault(); setSuggestionsOpen(true);
-            setActiveSuggestion((index) => Math.min(Math.max(index + 1, 0), suggestions.length - 1));
-          } else if (event.key === "ArrowUp") {
-            event.preventDefault(); setSuggestionsOpen(true);
-            setActiveSuggestion((index) => Math.max(index - 1, 0));
-          } else if ((event.key === "Enter" || event.key === "Tab") && suggestionsOpen && activeSuggestion >= 0 && suggestions[activeSuggestion]) {
-            event.preventDefault(); chooseSuggestion(suggestions[activeSuggestion]!);
-          } else if (event.key === "Escape" && suggestionsOpen) {
-            event.preventDefault(); event.stopPropagation(); setSuggestionsOpen(false);
-          }
-        }}
-      />{suggestionsOpen && <div className="project-suggestions" id={suggestionListId} role="listbox" aria-label="Project suggestions">
-        {suggestions.map((suggestion, index) => <button
-          id={`${suggestionListId}-${index}`}
-          type="button"
-          role="option"
-          aria-selected={index === activeSuggestion}
-          className={index === activeSuggestion ? "active" : ""}
-          key={suggestion.path}
-          onMouseDown={(event) => event.preventDefault()}
-          onMouseEnter={() => setActiveSuggestion(index)}
-          onClick={() => chooseSuggestion(suggestion)}
-        ><span><strong>{suggestion.name}</strong><small>{suggestion.source === "p" ? "p project" : suggestion.source}</small></span><code>{suggestion.detail}</code></button>)}
-        {!suggestions.length && <p>{suggestionsLoading ? "Searching projects…" : "No matching project directories"}</p>}
-      </div>}</div><Button type="button" icon={FolderPlus} onClick={() => void chooseProject(project).then((selected) => { if (selected) setProject(selected); })}>Add folder</Button></div></label>
+      <section className="project-search-hero" aria-labelledby="project-search-title">
+        <header><span className="project-search-icon"><Search size={20} aria-hidden="true" /></span><div><h3 id="project-search-title">Find a project</h3><p>Search registered folders, recent <code>p</code> projects, and Git repositories.</p></div></header>
+        <div className="project-combobox" onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setSuggestionsOpen(false);
+        }}>
+          <div className="project-search-bar"><Search size={18} aria-hidden="true" /><input
+            autoFocus
+            role="combobox"
+            aria-label="Search all projects"
+            aria-describedby={`${projectSearchHelpId} ${projectSelectionId}`}
+            aria-autocomplete="list"
+            aria-expanded={suggestionsOpen}
+            aria-controls={suggestionListId}
+            {...(activeSuggestion >= 0 && suggestions[activeSuggestion] ? { "aria-activedescendant": `${suggestionListId}-${activeSuggestion}` } : {})}
+            placeholder="Search all projects or type an absolute path"
+            value={project}
+            onFocus={(event) => { event.currentTarget.select(); setSuggestionsOpen(true); }}
+            onChange={(event) => { setProject(event.target.value); setSuggestionsOpen(true); setActiveSuggestion(-1); }}
+            onKeyDown={(event) => {
+              if (event.key === "ArrowDown") {
+                event.preventDefault(); setSuggestionsOpen(true);
+                setActiveSuggestion((index) => Math.min(Math.max(index + 1, 0), suggestions.length - 1));
+              } else if (event.key === "ArrowUp") {
+                event.preventDefault(); setSuggestionsOpen(true);
+                setActiveSuggestion((index) => Math.max(index - 1, 0));
+              } else if ((event.key === "Enter" || event.key === "Tab") && suggestionsOpen && activeSuggestion >= 0 && suggestions[activeSuggestion]) {
+                event.preventDefault(); chooseSuggestion(suggestions[activeSuggestion]!);
+              } else if (event.key === "Escape" && suggestionsOpen) {
+                event.preventDefault(); event.stopPropagation(); setSuggestionsOpen(false);
+              }
+            }}
+          /><kbd>Tab</kbd></div>
+          {suggestionsOpen && <div className="project-suggestions" id={suggestionListId} role="listbox" aria-label="Project suggestions">
+            {suggestions.map((suggestion, index) => <button
+              id={`${suggestionListId}-${index}`}
+              type="button"
+              role="option"
+              aria-selected={index === activeSuggestion}
+              className={index === activeSuggestion ? "active" : ""}
+              key={suggestion.path}
+              onMouseDown={(event) => event.preventDefault()}
+              onMouseEnter={() => setActiveSuggestion(index)}
+              onClick={() => chooseSuggestion(suggestion)}
+            ><span><strong>{suggestion.name}</strong><small>{suggestion.source === "p" ? "p project" : suggestion.source}</small></span><code>{suggestion.detail}</code></button>)}
+            {!suggestions.length && <p>{suggestionsLoading ? "Searching projects…" : "No matching project directories"}</p>}
+          </div>}
+        </div>
+        <div className="project-search-meta"><span id={projectSearchHelpId}>Type to search · Arrow keys navigate · Tab or Enter selects</span><Button type="button" icon={FolderPlus} tone="quiet" onClick={() => void chooseProject(project).then((selected) => { if (selected) setProject(selected); })}>Browse folders…</Button></div>
+        <p className="project-selection" id={projectSelectionId}><span>Session directory</span><code>{project || "Choose a project to continue"}</code></p>
+      </section>
+      <div className="session-options-heading"><span>Session setup</span><i /></div>
       <label>Session title<input placeholder={`${project.split("/").filter(Boolean).at(-1) ?? "Project"} · automatic if blank`} value={title} onChange={(event) => setTitle(event.target.value)} /></label>
       <div className="modal-grid"><label>Permissions<select value={permission} onChange={(event) => setPermission(event.target.value as "workspace" | "read-only")}><option value="workspace">Workspace</option><option value="read-only">Read only</option></select></label><label>Model<select value={model} onChange={(event) => { setModel(event.target.value); setEffort(models.find((item) => item.id === event.target.value)?.defaultReasoningEffort ?? ""); }}><option value="">Recommended</option>{models.map((item) => <option value={item.id} key={item.id}>{item.displayName}{item.recommended ? " · recommended" : ""}</option>)}</select></label><label>Reasoning<select value={effort} onChange={(event) => setEffort(event.target.value)}><option value="">Model default</option>{(models.find((item) => item.id === model)?.reasoningEfforts ?? recommended?.reasoningEfforts ?? []).map((item) => <option key={item}>{item}</option>)}</select></label></div>
       <p className="permission-help">{permission === "workspace" ? "Writes are limited to this workspace. Network is off by default and escalations require approval." : "Files are read-only. Network is off and approval prompts are never accepted."}</p>
