@@ -93,12 +93,14 @@ export const clientEnrollmentResponseSchema = z.object({
 });
 
 const frameBase = { v: z.literal(HOST_PROTOCOL_VERSION) };
+const streamId = z.string().min(8).max(CONTROL_PLANE_LIMITS.identifier).regex(/^stream_[a-f0-9]+$/);
 export const surfaceServerFrameSchema = z.discriminatedUnion("t", [
-  z.object({ ...frameBase, t: z.literal("attached"), surfaceId: id, sessionId: id, hostId: id, authority: z.enum(["unleased", "leased"]), nextSeq: seq }),
-  z.object({ ...frameBase, t: z.literal("output"), surfaceId: id, seq, data: boundedUtf8(CONTROL_PLANE_LIMITS.terminalChunkBytes) }),
+  z.object({ ...frameBase, t: z.literal("attached"), surfaceId: id, sessionId: id, hostId: id, authority: z.enum(["unleased", "leased"]), streamId: streamId.optional(), nextSeq: seq }),
+  z.object({ ...frameBase, t: z.literal("output"), surfaceId: id, streamId: streamId.optional(), seq, data: boundedUtf8(CONTROL_PLANE_LIMITS.terminalChunkBytes) }),
   z.object({ ...frameBase, t: z.literal("heartbeat"), at: timestamp }),
   z.object({ ...frameBase, t: z.literal("terminal_exit"), surfaceId: id, exitCode: z.number().int().nullable() }),
-  z.object({ ...frameBase, t: z.literal("reset"), surfaceId: id, nextSeq: seq, reason: z.literal("replay_gap") }),
+  z.object({ ...frameBase, t: z.literal("reset"), surfaceId: id, streamId: streamId.optional(), nextSeq: seq, reason: z.enum(["replay_gap", "stream_changed", "history_unavailable"]) }),
+  z.object({ ...frameBase, t: z.literal("history_status"), surfaceId: id, streamId, status: z.enum(["durable", "degraded"]), reason: z.enum(["storage_unavailable", "corrupt_store", "disk_pressure"]).optional() }),
   z.object({ ...frameBase, t: z.literal("lease"), surfaceId: id, status: z.enum(["active", "released", "expired", "denied"]), leaseId: id.optional(), holder: z.object({ deviceId: id, label: z.string().min(1).max(120) }).nullable().optional(), expiresAt: timestamp.nullable() }),
   z.object({ ...frameBase, t: z.literal("error"), surfaceId: id.optional(), code: z.string().min(1).max(80), message: z.string().max(1000) })
 ]);

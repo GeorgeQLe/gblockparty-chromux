@@ -5,9 +5,14 @@ separate Electron app from legacy Chromux in `../prototype/`: it has a distinct
 package, bundle identifier, user-data directory, architecture, and release
 line.
 
-## Current prerelease: v0.18.0
+## Current prerelease: v0.18.1
 
 This runner-first prerelease includes:
+
+- Production-safe Fleet WebSockets in packaged builds. The Electron main
+  bundle uses `ws`'s built-in JavaScript masking and validation paths, accepts
+  the control plane's durable-history status and stream/reset metadata, and
+  queues the initial terminal dimensions until the attachment socket opens.
 
 - A front-and-center, p-style New Session project search that prioritizes
   registered folders and recent `p_history`, discovers Git projects under `P_BASE` or `~/projects`,

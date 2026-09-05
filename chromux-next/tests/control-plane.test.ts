@@ -26,6 +26,8 @@ describe("GBlockParty control-plane client", () => {
     expect(() => controlPlaneSnapshotSchema.parse({ ...snapshot, apiVersion: "v2" })).toThrow();
     expect(() => surfaceServerFrameSchema.parse({ v: HOST_PROTOCOL_VERSION, t: "output", surfaceId: "surface_one", seq: -1, data: "bad" })).toThrow();
     expect(() => surfaceServerFrameSchema.parse({ v: HOST_PROTOCOL_VERSION, t: "output", surfaceId: "surface_one", seq: 1, data: "😀".repeat(CONTROL_PLANE_LIMITS.terminalChunkBytes / 2) })).toThrow();
+    expect(surfaceServerFrameSchema.parse({ v: HOST_PROTOCOL_VERSION, t: "history_status", surfaceId: "surface_one", streamId: "stream_abcdef12", status: "durable" }).t).toBe("history_status");
+    expect(surfaceServerFrameSchema.parse({ v: HOST_PROTOCOL_VERSION, t: "reset", surfaceId: "surface_one", streamId: "stream_abcdef12", nextSeq: 0, reason: "stream_changed" }).t).toBe("reset");
     expect(() => fleetStateSchema.parse({ enabled: true, connection: "ready", enrollment: { status: "not_enrolled", deviceId: null, deviceLabel: null, endpoint: null, error: null }, refreshedAt: 1, items: [{ workspaceDir: "/private" }], error: null })).toThrow();
   });
 
@@ -53,13 +55,14 @@ describe("GBlockParty control-plane client", () => {
     const events: AttachmentEvent[] = []; client.on("attachment", (event) => events.push(event));
     const fleet = await client.refresh();
     expect(fleet.items).toHaveLength(1); expect(fleet.items[0]).not.toHaveProperty("workspaceDir"); expect(JSON.stringify(fleet)).not.toContain("/Users/private");
-    client.attach("surface_one", "Daemon session");
+    client.attach("surface_one", "Daemon session"); client.resize("surface_one", 111, 31);
     await waitFor(() => connections >= 2 && events.some((event) => event.type === "output" && event.data === "after-gap"));
     expect(received.filter((frame) => frame.t === "attach").map((frame) => frame.sinceSeq)).toEqual([0, 1]);
     expect(events.some((event) => event.type === "state" && event.tab.status === "reconnecting")).toBe(true);
     expect(events.some((event) => event.type === "reset")).toBe(true);
     client.input("surface_one", "ls\r"); client.resize("surface_one", 120, 40); client.detach("surface_one");
     await waitFor(() => received.some((frame) => frame.t === "detach"));
+    expect(received.some((frame) => frame.t === "resize" && frame.cols === 111 && frame.rows === 31)).toBe(true);
     expect(received.map((frame) => frame.t)).toContain("input"); expect(received.map((frame) => frame.t)).toContain("resize"); expect(received.map((frame) => frame.t)).not.toContain("stop");
   });
 
@@ -78,7 +81,10 @@ describe("GBlockParty control-plane client", () => {
     const sockets = new WebSocketServer({ server, path: "/api/v1/control-plane/surfaces/attach" });
     sockets.on("connection", (socket) => socket.on("message", (raw) => {
       const frame = JSON.parse(raw.toString()) as Record<string, unknown>; received.push(frame);
-      if (frame.t === "attach") socket.send(JSON.stringify({ v: HOST_PROTOCOL_VERSION, t: "attached", surfaceId: "surface_one", sessionId: "session_one", hostId: "host_daemon1", authority: "leased", nextSeq: 0 }));
+      if (frame.t === "attach") {
+        socket.send(JSON.stringify({ v: HOST_PROTOCOL_VERSION, t: "attached", surfaceId: "surface_one", sessionId: "session_one", hostId: "host_daemon1", authority: "leased", streamId: "stream_abcdef12", nextSeq: 0 }));
+        socket.send(JSON.stringify({ v: HOST_PROTOCOL_VERSION, t: "history_status", surfaceId: "surface_one", streamId: "stream_abcdef12", status: "durable" }));
+      }
       if (frame.t === "lease_request") {
         const requestCount = received.filter((item) => item.t === "lease_request").length;
         socket.send(JSON.stringify(requestCount === 1

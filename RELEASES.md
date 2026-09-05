@@ -1,5 +1,21 @@
 # Release Notes
 
+## GBlockParty Chromux Next v0.18.1 (prerelease)
+
+Tag: `chromux-next-v0.18.1`
+
+- Prevent packaged Electron Fleet attachments from crashing on their first
+  masked WebSocket frame by keeping `ws` on its built-in JavaScript masking
+  and UTF-8 validation paths instead of bundling empty optional accelerators.
+- Accept the production control plane's bounded stream identifiers, durable
+  history status, and expanded replay-reset reasons without rejecting the
+  connection as an invalid frame.
+- Queue terminal dimensions while an attachment socket is opening and send
+  the latest size immediately after attach, eliminating startup resize IPC
+  errors without weakening validation or authority checks.
+- Retain v0.18.0's project-search usability changes. This successor-only fix
+  remains a prerelease and does not replace legacy `/releases/latest`.
+
 ## GBlockParty Chromux Next v0.18.0 (prerelease)
 
 Tag: `chromux-next-v0.18.0`

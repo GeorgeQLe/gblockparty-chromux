@@ -29,6 +29,7 @@ interface Attachment {
   renewTimer: ReturnType<typeof setInterval> | null;
   expiryTimer: ReturnType<typeof setTimeout> | null;
   leaseId: string | null;
+  pendingResize: { cols: number; rows: number } | null;
   wantsControl: boolean;
   backoffMs: number;
   detached: boolean;
@@ -132,7 +133,7 @@ export class ControlPlaneClient extends EventEmitter {
     const attachment: Attachment = {
       tab: remoteTabSchema.parse({ surfaceId, sessionId: item.sessionId, title: title || item.sessionName, status: "connecting", authority: null, control: "negotiating", leaseHolder: null, leaseExpiresAt: null, lastSeq: 0, resetCount: 0, error: null }),
       socket: null, reconnectTimer: null, heartbeatTimer: null, renewTimer: null, expiryTimer: null,
-      leaseId: null, wantsControl: false, backoffMs: 500, detached: false
+      leaseId: null, pendingResize: null, wantsControl: false, backoffMs: 500, detached: false
     };
     this.attachments.set(surfaceId, attachment); this.emitState(attachment); this.connect(attachment); return structuredClone(attachment.tab);
   }
@@ -169,7 +170,11 @@ export class ControlPlaneClient extends EventEmitter {
     if (attachment.tab.control !== "controlled" && attachment.tab.control !== "unleased") throw new Error("Terminal input is read-only until this device holds the control lease");
     this.send(attachment, { v: HOST_PROTOCOL_VERSION, t: "input", ...value });
   }
-  resize(surfaceId: string, cols: number, rows: number): void { const value = attachmentResizeSchema.parse({ surfaceId, cols, rows }); this.send(this.require(value.surfaceId), { v: HOST_PROTOCOL_VERSION, t: "resize", ...value }); }
+  resize(surfaceId: string, cols: number, rows: number): void {
+    const value = attachmentResizeSchema.parse({ surfaceId, cols, rows }); const attachment = this.require(value.surfaceId);
+    attachment.pendingResize = { cols: value.cols, rows: value.rows };
+    if (attachment.socket?.readyState === WebSocket.OPEN) this.send(attachment, { v: HOST_PROTOCOL_VERSION, t: "resize", ...value });
+  }
   close(): void { for (const surfaceId of [...this.attachments.keys()]) this.detach(surfaceId); }
 
   private connect(attachment: Attachment): void {
@@ -179,6 +184,7 @@ export class ControlPlaneClient extends EventEmitter {
     socket.on("open", () => {
       attachment.backoffMs = 500;
       this.send(attachment, { v: HOST_PROTOCOL_VERSION, t: "attach", surfaceId: attachment.tab.surfaceId, sinceSeq: attachment.tab.lastSeq });
+      if (attachment.pendingResize) this.send(attachment, { v: HOST_PROTOCOL_VERSION, t: "resize", surfaceId: attachment.tab.surfaceId, ...attachment.pendingResize });
       attachment.heartbeatTimer = setInterval(() => { if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ v: HOST_PROTOCOL_VERSION, t: "heartbeat", at: Date.now() })); }, 10_000); attachment.heartbeatTimer.unref();
     });
     socket.on("message", (raw) => this.receive(attachment, raw));
@@ -197,7 +203,9 @@ export class ControlPlaneClient extends EventEmitter {
     const bytes = Array.isArray(raw) ? raw.reduce((sum, part) => sum + part.byteLength, 0) : raw.byteLength;
     if (bytes > CONTROL_PLANE_LIMITS.messageBytes) return attachment.socket?.close(4400, "frame too large");
     let value: unknown; try { value = JSON.parse(raw.toString()); } catch { return attachment.socket?.close(4400, "invalid json"); }
-    const parsed = surfaceServerFrameSchema.safeParse(value); if (!parsed.success) return attachment.socket?.close(4400, "invalid frame"); const frame = parsed.data;
+    const parsed = surfaceServerFrameSchema.safeParse(value);
+    if (!parsed.success) return attachment.socket?.close(4400, "invalid frame");
+    const frame = parsed.data;
     if (frame.t !== "heartbeat" && "surfaceId" in frame && frame.surfaceId && frame.surfaceId !== attachment.tab.surfaceId) return attachment.socket?.close(4403, "wrong surface");
     if (frame.t === "attached") {
       attachment.tab = { ...attachment.tab, status: "connected", authority: frame.authority, control: frame.authority === "unleased" ? "unleased" : "read_only", lastSeq: Math.max(attachment.tab.lastSeq, frame.nextSeq), error: null }; this.emitState(attachment);
