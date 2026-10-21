@@ -1,3 +1,8 @@
+> **Archived 2026-10-21:** Original Chromux (`prototype/`) and Chromux Next
+> (`chromux-next/`) are retired. Chromux v2 is the current development target.
+> The setup, roadmap, version and release guidance below is historical.
+> Use the owner's current v2 checkout for new work.
+
 # GBlockParty Chromux Next
 
 Chromux Next is an experimental, local-first alignment workspace. It is a

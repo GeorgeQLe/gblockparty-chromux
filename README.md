@@ -1,11 +1,14 @@
+> **Archived 2026-10-21:** Original Chromux (`prototype/`) and Chromux Next
+> (`chromux-next/`) are retired. Chromux v2 is the current development target.
+> The setup, roadmap, version and release guidance below is historical.
+> Use the owner's current v2 checkout for new work.
+
 # GBlockParty Chromux
 
 GBlockParty Chromux is an OSS Electron/Chromium desktop front-end for local and GBlockParty-managed agent/browser workspaces.
 
-The current product is [Chromux Next](chromux-next/README.md), located in
-[`chromux-next/`](chromux-next/). All new product work targets Chromux Next by
-default. The app in [`prototype/`](prototype/) is legacy and maintenance-only;
-work there requires an explicit legacy request.
+This archive preserves both [Chromux Next](chromux-next/README.md) and the
+[original prototype](prototype/README.md). Neither is an active development target.
 
 ## Quickstart
 
